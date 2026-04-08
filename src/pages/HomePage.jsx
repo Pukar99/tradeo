@@ -21,6 +21,7 @@ function HomePage() {
         <StockCard name="NIC ASIA Bank" symbol="NICA"  price="890"   change={-1.2} volume="8,200"  sector="Banking" />
         <StockCard name="HDFC Bank"     symbol="HDFCB" price="2,100" change={0.8}  volume="15,800" sector="Banking" />
       </div>
+      <p className="text-sm text-gray-500">Built by Pukar Sharma</p>
     </div>
   )
 }
