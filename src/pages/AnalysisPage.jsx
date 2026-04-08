@@ -1,4 +1,5 @@
 import TopMovers from '../components/TopMovers'
+import NEPSEChart from '../components/NEPSEChart'
 
 function AnalysisPage() {
   return (
@@ -7,17 +8,23 @@ function AnalysisPage() {
         NEPSE Analysis
       </h1>
 
+      <NEPSEChart />
+
       <TopMovers />
 
       <div className="grid grid-cols-2 gap-4 mt-6">
         <div className="bg-white rounded-xl p-6 shadow-sm">
-          <h3 className="text-lg font-semibold text-gray-900">Technical Chart</h3>
+          <h3 className="text-lg font-semibold text-gray-900">
+            Technical Chart
+          </h3>
           <p className="text-sm text-gray-500 mt-2">
             Visit nepsealpha.com for interactive charts
           </p>
         </div>
         <div className="bg-white rounded-xl p-6 shadow-sm">
-          <h3 className="text-lg font-semibold text-gray-900">Market Breadth</h3>
+          <h3 className="text-lg font-semibold text-gray-900">
+            Market Breadth
+          </h3>
           <p className="text-sm text-gray-500 mt-2">
             How many stocks went up vs down — coming soon
           </p>

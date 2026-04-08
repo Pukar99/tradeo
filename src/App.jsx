@@ -6,6 +6,7 @@ import PortfolioPage from './pages/PortfolioPage'
 import NotFoundPage from './pages/NotFoundPage'
 import LoginPage from './pages/LoginPage'
 import SignupPage from './pages/SignupPage'
+import TraderPage from './pages/TraderPage'
 
 function App() {
   return (
@@ -16,6 +17,7 @@ function App() {
           <Route path="/" element={<HomePage />} />
           <Route path="/analysis" element={<AnalysisPage />} />
           <Route path="/portfolio" element={<PortfolioPage />} />
+          <Route path="/trader" element={<TraderPage />} />
           <Route path="/login" element={<LoginPage />} />
           <Route path="/signup" element={<SignupPage />} />
           <Route path="*" element={<NotFoundPage />} />
