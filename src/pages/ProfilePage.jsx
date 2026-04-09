@@ -16,7 +16,7 @@ function StatCard({ label, value, color = 'text-gray-900 dark:text-white', sub }
 }
 
 function ProfilePage() {
-  const { user, login } = useAuth()
+const { user, login, updateUser } = useAuth()
   const navigate = useNavigate()
   const fileInputRef = useRef(null)
   const [profile, setProfile] = useState(null)
@@ -54,26 +54,25 @@ function ProfilePage() {
     }
   }
 
-  const handleAvatarUpload = async (e) => {
-    const file = e.target.files[0]
-    if (!file) return
-    setUploadingAvatar(true)
-    try {
-      const formData = new FormData()
-      formData.append('avatar', file)
-      const res = await uploadAvatar(formData)
-      setProfile(prev => ({
-        ...prev,
-        user: { ...prev.user, avatar_url: res.data.avatar_url }
-      }))
-      const token = localStorage.getItem('token')
-      login({ ...user, avatar_url: res.data.avatar_url }, token)
-    } catch (err) {
-      console.error(err)
-    } finally {
-      setUploadingAvatar(false)
-    }
+ const handleAvatarUpload = async (e) => {
+  const file = e.target.files[0]
+  if (!file) return
+  setUploadingAvatar(true)
+  try {
+    const formData = new FormData()
+    formData.append('avatar', file)
+    const res = await uploadAvatar(formData)
+    setProfile(prev => ({
+      ...prev,
+      user: { ...prev.user, avatar_url: res.data.avatar_url }
+    }))
+    updateUser({ avatar_url: res.data.avatar_url })
+  } catch (err) {
+    console.error(err)
+  } finally {
+    setUploadingAvatar(false)
   }
+}
 
   const handleSave = async () => {
     setSaving(true)
