@@ -1,3 +1,25 @@
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
+/* BlockNote dark theme fix */
+.dark .bn-editor {
+  background-color: #111827 !important;
+  color: #f3f4f6 !important;
+}
+
+.dark .bn-container {
+  background-color: #111827 !important;
+}
+
+.dark [class*="bn-"] {
+  --bn-colors-editor-background: #111827 !important;
+  --bn-colors-editor-text: #f3f4f6 !important;
+  --bn-colors-menu-background: #1f2937 !important;
+  --bn-colors-tooltip-background: #1f2937 !important;
+  --bn-colors-hovered-background: #1f2937 !important;
+  --bn-colors-selected-background: #374151 !important;
+  --bn-colors-disabled-background: #1f2937 !important;
+  --bn-colors-shadow: rgba(0, 0, 0, 0.3) !important;
+  --bn-colors-border: #374151 !important;
+  --bn-colors-side-menu: #9ca3af !important;
+}

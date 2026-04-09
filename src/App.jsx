@@ -7,6 +7,9 @@ import NotFoundPage from './pages/NotFoundPage'
 import LoginPage from './pages/LoginPage'
 import SignupPage from './pages/SignupPage'
 import TraderPage from './pages/TraderPage'
+import ResearchPage from './pages/ResearchPage'
+import ResearchEditorPage from './pages/ResearchEditorPage'
+import ResearchViewPage from './pages/ResearchViewPage'
 
 function App() {
   return (
@@ -18,6 +21,10 @@ function App() {
           <Route path="/analysis" element={<AnalysisPage />} />
           <Route path="/portfolio" element={<PortfolioPage />} />
           <Route path="/trader" element={<TraderPage />} />
+          <Route path="/research" element={<ResearchPage />} />
+          <Route path="/research/new" element={<ResearchEditorPage />} />
+          <Route path="/research/edit/:id" element={<ResearchEditorPage />} />
+          <Route path="/research/:id" element={<ResearchViewPage />} />
           <Route path="/login" element={<LoginPage />} />
           <Route path="/signup" element={<SignupPage />} />
           <Route path="*" element={<NotFoundPage />} />

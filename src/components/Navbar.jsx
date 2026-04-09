@@ -8,6 +8,7 @@ const NAV_LINKS = [
   { path: '/analysis', label: 'Analysis' },
   { path: '/trader', label: 'Trader' },
   { path: '/portfolio', label: 'Portfolio' },
+  { path: '/research', label: 'Research' },
 ]
 
 function Navbar() {

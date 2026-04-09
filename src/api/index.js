@@ -43,3 +43,18 @@ export const removeFromWatchlist = (id) => API.delete(`/api/dashboard/watchlist/
 export const getMindset = () => API.get('/api/dashboard/mindset')
 export const saveMindset = (content) => API.post('/api/dashboard/mindset', { content })
 export const getStockPrice = (symbol) => API.get(`/api/market/stock-price/${symbol}`)
+export const getResearchPosts = () => API.get('/api/research/posts')
+export const getResearchPost = (id) => API.get(`/api/research/posts/${id}`)
+export const getMyResearchPosts = () => API.get('/api/research/my-posts')
+export const getResearchEligibility = () => API.get('/api/research/eligibility')
+export const createResearchPost = (data) => API.post('/api/research/posts', data)
+export const updateResearchPost = (id, data) => API.put(`/api/research/posts/${id}`, data)
+export const deleteResearchPost = (id) => API.delete(`/api/research/posts/${id}`)
+export const verifyResearchPost = (id) => API.post(`/api/research/posts/${id}/verify`)
+export const pinResearchPost = (id) => API.post(`/api/research/posts/${id}/pin`)
+export const addResearchComment = (data) => API.post('/api/research/comments', data)
+export const deleteResearchComment = (id) => API.delete(`/api/research/comments/${id}`)
+export const getAdminPending = () => API.get('/api/research/admin/pending')
+export const uploadResearchFile = (formData) => API.post('/api/research/upload', formData, {
+  headers: { 'Content-Type': 'multipart/form-data' }
+})
