@@ -11,7 +11,9 @@ function TraderPage() {
   if (!user) {
     return (
       <div className="max-w-5xl mx-auto px-4 py-6 text-center">
-        <p className="text-gray-500 mb-4">Please login to access Trader's Screen</p>
+        <p className="text-gray-500 dark:text-gray-400 mb-4">
+          Please login to access Trader's Screen
+        </p>
         <Link to="/login" className="text-blue-600 hover:underline">
           Go to Login
         </Link>
@@ -21,7 +23,7 @@ function TraderPage() {
 
   return (
     <div className="max-w-5xl mx-auto px-4 py-6">
-      <h1 className="text-3xl font-bold text-gray-900 mb-6">
+      <h1 className="text-3xl font-bold text-gray-900 dark:text-white mb-6">
         Trader's Screen
       </h1>
 
@@ -31,7 +33,7 @@ function TraderPage() {
           className={`px-4 py-2 rounded-lg text-sm font-medium transition-colors ${
             activeTab === 'trades'
               ? 'bg-blue-600 text-white'
-              : 'bg-white text-gray-600 border border-gray-200 hover:bg-gray-50'
+              : 'bg-white dark:bg-gray-800 text-gray-600 dark:text-gray-300 border border-gray-200 dark:border-gray-700 hover:bg-gray-50 dark:hover:bg-gray-700'
           }`}
         >
           Trade Log
@@ -41,7 +43,7 @@ function TraderPage() {
           className={`px-4 py-2 rounded-lg text-sm font-medium transition-colors ${
             activeTab === 'journal'
               ? 'bg-blue-600 text-white'
-              : 'bg-white text-gray-600 border border-gray-200 hover:bg-gray-50'
+              : 'bg-white dark:bg-gray-800 text-gray-600 dark:text-gray-300 border border-gray-200 dark:border-gray-700 hover:bg-gray-50 dark:hover:bg-gray-700'
           }`}
         >
           Journal

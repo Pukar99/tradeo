@@ -4,7 +4,7 @@ import NEPSEChart from '../components/NEPSEChart'
 function AnalysisPage() {
   return (
     <div className="max-w-5xl mx-auto px-4 py-6">
-      <h1 className="text-3xl font-bold text-gray-900 mb-6">
+      <h1 className="text-3xl font-bold text-gray-900 dark:text-white mb-6">
         NEPSE Analysis
       </h1>
 
@@ -13,19 +13,19 @@ function AnalysisPage() {
       <TopMovers />
 
       <div className="grid grid-cols-2 gap-4 mt-6">
-        <div className="bg-white rounded-xl p-6 shadow-sm">
-          <h3 className="text-lg font-semibold text-gray-900">
+        <div className="bg-white dark:bg-gray-800 rounded-xl p-6 shadow-sm">
+          <h3 className="text-lg font-semibold text-gray-900 dark:text-white">
             Technical Chart
           </h3>
-          <p className="text-sm text-gray-500 mt-2">
+          <p className="text-sm text-gray-500 dark:text-gray-400 mt-2">
             Visit nepsealpha.com for interactive charts
           </p>
         </div>
-        <div className="bg-white rounded-xl p-6 shadow-sm">
-          <h3 className="text-lg font-semibold text-gray-900">
+        <div className="bg-white dark:bg-gray-800 rounded-xl p-6 shadow-sm">
+          <h3 className="text-lg font-semibold text-gray-900 dark:text-white">
             Market Breadth
           </h3>
-          <p className="text-sm text-gray-500 mt-2">
+          <p className="text-sm text-gray-500 dark:text-gray-400 mt-2">
             How many stocks went up vs down — coming soon
           </p>
         </div>

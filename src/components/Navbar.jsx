@@ -1,8 +1,10 @@
 import { Link } from 'react-router-dom'
 import { useAuth } from '../context/AuthContext'
+import { useTheme } from '../context/ThemeContext'
 
 function Navbar() {
   const { user, logout } = useAuth()
+  const { isDark, toggleTheme } = useTheme()
 
   return (
     <nav className="bg-gray-900 text-white px-6 py-4 flex justify-between items-center">
@@ -27,6 +29,15 @@ function Navbar() {
           <Link to="/portfolio" className="text-gray-300 hover:text-white hover:underline text-sm">
             Portfolio
           </Link>
+        </li>
+        <li>
+          <button
+            onClick={toggleTheme}
+            className="text-gray-300 hover:text-white text-lg transition-colors"
+            title={isDark ? 'Switch to Light' : 'Switch to Dark'}
+          >
+            {isDark ? '☀️' : '🌙'}
+          </button>
         </li>
         {user ? (
           <>

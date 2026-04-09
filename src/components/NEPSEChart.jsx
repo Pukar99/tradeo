@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from 'react'
 import axios from 'axios'
+import { useTheme } from '../context/ThemeContext'
 
 const ranges = [
   { label: '1M', value: '1m' },
@@ -15,6 +16,7 @@ function NEPSEChart() {
   const chartRef = useRef(null)
   const seriesRef = useRef(null)
   const moversRef = useRef({})
+  const { isDark } = useTheme()
   const [range, setRange] = useState('1y')
   const [loading, setLoading] = useState(true)
   const [stats, setStats] = useState(null)
@@ -42,15 +44,19 @@ function NEPSEChart() {
           width: width,
           height: 350,
           layout: {
-            background: { color: '#ffffff' },
-            textColor: '#374151',
+            background: { color: isDark ? '#1f2937' : '#ffffff' },
+            textColor: isDark ? '#d1d5db' : '#374151',
           },
           grid: {
-            vertLines: { color: '#f3f4f6' },
-            horzLines: { color: '#f3f4f6' },
+            vertLines: { color: isDark ? '#374151' : '#f3f4f6' },
+            horzLines: { color: isDark ? '#374151' : '#f3f4f6' },
           },
-          rightPriceScale: { borderColor: '#e5e7eb' },
-          timeScale: { borderColor: '#e5e7eb' },
+          rightPriceScale: {
+            borderColor: isDark ? '#4b5563' : '#e5e7eb'
+          },
+          timeScale: {
+            borderColor: isDark ? '#4b5563' : '#e5e7eb'
+          },
         })
 
         const candleSeries = chart.addCandlestickSeries({
@@ -113,7 +119,7 @@ function NEPSEChart() {
         seriesRef.current = null
       }
     }
-  }, [])
+  }, [isDark])
 
   useEffect(() => {
     if (!chartReady) return
@@ -166,22 +172,22 @@ function NEPSEChart() {
   const isPeriodPositive = parseFloat(stats?.periodChange) >= 0
 
   return (
-    <div className="bg-white rounded-xl p-4 shadow-sm">
+    <div className="bg-white dark:bg-gray-800 rounded-xl p-4 shadow-sm">
       <div className="flex justify-between items-start mb-3">
         <div>
           <div className="flex items-center gap-2">
-            <h2 className="text-lg font-semibold text-gray-900">
+            <h2 className="text-lg font-semibold text-gray-900 dark:text-white">
               NEPSE Index
             </h2>
             {latestDate && (
-              <span className="text-xs text-gray-400 bg-gray-100 px-2 py-0.5 rounded-full">
+              <span className="text-xs text-gray-400 bg-gray-100 dark:bg-gray-700 px-2 py-0.5 rounded-full">
                 Data up to {latestDate}
               </span>
             )}
           </div>
           {stats && (
             <div className="flex items-center gap-3 mt-1 flex-wrap">
-              <span className="text-2xl font-bold text-gray-900">
+              <span className="text-2xl font-bold text-gray-900 dark:text-white">
                 {stats.last.toFixed(2)}
               </span>
               <span className={`text-sm font-medium px-2 py-0.5 rounded-full ${
@@ -192,12 +198,12 @@ function NEPSEChart() {
                 {isPositive ? '+' : ''}{stats.change}% last day
               </span>
               <span className={`text-xs font-medium px-2 py-0.5 rounded-full ${
-              isPeriodPositive
-                ? 'bg-green-50 text-green-600'
-                : 'bg-red-50 text-red-500'
-            }`}>
-              {isPeriodPositive ? '+' : ''}{stats.periodChange}% ({range.toUpperCase()})
-            </span>
+                isPeriodPositive
+                  ? 'bg-green-50 text-green-600'
+                  : 'bg-red-50 text-red-500'
+              }`}>
+                {isPeriodPositive ? '+' : ''}{stats.periodChange}% ({range.toUpperCase()})
+              </span>
             </div>
           )}
         </div>
@@ -209,7 +215,7 @@ function NEPSEChart() {
               className={`px-2 py-1 rounded text-xs font-medium transition-colors ${
                 range === r.value
                   ? 'bg-blue-600 text-white'
-                  : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
+                  : 'bg-gray-100 dark:bg-gray-700 text-gray-600 dark:text-gray-300 hover:bg-gray-200 dark:hover:bg-gray-600'
               }`}
             >
               {r.label}
@@ -220,12 +226,12 @@ function NEPSEChart() {
 
       {stats && (
         <div className="flex gap-4 mb-2">
-          <span className="text-xs text-gray-500">
+          <span className="text-xs text-gray-500 dark:text-gray-400">
             High: <span className="text-green-600 font-medium">
               {stats.high.toFixed(2)}
             </span>
           </span>
-          <span className="text-xs text-gray-500">
+          <span className="text-xs text-gray-500 dark:text-gray-400">
             Low: <span className="text-red-500 font-medium">
               {stats.low.toFixed(2)}
             </span>
@@ -236,7 +242,7 @@ function NEPSEChart() {
       <div className="relative" style={{ minHeight: '350px' }}>
         {loading && (
           <div
-            className="absolute inset-0 flex items-center justify-center bg-white z-10"
+            className="absolute inset-0 flex items-center justify-center bg-white dark:bg-gray-800 z-10"
             style={{ minHeight: '350px' }}
           >
             <p className="text-sm text-gray-400">Loading chart...</p>
@@ -270,8 +276,8 @@ function NEPSEChart() {
         )}
 
         {hoveredMovers && (
-          <div className="absolute top-2 right-2 bg-white border border-gray-200 rounded-lg p-3 text-xs z-20 pointer-events-none shadow-lg w-64">
-            <p className="font-semibold text-gray-700 mb-2">
+          <div className="absolute top-2 right-2 bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-600 rounded-lg p-3 text-xs z-20 pointer-events-none shadow-lg w-64">
+            <p className="font-semibold text-gray-700 dark:text-gray-200 mb-2">
               Top Movers — {tooltip?.date}
             </p>
             <div className="grid grid-cols-2 gap-2">
@@ -279,7 +285,9 @@ function NEPSEChart() {
                 <p className="text-green-600 font-medium mb-1">Gainers</p>
                 {hoveredMovers.gainers?.slice(0, 5).map((s, i) => (
                   <div key={i} className="flex justify-between gap-1">
-                    <span className="text-gray-700 font-medium">{s.s}</span>
+                    <span className="text-gray-700 dark:text-gray-300 font-medium">
+                      {s.s}
+                    </span>
                     <span className="text-green-500">+{s.p}%</span>
                   </div>
                 ))}
@@ -288,7 +296,9 @@ function NEPSEChart() {
                 <p className="text-red-500 font-medium mb-1">Losers</p>
                 {hoveredMovers.losers?.slice(0, 5).map((s, i) => (
                   <div key={i} className="flex justify-between gap-1">
-                    <span className="text-gray-700 font-medium">{s.s}</span>
+                    <span className="text-gray-700 dark:text-gray-300 font-medium">
+                      {s.s}
+                    </span>
                     <span className="text-red-500">{s.p}%</span>
                   </div>
                 ))}

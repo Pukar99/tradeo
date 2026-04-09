@@ -1,38 +1,57 @@
-import { useState } from 'react'
-
-const STARTING_INDEX = 2100
+import { useState, useEffect } from 'react'
+import axios from 'axios'
 
 function NEPSEIndex() {
-  const [index, setIndex] = useState(STARTING_INDEX)
-  const [count, setCount] = useState(0)
+  const [data, setData] = useState(null)
+  const [loading, setLoading] = useState(true)
+
+  useEffect(() => {
+    axios.get('http://localhost:5000/api/market/nepse-chart?range=1m')
+      .then(res => {
+        const chartData = res.data.data
+        if (chartData.length > 0) {
+          const last = chartData[chartData.length - 1]
+          const prev = chartData[chartData.length - 2]
+          const change = prev
+            ? ((last.close - prev.close) / prev.close * 100).toFixed(2)
+            : '0.00'
+          setData({
+            close: last.close,
+            change,
+            date: last.time
+          })
+        }
+      })
+      .catch(() => {})
+      .finally(() => setLoading(false))
+  }, [])
+
+  if (loading) return (
+    <div className="bg-white dark:bg-gray-800 rounded-xl p-4 shadow-sm w-52">
+      <p className="text-sm text-gray-400">Loading...</p>
+    </div>
+  )
+
+  const isPositive = parseFloat(data?.change) >= 0
 
   return (
-    <div className="bg-white rounded-xl p-4 shadow-sm w-52">
-      <h3 className="text-lg font-semibold text-gray-900">NEPSE Index</h3>
-      <h1 className={`text-4xl font-bold mt-1 ${index >= STARTING_INDEX ? 'text-green-500' : 'text-red-500'}`}>
-        {index}
+    <div className="bg-white dark:bg-gray-800 rounded-xl p-4 shadow-sm w-52">
+      <h3 className="text-sm font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wide">
+        NEPSE Index
+      </h3>
+      <h1 className={`text-3xl font-bold mt-1 ${
+        isPositive ? 'text-green-500' : 'text-red-500'
+      }`}>
+        {data?.close?.toFixed(2) || '—'}
       </h1>
-      <p className="text-sm text-gray-500 mt-1">Moves: {count}</p>
-      <div className="flex gap-2 mt-4">
-        <button
-          onClick={() => { setIndex(index + 10); setCount(count + 1) }}
-          className="bg-green-500 text-white px-3 py-1 rounded-lg text-sm font-medium"
-        >
-          UP
-        </button>
-        <button
-          onClick={() => { setIndex(index - 10); setCount(count + 1) }}
-          className="bg-red-500 text-white px-3 py-1 rounded-lg text-sm font-medium"
-        >
-          DOWN
-        </button>
-        <button
-          onClick={() => { setIndex(STARTING_INDEX); setCount(0) }}
-          className="bg-gray-200 text-gray-700 px-3 py-1 rounded-lg text-sm font-medium"
-        >
-          RESET
-        </button>
-      </div>
+      <p className={`text-sm font-medium mt-1 ${
+        isPositive ? 'text-green-500' : 'text-red-500'
+      }`}>
+        {isPositive ? '+' : ''}{data?.change}% last day
+      </p>
+      <p className="text-xs text-gray-400 mt-1">
+        As of {data?.date}
+      </p>
     </div>
   )
 }

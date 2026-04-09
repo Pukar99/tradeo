@@ -30,11 +30,13 @@ function TopMovers() {
   const handleToday = () => setSelectedDate(latestDate)
 
   return (
-    <div className="bg-white rounded-xl p-4 shadow-sm mt-6">
+    <div className="bg-white dark:bg-gray-800 rounded-xl p-4 shadow-sm mt-6">
 
       <div className="flex justify-between items-center mb-4">
         <div>
-          <h2 className="text-lg font-semibold text-gray-900">Top Movers</h2>
+          <h2 className="text-lg font-semibold text-gray-900 dark:text-white">
+            Top Movers
+          </h2>
           {data && (
             <p className="text-xs text-gray-400">
               {data.total} stocks traded on {selectedDate}
@@ -42,15 +44,15 @@ function TopMovers() {
           )}
         </div>
         <div className="flex gap-2 items-center">
-            <select
+          <select
             value={selectedDate}
             onChange={e => setSelectedDate(e.target.value)}
-            className="border border-gray-200 rounded-lg px-2 py-1 text-sm text-gray-700 focus:outline-none focus:border-blue-500 max-w-36"
-            >
+            className="border border-gray-200 dark:border-gray-600 dark:bg-gray-700 dark:text-white rounded-lg px-2 py-1 text-sm text-gray-700 focus:outline-none focus:border-blue-500 max-w-36"
+          >
             {dates.map(d => (
-                <option key={d} value={d}>{d}</option>
+              <option key={d} value={d}>{d}</option>
             ))}
-            </select>
+          </select>
           <button
             onClick={handleToday}
             className="bg-blue-600 text-white px-3 py-1 rounded-lg text-sm hover:bg-blue-700"
@@ -71,7 +73,7 @@ function TopMovers() {
             </h3>
             <table className="w-full text-sm">
               <thead>
-                <tr className="text-xs text-gray-400 border-b">
+                <tr className="text-xs text-gray-400 border-b dark:border-gray-700">
                   <th className="text-left py-1">Symbol</th>
                   <th className="text-right py-1">Price</th>
                   <th className="text-right py-1">Change</th>
@@ -79,11 +81,14 @@ function TopMovers() {
               </thead>
               <tbody>
                 {data?.gainers.map((stock, i) => (
-                  <tr key={i} className="border-b border-gray-50 hover:bg-gray-50">
-                    <td className="py-1 font-medium text-gray-900">
+                  <tr
+                    key={i}
+                    className="border-b border-gray-50 dark:border-gray-700 hover:bg-gray-50 dark:hover:bg-gray-700"
+                  >
+                    <td className="py-1 font-medium text-gray-900 dark:text-white">
                       {stock.s}
                     </td>
-                    <td className="py-1 text-right text-gray-600">
+                    <td className="py-1 text-right text-gray-600 dark:text-gray-300">
                       {stock.c.toLocaleString()}
                     </td>
                     <td className="py-1 text-right text-green-500 font-medium">
@@ -101,7 +106,7 @@ function TopMovers() {
             </h3>
             <table className="w-full text-sm">
               <thead>
-                <tr className="text-xs text-gray-400 border-b">
+                <tr className="text-xs text-gray-400 border-b dark:border-gray-700">
                   <th className="text-left py-1">Symbol</th>
                   <th className="text-right py-1">Price</th>
                   <th className="text-right py-1">Change</th>
@@ -109,11 +114,14 @@ function TopMovers() {
               </thead>
               <tbody>
                 {data?.losers.map((stock, i) => (
-                  <tr key={i} className="border-b border-gray-50 hover:bg-gray-50">
-                    <td className="py-1 font-medium text-gray-900">
+                  <tr
+                    key={i}
+                    className="border-b border-gray-50 dark:border-gray-700 hover:bg-gray-50 dark:hover:bg-gray-700"
+                  >
+                    <td className="py-1 font-medium text-gray-900 dark:text-white">
                       {stock.s}
                     </td>
-                    <td className="py-1 text-right text-gray-600">
+                    <td className="py-1 text-right text-gray-600 dark:text-gray-300">
                       {stock.c.toLocaleString()}
                     </td>
                     <td className="py-1 text-right text-red-500 font-medium">
