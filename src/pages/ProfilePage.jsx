@@ -1,7 +1,7 @@
 import { useState, useEffect, useRef } from 'react'
 import { useAuth } from '../context/AuthContext'
 import { useNavigate } from 'react-router-dom'
-import { getProfile, updateProfile, uploadAvatar } from '../api'
+import { getProfile, updateProfile, uploadAvatar, changePassword } from '../api'
 
 const ADMIN_USER_ID = 1
 
@@ -16,7 +16,7 @@ function StatCard({ label, value, color = 'text-gray-900 dark:text-white', sub }
 }
 
 function ProfilePage() {
-const { user, login, updateUser } = useAuth()
+  const { user, updateUser } = useAuth()
   const navigate = useNavigate()
   const fileInputRef = useRef(null)
   const [profile, setProfile] = useState(null)
@@ -31,6 +31,15 @@ const { user, login, updateUser } = useAuth()
     location: '',
     trading_since: ''
   })
+  const [showPasswordForm, setShowPasswordForm] = useState(false)
+  const [passwordForm, setPasswordForm] = useState({
+    currentPassword: '',
+    newPassword: '',
+    confirmPassword: ''
+  })
+  const [passwordError, setPasswordError] = useState('')
+  const [passwordSuccess, setPasswordSuccess] = useState('')
+  const [savingPassword, setSavingPassword] = useState(false)
 
   useEffect(() => {
     if (!user) { navigate('/login'); return }
@@ -54,38 +63,70 @@ const { user, login, updateUser } = useAuth()
     }
   }
 
- const handleAvatarUpload = async (e) => {
-  const file = e.target.files[0]
-  if (!file) return
-  setUploadingAvatar(true)
-  try {
-    const formData = new FormData()
-    formData.append('avatar', file)
-    const res = await uploadAvatar(formData)
-    setProfile(prev => ({
-      ...prev,
-      user: { ...prev.user, avatar_url: res.data.avatar_url }
-    }))
-    updateUser({ avatar_url: res.data.avatar_url })
-  } catch (err) {
-    console.error(err)
-  } finally {
-    setUploadingAvatar(false)
+  const handleAvatarUpload = async (e) => {
+    const file = e.target.files[0]
+    if (!file) return
+    setUploadingAvatar(true)
+    try {
+      const formData = new FormData()
+      formData.append('avatar', file)
+      const res = await uploadAvatar(formData)
+      setProfile(prev => ({
+        ...prev,
+        user: { ...prev.user, avatar_url: res.data.avatar_url }
+      }))
+      updateUser({ avatar_url: res.data.avatar_url })
+    } catch (err) {
+      console.error(err)
+    } finally {
+      setUploadingAvatar(false)
+    }
   }
-}
 
   const handleSave = async () => {
     setSaving(true)
     try {
       const res = await updateProfile(form)
       setProfile(prev => ({ ...prev, user: { ...prev.user, ...res.data } }))
-      const token = localStorage.getItem('token')
-      login({ ...user, name: form.name }, token)
+      updateUser({ name: form.name })
       setEditing(false)
     } catch (err) {
       console.error(err)
     } finally {
       setSaving(false)
+    }
+  }
+
+  const handleChangePassword = async (e) => {
+    e.preventDefault()
+    setPasswordError('')
+    setPasswordSuccess('')
+
+    if (passwordForm.newPassword !== passwordForm.confirmPassword) {
+      setPasswordError('New passwords do not match')
+      return
+    }
+    if (passwordForm.newPassword.length < 6) {
+      setPasswordError('Password must be at least 6 characters')
+      return
+    }
+
+    setSavingPassword(true)
+    try {
+      await changePassword({
+        currentPassword: passwordForm.currentPassword,
+        newPassword: passwordForm.newPassword
+      })
+      setPasswordSuccess('Password changed successfully!')
+      setPasswordForm({ currentPassword: '', newPassword: '', confirmPassword: '' })
+      setTimeout(() => {
+        setShowPasswordForm(false)
+        setPasswordSuccess('')
+      }, 2000)
+    } catch (err) {
+      setPasswordError(err.response?.data?.message || 'Failed to change password')
+    } finally {
+      setSavingPassword(false)
     }
   }
 
@@ -136,19 +177,13 @@ const { user, login, updateUser } = useAuth()
         <div className="relative p-8">
           <div className="flex items-start justify-between flex-wrap gap-4">
             <div className="flex items-center gap-6">
-              <div className="relative group">
+              <div className="relative">
                 <div className="w-24 h-24 rounded-2xl overflow-hidden border-4 border-white border-opacity-20 shadow-xl">
                   {profile.user.avatar_url ? (
-                    <img
-                      src={profile.user.avatar_url}
-                      alt={profile.user.name}
-                      className="w-full h-full object-cover"
-                    />
+                    <img src={profile.user.avatar_url} alt={profile.user.name} className="w-full h-full object-cover" />
                   ) : (
                     <div className="w-full h-full bg-gradient-to-br from-blue-500 to-purple-600 flex items-center justify-center">
-                      <span className="text-white text-3xl font-bold">
-                        {getInitials(profile.user.name)}
-                      </span>
+                      <span className="text-white text-3xl font-bold">{getInitials(profile.user.name)}</span>
                     </div>
                   )}
                 </div>
@@ -166,20 +201,12 @@ const { user, login, updateUser } = useAuth()
                     </svg>
                   )}
                 </button>
-                <input
-                  ref={fileInputRef}
-                  type="file"
-                  accept="image/*"
-                  onChange={handleAvatarUpload}
-                  className="hidden"
-                />
+                <input ref={fileInputRef} type="file" accept="image/*" onChange={handleAvatarUpload} className="hidden" />
               </div>
 
               <div>
                 <div className="flex items-center gap-3 flex-wrap mb-1">
-                  <h1 className="text-2xl font-bold text-white">
-                    {profile.user.name}
-                  </h1>
+                  <h1 className="text-2xl font-bold text-white">{profile.user.name}</h1>
                   {isAdmin && (
                     <span className="bg-yellow-500 text-yellow-900 text-xs font-bold px-2 py-0.5 rounded-full">
                       👑 Admin
@@ -191,37 +218,19 @@ const { user, login, updateUser } = useAuth()
                     </span>
                   )}
                 </div>
-                <p className="text-gray-400 text-sm mb-2">
-                  {profile.user.email}
-                </p>
+                <p className="text-gray-400 text-sm mb-2">{profile.user.email}</p>
                 <div className="flex items-center gap-4 flex-wrap">
-                  <span className={`text-sm font-medium ${level.color}`}>
-                    {level.icon} {level.label} Trader
-                  </span>
-                  {profile.user.location && (
-                    <span className="text-gray-400 text-xs flex items-center gap-1">
-                      📍 {profile.user.location}
-                    </span>
-                  )}
-                  {profile.user.trading_since && (
-                    <span className="text-gray-400 text-xs flex items-center gap-1">
-                      📅 Trading since {profile.user.trading_since}
-                    </span>
-                  )}
-                  <span className="text-gray-500 text-xs">
-                    Member since {formatDate(profile.user.created_at)}
-                  </span>
+                  <span className={`text-sm font-medium ${level.color}`}>{level.icon} {level.label} Trader</span>
+                  {profile.user.location && <span className="text-gray-400 text-xs">📍 {profile.user.location}</span>}
+                  {profile.user.trading_since && <span className="text-gray-400 text-xs">📅 Trading since {profile.user.trading_since}</span>}
+                  <span className="text-gray-500 text-xs">Member since {formatDate(profile.user.created_at)}</span>
                 </div>
-                {profile.user.bio && (
-                  <p className="text-gray-300 text-sm mt-2 max-w-md">
-                    {profile.user.bio}
-                  </p>
-                )}
+                {profile.user.bio && <p className="text-gray-300 text-sm mt-2 max-w-md">{profile.user.bio}</p>}
               </div>
             </div>
 
             <button
-              onClick={() => setEditing(!editing)}
+              onClick={() => { setEditing(!editing); setShowPasswordForm(false) }}
               className={`px-4 py-2 rounded-xl text-sm font-medium transition-colors ${
                 editing
                   ? 'bg-gray-700 text-gray-300 hover:bg-gray-600'
@@ -244,15 +253,11 @@ const { user, login, updateUser } = useAuth()
               <p className="text-xs text-gray-400 mt-1">Win Rate</p>
             </div>
             <div className="bg-white bg-opacity-5 rounded-xl p-3 text-center border border-white border-opacity-10">
-              <p className="text-2xl font-bold text-blue-400">
-                🔥 {profile.discipline.streak}
-              </p>
+              <p className="text-2xl font-bold text-blue-400">🔥 {profile.discipline.streak}</p>
               <p className="text-xs text-gray-400 mt-1">Day Streak</p>
             </div>
             <div className="bg-white bg-opacity-5 rounded-xl p-3 text-center border border-white border-opacity-10">
-              <p className="text-2xl font-bold text-purple-400">
-                {profile.research.totalPosts}
-              </p>
+              <p className="text-2xl font-bold text-purple-400">{profile.research.totalPosts}</p>
               <p className="text-xs text-gray-400 mt-1">Research Posts</p>
             </div>
           </div>
@@ -261,14 +266,11 @@ const { user, login, updateUser } = useAuth()
 
       {editing && (
         <div className="bg-white dark:bg-gray-800 rounded-2xl p-6 mb-6 shadow-sm border border-gray-100 dark:border-gray-700">
-          <h2 className="text-base font-semibold text-gray-900 dark:text-white mb-4">
-            Edit Profile
-          </h2>
+          <h2 className="text-base font-semibold text-gray-900 dark:text-white mb-4">Edit Profile</h2>
+
           <div className="grid grid-cols-2 gap-4 mb-4">
             <div>
-              <label className="block text-xs text-gray-500 dark:text-gray-400 mb-1">
-                Full Name
-              </label>
+              <label className="block text-xs text-gray-500 dark:text-gray-400 mb-1">Full Name</label>
               <input
                 type="text"
                 value={form.name}
@@ -277,9 +279,7 @@ const { user, login, updateUser } = useAuth()
               />
             </div>
             <div>
-              <label className="block text-xs text-gray-500 dark:text-gray-400 mb-1">
-                Location
-              </label>
+              <label className="block text-xs text-gray-500 dark:text-gray-400 mb-1">Location</label>
               <input
                 type="text"
                 value={form.location}
@@ -289,9 +289,7 @@ const { user, login, updateUser } = useAuth()
               />
             </div>
             <div>
-              <label className="block text-xs text-gray-500 dark:text-gray-400 mb-1">
-                Trading Since
-              </label>
+              <label className="block text-xs text-gray-500 dark:text-gray-400 mb-1">Trading Since</label>
               <input
                 type="text"
                 value={form.trading_since}
@@ -301,9 +299,7 @@ const { user, login, updateUser } = useAuth()
               />
             </div>
             <div>
-              <label className="block text-xs text-gray-500 dark:text-gray-400 mb-1">
-                Bio
-              </label>
+              <label className="block text-xs text-gray-500 dark:text-gray-400 mb-1">Bio</label>
               <input
                 type="text"
                 value={form.bio}
@@ -313,13 +309,85 @@ const { user, login, updateUser } = useAuth()
               />
             </div>
           </div>
-          <button
-            onClick={handleSave}
-            disabled={saving}
-            className="bg-blue-600 text-white px-6 py-2 rounded-xl text-sm font-medium hover:bg-blue-700 disabled:opacity-50"
-          >
-            {saving ? 'Saving...' : 'Save Changes'}
-          </button>
+
+          <div className="flex items-center gap-3">
+            <button
+              onClick={handleSave}
+              disabled={saving}
+              className="bg-blue-600 text-white px-6 py-2 rounded-xl text-sm font-medium hover:bg-blue-700 disabled:opacity-50"
+            >
+              {saving ? 'Saving...' : 'Save Changes'}
+            </button>
+            <button
+              type="button"
+              onClick={() => setShowPasswordForm(!showPasswordForm)}
+              className="bg-gray-100 dark:bg-gray-700 text-gray-600 dark:text-gray-300 px-6 py-2 rounded-xl text-sm font-medium hover:bg-gray-200 dark:hover:bg-gray-600"
+            >
+              {showPasswordForm ? 'Cancel Password Change' : '🔒 Change Password'}
+            </button>
+          </div>
+
+          {showPasswordForm && (
+            <div className="mt-4 pt-4 border-t border-gray-100 dark:border-gray-700">
+              <h3 className="text-sm font-semibold text-gray-900 dark:text-white mb-3">
+                Change Password
+              </h3>
+              {passwordError && (
+                <div className="bg-red-50 dark:bg-red-900 text-red-600 dark:text-red-300 p-3 rounded-xl text-sm mb-3">
+                  {passwordError}
+                </div>
+              )}
+              {passwordSuccess && (
+                <div className="bg-green-50 dark:bg-green-900 text-green-600 dark:text-green-300 p-3 rounded-xl text-sm mb-3">
+                  ✓ {passwordSuccess}
+                </div>
+              )}
+              <form onSubmit={handleChangePassword}>
+                <div className="grid grid-cols-3 gap-4 mb-4">
+                  <div>
+                    <label className="block text-xs text-gray-500 dark:text-gray-400 mb-1">Current Password</label>
+                    <input
+                      type="password"
+                      value={passwordForm.currentPassword}
+                      onChange={e => setPasswordForm({ ...passwordForm, currentPassword: e.target.value })}
+                      placeholder="••••••••"
+                      className="w-full border border-gray-200 dark:border-gray-600 dark:bg-gray-700 dark:text-white rounded-xl px-3 py-2 text-sm focus:outline-none focus:border-blue-500"
+                      required
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-xs text-gray-500 dark:text-gray-400 mb-1">New Password</label>
+                    <input
+                      type="password"
+                      value={passwordForm.newPassword}
+                      onChange={e => setPasswordForm({ ...passwordForm, newPassword: e.target.value })}
+                      placeholder="••••••••"
+                      className="w-full border border-gray-200 dark:border-gray-600 dark:bg-gray-700 dark:text-white rounded-xl px-3 py-2 text-sm focus:outline-none focus:border-blue-500"
+                      required
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-xs text-gray-500 dark:text-gray-400 mb-1">Confirm New Password</label>
+                    <input
+                      type="password"
+                      value={passwordForm.confirmPassword}
+                      onChange={e => setPasswordForm({ ...passwordForm, confirmPassword: e.target.value })}
+                      placeholder="••••••••"
+                      className="w-full border border-gray-200 dark:border-gray-600 dark:bg-gray-700 dark:text-white rounded-xl px-3 py-2 text-sm focus:outline-none focus:border-blue-500"
+                      required
+                    />
+                  </div>
+                </div>
+                <button
+                  type="submit"
+                  disabled={savingPassword}
+                  className="bg-red-500 text-white px-6 py-2 rounded-xl text-sm font-medium hover:bg-red-600 disabled:opacity-50"
+                >
+                  {savingPassword ? 'Changing...' : 'Change Password'}
+                </button>
+              </form>
+            </div>
+          )}
         </div>
       )}
 
@@ -388,20 +456,16 @@ const { user, login, updateUser } = useAuth()
                 <svg className="w-20 h-20 transform -rotate-90" viewBox="0 0 80 80">
                   <circle cx="40" cy="40" r="30" fill="none" stroke="#f3f4f6" strokeWidth="8" />
                   <circle
-                    cx="40" cy="40" r="30"
-                    fill="none"
+                    cx="40" cy="40" r="30" fill="none"
                     stroke={profile.discipline.monthlyScore >= 80 ? '#22c55e' : profile.discipline.monthlyScore >= 50 ? '#3b82f6' : '#f87171'}
-                    strokeWidth="8"
-                    strokeLinecap="round"
+                    strokeWidth="8" strokeLinecap="round"
                     strokeDasharray={2 * Math.PI * 30}
                     strokeDashoffset={2 * Math.PI * 30 * (1 - profile.discipline.monthlyScore / 100)}
                     className="transition-all duration-700"
                   />
                 </svg>
                 <div className="absolute inset-0 flex items-center justify-center">
-                  <span className="text-lg font-bold text-gray-900 dark:text-white">
-                    {profile.discipline.monthlyScore}%
-                  </span>
+                  <span className="text-lg font-bold text-gray-900 dark:text-white">{profile.discipline.monthlyScore}%</span>
                 </div>
               </div>
             </div>
@@ -461,11 +525,7 @@ const { user, login, updateUser } = useAuth()
           <StatCard label="Avg Risk/Reward" value={`1:${profile.stats.avgRR}`} color="text-blue-500" />
           <StatCard label="Profitable Trades" value={profile.stats.profitableTrades} color="text-green-500" />
           <StatCard label="Open Positions" value={profile.stats.openPositions} />
-          <StatCard
-            label="Total Invested"
-            value={`Rs.${Math.round(profile.stats.totalInvested / 1000)}K`}
-            color="text-purple-400"
-          />
+          <StatCard label="Total Invested" value={`Rs.${Math.round(profile.stats.totalInvested / 1000)}K`} color="text-purple-400" />
           <div className={`col-span-4 rounded-xl p-4 text-center ${
             profile.isEligible
               ? 'bg-green-50 dark:bg-green-900 border border-green-200 dark:border-green-700'
@@ -488,9 +548,7 @@ const { user, login, updateUser } = useAuth()
           <StatCard label="Current Streak" value={`🔥 ${profile.discipline.streak}`} color="text-orange-400" sub="consecutive days ≥70%" />
           <StatCard label="Total Days Tracked" value={profile.discipline.totalDaysTracked} />
           <div className="col-span-2 bg-white dark:bg-gray-800 rounded-xl p-5 shadow-sm border border-gray-100 dark:border-gray-700">
-            <h3 className="text-sm font-semibold text-gray-900 dark:text-white mb-3">
-              Discipline Impact
-            </h3>
+            <h3 className="text-sm font-semibold text-gray-900 dark:text-white mb-3">Discipline Impact</h3>
             <p className={`text-sm font-medium p-3 rounded-lg ${
               profile.discipline.todayScore >= 80
                 ? 'bg-green-50 dark:bg-green-900 text-green-700 dark:text-green-300'
@@ -516,9 +574,7 @@ const { user, login, updateUser } = useAuth()
           <StatCard label="Research Status" value={profile.isEligible ? '✓ Eligible' : '✗ Not Yet'} color={profile.isEligible ? 'text-green-500' : 'text-red-400'} />
           {profile.research.recentPosts.length > 0 && (
             <div className="col-span-3 bg-white dark:bg-gray-800 rounded-xl p-5 shadow-sm border border-gray-100 dark:border-gray-700">
-              <h3 className="text-sm font-semibold text-gray-900 dark:text-white mb-3">
-                Recent Research Posts
-              </h3>
+              <h3 className="text-sm font-semibold text-gray-900 dark:text-white mb-3">Recent Research Posts</h3>
               <div className="space-y-2">
                 {profile.research.recentPosts.map(post => (
                   <div
@@ -527,16 +583,10 @@ const { user, login, updateUser } = useAuth()
                     className="flex items-center justify-between p-3 rounded-lg hover:bg-gray-50 dark:hover:bg-gray-700 cursor-pointer"
                   >
                     <div className="flex items-center gap-2">
-                      {post.is_verified && (
-                        <span className="text-blue-500 text-xs">✓</span>
-                      )}
-                      <span className="text-sm text-gray-700 dark:text-gray-300">
-                        {post.title}
-                      </span>
+                      {post.is_verified && <span className="text-blue-500 text-xs">✓</span>}
+                      <span className="text-sm text-gray-700 dark:text-gray-300">{post.title}</span>
                     </div>
-                    <span className="text-xs text-gray-400">
-                      {new Date(post.created_at).toLocaleDateString()}
-                    </span>
+                    <span className="text-xs text-gray-400">{new Date(post.created_at).toLocaleDateString()}</span>
                   </div>
                 ))}
               </div>
