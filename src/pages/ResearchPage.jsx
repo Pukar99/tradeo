@@ -51,11 +51,19 @@ function ResearchCard({ post, onDelete, onVerify, onPin, isAdmin, currentUserId 
               {post.title}
             </h3>
             <div className="flex items-center gap-2 flex-wrap">
-              <div className="w-6 h-6 rounded-full bg-blue-500 flex items-center justify-center">
-                <span className="text-white text-xs font-bold">
-                  {post.author?.name?.[0]?.toUpperCase() || '?'}
-                </span>
-              </div>
+              <div className="w-6 h-6 rounded-full bg-blue-500 flex items-center justify-center overflow-hidden">
+  {post.author?.avatar_url ? (
+    <img
+      src={post.author.avatar_url}
+      alt={post.author.name}
+      className="w-full h-full object-cover"
+    />
+  ) : (
+    <span className="text-white text-xs font-bold">
+      {post.author?.name?.[0]?.toUpperCase() || '?'}
+    </span>
+  )}
+</div>
               <span className="text-sm text-gray-600 dark:text-gray-300 font-medium">
                 {post.author?.name || 'Unknown'}
               </span>

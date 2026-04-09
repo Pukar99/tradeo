@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react'
 import { useParams, useNavigate } from 'react-router-dom'
 import { useAuth } from '../context/AuthContext'
+import { useTheme } from '../context/ThemeContext'
 import {
   getResearchPost,
   addResearchComment,
@@ -19,6 +20,7 @@ const ADMIN_USER_ID = 1
 function ResearchViewPage() {
   const { id } = useParams()
   const { user } = useAuth()
+  const { isDark } = useTheme()
   const navigate = useNavigate()
   const [post, setPost] = useState(null)
   const [loading, setLoading] = useState(true)
@@ -29,9 +31,7 @@ function ResearchViewPage() {
   const editor = useCreateBlockNote()
   const isAdmin = user?.id === ADMIN_USER_ID
 
-  useEffect(() => {
-    fetchPost()
-  }, [id])
+  useEffect(() => { fetchPost() }, [id])
 
   useEffect(() => {
     if (post?.content && editor && !editorReady) {
@@ -117,6 +117,22 @@ function ResearchViewPage() {
     })
   }
 
+  const Avatar = ({ person, size = 'w-8 h-8' }) => (
+    <div className={`${size} rounded-full bg-blue-500 flex items-center justify-center flex-shrink-0 overflow-hidden`}>
+      {person?.avatar_url ? (
+        <img
+          src={person.avatar_url}
+          alt={person.name}
+          className="w-full h-full object-cover"
+        />
+      ) : (
+        <span className="text-white text-xs font-bold">
+          {person?.name?.[0]?.toUpperCase() || '?'}
+        </span>
+      )}
+    </div>
+  )
+
   if (!user) {
     navigate('/login')
     return null
@@ -182,11 +198,7 @@ function ResearchViewPage() {
 
           <div className="flex items-center justify-between flex-wrap gap-3">
             <div className="flex items-center gap-3">
-              <div className="w-9 h-9 rounded-full bg-blue-500 flex items-center justify-center">
-                <span className="text-white text-sm font-bold">
-                  {post.author?.name?.[0]?.toUpperCase() || '?'}
-                </span>
-              </div>
+              <Avatar person={post.author} size="w-9 h-9" />
               <div>
                 <div className="flex items-center gap-2">
                   <p className="text-sm font-semibold text-gray-900 dark:text-white">
@@ -247,13 +259,39 @@ function ResearchViewPage() {
           </div>
         </div>
 
-        <div className="p-4">
-          <BlockNoteView
-            editor={editor}
-            editable={false}
-            theme="light"
-          />
-        </div>
+        {post.post_type === 'pdf' && post.pdf_url ? (
+          <div className="p-6">
+            <div className="bg-gray-50 dark:bg-gray-700 rounded-xl p-4 flex items-center justify-between">
+              <div className="flex items-center gap-3">
+                <div className="w-10 h-10 bg-red-100 dark:bg-red-900 rounded-lg flex items-center justify-center">
+                  <span className="text-red-500 text-lg">📄</span>
+                </div>
+                <div>
+                  <p className="text-sm font-medium text-gray-900 dark:text-white">
+                    {post.pdf_name || 'Research PDF'}
+                  </p>
+                  <p className="text-xs text-gray-400">PDF Document</p>
+                </div>
+              </div>
+              <a
+                href={post.pdf_url}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="bg-blue-600 text-white px-4 py-2 rounded-lg text-sm font-medium hover:bg-blue-700"
+              >
+                Open PDF
+              </a>
+            </div>
+          </div>
+        ) : (
+          <div className="p-4">
+            <BlockNoteView
+              editor={editor}
+              editable={false}
+              theme={isDark ? 'dark' : 'light'}
+            />
+          </div>
+        )}
       </div>
 
       <div className="bg-white dark:bg-gray-800 rounded-xl shadow-sm p-6">
@@ -263,11 +301,7 @@ function ResearchViewPage() {
 
         <form onSubmit={handleComment} className="mb-6">
           <div className="flex gap-3">
-            <div className="w-8 h-8 rounded-full bg-blue-500 flex items-center justify-center flex-shrink-0">
-              <span className="text-white text-xs font-bold">
-                {user?.name?.[0]?.toUpperCase() || '?'}
-              </span>
-            </div>
+            <Avatar person={user} size="w-8 h-8" />
             <div className="flex-1">
               <input
                 type="text"
@@ -295,11 +329,7 @@ function ResearchViewPage() {
           ) : (
             post.comments?.map(c => (
               <div key={c.id} className="flex gap-3 group">
-                <div className="w-8 h-8 rounded-full bg-gray-400 flex items-center justify-center flex-shrink-0">
-                  <span className="text-white text-xs font-bold">
-                    {c.author?.name?.[0]?.toUpperCase() || '?'}
-                  </span>
-                </div>
+                <Avatar person={c.author} size="w-8 h-8" />
                 <div className="flex-1">
                   <div className="flex items-center gap-2 mb-1">
                     <span className="text-sm font-semibold text-gray-900 dark:text-white">
