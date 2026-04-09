@@ -12,23 +12,25 @@ import ResearchPage from './pages/ResearchPage'
 import ResearchEditorPage from './pages/ResearchEditorPage'
 import ResearchViewPage from './pages/ResearchViewPage'
 import ProfilePage from './pages/ProfilePage'
+import ChatPage from './pages/ChatPage'
+import FloatingChat from './components/FloatingChat'
 import { useAuth } from './context/AuthContext'
 import { getProfile } from './api'
 
 function AppContent() {
   const { user, updateUser } = useAuth()
 
-useEffect(() => {
-  if (user) {
-    getProfile()
-      .then(res => {
-        if (res.data.user.avatar_url) {
-          updateUser({ avatar_url: res.data.user.avatar_url })
-        }
-      })
-      .catch(() => {})
-  }
-}, [])
+  useEffect(() => {
+    if (user) {
+      getProfile()
+        .then(res => {
+          if (res.data.user.avatar_url) {
+            updateUser({ avatar_url: res.data.user.avatar_url })
+          }
+        })
+        .catch(() => {})
+    }
+  }, [])
 
   return (
     <div className="min-h-screen bg-gray-100 dark:bg-gray-900 transition-colors">
@@ -43,10 +45,12 @@ useEffect(() => {
         <Route path="/research/edit/:id" element={<ResearchEditorPage />} />
         <Route path="/research/:id" element={<ResearchViewPage />} />
         <Route path="/profile" element={<ProfilePage />} />
+        <Route path="/chat" element={<ChatPage />} />
         <Route path="/login" element={<LoginPage />} />
         <Route path="/signup" element={<SignupPage />} />
         <Route path="*" element={<NotFoundPage />} />
       </Routes>
+      <FloatingChat />
     </div>
   )
 }

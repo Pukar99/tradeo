@@ -64,3 +64,5 @@ export const uploadAvatar = (formData) => API.post('/api/profile/avatar', formDa
   headers: { 'Content-Type': 'multipart/form-data' }
 })
 export const changePassword = (data) => API.put('/api/profile/password', data)
+export const sendChatMessage = (data) => API.post('/api/chat/message', data)
+export const getChatSuggestions = () => API.get('/api/chat/suggestions')
