@@ -18,17 +18,17 @@ import { getProfile } from './api'
 function AppContent() {
   const { user, updateUser } = useAuth()
 
-  useEffect(() => {
-    if (user) {
-      getProfile()
-        .then(res => {
-          if (res.data.user.avatar_url) {
-            updateUser({ avatar_url: res.data.user.avatar_url })
-          }
-        })
-        .catch(() => {})
-    }
-  }, [])
+useEffect(() => {
+  if (user) {
+    getProfile()
+      .then(res => {
+        if (res.data.user.avatar_url) {
+          updateUser({ avatar_url: res.data.user.avatar_url })
+        }
+      })
+      .catch(() => {})
+  }
+}, [])
 
   return (
     <div className="min-h-screen bg-gray-100 dark:bg-gray-900 transition-colors">
