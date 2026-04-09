@@ -10,6 +10,7 @@ import TraderPage from './pages/TraderPage'
 import ResearchPage from './pages/ResearchPage'
 import ResearchEditorPage from './pages/ResearchEditorPage'
 import ResearchViewPage from './pages/ResearchViewPage'
+import ProfilePage from './pages/ProfilePage'
 
 function App() {
   return (
@@ -28,6 +29,7 @@ function App() {
           <Route path="/login" element={<LoginPage />} />
           <Route path="/signup" element={<SignupPage />} />
           <Route path="*" element={<NotFoundPage />} />
+          <Route path="/profile" element={<ProfilePage />} />
         </Routes>
       </div>
     </BrowserRouter>

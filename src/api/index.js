@@ -58,3 +58,8 @@ export const getAdminPending = () => API.get('/api/research/admin/pending')
 export const uploadResearchFile = (formData) => API.post('/api/research/upload', formData, {
   headers: { 'Content-Type': 'multipart/form-data' }
 })
+export const getProfile = () => API.get('/api/profile')
+export const updateProfile = (data) => API.put('/api/profile', data)
+export const uploadAvatar = (formData) => API.post('/api/profile/avatar', formData, {
+  headers: { 'Content-Type': 'multipart/form-data' }
+})

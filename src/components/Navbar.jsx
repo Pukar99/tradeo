@@ -42,10 +42,7 @@ function Navbar() {
     <nav className="bg-gray-950 border-b border-gray-800 px-6 py-0 flex justify-between items-center sticky top-0 z-40">
 
       <div className="flex items-center gap-8">
-        <Link
-          to="/"
-          className="flex items-center gap-2 py-4"
-        >
+        <Link to="/" className="flex items-center gap-2 py-4">
           <div className="w-7 h-7 bg-green-500 rounded-lg flex items-center justify-center">
             <span className="text-white text-xs font-black">T</span>
           </div>
@@ -75,7 +72,6 @@ function Navbar() {
       </div>
 
       <div className="flex items-center gap-3">
-
         <button
           onClick={toggleTheme}
           className="w-8 h-8 rounded-lg flex items-center justify-center text-gray-400 hover:text-white hover:bg-gray-800 transition-colors"
@@ -98,10 +94,18 @@ function Navbar() {
               onClick={() => setDropdownOpen(!dropdownOpen)}
               className="flex items-center gap-2 px-2 py-1.5 rounded-lg hover:bg-gray-800 transition-colors group"
             >
-              <div className="w-7 h-7 rounded-full bg-green-500 flex items-center justify-center">
-                <span className="text-white text-xs font-bold">
-                  {getInitials(user.name)}
-                </span>
+              <div className="w-7 h-7 rounded-full bg-green-500 flex items-center justify-center overflow-hidden">
+                {user.avatar_url ? (
+                  <img
+                    src={user.avatar_url}
+                    alt={user.name}
+                    className="w-full h-full object-cover"
+                  />
+                ) : (
+                  <span className="text-white text-xs font-bold">
+                    {getInitials(user.name)}
+                  </span>
+                )}
               </div>
               <span className="text-sm text-gray-300 group-hover:text-white">
                 {user.name.split(' ')[0]}
@@ -138,6 +142,13 @@ function Navbar() {
                     <span>🏠</span> Dashboard
                   </Link>
                   <Link
+                    to="/profile"
+                    onClick={() => setDropdownOpen(false)}
+                    className="flex items-center gap-2 px-3 py-2 text-sm text-gray-300 hover:text-white hover:bg-gray-800 rounded-lg transition-colors"
+                  >
+                    <span>👤</span> Profile
+                  </Link>
+                  <Link
                     to="/trader"
                     onClick={() => setDropdownOpen(false)}
                     className="flex items-center gap-2 px-3 py-2 text-sm text-gray-300 hover:text-white hover:bg-gray-800 rounded-lg transition-colors"
@@ -155,10 +166,7 @@ function Navbar() {
 
                 <div className="p-1 border-t border-gray-700">
                   <button
-                    onClick={() => {
-                      logout()
-                      setDropdownOpen(false)
-                    }}
+                    onClick={() => { logout(); setDropdownOpen(false) }}
                     className="w-full flex items-center gap-2 px-3 py-2 text-sm text-red-400 hover:text-red-300 hover:bg-gray-800 rounded-lg transition-colors"
                   >
                     <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
