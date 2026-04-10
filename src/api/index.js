@@ -12,21 +12,23 @@ API.interceptors.request.use((config) => {
   return config
 })
 
+// Auth
+export const loginUser = (data) => API.post('/api/auth/login', data)
+export const signupUser = (data) => API.post('/api/auth/signup', data)
+
+// Market
 export const getStocks = () => API.get('/api/stocks')
 export const getMarketSummary = () => API.get('/api/market-summary')
 export const getTopGainers = () => API.get('/api/top-gainers')
-export const loginUser = (data) => API.post('/api/auth/login', data)
-export const signupUser = (data) => API.post('/api/auth/signup', data)
-export const getTrades = () => API.get('/api/trades')
-export const addTrade = (data) => API.post('/api/trades', data)
-export const deleteTrade = (id) => API.delete(`/api/trades/${id}`)
-export const getTradeSummary = () => API.get('/api/trades/summary')
-export const getPortfolio = () => API.get('/api/portfolio')
-export const addPortfolioHolding = (data) => API.post('/api/portfolio', data)
+export const getStockPrice = (symbol) => API.get(`/api/market/stock-price/${symbol}`)
+
+// Journal (old general journal - keep for now)
 export const getJournal = () => API.get('/api/journal')
 export const addJournalEntry = (data) => API.post('/api/journal', data)
 export const updateJournalEntry = (id, data) => API.put(`/api/journal/${id}`, data)
 export const deleteJournalEntry = (id) => API.delete(`/api/journal/${id}`)
+
+// Dashboard
 export const getTodayTasks = () => API.get('/api/dashboard/tasks/today')
 export const toggleFixedTask = (taskId) => API.post('/api/dashboard/tasks/toggle-fixed', { taskId })
 export const addCustomTask = (title) => API.post('/api/dashboard/tasks/custom', { title })
@@ -42,7 +44,8 @@ export const addToWatchlist = (data) => API.post('/api/dashboard/watchlist', dat
 export const removeFromWatchlist = (id) => API.delete(`/api/dashboard/watchlist/${id}`)
 export const getMindset = () => API.get('/api/dashboard/mindset')
 export const saveMindset = (content) => API.post('/api/dashboard/mindset', { content })
-export const getStockPrice = (symbol) => API.get(`/api/market/stock-price/${symbol}`)
+
+// Research
 export const getResearchPosts = () => API.get('/api/research/posts')
 export const getResearchPost = (id) => API.get(`/api/research/posts/${id}`)
 export const getMyResearchPosts = () => API.get('/api/research/my-posts')
@@ -58,14 +61,20 @@ export const getAdminPending = () => API.get('/api/research/admin/pending')
 export const uploadResearchFile = (formData) => API.post('/api/research/upload', formData, {
   headers: { 'Content-Type': 'multipart/form-data' }
 })
+
+// Profile
 export const getProfile = () => API.get('/api/profile')
 export const updateProfile = (data) => API.put('/api/profile', data)
 export const uploadAvatar = (formData) => API.post('/api/profile/avatar', formData, {
   headers: { 'Content-Type': 'multipart/form-data' }
 })
 export const changePassword = (data) => API.put('/api/profile/password', data)
+
+// AI Chat
 export const sendChatMessage = (data) => API.post('/api/chat/message', data)
 export const getChatSuggestions = () => API.get('/api/chat/suggestions')
+
+// Trade Log (new system)
 export const getTradeLog = () => API.get('/api/tradelog')
 export const addTradeLog = (data) => API.post('/api/tradelog', data)
 export const updateTradeLog = (id, data) => API.put(`/api/tradelog/${id}`, data)
