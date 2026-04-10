@@ -189,7 +189,7 @@ function ExternalLinkModal({ task, onClose, onDone }) {
   )
 }
 
-function TaskBoard({ compact = false }) {
+function TaskBoard({ compact = false, onTaskComplete }) {
   const navigate = useNavigate()
   const [fixedTasks, setFixedTasks] = useState(FIXED_TASKS.map(t => ({ ...t, completed: false })))
   const [customTasks, setCustomTasks] = useState([])
@@ -231,6 +231,7 @@ function TaskBoard({ compact = false }) {
     try {
       await toggleFixedTask(taskId)
       setFixedTasks(prev => prev.map(t => t.id === taskId ? { ...t, completed: true } : t))
+      if (onTaskComplete) onTaskComplete()
     } catch (err) { console.error(err) }
   }
 
@@ -238,6 +239,7 @@ function TaskBoard({ compact = false }) {
     try {
       await updateCustomTask(task.id, !task.completed)
       setCustomTasks(prev => prev.map(t => t.id === task.id ? { ...t, completed: !t.completed } : t))
+      if (onTaskComplete) onTaskComplete()
     } catch (err) { console.error(err) }
   }
 
@@ -268,7 +270,7 @@ function TaskBoard({ compact = false }) {
   }
 
   if (loading) return (
-    <div className="bg-white dark:bg-gray-800 rounded-xl p-4 shadow-sm">
+    <div className="bg-white dark:bg-gray-800 rounded-xl p-4 shadow-sm h-full">
       <p className="text-sm text-gray-400">Loading tasks...</p>
     </div>
   )
@@ -294,7 +296,7 @@ function TaskBoard({ compact = false }) {
         />
       )}
 
-      <div className="bg-white dark:bg-gray-800 rounded-xl shadow-sm overflow-hidden">
+      <div className="bg-white dark:bg-gray-800 rounded-xl shadow-sm overflow-hidden h-full flex flex-col">
 
         <div className={`${p} border-b border-gray-100 dark:border-gray-700`}>
           <div className="flex justify-between items-center mb-2">
@@ -314,7 +316,7 @@ function TaskBoard({ compact = false }) {
           <p className="text-xs text-gray-400 mt-1">Today: {progress}% completed</p>
         </div>
 
-        <div className={p}>
+        <div className={`${p} flex-1`}>
           <p className="text-xs font-semibold text-gray-400 dark:text-gray-500 uppercase tracking-wide mb-2">
             Daily Routine
           </p>

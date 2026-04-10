@@ -136,6 +136,7 @@ function LoggedOutHome() {
 
 function LoggedInHome() {
   const { user } = useAuth()
+  const [disciplineKey, setDisciplineKey] = useState(0)
 
   const getGreeting = () => {
     const h = new Date().getHours()
@@ -169,10 +170,13 @@ function LoggedInHome() {
 
       <div className="grid grid-cols-1 lg:grid-cols-4 gap-4 mb-4">
         <div className="lg:col-span-3" style={{ height: '420px' }}>
-          <TaskBoard compact={true} />
+          <TaskBoard
+            compact={true}
+            onTaskComplete={() => setDisciplineKey(k => k + 1)}
+          />
         </div>
         <div style={{ height: '420px' }}>
-          <DisciplineScore />
+          <DisciplineScore key={disciplineKey} />
         </div>
       </div>
 
