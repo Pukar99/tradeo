@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react'
-import { getTrades, getPortfolio, getStockPrice } from '../../api'
+import { getTradeLog, getStockPrice } from '../../api'
 import {
   LineChart, Line, XAxis, YAxis, CartesianGrid,
   Tooltip, ResponsiveContainer
@@ -7,49 +7,46 @@ import {
 
 function PerformanceDashboard() {
   const [trades, setTrades] = useState([])
-  const [holdings, setHoldings] = useState([])
   const [equityCurve, setEquityCurve] = useState([])
   const [stats, setStats] = useState(null)
   const [loading, setLoading] = useState(true)
   const [priceDate, setPriceDate] = useState('')
   const [showHoldings, setShowHoldings] = useState(false)
+  const [openPositions, setOpenPositions] = useState([])
 
   useEffect(() => {
     const fetchData = async () => {
       try {
-        const [tradesRes, portfolioRes] = await Promise.all([
-          getTrades(),
-          getPortfolio()
-        ])
-
+        const tradesRes = await getTradeLog()
         const tradeData = tradesRes.data
-        const portfolioData = portfolioRes.data
         setTrades(tradeData)
 
-        const holdingsWithPrices = await Promise.all(
-          portfolioData.map(async (holding) => {
+        const open = tradeData.filter(t => t.status === 'OPEN' || t.status === 'PARTIAL')
+        const closed = tradeData.filter(t => t.status === 'CLOSED')
+
+        // Fetch latest prices for open positions
+        const openWithPrices = await Promise.all(
+          open.map(async (trade) => {
             try {
-              const priceRes = await getStockPrice(holding.symbol)
+              const priceRes = await getStockPrice(trade.symbol)
               return {
-                ...holding,
+                ...trade,
                 currentPrice: priceRes.data.price,
-                change: priceRes.data.change,
                 latestDate: priceRes.data.latestDate
               }
             } catch {
-              return { ...holding, currentPrice: null }
+              return { ...trade, currentPrice: null }
             }
           })
         )
 
-        setHoldings(holdingsWithPrices)
-
-        if (holdingsWithPrices[0]?.latestDate) {
-          setPriceDate(holdingsWithPrices[0].latestDate)
+        setOpenPositions(openWithPrices)
+        if (openWithPrices[0]?.latestDate) {
+          setPriceDate(openWithPrices[0].latestDate)
         }
 
-        calculateStats(tradeData, holdingsWithPrices)
-        buildEquityCurve(tradeData, holdingsWithPrices)
+        calculateStats(tradeData, openWithPrices, closed)
+        buildEquityCurve(tradeData, openWithPrices)
       } catch (err) {
         console.error(err)
       } finally {
@@ -59,43 +56,38 @@ function PerformanceDashboard() {
     fetchData()
   }, [])
 
-  const calculateStats = (tradeData, holdingsData) => {
-    const buys = tradeData.filter(t => t.type === 'BUY')
-    const sells = tradeData.filter(t => t.type === 'SELL')
-
-    const totalInvested = buys.reduce((sum, t) => sum + t.total, 0)
-    const realizedPnl = sells.reduce((sum, t) => sum + t.total, 0) -
-      buys
-        .filter(b => sells.some(s => s.symbol === b.symbol))
-        .reduce((sum, t) => sum + t.total, 0)
+  const calculateStats = (tradeData, openWithPrices, closedTrades) => {
+    const realizedPnl = closedTrades.reduce((sum, t) => sum + (t.realized_pnl || 0), 0)
 
     let unrealizedPnl = 0
-    holdingsData.forEach(h => {
-      if (h.currentPrice) {
-        const costBasis = h.avg_price * h.quantity
-        const currentValue = h.currentPrice * h.quantity
-        unrealizedPnl += currentValue - costBasis
+    openWithPrices.forEach(t => {
+      if (t.currentPrice) {
+        const qty = t.remaining_quantity || t.quantity
+        const pnl = t.position === 'LONG'
+          ? (t.currentPrice - t.entry_price) * qty
+          : (t.entry_price - t.currentPrice) * qty
+        unrealizedPnl += pnl
       }
     })
 
-    const totalPnl = realizedPnl + unrealizedPnl
-    const currentValue = holdingsData.reduce((sum, h) => {
-      return sum + (h.currentPrice
-        ? h.currentPrice * h.quantity
-        : h.avg_price * h.quantity)
+    const totalInvested = openWithPrices.reduce((sum, t) => {
+      return sum + (t.entry_price * (t.remaining_quantity || t.quantity))
     }, 0)
 
+    const currentValue = openWithPrices.reduce((sum, t) => {
+      const price = t.currentPrice || t.entry_price
+      const qty = t.remaining_quantity || t.quantity
+      return sum + (price * qty)
+    }, 0)
+
+    const totalPnl = realizedPnl + unrealizedPnl
     const pnlPct = totalInvested > 0
-      ? ((totalPnl / totalInvested) * 100).toFixed(2)
+      ? ((unrealizedPnl / totalInvested) * 100).toFixed(2)
       : '0.00'
 
-    const winRate = sells.length > 0
-      ? Math.round(
-          (sells.filter(t => {
-            const matchBuy = buys.find(b => b.symbol === t.symbol)
-            return matchBuy ? t.price > matchBuy.price : false
-          }).length / sells.length) * 100
-        )
+    const profitableTrades = closedTrades.filter(t => (t.realized_pnl || 0) > 0).length
+    const winRate = closedTrades.length > 0
+      ? Math.round((profitableTrades / closedTrades.length) * 100)
       : 0
 
     setStats({
@@ -107,49 +99,47 @@ function PerformanceDashboard() {
       pnlPct,
       winRate,
       totalTrades: tradeData.length,
-      openPositions: holdingsData.length
+      closedTrades: closedTrades.length,
+      openCount: openWithPrices.length,
+      profitableTrades
     })
   }
 
-  const buildEquityCurve = (tradeData, holdingsData) => {
-    if (!tradeData.length) return
+  const buildEquityCurve = (tradeData, openWithPrices) => {
+    const closed = tradeData
+      .filter(t => t.status === 'CLOSED')
+      .sort((a, b) => new Date(a.date) - new Date(b.date))
 
-    const sorted = [...tradeData].sort(
-      (a, b) => new Date(a.date) - new Date(b.date)
-    )
+    if (!closed.length) return
 
-    let invested = 0
-    const curve = sorted.map(t => {
-      if (t.type === 'BUY') invested += t.total
-      else invested -= t.total
+    let cumPnl = 0
+    const curve = closed.map(t => {
+      cumPnl += t.realized_pnl || 0
       return {
         date: t.date,
-        invested: Math.round(invested)
+        pnl: Math.round(cumPnl)
       }
     })
 
-    const currentValue = holdingsData.reduce((sum, h) => {
-      return sum + (h.currentPrice
-        ? h.currentPrice * h.quantity
-        : h.avg_price * h.quantity)
+    const unrealized = openWithPrices.reduce((sum, t) => {
+      if (t.currentPrice) {
+        const qty = t.remaining_quantity || t.quantity
+        return sum + (t.position === 'LONG'
+          ? (t.currentPrice - t.entry_price) * qty
+          : (t.entry_price - t.currentPrice) * qty)
+      }
+      return sum
     }, 0)
 
-    curve.push({
-      date: 'Now',
-      invested: Math.round(currentValue)
-    })
-
+    curve.push({ date: 'Now', pnl: Math.round(cumPnl + unrealized) })
     setEquityCurve(curve)
   }
 
   const calculateDrawdown = () => {
-    if (!stats) return null
-    if (stats.totalPnl >= 0) return null
+    if (!stats || stats.totalPnl >= 0) return null
     const dd = Math.abs(parseFloat(stats.pnlPct))
     if (dd === 0) return null
-    const recovery = dd >= 100
-      ? '∞'
-      : ((dd / (100 - dd)) * 100).toFixed(2)
+    const recovery = dd >= 100 ? '∞' : ((dd / (100 - dd)) * 100).toFixed(2)
     return { dd: dd.toFixed(2), recovery }
   }
 
@@ -161,8 +151,8 @@ function PerformanceDashboard() {
       return (
         <div className="bg-gray-900 text-white rounded-lg p-2 text-xs">
           <p className="text-gray-400">{payload[0].payload.date}</p>
-          <p className="text-blue-400 font-medium">
-            Rs. {val.toLocaleString()}
+          <p className={`font-medium ${val >= 0 ? 'text-green-400' : 'text-red-400'}`}>
+            {val >= 0 ? '+' : ''}Rs. {val.toLocaleString()}
           </p>
         </div>
       )
@@ -217,48 +207,43 @@ function PerformanceDashboard() {
       {stats && (
         <div className="grid grid-cols-4 gap-3 mb-4">
           <div className="bg-gray-50 dark:bg-gray-700 rounded-lg p-3 text-center">
-            <p className={`text-lg font-bold ${
-              stats.totalPnl >= 0 ? 'text-green-500' : 'text-red-500'
-            }`}>
+            <p className={`text-lg font-bold ${stats.totalPnl >= 0 ? 'text-green-500' : 'text-red-500'}`}>
               {stats.totalPnl >= 0 ? '+' : '-'}Rs.{Math.abs(Math.round(stats.totalPnl)).toLocaleString()}
             </p>
             <p className="text-xs text-gray-400 mt-0.5">Total P&L</p>
           </div>
           <div className="bg-gray-50 dark:bg-gray-700 rounded-lg p-3 text-center">
-            <p className={`text-lg font-bold ${
-              parseFloat(stats.pnlPct) >= 0 ? 'text-green-500' : 'text-red-500'
-            }`}>
+            <p className={`text-lg font-bold ${parseFloat(stats.pnlPct) >= 0 ? 'text-green-500' : 'text-red-500'}`}>
               {parseFloat(stats.pnlPct) >= 0 ? '+' : ''}{stats.pnlPct}%
             </p>
-            <p className="text-xs text-gray-400 mt-0.5">Return</p>
+            <p className="text-xs text-gray-400 mt-0.5">Unrealized Return</p>
           </div>
           <div className="bg-gray-50 dark:bg-gray-700 rounded-lg p-3 text-center">
-            <p className="text-lg font-bold text-blue-500">
-              {stats.winRate}%
-            </p>
+            <p className="text-lg font-bold text-blue-500">{stats.winRate}%</p>
             <p className="text-xs text-gray-400 mt-0.5">Win Rate</p>
           </div>
           <div className="bg-gray-50 dark:bg-gray-700 rounded-lg p-3 text-center">
-            <p className="text-lg font-bold text-gray-900 dark:text-white">
-              {stats.openPositions}
-            </p>
+            <p className="text-lg font-bold text-gray-900 dark:text-white">{stats.openCount}</p>
             <p className="text-xs text-gray-400 mt-0.5">Open Positions</p>
           </div>
         </div>
       )}
 
       {stats && (
-        <div className="grid grid-cols-2 gap-3 mb-4">
+        <div className="grid grid-cols-3 gap-3 mb-4">
+          <div className="bg-gray-50 dark:bg-gray-700 rounded-lg p-3">
+            <p className="text-xs text-gray-400 mb-1">Realized P&L</p>
+            <p className={`text-base font-bold ${stats.realizedPnl >= 0 ? 'text-green-500' : 'text-red-500'}`}>
+              {stats.realizedPnl >= 0 ? '+' : '-'}Rs.{Math.abs(Math.round(stats.realizedPnl)).toLocaleString()}
+            </p>
+            <p className="text-xs text-gray-400 mt-0.5">{stats.profitableTrades}/{stats.closedTrades} trades profitable</p>
+          </div>
           <div className="bg-gray-50 dark:bg-gray-700 rounded-lg p-3">
             <p className="text-xs text-gray-400 mb-1">Unrealized P&L</p>
-            <p className={`text-base font-bold ${
-              stats.unrealizedPnl >= 0 ? 'text-green-500' : 'text-red-500'
-            }`}>
+            <p className={`text-base font-bold ${stats.unrealizedPnl >= 0 ? 'text-green-500' : 'text-red-500'}`}>
               {stats.unrealizedPnl >= 0 ? '+' : '-'}Rs.{Math.abs(Math.round(stats.unrealizedPnl)).toLocaleString()}
             </p>
-            <p className="text-xs text-gray-400 mt-0.5">
-              From {stats.openPositions} open position{stats.openPositions !== 1 ? 's' : ''}
-            </p>
+            <p className="text-xs text-gray-400 mt-0.5">{stats.openCount} open position{stats.openCount !== 1 ? 's' : ''}</p>
           </div>
           <div className="bg-gray-50 dark:bg-gray-700 rounded-lg p-3">
             <p className="text-xs text-gray-400 mb-1">Total Invested</p>
@@ -266,7 +251,7 @@ function PerformanceDashboard() {
               Rs.{Math.round(stats.totalInvested).toLocaleString()}
             </p>
             <p className="text-xs text-gray-400 mt-0.5">
-              Current value: Rs.{Math.round(stats.currentValue).toLocaleString()}
+              Current: Rs.{Math.round(stats.currentValue).toLocaleString()}
             </p>
           </div>
         </div>
@@ -275,20 +260,19 @@ function PerformanceDashboard() {
       {drawdown && (
         <div className="bg-red-50 dark:bg-red-900 border border-red-100 dark:border-red-800 rounded-lg p-3 mb-4 text-xs">
           <p className="text-red-600 dark:text-red-300 font-medium">
-            ⚠️ You are -{drawdown.dd}% down →
-            Need +{drawdown.recovery}% to recover
+            ⚠️ Down -{drawdown.dd}% → Need +{drawdown.recovery}% to recover
           </p>
         </div>
       )}
 
-      {holdings.length > 0 && (
+      {openPositions.length > 0 && (
         <div className="mb-4">
           <button
             onClick={() => setShowHoldings(prev => !prev)}
             className="flex items-center justify-between w-full mb-2 group"
           >
             <p className="text-xs text-gray-400 font-medium uppercase tracking-wide">
-              Holdings ({holdings.length})
+              Open Positions ({openPositions.length})
             </p>
             <span className="text-xs text-gray-400 group-hover:text-gray-600 dark:group-hover:text-gray-200">
               {showHoldings ? '▲ Hide' : '▼ Show'}
@@ -297,33 +281,43 @@ function PerformanceDashboard() {
 
           {showHoldings && (
             <div className="space-y-2">
-              {holdings.map(h => {
-                const costBasis = h.avg_price * h.quantity
-                const currentVal = h.currentPrice
-                  ? h.currentPrice * h.quantity
-                  : costBasis
-                const pnl = currentVal - costBasis
-                const pnlPct = ((pnl / costBasis) * 100).toFixed(2)
+              {openPositions.map(t => {
+                const qty = t.remaining_quantity || t.quantity
+                const ltp = t.currentPrice || t.entry_price
+                const pnl = t.position === 'LONG'
+                  ? (ltp - t.entry_price) * qty
+                  : (t.entry_price - ltp) * qty
+                const pnlPct = ((pnl / (t.entry_price * qty)) * 100).toFixed(2)
+
                 return (
-                  <div
-                    key={h.id}
-                    className="flex items-center justify-between bg-gray-50 dark:bg-gray-700 rounded-lg px-3 py-2"
-                  >
+                  <div key={t.id} className="flex items-center justify-between bg-gray-50 dark:bg-gray-700 rounded-lg px-3 py-2">
                     <div>
-                      <p className="text-sm font-semibold text-gray-900 dark:text-white">
-                        {h.symbol}
-                      </p>
+                      <div className="flex items-center gap-2">
+                        <p className="text-sm font-semibold text-gray-900 dark:text-white">{t.symbol}</p>
+                        <span className={`text-xs px-1.5 py-0.5 rounded font-medium ${
+                          t.position === 'LONG'
+                            ? 'bg-green-100 text-green-700 dark:bg-green-900 dark:text-green-300'
+                            : 'bg-red-100 text-red-700 dark:bg-red-900 dark:text-red-300'
+                        }`}>
+                          {t.position}
+                        </span>
+                        {t.status === 'PARTIAL' && (
+                          <span className="text-xs px-1.5 py-0.5 rounded bg-orange-100 text-orange-700 dark:bg-orange-900 dark:text-orange-300 font-medium">
+                            PARTIAL
+                          </span>
+                        )}
+                      </div>
                       <p className="text-xs text-gray-400">
-                        {h.quantity} shares @ Rs.{h.avg_price}
+                        {qty} shares @ Rs.{t.entry_price}
+                        {t.sl && <span className="text-red-400 ml-2">SL:{t.sl}</span>}
+                        {t.tp && <span className="text-green-400 ml-2">TP:{t.tp}</span>}
                       </p>
                     </div>
                     <div className="text-right">
                       <p className="text-sm font-medium text-gray-900 dark:text-white">
-                        Rs.{h.currentPrice?.toLocaleString() || '—'}
+                        Rs.{t.currentPrice?.toLocaleString() || '—'}
                       </p>
-                      <p className={`text-xs font-medium ${
-                        pnl >= 0 ? 'text-green-500' : 'text-red-500'
-                      }`}>
+                      <p className={`text-xs font-medium ${pnl >= 0 ? 'text-green-500' : 'text-red-500'}`}>
                         {pnl >= 0 ? '+' : '-'}Rs.{Math.abs(Math.round(pnl)).toLocaleString()} ({pnlPct}%)
                       </p>
                     </div>
@@ -338,22 +332,18 @@ function PerformanceDashboard() {
       {equityCurve.length > 1 && (
         <div>
           <p className="text-xs text-gray-400 mb-2 uppercase tracking-wide font-medium">
-            Investment Curve
+            P&L Curve
           </p>
           <ResponsiveContainer width="100%" height={160}>
             <LineChart data={equityCurve}>
               <CartesianGrid strokeDasharray="3 3" stroke="#f3f4f6" />
-              <XAxis
-                dataKey="date"
-                tick={{ fontSize: 10 }}
-                interval={Math.floor(equityCurve.length / 4)}
-              />
+              <XAxis dataKey="date" tick={{ fontSize: 10 }} interval={Math.floor(equityCurve.length / 4)} />
               <YAxis tick={{ fontSize: 10 }} width={70} />
               <Tooltip content={<CustomTooltip />} />
               <Line
                 type="monotone"
-                dataKey="invested"
-                stroke="#3b82f6"
+                dataKey="pnl"
+                stroke="#22c55e"
                 strokeWidth={2}
                 dot={false}
                 activeDot={{ r: 4 }}
@@ -362,7 +352,6 @@ function PerformanceDashboard() {
           </ResponsiveContainer>
         </div>
       )}
-
     </div>
   )
 }
