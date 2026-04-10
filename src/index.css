@@ -23,3 +23,13 @@
   --bn-colors-border: #374151 !important;
   --bn-colors-side-menu: #9ca3af !important;
 }
+
+.tradeo-logo-bg {
+  fill: white;
+  stroke: #e5e7eb;
+}
+
+.dark .tradeo-logo-bg {
+  fill: #1f2937;
+  stroke: #374151;
+}
