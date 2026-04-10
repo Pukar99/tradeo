@@ -134,6 +134,12 @@ function CenterDashboard({ navigate }) {
   const [searchingSymbol, setSearchingSymbol] = useState(false)
   const [symbolInfo, setSymbolInfo] = useState(null)
   const [symbolError, setSymbolError] = useState('')
+  const [watchForm, setWatchForm] = useState({
+    price_alert: '',
+    alert_date: '',
+    alert_type: '',
+    notes: ''
+  })
 
   useEffect(() => { fetchData() }, [])
 
@@ -239,10 +245,19 @@ function CenterDashboard({ navigate }) {
   const handleAddWatch = async (category) => {
     if (!symbolInfo) return
     try {
-      await addToWatchlist({ symbol: newSymbol.toUpperCase(), category })
+      await addToWatchlist({
+        symbol: newSymbol.toUpperCase(),
+        category,
+        price_alert: watchForm.price_alert ? parseFloat(watchForm.price_alert) : null,
+        alert_date: watchForm.alert_date || null,
+        notes: watchForm.alert_type
+          ? `[${watchForm.alert_type}] ${watchForm.notes || ''}`.trim()
+          : watchForm.notes || null,
+      })
       setNewSymbol('')
       setSymbolInfo(null)
       setShowAddWatch(false)
+      setWatchForm({ price_alert: '', alert_date: '', alert_type: '', notes: '' })
       fetchData()
     } catch (err) { console.error(err) }
   }
@@ -489,7 +504,9 @@ function CenterDashboard({ navigate }) {
 
         {showAddWatch && watchlistTab !== 'portfolio' && (
           <div className="px-4 py-3 border-b border-gray-100 dark:border-gray-700 bg-gray-50 dark:bg-gray-900">
-            <div className="flex gap-2 mb-2">
+
+            {/* Symbol Search */}
+            <div className="flex gap-2 mb-3">
               <input
                 type="text"
                 value={newSymbol}
@@ -506,21 +523,148 @@ function CenterDashboard({ navigate }) {
                 {searchingSymbol ? '...' : 'Search'}
               </button>
             </div>
+
             {symbolError && <p className="text-xs text-red-500 mb-2">{symbolError}</p>}
+
+            {/* Stock Info */}
             {symbolInfo && (
-              <div className="flex items-center justify-between bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-600 rounded-xl p-2 mb-2">
-                <div className="flex items-center gap-2">
-                  <StockAvatar symbol={symbolInfo.symbol} size="w-7 h-7" />
-                  <div>
-                    <p className="text-xs font-bold text-gray-900 dark:text-white">{symbolInfo.symbol}</p>
-                    <p className="text-xs text-gray-400">Rs.{symbolInfo.price}</p>
+              <>
+                <div className="flex items-center justify-between bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-600 rounded-xl p-2.5 mb-3">
+                  <div className="flex items-center gap-2">
+                    <StockAvatar symbol={symbolInfo.symbol} size="w-7 h-7" />
+                    <div>
+                      <p className="text-xs font-bold text-gray-900 dark:text-white">{symbolInfo.symbol}</p>
+                      <p className="text-xs text-gray-400">Rs.{symbolInfo.price?.toLocaleString()}</p>
+                    </div>
+                  </div>
+                  <p className={`text-xs font-medium ${symbolInfo.change >= 0 ? 'text-green-500' : 'text-red-500'}`}>
+                    {symbolInfo.change >= 0 ? '+' : ''}{symbolInfo.change}%
+                  </p>
+                </div>
+
+                {/* Alert Type */}
+                <div className="flex gap-2 mb-3">
+                  <button
+                    type="button"
+                    onClick={() => setWatchForm(prev => ({ ...prev, alert_type: prev.alert_type === 'BUY' ? '' : 'BUY' }))}
+                    className={`flex-1 py-1.5 rounded-xl text-xs font-semibold border transition-colors ${
+                      watchForm.alert_type === 'BUY'
+                        ? 'bg-green-500 text-white border-green-500'
+                        : 'border-gray-200 dark:border-gray-600 text-gray-500 dark:text-gray-400 hover:border-green-400 hover:text-green-500'
+                    }`}
+                  >
+                    ✓ Buy Alert
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setWatchForm(prev => ({ ...prev, alert_type: prev.alert_type === 'SELL' ? '' : 'SELL' }))}
+                    className={`flex-1 py-1.5 rounded-xl text-xs font-semibold border transition-colors ${
+                      watchForm.alert_type === 'SELL'
+                        ? 'bg-red-500 text-white border-red-500'
+                        : 'border-gray-200 dark:border-gray-600 text-gray-500 dark:text-gray-400 hover:border-red-400 hover:text-red-500'
+                    }`}
+                  >
+                    ✓ Sell Alert
+                  </button>
+                </div>
+
+                {/* Price Alert */}
+                <div className="mb-2">
+                  <p className="text-xs text-gray-400 mb-1">🎯 Price Alert (Rs.)</p>
+                  <input
+                    type="number"
+                    value={watchForm.price_alert}
+                    onChange={e => setWatchForm(prev => ({ ...prev, price_alert: e.target.value }))}
+                    placeholder={`Current: Rs.${symbolInfo.price}`}
+                    className="w-full border border-gray-200 dark:border-gray-600 dark:bg-gray-700 dark:text-white rounded-xl px-3 py-1.5 text-xs focus:outline-none focus:border-blue-500"
+                  />
+                  {watchForm.price_alert && symbolInfo.price && (
+                    <div className={`mt-1 px-2.5 py-1 rounded-lg text-xs font-medium flex items-center justify-between ${
+                      parseFloat(watchForm.price_alert) > symbolInfo.price
+                        ? 'bg-green-50 dark:bg-green-900 text-green-600 dark:text-green-300'
+                        : 'bg-red-50 dark:bg-red-900 text-red-500'
+                    }`}>
+                      <span>
+                        {parseFloat(watchForm.price_alert) > symbolInfo.price ? '↑' : '↓'} Rs.{Math.abs(Math.round(parseFloat(watchForm.price_alert) - symbolInfo.price)).toLocaleString()} away
+                      </span>
+                      <span>
+                        {Math.abs(((parseFloat(watchForm.price_alert) - symbolInfo.price) / symbolInfo.price) * 100).toFixed(2)}% {parseFloat(watchForm.price_alert) > symbolInfo.price ? 'rally' : 'drop'} needed
+                      </span>
+                    </div>
+                  )}
+                </div>
+
+                {/* Date Alert */}
+                <div className="mb-2">
+                  <p className="text-xs text-gray-400 mb-1">📅 Date Alert</p>
+                  <input
+                    type="date"
+                    value={watchForm.alert_date}
+                    onChange={e => setWatchForm(prev => ({ ...prev, alert_date: e.target.value }))}
+                    min={new Date().toISOString().split('T')[0]}
+                    className="w-full border border-gray-200 dark:border-gray-600 dark:bg-gray-700 dark:text-white rounded-xl px-3 py-1.5 text-xs focus:outline-none focus:border-blue-500"
+                  />
+                  {watchForm.alert_date && (
+                    <div className="mt-1 px-2.5 py-1 rounded-lg text-xs font-medium bg-blue-50 dark:bg-blue-900 text-blue-600 dark:text-blue-300 flex items-center justify-between">
+                      <span>📅 {new Date(watchForm.alert_date).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}</span>
+                      <span>{Math.ceil((new Date(watchForm.alert_date) - new Date()) / (1000 * 60 * 60 * 24))} days remaining</span>
+                    </div>
+                  )}
+                </div>
+
+                {/* Notes */}
+                <div className="mb-3">
+                  <div className="relative">
+                    <input
+                      type="text"
+                      value={watchForm.notes}
+                      onChange={e => setWatchForm(prev => ({ ...prev, notes: e.target.value }))}
+                      placeholder="📝 Note (optional)"
+                      className="w-full border border-gray-200 dark:border-gray-600 dark:bg-gray-700 dark:text-white rounded-xl px-3 py-1.5 text-xs focus:outline-none focus:border-blue-500"
+                    />
+                    <div className="flex flex-wrap gap-1 mt-1.5">
+                      {[
+                        '💰 Salary coming',
+                        '📰 Bad news',
+                        '📈 NEPSE season starting',
+                        '📉 NEPSE season ending',
+                        '🏦 Dividend expected',
+                        '📊 Bonus share',
+                        '⚡ Breakout watch',
+                        '🔄 Accumulation zone',
+                      ].map(suggestion => (
+                        <button
+                          key={suggestion}
+                          type="button"
+                          onClick={() => setWatchForm(prev => ({ ...prev, notes: suggestion }))}
+                          className={`text-xs px-2 py-0.5 rounded-full border transition-colors ${
+                            watchForm.notes === suggestion
+                              ? 'bg-blue-600 text-white border-blue-600'
+                              : 'border-gray-200 dark:border-gray-600 text-gray-500 dark:text-gray-400 hover:border-blue-400 hover:text-blue-500 bg-white dark:bg-gray-800'
+                          }`}
+                        >
+                          {suggestion}
+                        </button>
+                      ))}
+                    </div>
                   </div>
                 </div>
-                <div className="flex gap-1">
-                  <button onClick={() => handleAddWatch('active')} className="text-xs bg-blue-600 text-white px-2 py-1 rounded-lg hover:bg-blue-700">+ Active</button>
-                  <button onClick={() => handleAddWatch('pre')} className="text-xs bg-gray-200 dark:bg-gray-600 text-gray-700 dark:text-gray-200 px-2 py-1 rounded-lg hover:bg-gray-300">+ Pre</button>
+
+                <div className="flex gap-2">
+                  <button
+                    onClick={() => handleAddWatch('active')}
+                    className="flex-1 text-xs bg-blue-600 text-white py-2 rounded-xl hover:bg-blue-700 font-medium"
+                  >
+                    ⭐ Active
+                  </button>
+                  <button
+                    onClick={() => handleAddWatch('pre')}
+                    className="flex-1 text-xs bg-gray-100 dark:bg-gray-700 text-gray-700 dark:text-gray-200 py-2 rounded-xl hover:bg-gray-200 font-medium"
+                  >
+                    🟡 Pre-Watch
+                  </button>
                 </div>
-              </div>
+              </>
             )}
           </div>
         )}
@@ -538,44 +682,101 @@ function CenterDashboard({ navigate }) {
           ) : (
             <div className="grid grid-cols-2 gap-2">
               {filteredWatch.map(item => (
-                <div key={item.id} className="flex items-center justify-between bg-gray-50 dark:bg-gray-700 rounded-xl px-3 py-2.5 group">
-                  <div className="flex items-center gap-2">
-                    <StockAvatar symbol={item.symbol} size="w-8 h-8" />
-                    <div>
-                      <p className="text-sm font-semibold text-gray-900 dark:text-white">{item.symbol}</p>
-                      <p className="text-xs text-gray-400">
-                        {item.isPosition
-                          ? `${item.quantity} @ Rs.${item.entry_price}`
-                          : `Rs.${item.currentPrice?.toLocaleString() || '—'}`
-                        }
-                      </p>
+                <div key={item.id} className="flex flex-col bg-gray-50 dark:bg-gray-700 rounded-xl px-3 py-2.5 group">
+                  <div className="flex items-center justify-between">
+                    <div className="flex items-center gap-2">
+                      <StockAvatar symbol={item.symbol} size="w-8 h-8" />
+                      <div>
+                        <p className="text-sm font-semibold text-gray-900 dark:text-white">{item.symbol}</p>
+                        <p className="text-xs text-gray-400">
+                          {item.isPosition
+                            ? `${item.quantity} @ Rs.${item.entry_price}`
+                            : `Rs.${item.currentPrice?.toLocaleString() || '—'}`
+                          }
+                        </p>
+                      </div>
+                    </div>
+                    <div className="flex items-center gap-1">
+                      {item.isPosition && item.unrealizedPnl !== null ? (
+                        <span className={`text-xs font-medium px-2 py-0.5 rounded-full ${
+                          item.unrealizedPnl >= 0
+                            ? 'bg-green-100 dark:bg-green-900 text-green-600 dark:text-green-300'
+                            : 'bg-red-100 dark:bg-red-900 text-red-600 dark:text-red-300'
+                        }`}>
+                          {item.unrealizedPnl >= 0 ? '+' : ''}Rs.{Math.abs(item.unrealizedPnl).toLocaleString()}
+                        </span>
+                      ) : item.change !== undefined && item.change !== null ? (
+                        <span className={`text-xs font-medium px-2 py-0.5 rounded-full ${
+                          item.change >= 0
+                            ? 'bg-green-100 dark:bg-green-900 text-green-600 dark:text-green-300'
+                            : 'bg-red-100 dark:bg-red-900 text-red-600 dark:text-red-300'
+                        }`}>
+                          {item.change >= 0 ? '+' : ''}{item.change}%
+                        </span>
+                      ) : null}
+                      {!item.isPosition && (
+                        <button
+                          onClick={() => handleRemoveWatch(item.id)}
+                          className="opacity-0 group-hover:opacity-100 text-gray-300 hover:text-red-400 text-xs transition-opacity ml-1"
+                        >✕</button>
+                      )}
                     </div>
                   </div>
-                  <div className="flex items-center gap-1">
-                    {item.isPosition && item.unrealizedPnl !== null ? (
-                      <span className={`text-xs font-medium px-2 py-0.5 rounded-full ${
-                        item.unrealizedPnl >= 0
-                          ? 'bg-green-100 dark:bg-green-900 text-green-600 dark:text-green-300'
-                          : 'bg-red-100 dark:bg-red-900 text-red-600 dark:text-red-300'
-                      }`}>
-                        {item.unrealizedPnl >= 0 ? '+' : ''}Rs.{Math.abs(item.unrealizedPnl).toLocaleString()}
-                      </span>
-                    ) : item.change !== undefined && item.change !== null ? (
-                      <span className={`text-xs font-medium px-2 py-0.5 rounded-full ${
-                        item.change >= 0
-                          ? 'bg-green-100 dark:bg-green-900 text-green-600 dark:text-green-300'
-                          : 'bg-red-100 dark:bg-red-900 text-red-600 dark:text-red-300'
-                      }`}>
-                        {item.change >= 0 ? '+' : ''}{item.change}%
-                      </span>
-                    ) : null}
-                    {!item.isPosition && (
-                      <button
-                        onClick={() => handleRemoveWatch(item.id)}
-                        className="opacity-0 group-hover:opacity-100 text-gray-300 hover:text-red-400 text-xs transition-opacity ml-1"
-                      >✕</button>
-                    )}
-                  </div>
+                  {/* Alert messages */}
+                  {!item.isPosition && (() => {
+                    const messages = []
+                    const ltp = item.currentPrice
+
+                    if (item.price_alert && ltp) {
+                      const diff = item.price_alert - ltp
+                      const pct = Math.abs((diff / ltp) * 100).toFixed(2)
+                      const isBuy = item.notes?.startsWith('[BUY]')
+                      const isSell = item.notes?.startsWith('[SELL]')
+                      const tag = isBuy ? '🟢 BUY' : isSell ? '🔴 SELL' : '🎯'
+
+                      if (Math.abs(diff) < ltp * 0.02) {
+                        messages.push({ text: `${tag} Near alert! Rs.${item.price_alert}`, color: 'text-orange-500', bg: 'bg-orange-50 dark:bg-orange-900' })
+                      } else if (diff > 0) {
+                        messages.push({ text: `${tag} +${pct}% rally → Rs.${item.price_alert}`, color: 'text-green-600 dark:text-green-400', bg: 'bg-green-50 dark:bg-green-900' })
+                      } else {
+                        messages.push({ text: `${tag} ${pct}% drop → Rs.${item.price_alert}`, color: 'text-red-500', bg: 'bg-red-50 dark:bg-red-900' })
+                      }
+                    }
+
+                    if (item.alert_date) {
+                      const days = Math.ceil((new Date(item.alert_date) - new Date()) / (1000 * 60 * 60 * 24))
+                      const isBuy = item.notes?.startsWith('[BUY]')
+                      const isSell = item.notes?.startsWith('[SELL]')
+                      const dateTag = isBuy ? '🟢 BUY' : isSell ? '🔴 SELL' : '📅'
+                      const dateColor = isBuy ? 'text-green-600 dark:text-green-400' : isSell ? 'text-red-500' : 'text-blue-500'
+                      const dateBg = isBuy ? 'bg-green-50 dark:bg-green-900' : isSell ? 'bg-red-50 dark:bg-red-900' : 'bg-blue-50 dark:bg-blue-900'
+
+                      if (days < 0) {
+                        messages.push({ text: `${dateTag} Alert expired ${Math.abs(days)}d ago`, color: 'text-gray-400', bg: 'bg-gray-50 dark:bg-gray-700' })
+                      } else if (days === 0) {
+                        messages.push({ text: `${dateTag} Alert date is TODAY!`, color: 'text-orange-500', bg: 'bg-orange-50 dark:bg-orange-900' })
+                      } else if (days <= 3) {
+                        messages.push({ text: `${dateTag} ${days}d to alert date`, color: 'text-orange-500', bg: 'bg-orange-50 dark:bg-orange-900' })
+                      } else {
+                        messages.push({ text: `${dateTag} ${days} days to alert date`, color: dateColor, bg: dateBg })
+                      }
+                    }
+
+                    const cleanNote = item.notes?.replace(/^\[(BUY|SELL)\]\s*/, '')
+                    if (cleanNote) {
+                      messages.push({ text: `📝 ${cleanNote}`, color: 'text-gray-500 dark:text-gray-400', bg: 'bg-gray-50 dark:bg-gray-700' })
+                    }
+
+                    return messages.length > 0 ? (
+                      <div className="mt-1.5 space-y-1">
+                        {messages.map((m, i) => (
+                          <div key={i} className={`${m.bg} px-2 py-1 rounded-lg`}>
+                            <p className={`text-xs font-medium ${m.color}`}>{m.text}</p>
+                          </div>
+                        ))}
+                      </div>
+                    ) : null
+                  })()}
                 </div>
               ))}
             </div>
