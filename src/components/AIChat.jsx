@@ -685,7 +685,11 @@ function AIChat({ isFullPage = false, onClose }) {
       && !['DRAFT_JOURNAL'].includes(msg.actionType)
 
     return (
-      <div key={i} className={`flex ${msg.role === 'user' ? 'justify-end' : 'justify-start'} gap-1.5`}>
+      <div
+        key={i}
+        className={`flex ${msg.role === 'user' ? 'justify-end' : 'justify-start'} gap-1.5 animate-fade-up`}
+        style={{ animationDelay: `${Math.min(i, 6) * 40}ms` }}
+      >
         {msg.role === 'assistant' && (
           <div className="flex-shrink-0 mt-0.5"><TradeoLogo size={20} /></div>
         )}
@@ -803,7 +807,12 @@ function AIChat({ isFullPage = false, onClose }) {
       )}
 
       {/* ── Messages area ── */}
-      <div className="flex-1 overflow-y-auto px-3 py-3 space-y-3 bg-gray-50 dark:bg-gray-950">
+      <div className="flex-1 relative overflow-hidden">
+        {/* Top fade edge */}
+        <div className="absolute top-0 left-0 right-0 h-5 bg-gradient-to-b from-gray-50 dark:from-gray-950 to-transparent z-10 pointer-events-none" />
+        {/* Bottom fade edge */}
+        <div className="absolute bottom-0 left-0 right-0 h-5 bg-gradient-to-t from-gray-50 dark:from-gray-950 to-transparent z-10 pointer-events-none" />
+      <div className="h-full overflow-y-auto no-scrollbar px-3 py-3 space-y-3 bg-gray-50 dark:bg-gray-950">
 
         {/* Empty state */}
         {messages.length === 0 && !activeForm && (
@@ -858,13 +867,13 @@ function AIChat({ isFullPage = false, onClose }) {
 
         {/* Loading indicator */}
         {loading && (
-          <div className="flex justify-start gap-1.5">
+          <div className="flex justify-start gap-1.5 animate-fade-up">
             <div className="flex-shrink-0 mt-0.5"><TradeoLogo size={20} /></div>
             <div className="bg-white dark:bg-gray-900 border border-gray-100 dark:border-gray-800 px-3 py-2.5 rounded-2xl rounded-tl-sm shadow-sm">
               <div className="flex gap-1 items-center">
-                <div className="w-1.5 h-1.5 bg-green-500 rounded-full animate-bounce" style={{ animationDelay: '0ms' }} />
-                <div className="w-1.5 h-1.5 bg-green-500 rounded-full animate-bounce" style={{ animationDelay: '150ms' }} />
-                <div className="w-1.5 h-1.5 bg-green-500 rounded-full animate-bounce" style={{ animationDelay: '300ms' }} />
+                <div className="w-1.5 h-1.5 bg-green-400 rounded-full animate-soft-bounce" style={{ animationDelay: '0ms' }} />
+                <div className="w-1.5 h-1.5 bg-green-400 rounded-full animate-soft-bounce" style={{ animationDelay: '200ms' }} />
+                <div className="w-1.5 h-1.5 bg-green-400 rounded-full animate-soft-bounce" style={{ animationDelay: '400ms' }} />
               </div>
             </div>
           </div>
@@ -872,6 +881,7 @@ function AIChat({ isFullPage = false, onClose }) {
 
         <div ref={messagesEndRef} />
       </div>
+      </div>{/* end outer relative wrapper */}
 
       {/* ── Input bar ── */}
       <div className="px-3 py-2.5 border-t border-gray-100 dark:border-gray-800 bg-white dark:bg-gray-950">
