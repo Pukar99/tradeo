@@ -925,7 +925,7 @@ function CenterDashboard({ navigate }) {
                     }
 
                     return messages.length > 0 ? (
-                      <div className="mt-1.5 space-y-1">
+                      <div className="mt-1.5 space-y-1 hidden group-hover:block">
                         {messages.map((m, i) => (
                           <div key={i} className={`${m.bg} px-1.5 py-0.5 rounded-lg`}>
                             <p className={`text-[10px] font-medium leading-tight ${m.color}`}>{m.text}</p>
