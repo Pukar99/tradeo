@@ -9,6 +9,7 @@ const NAV_LINKS = [
   { path: '/trader', label: 'Trader' },
   { path: '/portfolio', label: 'Portfolio' },
   { path: '/research', label: 'Research' },
+  { path: '/risklab', label: 'Risk Lab' },
 ]
 
 function TradeoLogo() {

@@ -16,7 +16,6 @@ const MOTIVATIONAL_QUOTES = [
   "Risk comes from not knowing what you are doing.",
   "In investing, what is comfortable is rarely profitable.",
   "Trade what you see, not what you think.",
-  "Cut losses short, let profits run.",
   "Plan the trade, trade the plan.",
   "Discipline is the bridge between trading goals and trading reality.",
 ]
@@ -42,78 +41,233 @@ function StockAvatar({ symbol, size = 'w-8 h-8', textSize = 'text-xs' }) {
 
 function LoggedOutHome() {
   const quote = MOTIVATIONAL_QUOTES[Math.floor(Math.random() * MOTIVATIONAL_QUOTES.length)]
-  const [topGainers, setTopGainers] = useState([])
 
-  useEffect(() => {
-    axios.get('http://localhost:5000/api/market/top-movers')
-      .then(res => setTopGainers(res.data.gainers?.slice(0, 5) || []))
-      .catch(() => {})
-  }, [])
+  const dummyStats = [
+    { label: 'Total P/L', value: '+Rs. 24,850', color: 'text-green-500' },
+    { label: 'Win Rate', value: '68%', color: 'text-blue-500' },
+    { label: 'Open Trades', value: '4', color: 'text-gray-900 dark:text-white' },
+    { label: 'Streak', value: '🔥 7 days', color: 'text-orange-500' },
+  ]
+  const dummyWatchlist = ['NABIL', 'NTC', 'SCB', 'EBL', 'NICA', 'HBL', 'NLIC', 'UPPER']
+  const dummyTrades = [
+    { symbol: 'NABIL', entry: 1240, ltp: 1310, pnl: '+Rs. 3,500', pct: '+5.6%', pos: 'LONG' },
+    { symbol: 'NTC', entry: 890, ltp: 860, pnl: '-Rs. 1,200', pct: '-3.4%', pos: 'LONG' },
+    { symbol: 'SCB', entry: 3100, ltp: 3280, pnl: '+Rs. 9,000', pct: '+5.8%', pos: 'LONG' },
+    { symbol: 'EBL', entry: 1560, ltp: 1590, pnl: '+Rs. 1,500', pct: '+1.9%', pos: 'LONG' },
+  ]
+  const dummyTasks = ['Review morning briefing', 'Check NABIL resistance', 'Update trade journal', 'Set SL for SCB']
 
   return (
-    <div className="w-full max-w-4xl mx-auto px-6 py-16">
-      <div className="text-center mb-12">
-        <div className="inline-flex items-center gap-2 bg-green-50 dark:bg-green-900 text-green-700 dark:text-green-300 px-3 py-1 rounded-full text-xs font-medium mb-4">
-          <span className="w-1.5 h-1.5 bg-green-500 rounded-full animate-pulse" />
-          Professional NEPSE Trading Workspace
+    <div className="relative w-full">
+
+      {/* Blurred dashboard preview */}
+      <div className="relative select-none pointer-events-none px-4 py-4 flex flex-col gap-4">
+
+        {/* Stats bar */}
+        <div className="grid grid-cols-4 gap-3 filter blur-[2px]">
+          {dummyStats.map((s, i) => (
+            <div key={i} className="bg-white dark:bg-gray-800 rounded-xl px-4 py-3 shadow-sm border border-gray-100 dark:border-gray-700">
+              <p className="text-xs text-gray-400 mb-1">{s.label}</p>
+              <p className={`text-lg font-bold ${s.color}`}>{s.value}</p>
+            </div>
+          ))}
         </div>
-        <h1 className="text-5xl font-bold text-gray-900 dark:text-white mb-4 leading-tight">
-          Trade Smarter.<br /><span className="text-green-500">Stay Disciplined.</span>
-        </h1>
-        <p className="text-gray-500 dark:text-gray-400 text-lg mb-8 max-w-xl mx-auto">
-          Your all-in-one NEPSE trading workspace — charts, journal, portfolio, and discipline tracker.
-        </p>
-        <div className="flex items-center justify-center gap-3">
-          <Link to="/signup" className="bg-green-500 hover:bg-green-400 text-white px-6 py-3 rounded-xl text-sm font-semibold transition-colors">Get Started Free →</Link>
-          <Link to="/login" className="bg-white dark:bg-gray-800 text-gray-700 dark:text-gray-300 px-6 py-3 rounded-xl text-sm font-medium border border-gray-200 dark:border-gray-700 hover:bg-gray-50 transition-colors">Login</Link>
-        </div>
-      </div>
-      <div className="bg-gradient-to-r from-blue-600 to-purple-600 rounded-2xl p-6 mb-8 text-center">
-        <p className="text-white italic text-sm font-medium opacity-90">"{quote}"</p>
-      </div>
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-        <div className="bg-white dark:bg-gray-800 rounded-xl p-5 shadow-sm border border-gray-100 dark:border-gray-700">
-          <div className="flex items-center gap-2 mb-4">
-            <span className="text-green-500 text-lg">📈</span>
-            <h3 className="text-sm font-semibold text-gray-900 dark:text-white">Today's Top Gainers</h3>
-          </div>
-          {topGainers.length > 0 ? (
-            <div className="space-y-2">
-              {topGainers.map((s, i) => (
-                <div key={i} className="flex justify-between items-center py-1 border-b border-gray-50 dark:border-gray-700">
-                  <div className="flex items-center gap-2">
-                    <StockAvatar symbol={s.s} size="w-6 h-6" />
-                    <span className="text-sm font-medium text-gray-900 dark:text-white">{s.s}</span>
+
+        <div className="grid grid-cols-12 gap-4">
+          {/* Left column */}
+          <div className="col-span-3 flex flex-col gap-4">
+            {/* Discipline score skeleton */}
+            <div className="bg-white dark:bg-gray-800 rounded-2xl p-4 shadow-sm border border-gray-100 dark:border-gray-700 filter blur-[2px]">
+              <p className="text-xs font-semibold text-gray-500 mb-3">Discipline Score</p>
+              <div className="flex items-center justify-center">
+                <div className="relative w-24 h-24">
+                  <svg viewBox="0 0 36 36" className="w-full h-full -rotate-90">
+                    <circle cx="18" cy="18" r="15.9" fill="none" stroke="#e5e7eb" strokeWidth="3" />
+                    <circle cx="18" cy="18" r="15.9" fill="none" stroke="#22c55e" strokeWidth="3"
+                      strokeDasharray="68 32" strokeLinecap="round" />
+                  </svg>
+                  <div className="absolute inset-0 flex flex-col items-center justify-center">
+                    <span className="text-xl font-bold text-gray-900 dark:text-white">68</span>
+                    <span className="text-[9px] text-gray-400">/ 100</span>
                   </div>
-                  <span className="text-sm text-green-500 font-medium bg-green-50 dark:bg-green-900 px-2 py-0.5 rounded-full">+{s.p}%</span>
                 </div>
-              ))}
-            </div>
-          ) : (
-            <div className="space-y-2">
-              {[1,2,3,4,5].map(i => (
-                <div key={i} className="flex justify-between py-1">
-                  <div className="h-4 bg-gray-100 dark:bg-gray-700 rounded w-20 animate-pulse" />
-                  <div className="h-4 bg-gray-100 dark:bg-gray-700 rounded w-12 animate-pulse" />
-                </div>
-              ))}
-            </div>
-          )}
-        </div>
-        <div className="bg-white dark:bg-gray-800 rounded-xl p-5 shadow-sm border border-gray-100 dark:border-gray-700">
-          <div className="flex items-center gap-2 mb-4">
-            <span className="text-blue-500 text-lg">💼</span>
-            <h3 className="text-sm font-semibold text-gray-900 dark:text-white">Performance Preview</h3>
-          </div>
-          <div className="space-y-3 filter blur-sm select-none pointer-events-none">
-            {[['Total P&L','+Rs. 12,450','text-green-500'],['Win Rate','68%','text-blue-500'],['Total Trades','24','text-gray-900 dark:text-white'],['Streak','🔥 5 days','text-orange-500']].map(([l,v,c]) => (
-              <div key={l} className="flex justify-between items-center py-1 border-b border-gray-50 dark:border-gray-700">
-                <span className="text-sm text-gray-500 dark:text-gray-400">{l}</span>
-                <span className={`text-sm font-bold ${c}`}>{v}</span>
               </div>
-            ))}
+              <div className="mt-3 space-y-1.5">
+                {['Consistency', 'Risk Mgmt', 'Journaling'].map((l, i) => (
+                  <div key={l} className="flex justify-between items-center">
+                    <span className="text-[10px] text-gray-400">{l}</span>
+                    <div className="w-20 h-1.5 bg-gray-100 dark:bg-gray-700 rounded-full overflow-hidden">
+                      <div className="h-full bg-green-400 rounded-full" style={{ width: `${[72, 60, 80][i]}%` }} />
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
+
+            {/* Monthly goals skeleton */}
+            <div className="bg-white dark:bg-gray-800 rounded-2xl p-4 shadow-sm border border-gray-100 dark:border-gray-700 filter blur-[2px]">
+              <p className="text-xs font-semibold text-gray-500 mb-3">Monthly Goals</p>
+              <div className="space-y-2">
+                {[['P&L Target', 75], ['Win Rate', 60], ['Trade Count', 90]].map(([l, pct]) => (
+                  <div key={l}>
+                    <div className="flex justify-between text-[10px] text-gray-400 mb-0.5">
+                      <span>{l}</span><span>{pct}%</span>
+                    </div>
+                    <div className="w-full h-1.5 bg-gray-100 dark:bg-gray-700 rounded-full overflow-hidden">
+                      <div className="h-full bg-blue-400 rounded-full" style={{ width: `${pct}%` }} />
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
           </div>
-          <p className="text-xs text-center text-gray-400 mt-4 border-t border-gray-100 dark:border-gray-700 pt-3">🔒 Login to see your real data</p>
+
+          {/* Center column */}
+          <div className="col-span-6 flex flex-col gap-4">
+            {/* Open positions */}
+            <div className="bg-white dark:bg-gray-800 rounded-2xl shadow-sm border border-gray-100 dark:border-gray-700 overflow-hidden filter blur-[2px]">
+              <div className="flex items-center justify-between px-5 py-3 border-b border-gray-100 dark:border-gray-700">
+                <h3 className="text-sm font-semibold text-gray-900 dark:text-white">Open Positions</h3>
+                <span className="text-xs text-gray-400">4 active</span>
+              </div>
+              <div className="divide-y divide-gray-50 dark:divide-gray-700">
+                {dummyTrades.map((t, i) => (
+                  <div key={i} className="flex items-center justify-between px-5 py-2.5">
+                    <div className="flex items-center gap-2">
+                      <StockAvatar symbol={t.symbol} size="w-7 h-7" />
+                      <div>
+                        <p className="text-xs font-semibold text-gray-900 dark:text-white">{t.symbol}</p>
+                        <p className="text-[10px] text-gray-400">Entry Rs.{t.entry}</p>
+                      </div>
+                    </div>
+                    <div className="text-right">
+                      <p className={`text-xs font-semibold ${t.pnl.startsWith('+') ? 'text-green-500' : 'text-red-500'}`}>{t.pnl}</p>
+                      <p className={`text-[10px] ${t.pct.startsWith('+') ? 'text-green-400' : 'text-red-400'}`}>{t.pct}</p>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
+
+            {/* Watchlist */}
+            <div className="bg-white dark:bg-gray-800 rounded-2xl shadow-sm border border-gray-100 dark:border-gray-700 overflow-hidden filter blur-[2px]">
+              <div className="flex items-center justify-between px-5 py-3 border-b border-gray-100 dark:border-gray-700">
+                <h3 className="text-sm font-semibold text-gray-900 dark:text-white">Watchlist</h3>
+                <div className="flex gap-1">
+                  {['Active', 'Pre-Watch', 'Portfolio'].map(t => (
+                    <span key={t} className={`text-[10px] px-2 py-0.5 rounded-full ${t === 'Active' ? 'bg-blue-100 dark:bg-blue-900 text-blue-600' : 'text-gray-400'}`}>{t}</span>
+                  ))}
+                </div>
+              </div>
+              <div className="p-3 grid grid-cols-4 gap-2">
+                {dummyWatchlist.map((sym, i) => (
+                  <div key={i} className="bg-gray-50 dark:bg-gray-700 rounded-xl px-3 py-2">
+                    <div className="flex items-center gap-1.5 mb-1">
+                      <StockAvatar symbol={sym} size="w-6 h-6" textSize="text-[9px]" />
+                      <p className="text-xs font-semibold text-gray-900 dark:text-white">{sym}</p>
+                    </div>
+                    <p className="text-[10px] text-gray-400">Rs.{[1240,890,3100,1560,420,760,980,640][i]}</p>
+                    <span className={`text-[10px] font-medium px-1.5 py-0.5 rounded-full ${i % 2 === 0 ? 'bg-green-100 dark:bg-green-900 text-green-600' : 'bg-red-100 dark:bg-red-900 text-red-500'}`}>
+                      {i % 2 === 0 ? '+' : '-'}{[2.4,1.8,3.1,0.9,2.2,1.5,4.0,0.7][i]}%
+                    </span>
+                  </div>
+                ))}
+              </div>
+            </div>
+          </div>
+
+          {/* Right column */}
+          <div className="col-span-3 flex flex-col gap-4">
+            {/* Task board skeleton */}
+            <div className="bg-white dark:bg-gray-800 rounded-2xl p-4 shadow-sm border border-gray-100 dark:border-gray-700 filter blur-[2px]">
+              <p className="text-xs font-semibold text-gray-500 mb-3">Today's Tasks</p>
+              <div className="space-y-2">
+                {dummyTasks.map((task, i) => (
+                  <div key={i} className="flex items-center gap-2">
+                    <div className={`w-3.5 h-3.5 rounded-full border-2 flex-shrink-0 ${i < 2 ? 'bg-green-400 border-green-400' : 'border-gray-300'}`} />
+                    <span className={`text-[11px] ${i < 2 ? 'line-through text-gray-300' : 'text-gray-600 dark:text-gray-300'}`}>{task}</span>
+                  </div>
+                ))}
+              </div>
+              <div className="mt-3 pt-2 border-t border-gray-100 dark:border-gray-700 flex justify-between text-[10px] text-gray-400">
+                <span>2 / 4 done</span><span>50%</span>
+              </div>
+            </div>
+
+            {/* AI chat skeleton */}
+            <div className="bg-white dark:bg-gray-800 rounded-2xl p-4 shadow-sm border border-gray-100 dark:border-gray-700 filter blur-[2px]">
+              <p className="text-xs font-semibold text-gray-500 mb-3">Tradeo AI</p>
+              <div className="space-y-2">
+                <div className="bg-gray-50 dark:bg-gray-700 rounded-xl px-3 py-2">
+                  <p className="text-[11px] text-gray-500">NABIL has broken resistance at 1300. Consider reviewing your SL.</p>
+                </div>
+                <div className="bg-blue-50 dark:bg-blue-900 rounded-xl px-3 py-2 ml-4">
+                  <p className="text-[11px] text-blue-600 dark:text-blue-300">What's my win rate this month?</p>
+                </div>
+                <div className="bg-gray-50 dark:bg-gray-700 rounded-xl px-3 py-2">
+                  <p className="text-[11px] text-gray-500">Your win rate is 68% with 17 trades closed this month.</p>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      {/* Centered intro overlay */}
+      <div className="absolute inset-0 flex items-center justify-center z-20 pointer-events-none">
+        <div className="pointer-events-auto w-full max-w-lg mx-4">
+          {/* Main card */}
+          <div className="bg-white/97 dark:bg-gray-900/97 backdrop-blur-md rounded-2xl shadow-2xl border border-gray-200 dark:border-gray-700 overflow-hidden">
+            {/* Header strip */}
+            <div className="bg-gradient-to-r from-gray-900 to-gray-800 dark:from-gray-950 dark:to-gray-900 px-8 py-6 border-b border-gray-700">
+              <div className="flex items-center gap-2 mb-3">
+                <span className="w-1.5 h-1.5 bg-green-400 rounded-full animate-pulse" />
+                <span className="text-green-400 text-xs font-medium tracking-widest uppercase">NEPSE Trading Workspace</span>
+              </div>
+              <h1 className="text-2xl font-bold text-white leading-snug">
+                Built for traders who take<br />
+                <span className="text-green-400">discipline seriously.</span>
+              </h1>
+              <p className="text-gray-400 text-sm mt-2 leading-relaxed">
+                Tradeo is your all-in-one command center — from your first trade to your thousandth.
+              </p>
+            </div>
+
+            {/* Features grid */}
+            <div className="px-8 py-5 grid grid-cols-2 gap-3">
+              {[
+                { icon: '📒', title: 'Trade Journal', desc: 'Log every entry, exit, and lesson learned' },
+                { icon: '👁️', title: 'Smart Watchlist', desc: 'Price & date alerts with BUY/SELL tags' },
+                { icon: '📊', title: 'Portfolio Tracker', desc: 'Unrealized P&L, positions, and exposure' },
+                { icon: '🧠', title: 'Discipline Score', desc: 'Track consistency, habits, and streaks' },
+                { icon: '🤖', title: 'Tradeo AI', desc: 'Ask anything about your trades & market' },
+                { icon: '⚗️', title: 'Risk Lab', desc: 'Position sizer, NEPSE calc, SIP planner' },
+              ].map(f => (
+                <div key={f.title} className="flex items-start gap-2.5">
+                  <span className="text-base mt-0.5">{f.icon}</span>
+                  <div>
+                    <p className="text-xs font-semibold text-gray-900 dark:text-white">{f.title}</p>
+                    <p className="text-[11px] text-gray-400 leading-snug">{f.desc}</p>
+                  </div>
+                </div>
+              ))}
+            </div>
+
+            {/* Quote */}
+            <div className="px-8 py-3 border-t border-gray-100 dark:border-gray-800">
+              <p className="text-[11px] text-gray-400 italic text-center">"{quote}"</p>
+            </div>
+
+            {/* CTA */}
+            <div className="px-8 py-5 border-t border-gray-100 dark:border-gray-800 flex gap-3">
+              <Link to="/signup" className="flex-1 bg-green-500 hover:bg-green-400 text-white py-2.5 rounded-xl text-sm font-semibold text-center transition-colors">
+                Get Started — It's Free
+              </Link>
+              <Link to="/login" className="flex-1 bg-gray-100 dark:bg-gray-800 text-gray-700 dark:text-gray-300 py-2.5 rounded-xl text-sm font-medium text-center hover:bg-gray-200 dark:hover:bg-gray-700 border border-gray-200 dark:border-gray-700 transition-colors">
+                Login
+              </Link>
+            </div>
+          </div>
         </div>
       </div>
     </div>
@@ -127,7 +281,7 @@ function CenterDashboard({ navigate }) {
   const [watchlist, setWatchlist] = useState([])
   const [watchlistTab, setWatchlistTab] = useState('active')
   const [perfCollapsed, setPerfCollapsed] = useState(false)
-  const [positionsCollapsed, setPositionsCollapsed] = useState(false)
+  const [positionsCollapsed, setPositionsCollapsed] = useState(true)
   const [loading, setLoading] = useState(true)
   const [showAddWatch, setShowAddWatch] = useState(false)
   const [newSymbol, setNewSymbol] = useState('')
@@ -680,15 +834,15 @@ function CenterDashboard({ navigate }) {
               )}
             </div>
           ) : (
-            <div className="grid grid-cols-2 gap-2">
+            <div className="grid grid-cols-2 md:grid-cols-4 gap-2">
               {filteredWatch.map(item => (
-                <div key={item.id} className="flex flex-col bg-gray-50 dark:bg-gray-700 rounded-xl px-3 py-2.5 group">
+                <div key={item.id} className="flex flex-col bg-gray-50 dark:bg-gray-700 rounded-lg px-2.5 py-2 group">
                   <div className="flex items-center justify-between">
-                    <div className="flex items-center gap-2">
-                      <StockAvatar symbol={item.symbol} size="w-8 h-8" />
+                    <div className="flex items-center gap-1.5">
+                      <StockAvatar symbol={item.symbol} size="w-7 h-7" />
                       <div>
-                        <p className="text-sm font-semibold text-gray-900 dark:text-white">{item.symbol}</p>
-                        <p className="text-xs text-gray-400">
+                        <p className="text-xs font-semibold text-gray-900 dark:text-white">{item.symbol}</p>
+                        <p className="text-[10px] text-gray-400">
                           {item.isPosition
                             ? `${item.quantity} @ Rs.${item.entry_price}`
                             : `Rs.${item.currentPrice?.toLocaleString() || '—'}`
@@ -698,7 +852,7 @@ function CenterDashboard({ navigate }) {
                     </div>
                     <div className="flex items-center gap-1">
                       {item.isPosition && item.unrealizedPnl !== null ? (
-                        <span className={`text-xs font-medium px-2 py-0.5 rounded-full ${
+                        <span className={`text-[10px] font-medium px-1.5 py-0.5 rounded-full ${
                           item.unrealizedPnl >= 0
                             ? 'bg-green-100 dark:bg-green-900 text-green-600 dark:text-green-300'
                             : 'bg-red-100 dark:bg-red-900 text-red-600 dark:text-red-300'
@@ -706,7 +860,7 @@ function CenterDashboard({ navigate }) {
                           {item.unrealizedPnl >= 0 ? '+' : ''}Rs.{Math.abs(item.unrealizedPnl).toLocaleString()}
                         </span>
                       ) : item.change !== undefined && item.change !== null ? (
-                        <span className={`text-xs font-medium px-2 py-0.5 rounded-full ${
+                        <span className={`text-[10px] font-medium px-1.5 py-0.5 rounded-full ${
                           item.change >= 0
                             ? 'bg-green-100 dark:bg-green-900 text-green-600 dark:text-green-300'
                             : 'bg-red-100 dark:bg-red-900 text-red-600 dark:text-red-300'
@@ -770,8 +924,8 @@ function CenterDashboard({ navigate }) {
                     return messages.length > 0 ? (
                       <div className="mt-1.5 space-y-1">
                         {messages.map((m, i) => (
-                          <div key={i} className={`${m.bg} px-2 py-1 rounded-lg`}>
-                            <p className={`text-xs font-medium ${m.color}`}>{m.text}</p>
+                          <div key={i} className={`${m.bg} px-1.5 py-0.5 rounded-lg`}>
+                            <p className={`text-[10px] font-medium leading-tight ${m.color}`}>{m.text}</p>
                           </div>
                         ))}
                       </div>

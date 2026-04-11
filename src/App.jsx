@@ -1,5 +1,5 @@
 import { BrowserRouter, Routes, Route } from 'react-router-dom'
-import { useEffect } from 'react'
+import { useEffect, useState } from 'react'
 import Navbar from './components/Navbar'
 import HomePage from './pages/HomePage'
 import AnalysisPage from './pages/AnalysisPage'
@@ -13,12 +13,15 @@ import ResearchEditorPage from './pages/ResearchEditorPage'
 import ResearchViewPage from './pages/ResearchViewPage'
 import ProfilePage from './pages/ProfilePage'
 import ChatPage from './pages/ChatPage'
+import RiskLabPage from './pages/RiskLabPage'
 import FloatingChat from './components/FloatingChat'
+import MorningBriefing from './components/MorningBriefing'
 import { useAuth } from './context/AuthContext'
 import { getProfile } from './api'
 
 function AppContent() {
   const { user, updateUser } = useAuth()
+  const [showBriefing, setShowBriefing] = useState(false)
 
   useEffect(() => {
     if (user) {
@@ -29,11 +32,18 @@ function AppContent() {
           }
         })
         .catch(() => {})
+
+      // Show briefing once per session (clears on tab close, not on refresh)
+      const briefingShown = sessionStorage.getItem('briefingShown')
+      if (!briefingShown) {
+        setTimeout(() => setShowBriefing(true), 1000)
+        sessionStorage.setItem('briefingShown', 'true')
+      }
     }
   }, [])
 
   return (
-    <div className="min-h-screen bg-gray-100 dark:bg-gray-900 transition-colors">
+    <div className="min-h-screen bg-gray-50 dark:bg-gray-900 transition-colors">
       <Navbar />
       <Routes>
         <Route path="/" element={<HomePage />} />
@@ -46,11 +56,15 @@ function AppContent() {
         <Route path="/research/:id" element={<ResearchViewPage />} />
         <Route path="/profile" element={<ProfilePage />} />
         <Route path="/chat" element={<ChatPage />} />
+        <Route path="/risklab" element={<RiskLabPage />} />
         <Route path="/login" element={<LoginPage />} />
         <Route path="/signup" element={<SignupPage />} />
         <Route path="*" element={<NotFoundPage />} />
       </Routes>
       <FloatingChat />
+      {showBriefing && user && (
+        <MorningBriefing onClose={() => setShowBriefing(false)} />
+      )}
     </div>
   )
 }

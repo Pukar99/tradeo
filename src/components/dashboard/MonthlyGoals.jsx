@@ -5,12 +5,11 @@ function MonthlyGoals() {
   const [goals, setGoals] = useState([])
   const [loading, setLoading] = useState(true)
   const [showForm, setShowForm] = useState(false)
-  const [form, setForm] = useState({
-    title: '',
-    description: '',
-    target_date: ''
-  })
+  const [form, setForm] = useState({ title: '', description: '', target_date: '' })
   const [adding, setAdding] = useState(false)
+  const [editingId, setEditingId] = useState(null)
+  const [editForm, setEditForm] = useState({ title: '', description: '', target_date: '' })
+  const [saving, setSaving] = useState(false)
 
   const fetchGoals = async () => {
     try {
@@ -26,9 +25,7 @@ function MonthlyGoals() {
   useEffect(() => { fetchGoals() }, [])
 
   const completedCount = goals.filter(g => g.completed).length
-  const progress = goals.length > 0
-    ? Math.round((completedCount / goals.length) * 100)
-    : 0
+  const progress = goals.length > 0 ? Math.round((completedCount / goals.length) * 100) : 0
 
   const handleAdd = async (e) => {
     e.preventDefault()
@@ -48,12 +45,7 @@ function MonthlyGoals() {
   const handleToggle = async (goal) => {
     try {
       await updateGoal(goal.id, !goal.completed)
-      setGoals(prev =>
-        prev.map(g => g.id === goal.id
-          ? { ...g, completed: !g.completed }
-          : g
-        )
-      )
+      setGoals(prev => prev.map(g => g.id === goal.id ? { ...g, completed: !g.completed } : g))
     } catch (err) {
       console.error(err)
     }
@@ -68,6 +60,30 @@ function MonthlyGoals() {
     }
   }
 
+  const startEdit = (goal) => {
+    setEditingId(goal.id)
+    setEditForm({ title: goal.title, description: goal.description || '', target_date: goal.target_date || '' })
+  }
+
+  const cancelEdit = () => {
+    setEditingId(null)
+    setEditForm({ title: '', description: '', target_date: '' })
+  }
+
+  const handleSaveEdit = async (id) => {
+    if (!editForm.title.trim()) return
+    setSaving(true)
+    try {
+      const res = await updateGoal(id, editForm)
+      setGoals(prev => prev.map(g => g.id === id ? res.data : g))
+      setEditingId(null)
+    } catch (err) {
+      console.error(err)
+    } finally {
+      setSaving(false)
+    }
+  }
+
   if (loading) return (
     <div className="bg-white dark:bg-gray-800 rounded-xl p-4 shadow-sm">
       <p className="text-sm text-gray-400">Loading goals...</p>
@@ -78,9 +94,7 @@ function MonthlyGoals() {
     <div className="bg-white dark:bg-gray-800 rounded-xl shadow-sm">
       <div className="p-4 border-b border-gray-100 dark:border-gray-700">
         <div className="flex justify-between items-center mb-2">
-          <h2 className="text-base font-semibold text-gray-900 dark:text-white">
-            Monthly Goals
-          </h2>
+          <h2 className="text-base font-semibold text-gray-900 dark:text-white">Monthly Goals</h2>
           <button
             onClick={() => setShowForm(!showForm)}
             className="bg-blue-600 text-white px-3 py-1 rounded-lg text-xs font-medium hover:bg-blue-700"
@@ -95,10 +109,7 @@ function MonthlyGoals() {
               <span>{progress}%</span>
             </div>
             <div className="w-full bg-gray-100 dark:bg-gray-700 rounded-full h-1.5">
-              <div
-                className="h-1.5 rounded-full bg-blue-500 transition-all duration-500"
-                style={{ width: `${progress}%` }}
-              />
+              <div className="h-1.5 rounded-full bg-blue-500 transition-all duration-500" style={{ width: `${progress}%` }} />
             </div>
           </div>
         )}
@@ -108,9 +119,7 @@ function MonthlyGoals() {
         <div className="p-4 border-b border-gray-100 dark:border-gray-700 bg-gray-50 dark:bg-gray-900">
           <form onSubmit={handleAdd}>
             <div className="mb-3">
-              <label className="block text-xs text-gray-500 mb-1">
-                Goal Title
-              </label>
+              <label className="block text-xs text-gray-500 mb-1">Goal Title</label>
               <input
                 type="text"
                 value={form.title}
@@ -121,9 +130,7 @@ function MonthlyGoals() {
               />
             </div>
             <div className="mb-3">
-              <label className="block text-xs text-gray-500 mb-1">
-                Description (optional)
-              </label>
+              <label className="block text-xs text-gray-500 mb-1">Description (optional)</label>
               <input
                 type="text"
                 value={form.description}
@@ -133,9 +140,7 @@ function MonthlyGoals() {
               />
             </div>
             <div className="mb-3">
-              <label className="block text-xs text-gray-500 mb-1">
-                Target Date (optional)
-              </label>
+              <label className="block text-xs text-gray-500 mb-1">Target Date (optional)</label>
               <input
                 type="date"
                 value={form.target_date}
@@ -158,55 +163,104 @@ function MonthlyGoals() {
         {goals.length === 0 ? (
           <div className="p-6 text-center">
             <p className="text-sm text-gray-400">No goals set for this month</p>
-            <p className="text-xs text-gray-400 mt-1">
-              Click "+ Add Goal" to set your monthly targets
-            </p>
+            <p className="text-xs text-gray-400 mt-1">Click "+ Add Goal" to set your monthly targets</p>
           </div>
         ) : (
           goals.map(goal => (
-            <div
-              key={goal.id}
-              className="px-4 py-3 flex items-start gap-3 hover:bg-gray-50 dark:hover:bg-gray-700 group"
-            >
-              <button
-                onClick={() => handleToggle(goal)}
-                className={`mt-0.5 w-5 h-5 rounded border-2 flex items-center justify-center flex-shrink-0 transition-colors ${
-                  goal.completed
-                    ? 'bg-green-500 border-green-500'
-                    : 'border-gray-300 dark:border-gray-600 hover:border-green-400'
-                }`}
-              >
-                {goal.completed && (
-                  <svg className="w-3 h-3 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M5 13l4 4L19 7" />
-                  </svg>
-                )}
-              </button>
-              <div className="flex-1 min-w-0">
-                <p className={`text-sm font-medium transition-colors ${
-                  goal.completed
-                    ? 'line-through text-gray-400'
-                    : 'text-gray-900 dark:text-white'
-                }`}>
-                  {goal.title}
-                </p>
-                {goal.description && (
-                  <p className="text-xs text-gray-400 mt-0.5">
-                    {goal.description}
-                  </p>
-                )}
-                {goal.target_date && (
-                  <p className="text-xs text-gray-400 mt-0.5">
-                    Target: {goal.target_date}
-                  </p>
-                )}
-              </div>
-              <button
-                onClick={() => handleDelete(goal.id)}
-                className="opacity-0 group-hover:opacity-100 text-gray-300 hover:text-red-400 text-xs transition-opacity mt-0.5"
-              >
-                ✕
-              </button>
+            <div key={goal.id}>
+              {editingId === goal.id ? (
+                // Inline edit form
+                <div className="px-4 py-3 bg-blue-50 dark:bg-blue-900/20 border-l-2 border-blue-400">
+                  <div className="mb-2">
+                    <input
+                      type="text"
+                      value={editForm.title}
+                      onChange={e => setEditForm({ ...editForm, title: e.target.value })}
+                      className="w-full border border-gray-200 dark:border-gray-600 dark:bg-gray-700 dark:text-white rounded-lg px-3 py-1.5 text-sm focus:outline-none focus:border-blue-500"
+                      placeholder="Goal title"
+                    />
+                  </div>
+                  <div className="mb-2">
+                    <input
+                      type="text"
+                      value={editForm.description}
+                      onChange={e => setEditForm({ ...editForm, description: e.target.value })}
+                      className="w-full border border-gray-200 dark:border-gray-600 dark:bg-gray-700 dark:text-white rounded-lg px-3 py-1.5 text-sm focus:outline-none focus:border-blue-500"
+                      placeholder="Description (optional)"
+                    />
+                  </div>
+                  <div className="mb-3">
+                    <input
+                      type="date"
+                      value={editForm.target_date}
+                      onChange={e => setEditForm({ ...editForm, target_date: e.target.value })}
+                      className="w-full border border-gray-200 dark:border-gray-600 dark:bg-gray-700 dark:text-white rounded-lg px-3 py-1.5 text-sm focus:outline-none focus:border-blue-500"
+                    />
+                  </div>
+                  <div className="flex gap-2">
+                    <button
+                      onClick={() => handleSaveEdit(goal.id)}
+                      disabled={saving}
+                      className="flex-1 bg-blue-600 text-white py-1.5 rounded-lg text-xs font-medium hover:bg-blue-700 disabled:opacity-50"
+                    >
+                      {saving ? 'Saving...' : 'Save'}
+                    </button>
+                    <button
+                      onClick={cancelEdit}
+                      className="flex-1 bg-gray-100 dark:bg-gray-700 text-gray-600 dark:text-gray-300 py-1.5 rounded-lg text-xs font-medium hover:bg-gray-200 dark:hover:bg-gray-600"
+                    >
+                      Cancel
+                    </button>
+                  </div>
+                </div>
+              ) : (
+                // Normal row
+                <div className="px-4 py-3 flex items-start gap-3 hover:bg-gray-50 dark:hover:bg-gray-700 group">
+                  <button
+                    onClick={() => handleToggle(goal)}
+                    className={`mt-0.5 w-5 h-5 rounded border-2 flex items-center justify-center flex-shrink-0 transition-colors ${
+                      goal.completed
+                        ? 'bg-green-500 border-green-500'
+                        : 'border-gray-300 dark:border-gray-600 hover:border-green-400'
+                    }`}
+                  >
+                    {goal.completed && (
+                      <svg className="w-3 h-3 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M5 13l4 4L19 7" />
+                      </svg>
+                    )}
+                  </button>
+                  <div className="flex-1 min-w-0">
+                    <p className={`text-sm font-medium transition-colors ${
+                      goal.completed ? 'line-through text-gray-400' : 'text-gray-900 dark:text-white'
+                    }`}>
+                      {goal.title}
+                    </p>
+                    {goal.description && (
+                      <p className="text-xs text-gray-400 mt-0.5">{goal.description}</p>
+                    )}
+                    {goal.target_date && (
+                      <p className="text-xs text-gray-400 mt-0.5">Target: {goal.target_date}</p>
+                    )}
+                  </div>
+                  <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity mt-0.5">
+                    <button
+                      onClick={() => startEdit(goal)}
+                      className="text-gray-400 hover:text-blue-500 text-xs px-1"
+                      title="Edit"
+                    >
+                      ✏️
+                    </button>
+                    <button
+                      onClick={() => handleDelete(goal.id)}
+                      className="text-gray-300 hover:text-red-400 text-xs px-1"
+                      title="Delete"
+                    >
+                      ✕
+                    </button>
+                  </div>
+                </div>
+              )}
             </div>
           ))
         )}
