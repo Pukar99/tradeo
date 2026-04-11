@@ -447,7 +447,7 @@ function CenterDashboard({ navigate }) {
 
       {/* Stats Bar — inside center */}
       {perfStats && (
-        <div className="grid grid-cols-4 gap-3">
+        <div className="grid grid-cols-4 gap-2.5">
           {[
             {
               label: tr('stats.totalPL'),
@@ -470,53 +470,51 @@ function CenterDashboard({ navigate }) {
               color: 'text-gray-900 dark:text-white'
             },
           ].map((s, i) => (
-            <div key={i} className="bg-white dark:bg-gray-800 rounded-xl px-4 py-3 shadow-sm border border-gray-100 dark:border-gray-700">
-              <p className="text-xs text-gray-400 mb-1">{s.label}</p>
-              <p className={`text-xl font-bold ${s.color}`}>{s.value}</p>
+            <div key={i} className="bg-white dark:bg-gray-900 rounded-2xl px-4 py-3 border border-gray-100 dark:border-gray-800">
+              <p className="text-[10px] font-medium text-gray-400 uppercase tracking-wide mb-1">{s.label}</p>
+              <p className={`text-lg font-bold tracking-tight ${s.color}`}>{s.value}</p>
             </div>
           ))}
         </div>
       )}
 
-      {/* Performance Section — Always Visible */}
-      <div className="bg-white dark:bg-gray-800 rounded-2xl shadow-sm border border-gray-100 dark:border-gray-700 overflow-hidden">
-        <div className="px-5 py-4 border-b border-gray-100 dark:border-gray-700">
-          <h3 className="text-sm font-semibold text-gray-900 dark:text-white">Performance</h3>
-        </div>
-
-        {perfStats && (
-          <div className="p-5">
-            <div className="grid grid-cols-4 gap-3 mb-4">
+      {/* Performance Section */}
+      {perfStats && (
+        <div className="bg-white dark:bg-gray-900 rounded-2xl border border-gray-100 dark:border-gray-800 overflow-hidden">
+          <div className="px-5 py-3 border-b border-gray-100 dark:border-gray-800 flex items-center justify-between">
+            <h3 className="text-[12px] font-semibold text-gray-700 dark:text-gray-300 uppercase tracking-wide">Performance</h3>
+          </div>
+          <div className="p-4">
+            <div className="grid grid-cols-4 gap-2.5 mb-3">
               {[
                 { label: 'Total P/L', value: `${perfStats.totalPnl >= 0 ? '+' : ''}Rs. ${Math.abs(Math.round(perfStats.totalPnl)).toLocaleString()}`, color: perfStats.totalPnl >= 0 ? 'text-green-500' : 'text-red-500' },
                 { label: 'Unrealized', value: `${perfStats.totalInvested > 0 ? ((perfStats.unrealizedPnl / perfStats.totalInvested) * 100).toFixed(2) : '0.00'}%`, color: perfStats.unrealizedPnl >= 0 ? 'text-green-500' : 'text-red-500' },
                 { label: 'Win Rate', value: `${perfStats.winRate}%`, color: 'text-gray-900 dark:text-white' },
-                { label: 'Total Invested', value: `Rs. ${Math.round(perfStats.totalInvested).toLocaleString()}`, sub: `Current Value Rs: ${Math.round(perfStats.currentValue).toLocaleString()}`, color: 'text-gray-900 dark:text-white' },
+                { label: 'Invested', value: `Rs. ${Math.round(perfStats.totalInvested).toLocaleString()}`, sub: `Val: Rs.${Math.round(perfStats.currentValue).toLocaleString()}`, color: 'text-gray-900 dark:text-white' },
               ].map((s, i) => (
-                <div key={i} className="bg-gray-50 dark:bg-gray-700 rounded-xl p-3 text-center">
-                  <p className="text-xs text-gray-400 mb-1">{s.label}</p>
-                  <p className={`text-lg font-bold ${s.color}`}>{s.value}</p>
-                  {s.sub && <p className="text-xs text-gray-400 mt-0.5">{s.sub}</p>}
+                <div key={i} className="bg-gray-50 dark:bg-gray-800 rounded-xl p-3">
+                  <p className="text-[10px] font-medium text-gray-400 uppercase tracking-wide mb-1">{s.label}</p>
+                  <p className={`text-sm font-bold tracking-tight ${s.color}`}>{s.value}</p>
+                  {s.sub && <p className="text-[10px] text-gray-400 mt-0.5">{s.sub}</p>}
                 </div>
               ))}
             </div>
-
             {perfStats.totalPnl < 0 && perfStats.totalInvested > 0 && (
-              <div className="flex items-center gap-2 bg-red-50 dark:bg-red-900 border border-red-100 dark:border-red-800 rounded-xl px-4 py-2.5">
-                <span className="w-2 h-2 bg-red-500 rounded-full flex-shrink-0" />
-                <p className="text-xs text-red-600 dark:text-red-300 font-medium">
+              <div className="flex items-center gap-2 bg-red-50 dark:bg-red-900/30 border border-red-100 dark:border-red-800 rounded-xl px-3 py-2">
+                <span className="w-1.5 h-1.5 bg-red-500 rounded-full flex-shrink-0" />
+                <p className="text-[11px] text-red-600 dark:text-red-300 font-medium">
                   Drawdown: {((perfStats.totalPnl / perfStats.totalInvested) * 100).toFixed(2)}% — Need +{Math.abs(((perfStats.totalPnl / (perfStats.totalInvested + perfStats.totalPnl))) * 100).toFixed(2)}% to recover
                 </p>
               </div>
             )}
           </div>
-        )}
-      </div>
+        </div>
+      )}
 
       {/* Open Positions — with Collapse */}
-      <div className="bg-white dark:bg-gray-800 rounded-2xl shadow-sm border border-gray-100 dark:border-gray-700 overflow-hidden">
-        <div className="flex items-center justify-between px-5 py-4 border-b border-gray-100 dark:border-gray-700">
-          <h3 className="text-sm font-semibold text-gray-900 dark:text-white">{tr('positions.title')}</h3>
+      <div className="bg-white dark:bg-gray-900 rounded-2xl border border-gray-100 dark:border-gray-800 overflow-hidden">
+        <div className="flex items-center justify-between px-5 py-3 border-b border-gray-100 dark:border-gray-800">
+          <h3 className="text-[12px] font-semibold text-gray-700 dark:text-gray-300 uppercase tracking-wide">{tr('positions.title')}</h3>
           <div className="flex items-center gap-2">
             <button
               onClick={() => setPositionsCollapsed(!positionsCollapsed)}
@@ -631,9 +629,9 @@ function CenterDashboard({ navigate }) {
       </div>
 
       {/* Watchlist — Full Width */}
-      <div className="bg-white dark:bg-gray-800 rounded-2xl shadow-sm border border-gray-100 dark:border-gray-700 overflow-hidden">
-        <div className="flex items-center justify-between px-4 py-3 border-b border-gray-100 dark:border-gray-700">
-          <h3 className="text-sm font-semibold text-gray-900 dark:text-white">{tr('watchlist.title')}</h3>
+      <div className="bg-white dark:bg-gray-900 rounded-2xl border border-gray-100 dark:border-gray-800 overflow-hidden">
+        <div className="flex items-center justify-between px-4 py-3 border-b border-gray-100 dark:border-gray-800">
+          <h3 className="text-[12px] font-semibold text-gray-700 dark:text-gray-300 uppercase tracking-wide">{tr('watchlist.title')}</h3>
           <div className="flex items-center gap-1">
             {['active', 'pre', 'portfolio'].map(tab => (
               <button
