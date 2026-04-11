@@ -37,7 +37,7 @@ export const deleteCustomTask = (id) => API.delete(`/api/dashboard/tasks/custom/
 export const getDiscipline = () => API.get('/api/dashboard/discipline')
 export const getGoals = () => API.get('/api/dashboard/goals')
 export const addGoal = (data) => API.post('/api/dashboard/goals', data)
-export const updateGoal = (id, completed) => API.put(`/api/dashboard/goals/${id}`, { completed })
+export const updateGoal = (id, data) => API.put(`/api/dashboard/goals/${id}`, typeof data === 'boolean' ? { completed: data } : data)
 export const deleteGoal = (id) => API.delete(`/api/dashboard/goals/${id}`)
 export const getWatchlist = () => API.get('/api/dashboard/watchlist')
 export const addToWatchlist = (data) => API.post('/api/dashboard/watchlist', data)
@@ -72,6 +72,7 @@ export const changePassword = (data) => API.put('/api/profile/password', data)
 
 // AI Chat
 export const sendChatMessage = (data) => API.post('/api/chat/message', data)
+export const sendAgentMessage = (data) => API.post('/api/chat/agent', data)
 export const getChatSuggestions = () => API.get('/api/chat/suggestions')
 
 // Trade Log (new system)
