@@ -2,6 +2,7 @@ import { useState } from 'react'
 import { useNavigate, Link } from 'react-router-dom'
 import { loginUser } from '../api'
 import { useAuth } from '../context/AuthContext'
+import { useLanguage } from '../context/LanguageContext'
 
 function LoginPage() {
   const [email, setEmail] = useState('')
@@ -10,6 +11,7 @@ function LoginPage() {
   const [loading, setLoading] = useState(false)
 
   const { login } = useAuth()
+  const { t } = useLanguage()
   const navigate = useNavigate()
 
   const handleSubmit = async (e) => {
@@ -34,10 +36,10 @@ function LoginPage() {
 
         <div className="text-center mb-6">
           <h1 className="text-2xl font-bold text-gray-900 dark:text-white">
-            Login to Tradeo
+            {t('loginPage.title')}
           </h1>
           <p className="text-sm text-gray-400 mt-1">
-            Welcome back, trader
+            {t('loginPage.sub')}
           </p>
         </div>
 
@@ -81,14 +83,14 @@ function LoginPage() {
             disabled={loading}
             className="w-full bg-blue-600 text-white py-2 rounded-lg text-sm font-medium hover:bg-blue-700 disabled:opacity-50"
           >
-            {loading ? 'Logging in...' : 'Login'}
+            {loading ? '...' : t('loginPage.btn')}
           </button>
         </form>
 
         <p className="text-sm text-gray-500 dark:text-gray-400 mt-4 text-center">
-          Don't have an account?{' '}
+          {t('loginPage.noAccount')}{' '}
           <Link to="/signup" className="text-blue-600 hover:underline">
-            Sign up
+            {t('loginPage.signup')}
           </Link>
         </p>
 

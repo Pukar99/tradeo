@@ -2,15 +2,7 @@ import { useState, useRef, useEffect } from 'react'
 import { Link, useLocation } from 'react-router-dom'
 import { useAuth } from '../context/AuthContext'
 import { useTheme } from '../context/ThemeContext'
-
-const NAV_LINKS = [
-  { path: '/', label: 'Home' },
-  { path: '/analysis', label: 'Analysis' },
-  { path: '/trader', label: 'Trader' },
-  { path: '/portfolio', label: 'Portfolio' },
-  { path: '/research', label: 'Research' },
-  { path: '/risklab', label: 'Risk Lab' },
-]
+import { useLanguage } from '../context/LanguageContext'
 
 function TradeoLogo() {
   return (
@@ -32,9 +24,19 @@ function TradeoLogo() {
 function Navbar() {
   const { user, logout } = useAuth()
   const { isDark, toggleTheme } = useTheme()
+  const { t, lang, toggleLang } = useLanguage()
   const location = useLocation()
   const [dropdownOpen, setDropdownOpen] = useState(false)
   const dropdownRef = useRef(null)
+
+  const NAV_LINKS = [
+    { path: '/', label: t('nav.home') },
+    { path: '/analysis', label: t('nav.analysis') },
+    { path: '/trader', label: t('nav.trader') },
+    { path: '/portfolio', label: t('nav.portfolio') },
+    { path: '/research', label: t('nav.research') },
+    { path: '/risklab', label: t('nav.risklab') },
+  ]
 
   useEffect(() => {
     const handleClickOutside = (e) => {
@@ -87,7 +89,18 @@ function Navbar() {
         </div>
       </div>
 
-      <div className="flex items-center gap-3">
+      <div className="flex items-center gap-2">
+        {/* Language toggle */}
+        <button
+          onClick={toggleLang}
+          className="flex items-center gap-1 px-2.5 py-1 rounded-lg border border-gray-200 dark:border-gray-700 text-xs font-semibold text-gray-600 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors"
+          title={lang === 'en' ? 'नेपालीमा हेर्नुस्' : 'Switch to English'}
+        >
+          <span>{lang === 'en' ? '🇳🇵' : '🇬🇧'}</span>
+          <span>{lang === 'en' ? 'नेपाली' : 'EN'}</span>
+        </button>
+
+        {/* Theme toggle */}
         <button
           onClick={toggleTheme}
           className="w-8 h-8 rounded-lg flex items-center justify-center text-gray-500 dark:text-gray-400 hover:text-gray-900 dark:hover:text-white hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors"
@@ -114,18 +127,13 @@ function Navbar() {
                 {user.avatar_url ? (
                   <img src={user.avatar_url} alt={user.name} className="w-full h-full object-cover" />
                 ) : (
-                  <span className="text-white text-xs font-bold">
-                    {getInitials(user.name)}
-                  </span>
+                  <span className="text-white text-xs font-bold">{getInitials(user.name)}</span>
                 )}
               </div>
               <span className="text-sm text-gray-700 dark:text-gray-300 group-hover:text-gray-900 dark:group-hover:text-white font-medium">
                 {user.name.split(' ')[0]}
               </span>
-              <svg
-                className={`w-3 h-3 text-gray-400 transition-transform ${dropdownOpen ? 'rotate-180' : ''}`}
-                fill="none" viewBox="0 0 24 24" stroke="currentColor"
-              >
+              <svg className={`w-3 h-3 text-gray-400 transition-transform ${dropdownOpen ? 'rotate-180' : ''}`} fill="none" viewBox="0 0 24 24" stroke="currentColor">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
               </svg>
             </button>
@@ -136,45 +144,23 @@ function Navbar() {
                   <p className="text-sm font-semibold text-gray-900 dark:text-white">{user.name}</p>
                   <p className="text-xs text-gray-400 mt-0.5">{user.email}</p>
                 </div>
-
                 <div className="p-1">
-                  <Link
-                    to="/"
-                    onClick={() => setDropdownOpen(false)}
-                    className="flex items-center gap-2 px-3 py-2 text-sm text-gray-600 dark:text-gray-300 hover:text-gray-900 dark:hover:text-white hover:bg-gray-50 dark:hover:bg-gray-800 rounded-lg transition-colors"
-                  >
-                    <span>🏠</span> Dashboard
+                  <Link to="/" onClick={() => setDropdownOpen(false)} className="flex items-center gap-2 px-3 py-2 text-sm text-gray-600 dark:text-gray-300 hover:text-gray-900 dark:hover:text-white hover:bg-gray-50 dark:hover:bg-gray-800 rounded-lg transition-colors">
+                    <span>🏠</span> {t('nav.dashboard')}
                   </Link>
-                  <Link
-                    to="/profile"
-                    onClick={() => setDropdownOpen(false)}
-                    className="flex items-center gap-2 px-3 py-2 text-sm text-gray-600 dark:text-gray-300 hover:text-gray-900 dark:hover:text-white hover:bg-gray-50 dark:hover:bg-gray-800 rounded-lg transition-colors"
-                  >
-                    <span>👤</span> Profile
+                  <Link to="/profile" onClick={() => setDropdownOpen(false)} className="flex items-center gap-2 px-3 py-2 text-sm text-gray-600 dark:text-gray-300 hover:text-gray-900 dark:hover:text-white hover:bg-gray-50 dark:hover:bg-gray-800 rounded-lg transition-colors">
+                    <span>👤</span> {t('nav.profile')}
                   </Link>
-                  <Link
-                    to="/chat"
-                    onClick={() => setDropdownOpen(false)}
-                    className="flex items-center gap-2 px-3 py-2 text-sm text-gray-600 dark:text-gray-300 hover:text-gray-900 dark:hover:text-white hover:bg-gray-50 dark:hover:bg-gray-800 rounded-lg transition-colors"
-                  >
-                    <span>🤖</span> AI Chat
+                  <Link to="/chat" onClick={() => setDropdownOpen(false)} className="flex items-center gap-2 px-3 py-2 text-sm text-gray-600 dark:text-gray-300 hover:text-gray-900 dark:hover:text-white hover:bg-gray-50 dark:hover:bg-gray-800 rounded-lg transition-colors">
+                    <span>🤖</span> {t('nav.aiChat')}
                   </Link>
-                  <Link
-                    to="/trader"
-                    onClick={() => setDropdownOpen(false)}
-                    className="flex items-center gap-2 px-3 py-2 text-sm text-gray-600 dark:text-gray-300 hover:text-gray-900 dark:hover:text-white hover:bg-gray-50 dark:hover:bg-gray-800 rounded-lg transition-colors"
-                  >
-                    <span>📈</span> Trade Log
+                  <Link to="/trader" onClick={() => setDropdownOpen(false)} className="flex items-center gap-2 px-3 py-2 text-sm text-gray-600 dark:text-gray-300 hover:text-gray-900 dark:hover:text-white hover:bg-gray-50 dark:hover:bg-gray-800 rounded-lg transition-colors">
+                    <span>📈</span> {t('nav.tradeLog')}
                   </Link>
-                  <Link
-                    to="/portfolio"
-                    onClick={() => setDropdownOpen(false)}
-                    className="flex items-center gap-2 px-3 py-2 text-sm text-gray-600 dark:text-gray-300 hover:text-gray-900 dark:hover:text-white hover:bg-gray-50 dark:hover:bg-gray-800 rounded-lg transition-colors"
-                  >
-                    <span>💼</span> Portfolio
+                  <Link to="/portfolio" onClick={() => setDropdownOpen(false)} className="flex items-center gap-2 px-3 py-2 text-sm text-gray-600 dark:text-gray-300 hover:text-gray-900 dark:hover:text-white hover:bg-gray-50 dark:hover:bg-gray-800 rounded-lg transition-colors">
+                    <span>💼</span> {t('nav.portfolio')}
                   </Link>
                 </div>
-
                 <div className="p-1 border-t border-gray-100 dark:border-gray-700">
                   <button
                     onClick={() => { logout(); setDropdownOpen(false) }}
@@ -183,7 +169,7 @@ function Navbar() {
                     <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                       <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1" />
                     </svg>
-                    Logout
+                    {t('nav.logout')}
                   </button>
                 </div>
               </div>
@@ -191,17 +177,11 @@ function Navbar() {
           </div>
         ) : (
           <div className="flex items-center gap-2">
-            <Link
-              to="/login"
-              className="text-sm text-gray-600 hover:text-gray-900 dark:text-gray-400 dark:hover:text-white px-3 py-1.5 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors font-medium"
-            >
-              Login
+            <Link to="/login" className="text-sm text-gray-600 hover:text-gray-900 dark:text-gray-400 dark:hover:text-white px-3 py-1.5 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors font-medium">
+              {t('nav.login')}
             </Link>
-            <Link
-              to="/signup"
-              className="text-sm bg-green-500 hover:bg-green-400 text-white px-3 py-1.5 rounded-lg font-medium transition-colors"
-            >
-              Get Started
+            <Link to="/signup" className="text-sm bg-green-500 hover:bg-green-400 text-white px-3 py-1.5 rounded-lg font-medium transition-colors">
+              {t('nav.getStarted')}
             </Link>
           </div>
         )}

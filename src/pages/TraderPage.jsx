@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { useAuth } from '../context/AuthContext'
+import { useLanguage } from '../context/LanguageContext'
 import {
   getTradeLog, addTradeLog, updateTradeLog,
   closeTradeLog, partialCloseTradeLog, deleteTradeLog,
@@ -821,6 +822,7 @@ function TradeRow({ trade, onEdit, onClose, onPartialClose, onDelete, onJournal 
 
 function TraderPage() {
   const { user } = useAuth()
+  const { t: tr } = useLanguage()
   const navigate = useNavigate()
   const [trades, setTrades] = useState([])
   const [journals, setJournals] = useState([])
@@ -915,23 +917,23 @@ function TraderPage() {
         <div className="bg-white dark:bg-gray-800 rounded-2xl p-8 shadow-sm text-center max-w-md border border-gray-100 dark:border-gray-700">
           <span className="text-4xl mb-4 block">🔒</span>
           <h2 className="text-xl font-bold text-gray-900 dark:text-white mb-2">
-            Login Required
+            {tr('portfolio.loginRequired')}
           </h2>
           <p className="text-gray-500 dark:text-gray-400 text-sm mb-6">
-            You need to login to access your Trade Log and Journal.
+            {tr('portfolio.loginMsg')}
           </p>
           <div className="flex gap-3 justify-center">
             <button
               onClick={() => navigate('/login')}
               className="bg-blue-600 text-white px-6 py-2 rounded-xl text-sm font-medium hover:bg-blue-700"
             >
-              Login
+              {tr('auth.loginBtn')}
             </button>
             <button
               onClick={() => navigate('/signup')}
               className="bg-gray-100 dark:bg-gray-700 text-gray-700 dark:text-gray-300 px-6 py-2 rounded-xl text-sm font-medium hover:bg-gray-200"
             >
-              Sign Up
+              {tr('auth.signupBtn')}
             </button>
           </div>
         </div>
@@ -985,26 +987,26 @@ function TraderPage() {
 
       <div className="flex items-center justify-between mb-6">
         <div>
-          <h1 className="text-2xl font-bold text-gray-900 dark:text-white">Trade Log</h1>
-          <p className="text-sm text-gray-400 mt-0.5">Record your trades with discipline & clarity</p>
+          <h1 className="text-2xl font-bold text-gray-900 dark:text-white">{tr('trader.title')}</h1>
+          <p className="text-sm text-gray-400 mt-0.5">{tr('trader.subtitle')}</p>
         </div>
         <button
           onClick={() => { setEditTrade(null); setShowAddModal(true) }}
           className="bg-blue-600 text-white px-4 py-2 rounded-xl text-sm font-semibold hover:bg-blue-700 transition-colors flex items-center gap-2"
         >
-          <span>+</span> Add New Trade
+          {tr('trader.addTrade')}
         </button>
       </div>
 
       <div className="grid grid-cols-2 lg:grid-cols-6 gap-3 mb-6">
         {[
-          { label: 'Total Trades', value: stats.total, color: 'text-gray-900 dark:text-white' },
-          { label: 'Open', value: stats.open, color: 'text-blue-500' },
-          { label: 'Partial', value: stats.partial, color: 'text-orange-500' },
-          { label: 'Closed', value: stats.closed, color: 'text-gray-500' },
-          { label: 'Winners', value: stats.winners, color: 'text-green-500' },
+          { label: tr('trader.totalTrades'), value: stats.total, color: 'text-gray-900 dark:text-white' },
+          { label: tr('trader.open'), value: stats.open, color: 'text-blue-500' },
+          { label: tr('trader.partial'), value: stats.partial, color: 'text-orange-500' },
+          { label: tr('trader.closed'), value: stats.closed, color: 'text-gray-500' },
+          { label: tr('trader.winners'), value: stats.winners, color: 'text-green-500' },
           {
-            label: 'Total P&L',
+            label: tr('trader.totalPL'),
             value: `${stats.totalPnl >= 0 ? '+' : ''}Rs.${Math.round(stats.totalPnl).toLocaleString()}`,
             color: stats.totalPnl >= 0 ? 'text-green-500' : 'text-red-500'
           },
@@ -1027,7 +1029,7 @@ function TraderPage() {
                 : 'bg-white dark:bg-gray-800 text-gray-600 dark:text-gray-300 border border-gray-200 dark:border-gray-700 hover:bg-gray-50 dark:hover:bg-gray-700'
             }`}
           >
-            {tab === 'trades' ? '📊 Trade Log' : '📝 Journal'}
+            {tab === 'trades' ? tr('trader.tabLog') : tr('trader.tabJournal')}
           </button>
         ))}
         <button
@@ -1045,21 +1047,26 @@ function TraderPage() {
               type="text"
               value={searchSymbol}
               onChange={e => setSearchSymbol(e.target.value)}
-              placeholder="Search symbol..."
+              placeholder={tr('trader.searchSymbol')}
               className="border border-gray-200 dark:border-gray-600 dark:bg-gray-700 dark:text-white rounded-xl px-3 py-1.5 text-sm focus:outline-none focus:border-blue-500 w-40"
             />
             <div className="flex gap-2">
-              {['ALL', 'OPEN', 'PARTIAL', 'CLOSED'].map(s => (
+              {[
+                { key: 'ALL', label: tr('trader.all') },
+                { key: 'OPEN', label: tr('trader.open') },
+                { key: 'PARTIAL', label: tr('trader.partial') },
+                { key: 'CLOSED', label: tr('trader.closed') },
+              ].map(s => (
                 <button
-                  key={s}
-                  onClick={() => setFilterStatus(s)}
+                  key={s.key}
+                  onClick={() => setFilterStatus(s.key)}
                   className={`px-3 py-1.5 rounded-xl text-xs font-medium transition-colors ${
-                    filterStatus === s
+                    filterStatus === s.key
                       ? 'bg-blue-600 text-white'
                       : 'bg-gray-100 dark:bg-gray-700 text-gray-600 dark:text-gray-300 hover:bg-gray-200'
                   }`}
                 >
-                  {s}
+                  {s.label}
                 </button>
               ))}
             </div>
@@ -1071,8 +1078,8 @@ function TraderPage() {
           {filteredTrades.length === 0 ? (
             <div className="p-12 text-center">
               <span className="text-4xl mb-4 block">📊</span>
-              <p className="text-gray-400 text-sm">No trades yet</p>
-              <p className="text-gray-400 text-xs mt-1">Click "+ Add New Trade" to start recording</p>
+              <p className="text-gray-400 text-sm">{tr('trader.noTrades')}</p>
+              <p className="text-gray-400 text-xs mt-1">{tr('trader.noTradesHint')}</p>
             </div>
           ) : (
             <div className="overflow-x-auto">

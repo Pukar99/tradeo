@@ -1,7 +1,9 @@
 import { useState, useEffect } from 'react'
 import { getGoals, addGoal, updateGoal, deleteGoal } from '../../api'
+import { useLanguage } from '../../context/LanguageContext'
 
 function MonthlyGoals() {
+  const { t } = useLanguage()
   const [goals, setGoals] = useState([])
   const [loading, setLoading] = useState(true)
   const [showForm, setShowForm] = useState(false)
@@ -94,18 +96,18 @@ function MonthlyGoals() {
     <div className="bg-white dark:bg-gray-800 rounded-xl shadow-sm">
       <div className="p-4 border-b border-gray-100 dark:border-gray-700">
         <div className="flex justify-between items-center mb-2">
-          <h2 className="text-base font-semibold text-gray-900 dark:text-white">Monthly Goals</h2>
+          <h2 className="text-base font-semibold text-gray-900 dark:text-white">{t('goals.title')}</h2>
           <button
             onClick={() => setShowForm(!showForm)}
             className="bg-blue-600 text-white px-3 py-1 rounded-lg text-xs font-medium hover:bg-blue-700"
           >
-            {showForm ? 'Cancel' : '+ Add Goal'}
+            {showForm ? t('goals.cancel') : t('goals.add')}
           </button>
         </div>
         {goals.length > 0 && (
           <div>
             <div className="flex justify-between text-xs text-gray-400 mb-1">
-              <span>{completedCount}/{goals.length} completed</span>
+              <span>{completedCount}/{goals.length} {t('goals.completed')}</span>
               <span>{progress}%</span>
             </div>
             <div className="w-full bg-gray-100 dark:bg-gray-700 rounded-full h-1.5">
@@ -119,7 +121,7 @@ function MonthlyGoals() {
         <div className="p-4 border-b border-gray-100 dark:border-gray-700 bg-gray-50 dark:bg-gray-900">
           <form onSubmit={handleAdd}>
             <div className="mb-3">
-              <label className="block text-xs text-gray-500 mb-1">Goal Title</label>
+              <label className="block text-xs text-gray-500 mb-1">{t('goals.titleLabel')}</label>
               <input
                 type="text"
                 value={form.title}
@@ -130,7 +132,7 @@ function MonthlyGoals() {
               />
             </div>
             <div className="mb-3">
-              <label className="block text-xs text-gray-500 mb-1">Description (optional)</label>
+              <label className="block text-xs text-gray-500 mb-1">{t('goals.descLabel')}</label>
               <input
                 type="text"
                 value={form.description}
@@ -140,7 +142,7 @@ function MonthlyGoals() {
               />
             </div>
             <div className="mb-3">
-              <label className="block text-xs text-gray-500 mb-1">Target Date (optional)</label>
+              <label className="block text-xs text-gray-500 mb-1">{t('goals.dateLabel')}</label>
               <input
                 type="date"
                 value={form.target_date}
@@ -153,7 +155,7 @@ function MonthlyGoals() {
               disabled={adding}
               className="w-full bg-blue-600 text-white py-2 rounded-lg text-sm font-medium hover:bg-blue-700 disabled:opacity-50"
             >
-              {adding ? 'Saving...' : 'Save Goal'}
+              {adding ? t('goals.saving') : t('goals.save')}
             </button>
           </form>
         </div>
@@ -162,8 +164,8 @@ function MonthlyGoals() {
       <div className="divide-y divide-gray-50 dark:divide-gray-700">
         {goals.length === 0 ? (
           <div className="p-6 text-center">
-            <p className="text-sm text-gray-400">No goals set for this month</p>
-            <p className="text-xs text-gray-400 mt-1">Click "+ Add Goal" to set your monthly targets</p>
+            <p className="text-sm text-gray-400">{t('goals.noGoals')}</p>
+            <p className="text-xs text-gray-400 mt-1">{t('goals.noGoalsHint')}</p>
           </div>
         ) : (
           goals.map(goal => (
@@ -203,13 +205,13 @@ function MonthlyGoals() {
                       disabled={saving}
                       className="flex-1 bg-blue-600 text-white py-1.5 rounded-lg text-xs font-medium hover:bg-blue-700 disabled:opacity-50"
                     >
-                      {saving ? 'Saving...' : 'Save'}
+                      {saving ? t('goals.saving') : t('goals.save')}
                     </button>
                     <button
                       onClick={cancelEdit}
                       className="flex-1 bg-gray-100 dark:bg-gray-700 text-gray-600 dark:text-gray-300 py-1.5 rounded-lg text-xs font-medium hover:bg-gray-200 dark:hover:bg-gray-600"
                     >
-                      Cancel
+                      {t('goals.cancel')}
                     </button>
                   </div>
                 </div>
