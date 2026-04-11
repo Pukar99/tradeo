@@ -87,178 +87,207 @@ function MonthlyGoals() {
   }
 
   if (loading) return (
-    <div className="bg-white dark:bg-gray-800 rounded-xl p-4 shadow-sm">
-      <p className="text-sm text-gray-400">Loading goals...</p>
+    <div className="bg-white dark:bg-gray-900 rounded-2xl p-4 border border-gray-100 dark:border-gray-800">
+      <div className="animate-pulse space-y-2">
+        <div className="h-4 bg-gray-100 dark:bg-gray-800 rounded w-1/2" />
+        <div className="h-2 bg-gray-100 dark:bg-gray-800 rounded w-full mt-3" />
+        <div className="h-8 bg-gray-100 dark:bg-gray-800 rounded-xl mt-2" />
+        <div className="h-8 bg-gray-100 dark:bg-gray-800 rounded-xl" />
+      </div>
     </div>
   )
 
   return (
-    <div className="bg-white dark:bg-gray-800 rounded-xl shadow-sm">
-      <div className="p-4 border-b border-gray-100 dark:border-gray-700">
-        <div className="flex justify-between items-center mb-2">
-          <h2 className="text-base font-semibold text-gray-900 dark:text-white">{t('goals.title')}</h2>
+    <div className="bg-white dark:bg-gray-900 rounded-2xl border border-gray-100 dark:border-gray-800 overflow-hidden">
+
+      {/* Header */}
+      <div className="px-4 pt-4 pb-3">
+        <div className="flex items-center justify-between mb-3">
+          <div>
+            <h2 className="text-[13px] font-semibold text-gray-900 dark:text-white tracking-tight">{t('goals.title')}</h2>
+            {goals.length > 0 && (
+              <p className="text-[10px] text-gray-400 mt-0.5">
+                {completedCount}/{goals.length} {t('goals.completed')} · {progress}%
+              </p>
+            )}
+          </div>
           <button
-            onClick={() => setShowForm(!showForm)}
-            className="bg-blue-600 text-white px-3 py-1 rounded-lg text-xs font-medium hover:bg-blue-700"
+            onClick={() => { setShowForm(!showForm); setEditingId(null) }}
+            className={`text-[11px] font-medium px-2.5 py-1 rounded-lg transition-colors ${
+              showForm
+                ? 'text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-200'
+                : 'text-green-600 dark:text-green-400 hover:bg-green-50 dark:hover:bg-green-900/30'
+            }`}
           >
             {showForm ? t('goals.cancel') : t('goals.add')}
           </button>
         </div>
+
+        {/* Progress bar */}
         {goals.length > 0 && (
-          <div>
-            <div className="flex justify-between text-xs text-gray-400 mb-1">
-              <span>{completedCount}/{goals.length} {t('goals.completed')}</span>
-              <span>{progress}%</span>
-            </div>
-            <div className="w-full bg-gray-100 dark:bg-gray-700 rounded-full h-1.5">
-              <div className="h-1.5 rounded-full bg-blue-500 transition-all duration-500" style={{ width: `${progress}%` }} />
-            </div>
+          <div className="w-full h-1 bg-gray-100 dark:bg-gray-800 rounded-full overflow-hidden">
+            <div
+              className={`h-full rounded-full transition-all duration-500 ${
+                progress === 100 ? 'bg-green-500' : progress >= 50 ? 'bg-blue-500' : 'bg-gray-400'
+              }`}
+              style={{ width: `${progress}%` }}
+            />
           </div>
         )}
       </div>
 
+      {/* Add form */}
       {showForm && (
-        <div className="p-4 border-b border-gray-100 dark:border-gray-700 bg-gray-50 dark:bg-gray-900">
-          <form onSubmit={handleAdd}>
-            <div className="mb-3">
-              <label className="block text-xs text-gray-500 mb-1">{t('goals.titleLabel')}</label>
-              <input
-                type="text"
-                value={form.title}
-                onChange={e => setForm({ ...form, title: e.target.value })}
-                placeholder="e.g. Achieve 70% win rate this month"
-                className="w-full border border-gray-200 dark:border-gray-600 dark:bg-gray-700 dark:text-white rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-blue-500"
-                required
-              />
-            </div>
-            <div className="mb-3">
-              <label className="block text-xs text-gray-500 mb-1">{t('goals.descLabel')}</label>
-              <input
-                type="text"
-                value={form.description}
-                onChange={e => setForm({ ...form, description: e.target.value })}
-                placeholder="Details about this goal"
-                className="w-full border border-gray-200 dark:border-gray-600 dark:bg-gray-700 dark:text-white rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-blue-500"
-              />
-            </div>
-            <div className="mb-3">
-              <label className="block text-xs text-gray-500 mb-1">{t('goals.dateLabel')}</label>
+        <div className="mx-3 mb-3 bg-gray-50 dark:bg-gray-800 rounded-xl p-3 border border-gray-100 dark:border-gray-700">
+          <form onSubmit={handleAdd} className="space-y-2">
+            <input
+              type="text"
+              value={form.title}
+              onChange={e => setForm({ ...form, title: e.target.value })}
+              placeholder={t('goals.titleLabel')}
+              autoFocus
+              className="w-full bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-700 rounded-lg px-2.5 py-1.5 text-xs text-gray-800 dark:text-white placeholder-gray-400 focus:outline-none focus:border-green-400 dark:focus:border-green-600 transition-colors"
+              required
+            />
+            <input
+              type="text"
+              value={form.description}
+              onChange={e => setForm({ ...form, description: e.target.value })}
+              placeholder={t('goals.descLabel')}
+              className="w-full bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-700 rounded-lg px-2.5 py-1.5 text-xs text-gray-800 dark:text-white placeholder-gray-400 focus:outline-none focus:border-green-400 dark:focus:border-green-600 transition-colors"
+            />
+            <div className="flex gap-2 items-center">
               <input
                 type="date"
                 value={form.target_date}
                 onChange={e => setForm({ ...form, target_date: e.target.value })}
-                className="w-full border border-gray-200 dark:border-gray-600 dark:bg-gray-700 dark:text-white rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-blue-500"
+                className="flex-1 bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-700 rounded-lg px-2.5 py-1.5 text-xs text-gray-800 dark:text-white focus:outline-none focus:border-green-400 dark:focus:border-green-600 transition-colors"
               />
+              <button
+                type="submit"
+                disabled={adding || !form.title.trim()}
+                className="bg-green-500 hover:bg-green-400 disabled:opacity-40 text-white px-3 py-1.5 rounded-lg text-xs font-medium transition-colors whitespace-nowrap"
+              >
+                {adding ? t('goals.saving') : t('goals.save')}
+              </button>
             </div>
-            <button
-              type="submit"
-              disabled={adding}
-              className="w-full bg-blue-600 text-white py-2 rounded-lg text-sm font-medium hover:bg-blue-700 disabled:opacity-50"
-            >
-              {adding ? t('goals.saving') : t('goals.save')}
-            </button>
           </form>
         </div>
       )}
 
-      <div className="divide-y divide-gray-50 dark:divide-gray-700">
-        {goals.length === 0 ? (
-          <div className="p-6 text-center">
-            <p className="text-sm text-gray-400">{t('goals.noGoals')}</p>
-            <p className="text-xs text-gray-400 mt-1">{t('goals.noGoalsHint')}</p>
+      {/* Goal list */}
+      <div className="px-3 pb-3 space-y-1.5">
+        {goals.length === 0 && !showForm ? (
+          <div className="py-6 text-center">
+            <p className="text-[11px] text-gray-400">{t('goals.noGoals')}</p>
+            <button
+              onClick={() => setShowForm(true)}
+              className="mt-2 text-[11px] text-green-500 hover:text-green-400 transition-colors"
+            >
+              {t('goals.noGoalsHint')}
+            </button>
           </div>
         ) : (
           goals.map(goal => (
             <div key={goal.id}>
               {editingId === goal.id ? (
-                // Inline edit form
-                <div className="px-4 py-3 bg-blue-50 dark:bg-blue-900/20 border-l-2 border-blue-400">
-                  <div className="mb-2">
-                    <input
-                      type="text"
-                      value={editForm.title}
-                      onChange={e => setEditForm({ ...editForm, title: e.target.value })}
-                      className="w-full border border-gray-200 dark:border-gray-600 dark:bg-gray-700 dark:text-white rounded-lg px-3 py-1.5 text-sm focus:outline-none focus:border-blue-500"
-                      placeholder="Goal title"
-                    />
-                  </div>
-                  <div className="mb-2">
-                    <input
-                      type="text"
-                      value={editForm.description}
-                      onChange={e => setEditForm({ ...editForm, description: e.target.value })}
-                      className="w-full border border-gray-200 dark:border-gray-600 dark:bg-gray-700 dark:text-white rounded-lg px-3 py-1.5 text-sm focus:outline-none focus:border-blue-500"
-                      placeholder="Description (optional)"
-                    />
-                  </div>
-                  <div className="mb-3">
+                /* ── Inline edit ── */
+                <div className="bg-gray-50 dark:bg-gray-800 rounded-xl p-3 border border-gray-100 dark:border-gray-700 space-y-2">
+                  <input
+                    type="text"
+                    value={editForm.title}
+                    onChange={e => setEditForm({ ...editForm, title: e.target.value })}
+                    autoFocus
+                    className="w-full bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-700 rounded-lg px-2.5 py-1.5 text-xs text-gray-800 dark:text-white focus:outline-none focus:border-green-400 transition-colors"
+                  />
+                  <input
+                    type="text"
+                    value={editForm.description}
+                    onChange={e => setEditForm({ ...editForm, description: e.target.value })}
+                    placeholder="Description (optional)"
+                    className="w-full bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-700 rounded-lg px-2.5 py-1.5 text-xs text-gray-800 dark:text-white placeholder-gray-400 focus:outline-none focus:border-green-400 transition-colors"
+                  />
+                  <div className="flex gap-2 items-center">
                     <input
                       type="date"
                       value={editForm.target_date}
                       onChange={e => setEditForm({ ...editForm, target_date: e.target.value })}
-                      className="w-full border border-gray-200 dark:border-gray-600 dark:bg-gray-700 dark:text-white rounded-lg px-3 py-1.5 text-sm focus:outline-none focus:border-blue-500"
+                      className="flex-1 bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-700 rounded-lg px-2.5 py-1.5 text-xs text-gray-800 dark:text-white focus:outline-none focus:border-green-400 transition-colors"
                     />
-                  </div>
-                  <div className="flex gap-2">
                     <button
                       onClick={() => handleSaveEdit(goal.id)}
-                      disabled={saving}
-                      className="flex-1 bg-blue-600 text-white py-1.5 rounded-lg text-xs font-medium hover:bg-blue-700 disabled:opacity-50"
+                      disabled={saving || !editForm.title.trim()}
+                      className="bg-green-500 hover:bg-green-400 disabled:opacity-40 text-white px-3 py-1.5 rounded-lg text-xs font-medium transition-colors whitespace-nowrap"
                     >
                       {saving ? t('goals.saving') : t('goals.save')}
                     </button>
                     <button
                       onClick={cancelEdit}
-                      className="flex-1 bg-gray-100 dark:bg-gray-700 text-gray-600 dark:text-gray-300 py-1.5 rounded-lg text-xs font-medium hover:bg-gray-200 dark:hover:bg-gray-600"
+                      className="text-gray-400 hover:text-gray-600 dark:hover:text-gray-200 px-2 py-1.5 rounded-lg text-xs transition-colors"
                     >
                       {t('goals.cancel')}
                     </button>
                   </div>
                 </div>
               ) : (
-                // Normal row
-                <div className="px-4 py-3 flex items-start gap-3 hover:bg-gray-50 dark:hover:bg-gray-700 group">
+                /* ── Normal row ── */
+                <div className={`flex items-start gap-2.5 px-2.5 py-2 rounded-xl group transition-colors hover:bg-gray-50 dark:hover:bg-gray-800 ${
+                  goal.completed ? 'opacity-60' : ''
+                }`}>
+                  {/* Checkbox */}
                   <button
                     onClick={() => handleToggle(goal)}
-                    className={`mt-0.5 w-5 h-5 rounded border-2 flex items-center justify-center flex-shrink-0 transition-colors ${
+                    className={`mt-0.5 w-4 h-4 rounded-full border-2 flex items-center justify-center flex-shrink-0 transition-all ${
                       goal.completed
                         ? 'bg-green-500 border-green-500'
                         : 'border-gray-300 dark:border-gray-600 hover:border-green-400'
                     }`}
                   >
                     {goal.completed && (
-                      <svg className="w-3 h-3 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M5 13l4 4L19 7" />
+                      <svg className="w-2 h-2 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3.5} d="M5 13l4 4L19 7" />
                       </svg>
                     )}
                   </button>
+
+                  {/* Text */}
                   <div className="flex-1 min-w-0">
-                    <p className={`text-sm font-medium transition-colors ${
-                      goal.completed ? 'line-through text-gray-400' : 'text-gray-900 dark:text-white'
+                    <p className={`text-[12px] font-medium leading-snug ${
+                      goal.completed
+                        ? 'line-through text-gray-400 dark:text-gray-500'
+                        : 'text-gray-800 dark:text-gray-100'
                     }`}>
                       {goal.title}
                     </p>
                     {goal.description && (
-                      <p className="text-xs text-gray-400 mt-0.5">{goal.description}</p>
+                      <p className="text-[10px] text-gray-400 dark:text-gray-500 mt-0.5 leading-snug">{goal.description}</p>
                     )}
                     {goal.target_date && (
-                      <p className="text-xs text-gray-400 mt-0.5">Target: {goal.target_date}</p>
+                      <p className="text-[10px] text-gray-400 dark:text-gray-500 mt-0.5">
+                        🗓 {new Date(goal.target_date).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}
+                      </p>
                     )}
                   </div>
-                  <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity mt-0.5">
+
+                  {/* Actions — hover reveal */}
+                  <div className="flex items-center gap-0.5 opacity-0 group-hover:opacity-100 transition-opacity flex-shrink-0 mt-0.5">
                     <button
                       onClick={() => startEdit(goal)}
-                      className="text-gray-400 hover:text-blue-500 text-xs px-1"
+                      className="w-6 h-6 rounded-lg flex items-center justify-center text-gray-300 dark:text-gray-600 hover:text-blue-500 hover:bg-blue-50 dark:hover:bg-blue-900/30 transition-colors"
                       title="Edit"
                     >
-                      ✏️
+                      <svg className="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15.232 5.232l3.536 3.536M9 13l6.586-6.586a2 2 0 012.828 2.828L11.828 15.828a2 2 0 01-1.414.586H9v-2.414a2 2 0 01.586-1.414z" />
+                      </svg>
                     </button>
                     <button
                       onClick={() => handleDelete(goal.id)}
-                      className="text-gray-300 hover:text-red-400 text-xs px-1"
+                      className="w-6 h-6 rounded-lg flex items-center justify-center text-gray-300 dark:text-gray-600 hover:text-red-400 hover:bg-red-50 dark:hover:bg-red-900/30 transition-colors"
                       title="Delete"
                     >
-                      ✕
+                      <svg className="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                      </svg>
                     </button>
                   </div>
                 </div>
