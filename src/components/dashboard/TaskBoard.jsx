@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react'
 import { useNavigate } from 'react-router-dom'
+import { useLanguage } from '../../context/LanguageContext'
 import {
   getTodayTasks, toggleFixedTask,
   addCustomTask, updateCustomTask,
@@ -170,6 +171,7 @@ function ExternalLinkModal({ task, onClose, onDone }) {
 
 function TaskBoard({ compact = false, onTaskComplete }) {
   const navigate = useNavigate()
+  const { t } = useLanguage()
   const [fixedTasks, setFixedTasks] = useState(FIXED_TASKS.map(t => ({ ...t, completed: false })))
   const [customTasks, setCustomTasks] = useState([])
   const [newTask, setNewTask] = useState('')
@@ -275,7 +277,7 @@ function TaskBoard({ compact = false, onTaskComplete }) {
 
         {/* Header */}
         <div className="px-4 pt-4 pb-2">
-          <h2 className="text-sm font-semibold text-gray-900 dark:text-white">Daily Routine</h2>
+          <h2 className="text-sm font-semibold text-gray-900 dark:text-white">{t('tasks.dailyRoutine')}</h2>
         </div>
 
         {/* Circular Progress */}
@@ -296,11 +298,11 @@ function TaskBoard({ compact = false, onTaskComplete }) {
             </svg>
             <div className="absolute inset-0 flex flex-col items-center justify-center">
               <span className="text-2xl font-bold text-gray-900 dark:text-white">{progress}%</span>
-              <span className="text-xs text-gray-400">{completedTasks}/{totalTasks} Completed</span>
+              <span className="text-xs text-gray-400">{completedTasks}/{totalTasks} {t('tasks.completed')}</span>
             </div>
           </div>
           <p className="text-sm text-gray-500 dark:text-gray-400 mt-2">
-            {completedTasks} / {totalTasks} Completed
+            {completedTasks} / {totalTasks} {t('tasks.completed')}
           </p>
         </div>
 
@@ -400,7 +402,7 @@ function TaskBoard({ compact = false, onTaskComplete }) {
             >
               <div className="flex items-center gap-2">
                 <span className="text-gray-400 group-hover:text-blue-500 text-lg leading-none">+</span>
-                <span className="text-sm text-gray-400 group-hover:text-blue-500">Add Routine Log</span>
+                <span className="text-sm text-gray-400 group-hover:text-blue-500">{t('tasks.addRoutine')}</span>
               </div>
               <svg className="w-4 h-4 text-gray-300 group-hover:text-blue-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />

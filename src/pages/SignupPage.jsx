@@ -2,6 +2,7 @@ import { useState } from 'react'
 import { useNavigate, Link } from 'react-router-dom'
 import { signupUser } from '../api'
 import { useAuth } from '../context/AuthContext'
+import { useLanguage } from '../context/LanguageContext'
 
 function SignupPage() {
   const [name, setName] = useState('')
@@ -11,6 +12,7 @@ function SignupPage() {
   const [loading, setLoading] = useState(false)
 
   const { login } = useAuth()
+  const { t } = useLanguage()
   const navigate = useNavigate()
 
   const handleSubmit = async (e) => {
@@ -35,10 +37,10 @@ function SignupPage() {
 
         <div className="text-center mb-6">
           <h1 className="text-2xl font-bold text-gray-900 dark:text-white">
-            Create Tradeo Account
+            {t('signupPage.title')}
           </h1>
           <p className="text-sm text-gray-400 mt-1">
-            Start your trading journey today
+            {t('signupPage.sub')}
           </p>
         </div>
 
@@ -96,14 +98,14 @@ function SignupPage() {
             disabled={loading}
             className="w-full bg-blue-600 text-white py-2 rounded-lg text-sm font-medium hover:bg-blue-700 disabled:opacity-50"
           >
-            {loading ? 'Creating account...' : 'Create Account'}
+            {loading ? '...' : t('signupPage.btn')}
           </button>
         </form>
 
         <p className="text-sm text-gray-500 dark:text-gray-400 mt-4 text-center">
-          Already have an account?{' '}
+          {t('signupPage.hasAccount')}{' '}
           <Link to="/login" className="text-blue-600 hover:underline">
-            Login
+            {t('signupPage.login')}
           </Link>
         </p>
 

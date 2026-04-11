@@ -1,7 +1,9 @@
 import { useState, useEffect } from 'react'
 import { getDiscipline } from '../../api'
+import { useLanguage } from '../../context/LanguageContext'
 
 function DisciplineScore() {
+  const { t } = useLanguage()
   const [data, setData] = useState(null)
   const [loading, setLoading] = useState(true)
 
@@ -42,7 +44,7 @@ function DisciplineScore() {
     <div className="bg-white dark:bg-gray-800 rounded-xl shadow-sm p-4 h-full flex flex-col">
 
       <h2 className="text-base font-semibold text-gray-900 dark:text-white mb-4">
-        Discipline Score
+        {t('discipline.title')}
       </h2>
 
       <div className="flex items-center justify-center mb-3">

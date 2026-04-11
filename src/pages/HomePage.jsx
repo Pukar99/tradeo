@@ -1,4 +1,5 @@
 import { useAuth } from '../context/AuthContext'
+import { useLanguage } from '../context/LanguageContext'
 import TaskBoard from '../components/dashboard/TaskBoard'
 import DisciplineScore from '../components/dashboard/DisciplineScore'
 import MonthlyGoals from '../components/dashboard/MonthlyGoals'
@@ -40,6 +41,7 @@ function StockAvatar({ symbol, size = 'w-8 h-8', textSize = 'text-xs' }) {
 }
 
 function LoggedOutHome() {
+  const { t } = useLanguage()
   const quote = MOTIVATIONAL_QUOTES[Math.floor(Math.random() * MOTIVATIONAL_QUOTES.length)]
 
   const dummyStats = [
@@ -154,8 +156,8 @@ function LoggedOutHome() {
               <div className="flex items-center justify-between px-5 py-3 border-b border-gray-100 dark:border-gray-700">
                 <h3 className="text-sm font-semibold text-gray-900 dark:text-white">Watchlist</h3>
                 <div className="flex gap-1">
-                  {['Active', 'Pre-Watch', 'Portfolio'].map(t => (
-                    <span key={t} className={`text-[10px] px-2 py-0.5 rounded-full ${t === 'Active' ? 'bg-blue-100 dark:bg-blue-900 text-blue-600' : 'text-gray-400'}`}>{t}</span>
+                  {['Active', 'Pre-Watch', 'Portfolio'].map(tab => (
+                    <span key={tab} className={`text-[10px] px-2 py-0.5 rounded-full ${tab === 'Active' ? 'bg-blue-100 dark:bg-blue-900 text-blue-600' : 'text-gray-400'}`}>{tab}</span>
                   ))}
                 </div>
               </div>
@@ -225,23 +227,23 @@ function LoggedOutHome() {
                 <span className="text-green-400 text-xs font-medium tracking-widest uppercase">NEPSE Trading Workspace</span>
               </div>
               <h1 className="text-2xl font-bold text-white leading-snug">
-                Built for traders who take<br />
-                <span className="text-green-400">discipline seriously.</span>
+                {t('hero.headline')}<br />
+                <span className="text-green-400">{t('hero.headlineAccent')}</span>
               </h1>
               <p className="text-gray-400 text-sm mt-2 leading-relaxed">
-                Tradeo is your all-in-one command center — from your first trade to your thousandth.
+                {t('hero.sub')}
               </p>
             </div>
 
             {/* Features grid */}
             <div className="px-8 py-5 grid grid-cols-2 gap-3">
               {[
-                { icon: '📒', title: 'Trade Journal', desc: 'Log every entry, exit, and lesson learned' },
-                { icon: '👁️', title: 'Smart Watchlist', desc: 'Price & date alerts with BUY/SELL tags' },
-                { icon: '📊', title: 'Portfolio Tracker', desc: 'Unrealized P&L, positions, and exposure' },
-                { icon: '🧠', title: 'Discipline Score', desc: 'Track consistency, habits, and streaks' },
-                { icon: '🤖', title: 'Tradeo AI', desc: 'Ask anything about your trades & market' },
-                { icon: '⚗️', title: 'Risk Lab', desc: 'Position sizer, NEPSE calc, SIP planner' },
+                { icon: '📒', title: t('hero.feat1Title'), desc: t('hero.feat1Desc') },
+                { icon: '👁️', title: t('hero.feat2Title'), desc: t('hero.feat2Desc') },
+                { icon: '📊', title: t('hero.feat3Title'), desc: t('hero.feat3Desc') },
+                { icon: '🧠', title: t('hero.feat4Title'), desc: t('hero.feat4Desc') },
+                { icon: '🤖', title: t('hero.feat5Title'), desc: t('hero.feat5Desc') },
+                { icon: '⚗️', title: t('hero.feat6Title'), desc: t('hero.feat6Desc') },
               ].map(f => (
                 <div key={f.title} className="flex items-start gap-2.5">
                   <span className="text-base mt-0.5">{f.icon}</span>
@@ -261,10 +263,10 @@ function LoggedOutHome() {
             {/* CTA */}
             <div className="px-8 py-5 border-t border-gray-100 dark:border-gray-800 flex gap-3">
               <Link to="/signup" className="flex-1 bg-green-500 hover:bg-green-400 text-white py-2.5 rounded-xl text-sm font-semibold text-center transition-colors">
-                Get Started — It's Free
+                {t('hero.cta')}
               </Link>
               <Link to="/login" className="flex-1 bg-gray-100 dark:bg-gray-800 text-gray-700 dark:text-gray-300 py-2.5 rounded-xl text-sm font-medium text-center hover:bg-gray-200 dark:hover:bg-gray-700 border border-gray-200 dark:border-gray-700 transition-colors">
-                Login
+                {t('hero.ctaLogin')}
               </Link>
             </div>
           </div>
@@ -275,6 +277,7 @@ function LoggedOutHome() {
 }
 
 function CenterDashboard({ navigate }) {
+  const { t: tr } = useLanguage()
   const [trades, setTrades] = useState([])
   const [openPositions, setOpenPositions] = useState([])
   const [perfStats, setPerfStats] = useState(null)
@@ -447,22 +450,22 @@ function CenterDashboard({ navigate }) {
         <div className="grid grid-cols-4 gap-3">
           {[
             {
-              label: 'Total P/L Today',
+              label: tr('stats.totalPL'),
               value: `${perfStats.totalPnl >= 0 ? '+' : ''}Rs. ${Math.abs(Math.round(perfStats.totalPnl)).toLocaleString()}`,
               color: perfStats.totalPnl >= 0 ? 'text-green-500' : 'text-red-500'
             },
             {
-              label: 'Unrealized',
+              label: tr('stats.unrealized'),
               value: `${perfStats.totalInvested > 0 ? ((perfStats.unrealizedPnl / perfStats.totalInvested) * 100).toFixed(2) : '0.00'}%`,
               color: perfStats.unrealizedPnl >= 0 ? 'text-green-500' : 'text-red-500'
             },
             {
-              label: 'Win Rate',
+              label: tr('stats.winRate'),
               value: `${perfStats.winRate}%`,
               color: 'text-gray-900 dark:text-white'
             },
             {
-              label: 'Open Positions',
+              label: tr('stats.openPositions'),
               value: perfStats.openCount,
               color: 'text-gray-900 dark:text-white'
             },
@@ -513,13 +516,13 @@ function CenterDashboard({ navigate }) {
       {/* Open Positions — with Collapse */}
       <div className="bg-white dark:bg-gray-800 rounded-2xl shadow-sm border border-gray-100 dark:border-gray-700 overflow-hidden">
         <div className="flex items-center justify-between px-5 py-4 border-b border-gray-100 dark:border-gray-700">
-          <h3 className="text-sm font-semibold text-gray-900 dark:text-white">Open Positions</h3>
+          <h3 className="text-sm font-semibold text-gray-900 dark:text-white">{tr('positions.title')}</h3>
           <div className="flex items-center gap-2">
             <button
               onClick={() => setPositionsCollapsed(!positionsCollapsed)}
               className="text-xs text-gray-400 hover:text-gray-600 flex items-center gap-1"
             >
-              {positionsCollapsed ? 'Expand' : 'Collapse'}
+              {positionsCollapsed ? tr('positions.expand') : tr('positions.collapse')}
               <svg className={`w-3 h-3 transition-transform ${positionsCollapsed ? '' : 'rotate-180'}`} fill="none" viewBox="0 0 24 24" stroke="currentColor">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
               </svg>
@@ -532,7 +535,7 @@ function CenterDashboard({ navigate }) {
           <>
             {openPositions.length === 0 ? (
               <div className="p-8 text-center">
-                <p className="text-gray-400 text-sm">No open positions</p>
+                <p className="text-gray-400 text-sm">{tr('positions.noPositions')}</p>
                 <button onClick={() => navigate('/trader')} className="mt-2 text-blue-500 text-xs hover:underline">+ Add a trade</button>
               </div>
             ) : (
@@ -630,7 +633,7 @@ function CenterDashboard({ navigate }) {
       {/* Watchlist — Full Width */}
       <div className="bg-white dark:bg-gray-800 rounded-2xl shadow-sm border border-gray-100 dark:border-gray-700 overflow-hidden">
         <div className="flex items-center justify-between px-4 py-3 border-b border-gray-100 dark:border-gray-700">
-          <h3 className="text-sm font-semibold text-gray-900 dark:text-white">Watchlist</h3>
+          <h3 className="text-sm font-semibold text-gray-900 dark:text-white">{tr('watchlist.title')}</h3>
           <div className="flex items-center gap-1">
             {['active', 'pre', 'portfolio'].map(tab => (
               <button
@@ -642,7 +645,7 @@ function CenterDashboard({ navigate }) {
                     : 'text-gray-500 hover:text-gray-700 dark:hover:text-gray-300'
                 }`}
               >
-                {tab === 'active' ? 'Active' : tab === 'pre' ? 'Pre-Watch' : 'Portfolio'}
+                {tab === 'active' ? tr('watchlist.active') : tab === 'pre' ? tr('watchlist.preWatch') : tr('watchlist.portfolio')}
               </button>
             ))}
             {watchlistTab !== 'portfolio' && (
@@ -809,13 +812,13 @@ function CenterDashboard({ navigate }) {
                     onClick={() => handleAddWatch('active')}
                     className="flex-1 text-xs bg-blue-600 text-white py-2 rounded-xl hover:bg-blue-700 font-medium"
                   >
-                    ⭐ Active
+                    {tr('watchlist.addToActive')}
                   </button>
                   <button
                     onClick={() => handleAddWatch('pre')}
                     className="flex-1 text-xs bg-gray-100 dark:bg-gray-700 text-gray-700 dark:text-gray-200 py-2 rounded-xl hover:bg-gray-200 font-medium"
                   >
-                    🟡 Pre-Watch
+                    {tr('watchlist.addToPreWatch')}
                   </button>
                 </div>
               </>
@@ -827,10 +830,10 @@ function CenterDashboard({ navigate }) {
           {filteredWatch.length === 0 ? (
             <div className="text-center py-6">
               <p className="text-xs text-gray-400">
-                {watchlistTab === 'portfolio' ? 'No open positions' : 'No stocks added'}
+                {watchlistTab === 'portfolio' ? tr('watchlist.noPositions') : tr('watchlist.noStocks')}
               </p>
               {watchlistTab !== 'portfolio' && (
-                <button onClick={() => setShowAddWatch(true)} className="text-xs text-blue-500 mt-1 hover:underline">+ Add stock</button>
+                <button onClick={() => setShowAddWatch(true)} className="text-xs text-blue-500 mt-1 hover:underline">{tr('watchlist.addStock')}</button>
               )}
             </div>
           ) : (

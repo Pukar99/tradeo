@@ -1,4 +1,5 @@
 import { useState, useEffect } from 'react'
+import { useLanguage } from '../context/LanguageContext'
 import {
   LineChart, Line, XAxis, YAxis, CartesianGrid,
   Tooltip, ResponsiveContainer, PieChart, Pie,
@@ -674,16 +675,17 @@ function SIPCalculator() {
 // ─── MAIN PAGE ─────────────────────────────────────────────
 function RiskLabPage() {
   const [activeTab, setActiveTab] = useState('nepse')
+  const { t } = useLanguage()
 
   return (
     <div className="w-full px-6 py-6 max-w-7xl mx-auto">
 
       <div className="mb-6">
         <h1 className="text-2xl font-bold text-gray-900 dark:text-white">
-          ⚗️ Risk Lab
+          ⚗️ {t('risklab.title')}
         </h1>
         <p className="text-sm text-gray-400 mt-0.5">
-          Calculate before you trade — position sizing, NEPSE charges, performance analytics & SIP
+          {t('risklab.subtitle')}
         </p>
       </div>
 

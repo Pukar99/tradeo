@@ -1,6 +1,7 @@
 import { useState, useEffect, useRef } from 'react'
 import { useAuth } from '../context/AuthContext'
 import { useTheme } from '../context/ThemeContext'
+import { useLanguage } from '../context/LanguageContext'
 import { sendAgentMessage, getChatSuggestions } from '../api'
 import { useNavigate } from 'react-router-dom'
 
@@ -65,6 +66,7 @@ function ActionCard({ type, result }) {
 function AIChat({ isFullPage = false, onClose }) {
   const { user } = useAuth()
   const { isDark, toggleTheme } = useTheme()
+  const { t, lang } = useLanguage()
   const navigate = useNavigate()
   const [messages, setMessages] = useState([])
   const [input, setInput] = useState('')
@@ -97,7 +99,7 @@ function AIChat({ isFullPage = false, onClose }) {
     setLoading(true)
 
     try {
-      const res = await sendAgentMessage({ message: text, history: messages.slice(-6), lastAction })
+      const res = await sendAgentMessage({ message: text, history: messages.slice(-6), lastAction, lang })
       const data = res.data
       // Only keep lastAction alive for actions that need a follow-up input (SL/TP, confirmation)
       if (data.type === 'action' && data.action === 'TOGGLE_THEME') {
@@ -163,7 +165,7 @@ function AIChat({ isFullPage = false, onClose }) {
             <p className="text-sm font-semibold tracking-tight text-gray-900 dark:text-white">Tradeo AI</p>
             <div className="flex items-center gap-1.5">
               <div className="w-1.5 h-1.5 bg-green-400 rounded-full animate-pulse" />
-              <p className="text-gray-500 text-xs">Online</p>
+              <p className="text-gray-500 text-xs">{t('chat.online')}</p>
             </div>
           </div>
         </div>
@@ -173,7 +175,7 @@ function AIChat({ isFullPage = false, onClose }) {
               onClick={() => setMessages([])}
               className="text-gray-500 hover:text-gray-700 dark:hover:text-gray-300 text-xs px-2 py-1 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors"
             >
-              Clear
+              {t('chat.clear')}
             </button>
           )}
           {!isFullPage && (
@@ -211,10 +213,10 @@ function AIChat({ isFullPage = false, onClose }) {
                 </div>
               </div>
               <p className="text-white text-sm font-semibold mb-1">
-                How can I help you today?
+                {t('chat.greeting')}
               </p>
               <p className="text-gray-500 text-xs max-w-48 mx-auto leading-relaxed">
-                Ask about your portfolio, NEPSE stocks, or trading strategies
+                {t('chat.greetingSub')}
               </p>
             </div>
 
@@ -301,7 +303,7 @@ function AIChat({ isFullPage = false, onClose }) {
             onClick={() => navigate('/login')}
             className="w-full bg-green-500 text-white py-2 rounded-xl text-sm font-medium hover:bg-green-400 transition-colors"
           >
-            Login to Chat
+            {t('chat.loginToChat')}
           </button>
         ) : (
           <div className="flex gap-2 items-end">
@@ -310,7 +312,7 @@ function AIChat({ isFullPage = false, onClose }) {
               value={input}
               onChange={e => setInput(e.target.value)}
               onKeyDown={handleKeyDown}
-              placeholder="Ask anything about your trades..."
+              placeholder={t('chat.placeholder')}
               rows={1}
               className="flex-1 bg-gray-50 dark:bg-gray-900 border border-gray-200 dark:border-gray-800 focus:border-blue-400 dark:focus:border-gray-600 text-gray-800 dark:text-gray-200 placeholder-gray-400 dark:placeholder-gray-600 rounded-xl px-3 py-2 text-xs focus:outline-none resize-none transition-colors"
             />

@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react'
 import { getTradeLog, getStockPrice } from '../api'
 import { useAuth } from '../context/AuthContext'
+import { useLanguage } from '../context/LanguageContext'
 import { useNavigate } from 'react-router-dom'
 
 function PortfolioPage() {
@@ -8,6 +9,7 @@ function PortfolioPage() {
   const [openPositions, setOpenPositions] = useState([])
   const [loading, setLoading] = useState(true)
   const { user } = useAuth()
+  const { t } = useLanguage()
   const navigate = useNavigate()
 
   useEffect(() => {
@@ -60,23 +62,23 @@ function PortfolioPage() {
         <div className="bg-white dark:bg-gray-800 rounded-2xl p-8 shadow-sm text-center max-w-md border border-gray-100 dark:border-gray-700">
           <span className="text-4xl mb-4 block">🔒</span>
           <h2 className="text-xl font-bold text-gray-900 dark:text-white mb-2">
-            Login Required
+            {t('portfolio.loginRequired')}
           </h2>
           <p className="text-gray-500 dark:text-gray-400 text-sm mb-6">
-            You need to login to access your Portfolio and holdings.
+            {t('portfolio.loginMsg')}
           </p>
           <div className="flex gap-3 justify-center">
             <button
               onClick={() => navigate('/login')}
               className="bg-blue-600 text-white px-6 py-2 rounded-xl text-sm font-medium hover:bg-blue-700"
             >
-              Login
+              {t('auth.loginBtn')}
             </button>
             <button
               onClick={() => navigate('/signup')}
               className="bg-gray-100 dark:bg-gray-700 text-gray-700 dark:text-gray-300 px-6 py-2 rounded-xl text-sm font-medium hover:bg-gray-200 dark:hover:bg-gray-600"
             >
-              Sign Up
+              {t('auth.signupBtn')}
             </button>
           </div>
         </div>
