@@ -1,16 +1,15 @@
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
-/* BlockNote dark theme fix */
+
+/* ── BlockNote dark theme ───────────────────────────────────────────────── */
 .dark .bn-editor {
   background-color: #111827 !important;
   color: #f3f4f6 !important;
 }
-
 .dark .bn-container {
   background-color: #111827 !important;
 }
-
 .dark [class*="bn-"] {
   --bn-colors-editor-background: #111827 !important;
   --bn-colors-editor-text: #f3f4f6 !important;
@@ -24,12 +23,48 @@
   --bn-colors-side-menu: #9ca3af !important;
 }
 
+/* ── Tradeo logo ─────────────────────────────────────────────────────────── */
 .tradeo-logo-bg {
   fill: white;
   stroke: #e5e7eb;
 }
-
 .dark .tradeo-logo-bg {
   fill: #1f2937;
   stroke: #374151;
+}
+
+/* ── Hide scrollbar everywhere it's unwanted ─────────────────────────────── */
+.no-scrollbar {
+  -ms-overflow-style: none;
+  scrollbar-width: none;
+}
+.no-scrollbar::-webkit-scrollbar {
+  display: none;
+}
+
+/* ── Smooth fade-in for cards / messages ─────────────────────────────────── */
+@keyframes fadeSlideUp {
+  from { opacity: 0; transform: translateY(6px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+.animate-fade-up {
+  animation: fadeSlideUp 0.22s ease-out both;
+}
+
+/* ── Subtle scale-in for action cards ───────────────────────────────────── */
+@keyframes scaleIn {
+  from { opacity: 0; transform: scale(0.97); }
+  to   { opacity: 1; transform: scale(1); }
+}
+.animate-scale-in {
+  animation: scaleIn 0.18s ease-out both;
+}
+
+/* ── Gentle pulse for loading dots (override bounce for smoother feel) ───── */
+@keyframes softBounce {
+  0%, 100% { transform: translateY(0);    opacity: 0.5; }
+  50%       { transform: translateY(-4px); opacity: 1;   }
+}
+.animate-soft-bounce {
+  animation: softBounce 1s ease-in-out infinite;
 }
