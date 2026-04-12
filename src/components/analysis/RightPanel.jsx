@@ -1,6 +1,5 @@
 import { useState, useEffect, useRef } from 'react'
-import axios from 'axios'
-import { getTopVolume } from '../../api'
+import { getTopVolume, getMarketDates, getTopMovers, getAIReport, getIPOs, getMarketNews } from '../../api'
 import { useAnalysis } from '../../context/AnalysisContext'
 
 // ── Mini sparkline bar ────────────────────────────────────────────────────────
@@ -83,7 +82,7 @@ function AIReportCard() {
     setLoading(true)
     setOpen(true)
     try {
-      const r = await axios.get('http://localhost:5000/api/market/ai-report')
+      const r = await getAIReport()
       setReport(r.data)
     } catch {
       setReport({ summary: 'AI report unavailable. Check backend connection.', sentiment: 'neutral' })
@@ -163,7 +162,7 @@ function IPOSection() {
     if (loaded) return
     setLoaded(true)
     try {
-      const r = await axios.get('http://localhost:5000/api/market/ipos')
+      const r = await getIPOs()
       setIpos(r.data.ipos || [])
     } catch {
       setIpos([])
@@ -238,7 +237,7 @@ function NewsSection() {
     if (loaded) return
     setLoaded(true)
     try {
-      const r = await axios.get('http://localhost:5000/api/market/news')
+      const r = await getMarketNews()
       setNews(r.data.news || [])
     } catch {
       setNews([])
@@ -312,7 +311,7 @@ export default function RightPanel() {
   const [loading, setLoading]           = useState(false)
 
   useEffect(() => {
-    axios.get('http://localhost:5000/api/market/dates')
+    getMarketDates()
       .then(r => {
         setDates(r.data.dates)
         setLatestDate(r.data.latestDate)
@@ -325,7 +324,7 @@ export default function RightPanel() {
     if (!selectedDate) return
     setLoading(true)
     Promise.all([
-      axios.get(`http://localhost:5000/api/market/top-movers?date=${selectedDate}`),
+      getTopMovers(selectedDate),
       getTopVolume({ limit: 10, date: selectedDate }),
     ])
       .then(([mr, vr]) => {
