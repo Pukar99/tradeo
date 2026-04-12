@@ -7,6 +7,7 @@ import {
   closeTradeLog, partialCloseTradeLog, deleteTradeLog,
   getTradeJournal, addTradeJournal, deleteTradeJournal
 } from '../api'
+import { useContextMenu } from '../components/ContextMenu'
 
 const NEPSE_SYMBOLS = [
   'NTC','NABIL','SCB','EBL','NICA','HBL','KBL','MBL','CZBIL','SBI',
@@ -418,9 +419,9 @@ function JournalModal({ onClose, onSave, tradeId, tradeName }) {
 // ── Trade Row ─────────────────────────────────────────────────────────────────
 function TradeRow({ trade, onEdit, onClose, onPartialClose, onDelete, onJournal }) {
   const [expanded, setExpanded] = useState(false)
+  const { onContextMenu, ContextMenuPortal } = useContextMenu()
   const remaining = trade.remaining_quantity ?? trade.quantity
   const pnl = trade.realized_pnl || 0
-  const isOpen = trade.status === 'OPEN' || trade.status === 'PARTIAL'
 
   const statusPill = {
     OPEN:    'text-blue-500 bg-blue-50 dark:bg-blue-900/20',
@@ -428,9 +429,23 @@ function TradeRow({ trade, onEdit, onClose, onPartialClose, onDelete, onJournal 
     CLOSED:  'text-gray-400 bg-gray-100 dark:bg-gray-800',
   }[trade.status] || ''
 
+  const isOpen = trade.status === 'OPEN' || trade.status === 'PARTIAL'
+  const ctxItems = [
+    { label: 'Edit', icon: '✏️', action: () => onEdit(trade) },
+    { label: 'Journal', icon: '📓', action: () => onJournal(trade) },
+    ...(isOpen ? [
+      { label: 'Partial Close', icon: '½', action: () => onPartialClose(trade) },
+      { label: 'Close Trade', icon: '🔒', action: () => onClose(trade) },
+    ] : []),
+    { separator: true },
+    { label: 'Delete', icon: '🗑️', danger: true, action: () => onDelete(trade.id) },
+  ]
+
   return (
     <>
+      <ContextMenuPortal />
       <tr
+        onContextMenu={onContextMenu(ctxItems)}
         className="border-b border-gray-50 dark:border-gray-800/60 hover:bg-gray-50 dark:hover:bg-gray-800/40 transition-colors cursor-pointer"
         onClick={() => setExpanded(!expanded)}
       >
@@ -460,32 +475,7 @@ function TradeRow({ trade, onEdit, onClose, onPartialClose, onDelete, onJournal 
         <td className="px-4 py-3">
           <span className={`text-[10px] font-semibold px-2 py-0.5 rounded-full ${statusPill}`}>{trade.status}</span>
         </td>
-        <td className="px-4 py-3">
-          <div className="flex items-center gap-0.5" onClick={e => e.stopPropagation()}>
-            {isOpen && (
-              <>
-                <button onClick={() => onPartialClose(trade)} title="Partial Close"
-                  className="w-6 h-6 flex items-center justify-center rounded-lg text-amber-400 hover:bg-amber-50 dark:hover:bg-amber-900/30 transition-colors text-[10px] font-bold">½</button>
-                <button onClick={() => onClose(trade)} title="Close"
-                  className="w-6 h-6 flex items-center justify-center rounded-lg text-red-400 hover:bg-red-50 dark:hover:bg-red-900/30 transition-colors">
-                  <svg className="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" /></svg>
-                </button>
-              </>
-            )}
-            <button onClick={() => onJournal(trade)} title="Journal"
-              className="w-6 h-6 flex items-center justify-center rounded-lg text-blue-400 hover:bg-blue-50 dark:hover:bg-blue-900/30 transition-colors">
-              <svg className="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" /></svg>
-            </button>
-            <button onClick={() => onEdit(trade)} title="Edit"
-              className="w-6 h-6 flex items-center justify-center rounded-lg text-gray-400 hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors">
-              <svg className="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z" /></svg>
-            </button>
-            <button onClick={() => onDelete(trade.id)} title="Delete"
-              className="w-6 h-6 flex items-center justify-center rounded-lg text-gray-300 dark:text-gray-700 hover:text-red-400 hover:bg-red-50 dark:hover:bg-red-900/30 transition-colors">
-              <svg className="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" /></svg>
-            </button>
-          </div>
-        </td>
+        <td className="px-4 py-3 text-[9px] text-gray-300 dark:text-gray-700 select-none">⋯</td>
       </tr>
 
       {expanded && (
@@ -536,6 +526,7 @@ function TraderPage() {
   const [journalTrade, setJournalTrade] = useState(null)
   const [filterStatus, setFilterStatus] = useState('ALL')
   const [searchSymbol, setSearchSymbol] = useState('')
+  const { onContextMenu: journalCtx, ContextMenuPortal: JournalMenuPortal } = useContextMenu()
 
   useEffect(() => { fetchData() }, [])
 
@@ -555,9 +546,9 @@ function TraderPage() {
 
   const handleCloseTrade    = async ({ exit_price }) => { const res = await closeTradeLog(closeTrade.id, { exit_price }); setTrades(prev => prev.map(t => t.id === closeTrade.id ? res.data : t)); setCloseTrade(null) }
   const handlePartialClose  = async ({ exit_price, exit_quantity, reason }) => { const res = await partialCloseTradeLog(partialTrade.id, { exit_price, exit_quantity, reason }); setTrades(prev => prev.map(t => t.id === partialTrade.id ? res.data : t)); setPartialTrade(null) }
-  const handleDelete        = async (id) => { if (!window.confirm('Delete this trade?')) return; await deleteTradeLog(id); setTrades(prev => prev.filter(t => t.id !== id)) }
+  const handleDelete        = async (id) => { await deleteTradeLog(id); setTrades(prev => prev.filter(t => t.id !== id)) }
   const handleAddJournal    = async (form) => { const res = await addTradeJournal(form); setJournals(prev => [res.data, ...prev]); setJournalTrade(null) }
-  const handleDeleteJournal = async (id) => { if (!window.confirm('Delete this journal entry?')) return; await deleteTradeJournal(id); setJournals(prev => prev.filter(j => j.id !== id)) }
+  const handleDeleteJournal = async (id) => { await deleteTradeJournal(id); setJournals(prev => prev.filter(j => j.id !== id)) }
 
   const filteredTrades = trades.filter(t => (filterStatus === 'ALL' || t.status === filterStatus) && (!searchSymbol || t.symbol.includes(searchSymbol.toUpperCase())))
 
@@ -729,26 +720,24 @@ function TraderPage() {
             </div>
           ) : (
             <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-2.5">
+              <JournalMenuPortal />
               {journals.map((j, idx) => {
                 const emotion = EMOTIONAL_STATES.find(e => e.value === j.emotional_state)
                 const market  = MARKET_CONDITIONS.find(m => m.value === j.market_condition)
                 const linked  = trades.find(t => t.id === j.trade_id)
                 return (
                   <div key={j.id}
-                    className="bg-white dark:bg-gray-900 rounded-2xl border border-gray-100 dark:border-gray-800 p-3.5 flex flex-col gap-2 group hover:border-gray-200 dark:hover:border-gray-700 transition-colors animate-fade-up"
+                    onContextMenu={journalCtx([
+                      { label: 'Delete', icon: '🗑️', danger: true, action: () => handleDeleteJournal(j.id) },
+                    ])}
+                    className="bg-white dark:bg-gray-900 rounded-2xl border border-gray-100 dark:border-gray-800 p-3.5 flex flex-col gap-2 hover:border-gray-200 dark:hover:border-gray-700 transition-colors animate-fade-up"
                     style={{ animationDelay: `${Math.min(idx, 8) * 30}ms` }}
                   >
-                    <div className="flex items-center justify-between">
-                      <div className="flex items-center gap-1.5 flex-wrap">
-                        <span className="text-[9px] text-gray-400">{j.date}</span>
-                        {emotion && <span className={`text-[9px] font-medium px-1.5 py-0.5 rounded-full ${emotion.pill}`}>{emotion.label}</span>}
-                        {market  && <span className="text-[9px] font-medium px-1.5 py-0.5 rounded-full bg-gray-100 dark:bg-gray-800 text-gray-500">{market.label}</span>}
-                        {linked  && <span className="text-[9px] font-medium px-1.5 py-0.5 rounded-full bg-blue-50 dark:bg-blue-900/20 text-blue-500">{linked.symbol}</span>}
-                      </div>
-                      <button onClick={() => handleDeleteJournal(j.id)}
-                        className="opacity-0 group-hover:opacity-100 w-5 h-5 flex items-center justify-center rounded-lg text-gray-300 dark:text-gray-700 hover:text-red-400 hover:bg-red-50 dark:hover:bg-red-900/30 transition-all">
-                        <svg className="w-2.5 h-2.5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" /></svg>
-                      </button>
+                    <div className="flex items-center gap-1.5 flex-wrap">
+                      <span className="text-[9px] text-gray-400">{j.date}</span>
+                      {emotion && <span className={`text-[9px] font-medium px-1.5 py-0.5 rounded-full ${emotion.pill}`}>{emotion.label}</span>}
+                      {market  && <span className="text-[9px] font-medium px-1.5 py-0.5 rounded-full bg-gray-100 dark:bg-gray-800 text-gray-500">{market.label}</span>}
+                      {linked  && <span className="text-[9px] font-medium px-1.5 py-0.5 rounded-full bg-blue-50 dark:bg-blue-900/20 text-blue-500">{linked.symbol}</span>}
                     </div>
 
                     {(j.pre_trade_reasoning || j.post_trade_evaluation || j.notes) && (

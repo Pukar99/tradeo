@@ -1,5 +1,6 @@
 import { useAuth } from '../context/AuthContext'
 import { useLanguage } from '../context/LanguageContext'
+import { useContextMenu } from '../components/ContextMenu'
 import TaskBoard from '../components/dashboard/TaskBoard'
 import DisciplineScore from '../components/dashboard/DisciplineScore'
 import MonthlyGoals from '../components/dashboard/MonthlyGoals'
@@ -283,6 +284,7 @@ function CenterDashboard({ navigate }) {
   const [perfStats, setPerfStats] = useState(null)
   const [watchlist, setWatchlist] = useState([])
   const [watchlistTab, setWatchlistTab] = useState('active')
+  const { onContextMenu: watchCtx, ContextMenuPortal: WatchMenuPortal } = useContextMenu()
   const [perfCollapsed, setPerfCollapsed] = useState(false)
   const [positionsCollapsed, setPositionsCollapsed] = useState(true)
   const [loading, setLoading] = useState(true)
@@ -836,8 +838,13 @@ function CenterDashboard({ navigate }) {
             </div>
           ) : (
             <div className="grid grid-cols-2 md:grid-cols-4 gap-2">
+              <WatchMenuPortal />
               {filteredWatch.map(item => (
-                <div key={item.id} className="flex flex-col bg-gray-50 dark:bg-gray-700 rounded-lg px-2.5 py-2 group">
+                <div key={item.id}
+                  onContextMenu={!item.isPosition ? watchCtx([
+                    { label: 'Delete', icon: '🗑️', danger: true, action: () => handleRemoveWatch(item.id) },
+                  ]) : undefined}
+                  className="flex flex-col bg-gray-50 dark:bg-gray-700 rounded-lg px-2.5 py-2">
                   <div className="flex items-center justify-between">
                     <div className="flex items-center gap-1.5">
                       <StockAvatar symbol={item.symbol} size="w-7 h-7" />
@@ -869,12 +876,6 @@ function CenterDashboard({ navigate }) {
                           {item.change >= 0 ? '+' : ''}{item.change}%
                         </span>
                       ) : null}
-                      {!item.isPosition && (
-                        <button
-                          onClick={() => handleRemoveWatch(item.id)}
-                          className="opacity-0 group-hover:opacity-100 text-gray-300 hover:text-red-400 text-xs transition-opacity ml-1"
-                        >✕</button>
-                      )}
                     </div>
                   </div>
                   {/* Alert messages */}

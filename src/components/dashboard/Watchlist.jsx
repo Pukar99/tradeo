@@ -6,6 +6,7 @@ import {
   getStockPrice,
   getTradeLog
 } from '../../api'
+import { useContextMenu } from '../ContextMenu'
 
 const CATEGORIES = [
   { value: 'active', label: '⭐ Active' },
@@ -77,6 +78,7 @@ function Watchlist() {
   const [loading, setLoading] = useState(true)
   const [activeTab, setActiveTab] = useState('active')
   const [showForm, setShowForm] = useState(false)
+  const { onContextMenu, ContextMenuPortal } = useContextMenu()
   const [form, setForm] = useState({
     symbol: '',
     watch_low: '',
@@ -228,6 +230,7 @@ function Watchlist() {
 
   return (
     <div className="bg-white dark:bg-gray-800 rounded-xl shadow-sm">
+      <ContextMenuPortal />
 
       <div className="p-4 border-b border-gray-100 dark:border-gray-700">
         <div className="flex justify-between items-center mb-3">
@@ -424,7 +427,10 @@ function Watchlist() {
             return (
               <div
                 key={item.id}
-                className="px-4 py-3 hover:bg-gray-50 dark:hover:bg-gray-700 group transition-colors"
+                onContextMenu={!item.isPortfolio ? onContextMenu([
+                  { label: 'Delete', icon: '🗑️', danger: true, action: () => handleRemove(item.id) },
+                ]) : undefined}
+                className="px-4 py-3 hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors"
               >
                 <div className="flex items-center justify-between">
                   <div>
@@ -496,14 +502,6 @@ function Watchlist() {
                           </p>
                         )}
                       </div>
-                    )}
-                    {!item.isPortfolio && (
-                      <button
-                        onClick={() => handleRemove(item.id)}
-                        className="opacity-0 group-hover:opacity-100 text-gray-300 hover:text-red-400 text-xs transition-opacity"
-                      >
-                        ✕
-                      </button>
                     )}
                   </div>
                 </div>

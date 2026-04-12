@@ -1,9 +1,11 @@
 import { useState, useEffect } from 'react'
 import { getGoals, addGoal, updateGoal, deleteGoal } from '../../api'
 import { useLanguage } from '../../context/LanguageContext'
+import { useContextMenu } from '../ContextMenu'
 
 function MonthlyGoals() {
   const { t } = useLanguage()
+  const { onContextMenu, ContextMenuPortal } = useContextMenu()
   const [goals, setGoals] = useState([])
   const [loading, setLoading] = useState(true)
   const [showForm, setShowForm] = useState(false)
@@ -99,6 +101,7 @@ function MonthlyGoals() {
 
   return (
     <div className="bg-white dark:bg-gray-900 rounded-2xl border border-gray-100 dark:border-gray-800 overflow-hidden">
+      <ContextMenuPortal />
 
       {/* Header */}
       <div className="px-4 pt-4 pb-3">
@@ -231,7 +234,13 @@ function MonthlyGoals() {
                 </div>
               ) : (
                 /* ── Normal row ── */
-                <div className={`flex items-start gap-2.5 px-2.5 py-2 rounded-xl group transition-colors hover:bg-gray-50 dark:hover:bg-gray-800 ${
+                <div
+                  onContextMenu={onContextMenu([
+                    { label: 'Edit', icon: '✏️', action: () => startEdit(goal) },
+                    { separator: true },
+                    { label: 'Delete', icon: '🗑️', danger: true, action: () => handleDelete(goal.id) },
+                  ])}
+                  className={`flex items-start gap-2.5 px-2.5 py-2 rounded-xl transition-colors hover:bg-gray-50 dark:hover:bg-gray-800 ${
                   goal.completed ? 'opacity-60' : ''
                 }`}>
                   {/* Checkbox */}
@@ -269,27 +278,6 @@ function MonthlyGoals() {
                     )}
                   </div>
 
-                  {/* Actions — hover reveal */}
-                  <div className="flex items-center gap-0.5 opacity-0 group-hover:opacity-100 transition-opacity flex-shrink-0 mt-0.5">
-                    <button
-                      onClick={() => startEdit(goal)}
-                      className="w-6 h-6 rounded-lg flex items-center justify-center text-gray-300 dark:text-gray-600 hover:text-blue-500 hover:bg-blue-50 dark:hover:bg-blue-900/30 transition-colors"
-                      title="Edit"
-                    >
-                      <svg className="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15.232 5.232l3.536 3.536M9 13l6.586-6.586a2 2 0 012.828 2.828L11.828 15.828a2 2 0 01-1.414.586H9v-2.414a2 2 0 01.586-1.414z" />
-                      </svg>
-                    </button>
-                    <button
-                      onClick={() => handleDelete(goal.id)}
-                      className="w-6 h-6 rounded-lg flex items-center justify-center text-gray-300 dark:text-gray-600 hover:text-red-400 hover:bg-red-50 dark:hover:bg-red-900/30 transition-colors"
-                      title="Delete"
-                    >
-                      <svg className="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
-                      </svg>
-                    </button>
-                  </div>
                 </div>
               )}
             </div>

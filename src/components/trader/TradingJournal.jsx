@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react'
 import { getJournal, addJournalEntry, deleteJournalEntry } from '../../api'
+import { useContextMenu } from '../ContextMenu'
 
 const MOODS = [
   { value: 'positive', label: '😊 Positive', dot: 'bg-green-400', pill: 'text-green-600 bg-green-50 dark:bg-green-900/40 dark:text-green-400' },
@@ -53,8 +54,9 @@ function TradingJournal() {
     }
   }
 
+  const { onContextMenu, ContextMenuPortal } = useContextMenu()
+
   const handleDelete = async (id) => {
-    if (!window.confirm('Delete this entry?')) return
     try {
       await deleteJournalEntry(id)
       setEntries(prev => prev.filter(e => e.id !== id))
@@ -78,6 +80,7 @@ function TradingJournal() {
 
   return (
     <div className="space-y-4">
+      <ContextMenuPortal />
 
       {/* Header row */}
       <div className="flex items-center justify-between">
@@ -176,23 +179,16 @@ function TradingJournal() {
             return (
               <div
                 key={entry.id}
-                className="bg-white dark:bg-gray-900 rounded-2xl border border-gray-100 dark:border-gray-800 p-3 flex flex-col gap-2 group transition-all hover:border-gray-200 dark:hover:border-gray-700 hover:shadow-sm animate-fade-up"
+                onContextMenu={onContextMenu([
+                  { label: 'Delete', icon: '🗑️', danger: true, action: () => handleDelete(entry.id) },
+                ])}
+                className="bg-white dark:bg-gray-900 rounded-2xl border border-gray-100 dark:border-gray-800 p-3 flex flex-col gap-2 transition-all hover:border-gray-200 dark:hover:border-gray-700 hover:shadow-sm animate-fade-up"
                 style={{ animationDelay: `${Math.min(idx, 8) * 30}ms` }}
               >
-                {/* Top row: mood dot + date + delete */}
-                <div className="flex items-center justify-between">
-                  <div className="flex items-center gap-1.5">
-                    <span className={`w-1.5 h-1.5 rounded-full flex-shrink-0 ${mood.dot}`} />
-                    <span className="text-[9px] text-gray-400">{formatDate(entry.created_at)}</span>
-                  </div>
-                  <button
-                    onClick={() => handleDelete(entry.id)}
-                    className="opacity-0 group-hover:opacity-100 text-gray-300 dark:text-gray-600 hover:text-red-400 transition-all w-5 h-5 flex items-center justify-center rounded-lg hover:bg-red-50 dark:hover:bg-red-900/30"
-                  >
-                    <svg className="w-2.5 h-2.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
-                    </svg>
-                  </button>
+                {/* Top row: mood dot + date */}
+                <div className="flex items-center gap-1.5">
+                  <span className={`w-1.5 h-1.5 rounded-full flex-shrink-0 ${mood.dot}`} />
+                  <span className="text-[9px] text-gray-400">{formatDate(entry.created_at)}</span>
                 </div>
 
                 {/* Title */}

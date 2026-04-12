@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react'
 import { getTradeLog, getWatchlist, removeFromWatchlist, getTodayTasks, addTradeLog, closeTradeLog, getStockPrice } from '../../api'
+import { useContextMenu } from '../ContextMenu'
 import { useAnalysis } from '../../context/AnalysisContext'
 
 // ── BUY / SELL Modal ──────────────────────────────────────────────────────────
@@ -204,9 +205,11 @@ export default function LeftPanel() {
 
   const completedTasks = tasks.filter(t => t.completed).length
   const canTrade       = !isIndex(selectedSymbol)
+  const { onContextMenu, ContextMenuPortal } = useContextMenu()
 
   return (
     <div className="flex flex-col h-full overflow-hidden">
+      <ContextMenuPortal />
 
       {/* ── P / W tabs ────────────────────────────────────────────────── */}
       <div className="flex bg-gray-100 dark:bg-gray-800 rounded-xl p-0.5 m-2 shrink-0">
@@ -263,28 +266,25 @@ export default function LeftPanel() {
           {watchlist.length === 0 ? (
             <p className="text-center text-[9px] text-gray-400 py-4">No watchlist stocks</p>
           ) : watchlist.map(w => (
-            <div key={w.id} onClick={() => selectSymbol(w.symbol)}
-              className={`group cursor-pointer rounded-xl px-2 py-2 transition-all border ${
+            <div key={w.id}
+              onClick={() => selectSymbol(w.symbol)}
+              onContextMenu={onContextMenu([
+                { label: 'Delete', icon: '🗑️', danger: true, action: () =>
+                    removeFromWatchlist(w.id).then(() => setWatchlist(prev => prev.filter(x => x.id !== w.id)))
+                },
+              ])}
+              className={`cursor-pointer rounded-xl px-2 py-2 transition-all border ${
                 selectedSymbol === w.symbol
                   ? 'bg-blue-50 dark:bg-blue-950/50 border-blue-200 dark:border-blue-800'
                   : 'hover:bg-gray-50 dark:hover:bg-gray-800/50 border-transparent'
               }`}>
               <div className="flex items-center justify-between">
                 <span className="text-[11px] font-bold text-gray-800 dark:text-gray-100">{w.symbol}</span>
-                <div className="flex items-center gap-1">
-                  <span className={`text-[7px] font-semibold px-1.5 py-0.5 rounded-md ${
-                    (w.category === 'pre' || w.category === 'pre-watch')
-                      ? 'bg-amber-100 dark:bg-amber-950 text-amber-600 dark:text-amber-400'
-                      : 'bg-emerald-100 dark:bg-emerald-950 text-emerald-600 dark:text-emerald-400'
-                  }`}>{(w.category === 'pre' || w.category === 'pre-watch') ? 'Pre' : 'Active'}</span>
-                  <button
-                    onClick={e => {
-                      e.stopPropagation()
-                      removeFromWatchlist(w.id).then(() => setWatchlist(prev => prev.filter(x => x.id !== w.id)))
-                    }}
-                    className="opacity-0 group-hover:opacity-100 text-gray-300 hover:text-red-400 text-[10px] leading-none transition-opacity"
-                  >✕</button>
-                </div>
+                <span className={`text-[7px] font-semibold px-1.5 py-0.5 rounded-md ${
+                  (w.category === 'pre' || w.category === 'pre-watch')
+                    ? 'bg-amber-100 dark:bg-amber-950 text-amber-600 dark:text-amber-400'
+                    : 'bg-emerald-100 dark:bg-emerald-950 text-emerald-600 dark:text-emerald-400'
+                }`}>{(w.category === 'pre' || w.category === 'pre-watch') ? 'Pre' : 'Active'}</span>
               </div>
               {(w.watch_low || w.watch_high) && (
                 <div className="flex gap-2 mt-0.5 text-[7px] text-gray-400">
@@ -292,9 +292,7 @@ export default function LeftPanel() {
                   {w.watch_high && <span>H: <span className="text-emerald-500">{w.watch_high}</span></span>}
                 </div>
               )}
-              {w.notes && (
-                <p className="text-[7px] text-gray-400 mt-0.5 truncate">{w.notes}</p>
-              )}
+              {w.notes && <p className="text-[7px] text-gray-400 mt-0.5 truncate">{w.notes}</p>}
             </div>
           ))}
         </div>

@@ -6,6 +6,7 @@ import {
   addCustomTask, updateCustomTask,
   deleteCustomTask, getMindset
 } from '../../api'
+import { useContextMenu } from '../ContextMenu'
 
 const FIXED_TASKS = [
   { id: 'fixed_1', title: 'Read Mindset Reminder', type: 'mindset',   icon: '🧠' },
@@ -254,42 +255,32 @@ function Check() {
 
 // ── Task row ──────────────────────────────────────────────────────────────────
 function TaskRow({ done, label, onClick, onDelete, hint }) {
+  const handleContextMenu = onDelete ? (e) => {
+    e.preventDefault()
+    e.stopPropagation()
+    // dispatch custom event so TaskBoard's context menu picks it up
+    window.dispatchEvent(new CustomEvent('taskrow-context', { detail: { x: e.clientX, y: e.clientY, onDelete } }))
+  } : undefined
+
   return (
     <div
       onClick={!done ? onClick : undefined}
-      className={`flex items-center gap-2.5 px-2 py-2 rounded-xl transition-colors group
+      onContextMenu={handleContextMenu}
+      className={`flex items-center gap-2.5 px-2 py-2 rounded-xl transition-colors
         ${!done ? 'hover:bg-gray-50 dark:hover:bg-gray-800 cursor-pointer' : 'opacity-60'}`}
     >
-      {/* Circle / check */}
       <div
         className={`w-4 h-4 rounded-full flex items-center justify-center flex-shrink-0 transition-all
-          ${done
-            ? 'bg-green-400'
-            : 'border border-gray-300 dark:border-gray-600 group-hover:border-green-400'
-          }`}
+          ${done ? 'bg-green-400' : 'border border-gray-300 dark:border-gray-600'}`}
         onClick={e => { if (done && onClick) { e.stopPropagation(); onClick() } }}
       >
         {done && <Check />}
       </div>
-
-      {/* Label */}
       <span className={`text-[11px] flex-1 leading-snug ${done ? 'line-through text-gray-400 dark:text-gray-600' : 'text-gray-700 dark:text-gray-300'}`}>
         {label}
       </span>
-
-      {/* Hint / delete */}
       {!done && hint && (
-        <span className="text-[9px] text-gray-300 dark:text-gray-600 opacity-0 group-hover:opacity-100 transition-opacity">{hint}</span>
-      )}
-      {onDelete && (
-        <button
-          onClick={e => { e.stopPropagation(); onDelete() }}
-          className="opacity-0 group-hover:opacity-100 w-4 h-4 flex items-center justify-center rounded text-gray-300 dark:text-gray-600 hover:text-red-400 transition-all"
-        >
-          <svg className="w-2.5 h-2.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
-          </svg>
-        </button>
+        <span className="text-[9px] text-gray-300 dark:text-gray-600">{hint}</span>
       )}
     </div>
   )
@@ -306,6 +297,18 @@ function TaskBoard({ onTaskComplete }) {
   const [adding, setAdding]           = useState(false)
   const [showAdd, setShowAdd]         = useState(false)
   const [activeModal, setActiveModal] = useState(null)
+  const { onContextMenu: _ocm, ContextMenuPortal } = useContextMenu()
+
+  // TaskRow fires a custom event; we handle it here with our context menu instance
+  useEffect(() => {
+    const handler = (e) => {
+      const { x, y, onDelete } = e.detail
+      const fakeEvent = { clientX: x, clientY: y, preventDefault: () => {}, stopPropagation: () => {} }
+      _ocm([{ label: 'Delete', icon: '🗑️', danger: true, action: onDelete }])(fakeEvent)
+    }
+    window.addEventListener('taskrow-context', handler)
+    return () => window.removeEventListener('taskrow-context', handler)
+  }, [_ocm])
 
   const fetchTasks = async () => {
     try {
@@ -402,6 +405,7 @@ function TaskBoard({ onTaskComplete }) {
 
   return (
     <>
+      <ContextMenuPortal />
       {activeModal?.type === 'mindset' && (
         <MindsetModal onClose={() => setActiveModal(null)} onDone={() => handleTaskDone(activeModal.task.id)} />
       )}
