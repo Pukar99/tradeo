@@ -1,34 +1,73 @@
-import { createContext, useContext, useState } from 'react'
+import { createContext, useContext, useState, useCallback } from 'react'
 
 const AnalysisContext = createContext(null)
 
 export function AnalysisProvider({ children }) {
-  const [selectedSymbol, setSelectedSymbol] = useState('NEPSE')
+  const [selectedSymbol,  setSelectedSymbol]  = useState('NEPSE')
   const [selectedIndexId, setSelectedIndexId] = useState(12)
-  const [chartType, setChartType] = useState('candlestick')   // 'candlestick' | 'line'
-  const [timeframe, setTimeframe] = useState('1Y')             // '1D'|'1W'|'1M'|'6M'|'1Y'|'3Y'|'ALL'
-  const [activeIndicators, setActiveIndicators] = useState([]) // ['RSI','MACD','MA']
+  const [chartType,       setChartType]       = useState('candlestick')
+  const [timeframe,       setTimeframe]       = useState('1Y')
+  const [activeIndicators,setActiveIndicators]= useState([])
 
-  const isIndex = (sym) => sym === 'NEPSE' || sym.includes('Index') || sym.includes('Sub-Index')
+  // Hover / click-lock state — drives the candle movers overlay
+  const [hoveredDate,   setHoveredDate]   = useState(null)
+  const [pinnedDate,    setPinnedDate]    = useState(null)  // null = not pinned
+  const [hoveredMovers, setHoveredMovers] = useState(null)  // { gainers, losers }
+  const [pinnedMovers,  setPinnedMovers]  = useState(null)
 
-  function selectSymbol(sym, indexId = null) {
+  const isIndex = (sym) =>
+    sym === 'NEPSE' ||
+    sym.includes('Index') ||
+    sym.includes('Sub-Index') ||
+    sym.includes('NEPSE 20') ||
+    sym.includes('Float') ||
+    sym.includes('Sensitive')
+
+  const selectSymbol = useCallback((sym, indexId = null) => {
     setSelectedSymbol(sym)
     if (indexId) setSelectedIndexId(indexId)
-  }
+    // Clear any pin when switching symbol
+    setPinnedDate(null)
+    setPinnedMovers(null)
+  }, [])
 
-  function toggleIndicator(name) {
+  const toggleIndicator = useCallback((name) => {
     setActiveIndicators(prev =>
       prev.includes(name) ? prev.filter(i => i !== name) : [...prev, name]
     )
-  }
+  }, [])
+
+  // Called by StockChart on crosshair move
+  const onHover = useCallback((date, movers) => {
+    setHoveredDate(date)
+    setHoveredMovers(movers)
+  }, [])
+
+  // Called by StockChart on candle click — toggles pin
+  const onPin = useCallback((date, movers) => {
+    setPinnedDate(prev => prev === date ? null : date)
+    setPinnedMovers(prev => prev && pinnedDate === date ? null : movers)
+  }, [pinnedDate])
+
+  const clearPin = useCallback(() => {
+    setPinnedDate(null)
+    setPinnedMovers(null)
+  }, [])
+
+  // Active date/movers = pinned takes priority over hovered
+  const activeDate   = pinnedDate   ?? hoveredDate
+  const activeMovers = pinnedMovers ?? hoveredMovers
 
   return (
     <AnalysisContext.Provider value={{
       selectedSymbol, selectedIndexId,
-      chartType, setChartType,
-      timeframe, setTimeframe,
+      chartType,       setChartType,
+      timeframe,       setTimeframe,
       activeIndicators, toggleIndicator,
-      selectSymbol, isIndex,
+      selectSymbol,    isIndex,
+      hoveredDate, pinnedDate, activeDate,
+      hoveredMovers, pinnedMovers, activeMovers,
+      onHover, onPin, clearPin,
     }}>
       {children}
     </AnalysisContext.Provider>
