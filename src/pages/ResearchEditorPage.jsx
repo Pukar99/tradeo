@@ -174,78 +174,69 @@ function ResearchEditorPage() {
   return (
     <div className="w-full px-6 py-6 max-w-4xl mx-auto">
 
-      <div className="flex items-center justify-between mb-6">
-        <div className="flex items-center gap-3">
-          <button
-            onClick={() => navigate('/research')}
-            className="text-gray-400 hover:text-gray-600 dark:hover:text-gray-200 text-sm flex items-center gap-1"
-          >
-            ← Back
-          </button>
-          <h1 className="text-xl font-bold text-gray-900 dark:text-white">
-            {isEditing ? 'Edit Research' : 'New Research Post'}
-          </h1>
-        </div>
+      {/* Header */}
+      <div className="flex items-center justify-between mb-5">
+        <button
+          onClick={() => navigate('/research')}
+          className="flex items-center gap-1.5 text-[11px] text-gray-400 hover:text-gray-600 dark:hover:text-gray-300 transition-colors"
+        >
+          <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
+          </svg>
+          Research Hub
+        </button>
         <div className="flex items-center gap-2">
           <button
             onClick={() => handleSave('draft')}
             disabled={saving || uploading}
-            className="text-sm px-4 py-2 rounded-lg border border-gray-200 dark:border-gray-600 text-gray-600 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-700 disabled:opacity-50"
+            className="text-[11px] px-3 py-1.5 rounded-xl border border-gray-200 dark:border-gray-700 text-gray-600 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-800 disabled:opacity-50 transition-colors"
           >
-            {saving ? 'Saving...' : 'Save Draft'}
+            {saving ? 'Saving…' : 'Save Draft'}
           </button>
           <button
             onClick={() => handleSave('published')}
             disabled={saving || uploading}
-            className="text-sm px-4 py-2 rounded-lg bg-blue-600 text-white hover:bg-blue-700 disabled:opacity-50 font-medium"
+            className="text-[11px] px-4 py-1.5 rounded-xl bg-blue-600 text-white hover:bg-blue-700 disabled:opacity-50 font-semibold transition-colors"
           >
-            {saving ? 'Publishing...' : 'Publish'}
+            {saving ? 'Publishing…' : 'Publish'}
           </button>
         </div>
       </div>
 
       {error && (
-        <div className="bg-red-50 dark:bg-red-900 text-red-600 dark:text-red-300 p-3 rounded-lg mb-4 text-sm">
+        <div className="text-[11px] text-red-500 bg-red-50 dark:bg-red-900/30 px-4 py-2.5 rounded-xl mb-4 border border-red-100 dark:border-red-800/50">
           {error}
         </div>
       )}
-<div className="bg-white dark:bg-gray-900 rounded-xl shadow-sm overflow-hidden mb-4">
 
-        <div className="p-6 border-b border-gray-100 dark:border-gray-700 dark:bg-gray-900">
-  <input
-    type="text"
-    value={title}
-    onChange={e => setTitle(e.target.value)}
-    placeholder="Research Title..."
-    className="w-full text-2xl font-bold text-gray-900 dark:text-white bg-transparent border-none outline-none placeholder-gray-300 dark:placeholder-gray-600"
-  />
-</div>
+      <div className="bg-white dark:bg-gray-900 rounded-2xl border border-gray-100 dark:border-gray-800 overflow-hidden mb-4">
 
-<div className="px-6 py-3 border-b border-gray-100 dark:border-gray-700 dark:bg-gray-900 flex items-center gap-3">
-          <p className="text-xs text-gray-500 dark:text-gray-400 font-medium uppercase tracking-wide">
-            Post Type:
-          </p>
-          <div className="flex gap-2">
-            <button
-              onClick={() => setPostType('editor')}
-              className={`px-3 py-1.5 rounded-lg text-xs font-medium transition-colors ${
-                postType === 'editor'
-                  ? 'bg-blue-600 text-white'
-                  : 'bg-gray-100 dark:bg-gray-700 text-gray-600 dark:text-gray-300 hover:bg-gray-200 dark:hover:bg-gray-600'
-              }`}
-            >
-                ✍️ Editor
-            </button>
-            <button
-              onClick={() => setPostType('pdf')}
-              className={`px-3 py-1.5 rounded-lg text-xs font-medium transition-colors ${
-                postType === 'pdf'
-                  ? 'bg-blue-600 text-white'
-                  : 'bg-gray-100 dark:bg-gray-700 text-gray-600 dark:text-gray-300 hover:bg-gray-200 dark:hover:bg-gray-600'
-              }`}
-            >
-              📄 Upload PDF
-            </button>
+        <div className="px-6 py-5 border-b border-gray-100 dark:border-gray-800">
+          <input
+            type="text"
+            value={title}
+            onChange={e => setTitle(e.target.value)}
+            placeholder="Research Title..."
+            className="w-full text-xl font-bold text-gray-900 dark:text-white bg-transparent border-none outline-none placeholder-gray-300 dark:placeholder-gray-600"
+          />
+        </div>
+
+        <div className="px-6 py-3 border-b border-gray-100 dark:border-gray-800 flex items-center gap-3">
+          <p className="text-[10px] font-semibold uppercase tracking-widest text-gray-400">Format</p>
+          <div className="flex gap-1.5">
+            {[{ val: 'editor', label: 'Editor' }, { val: 'pdf', label: 'PDF Upload' }].map(({ val, label }) => (
+              <button
+                key={val}
+                onClick={() => setPostType(val)}
+                className={`px-3 py-1 rounded-lg text-[11px] font-medium transition-colors ${
+                  postType === val
+                    ? 'bg-blue-600 text-white'
+                    : 'bg-gray-100 dark:bg-gray-800 text-gray-500 dark:text-gray-400 hover:bg-gray-200 dark:hover:bg-gray-700'
+                }`}
+              >
+                {label}
+              </button>
+            ))}
           </div>
         </div>
 
@@ -336,24 +327,15 @@ function ResearchEditorPage() {
 
       </div>
 
-      <div className="flex items-center justify-between text-xs text-gray-400">
-        {postType === 'editor' ? (
-          <p>
-            💡 Type{' '}
-            <kbd className="bg-gray-100 dark:bg-gray-700 px-1 rounded">/</kbd>
-            {' '}for headings, tables, images · Paste images directly
-          </p>
-        ) : (
-          <p>📄 Upload your pre-made PDF research document</p>
-        )}
-        <p>
-          Status:{' '}
-          <span className={`font-medium ${
-            status === 'published' ? 'text-green-500' : 'text-orange-400'
-          }`}>
-            {status === 'published' ? 'Published' : 'Draft'}
-          </span>
+      <div className="flex items-center justify-between">
+        <p className="text-[10px] text-gray-400">
+          {postType === 'editor'
+            ? <>Type <kbd className="bg-gray-100 dark:bg-gray-800 px-1 rounded text-[9px]">/</kbd> for headings, tables, code blocks · paste images directly</>
+            : 'Upload a pre-made PDF research document'}
         </p>
+        <span className={`text-[10px] font-medium ${status === 'published' ? 'text-emerald-500' : 'text-amber-400'}`}>
+          {status === 'published' ? 'Published' : 'Draft'}
+        </span>
       </div>
 
     </div>

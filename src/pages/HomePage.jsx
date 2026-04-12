@@ -987,29 +987,35 @@ function LoggedInHome() {
         {/* RIGHT — Discipline + Journal */}
         <div className="col-span-12 lg:col-span-3 flex flex-col gap-4">
           <DisciplineScore key={disciplineKey} />
-          <div className="bg-white dark:bg-gray-800 rounded-2xl shadow-sm border border-gray-100 dark:border-gray-700 overflow-hidden flex flex-col">
-            <div className="flex items-center justify-between px-4 py-3 border-b border-gray-100 dark:border-gray-700 flex-shrink-0">
-              <h3 className="text-sm font-semibold text-gray-900 dark:text-white">Journal Entry</h3>
-              <button onClick={() => navigate('/trader')} className="text-gray-400 hover:text-gray-600">›</button>
+          <div className="bg-white dark:bg-gray-900 rounded-2xl border border-gray-100 dark:border-gray-800 flex flex-col">
+            <div className="flex items-center justify-between px-4 py-3 border-b border-gray-100 dark:border-gray-800">
+              <h3 className="text-[11px] font-semibold uppercase tracking-widest text-gray-400 dark:text-gray-500">Journal</h3>
+              <button onClick={() => navigate('/trader')} className="text-[10px] text-gray-400 hover:text-green-500 transition-colors">view all →</button>
             </div>
-            <div className="p-4 space-y-3 overflow-y-auto">
-              <Link to="/trader" className="flex items-center gap-3 p-3 rounded-xl bg-gray-50 dark:bg-gray-700 hover:bg-blue-50 dark:hover:bg-gray-600 transition-colors group">
-                <div className="w-10 h-10 bg-blue-100 dark:bg-blue-900 rounded-xl flex items-center justify-center flex-shrink-0">
-                  <span className="text-xl">📈</span>
+            <div className="p-3 space-y-1.5 no-scrollbar">
+              <Link to="/trader" className="flex items-center justify-between px-3 py-2.5 rounded-xl hover:bg-gray-50 dark:hover:bg-gray-800 transition-colors group">
+                <div className="flex items-center gap-2.5">
+                  <span className="w-1.5 h-1.5 rounded-full bg-blue-400 flex-shrink-0" />
+                  <div>
+                    <p className="text-[11px] font-medium text-gray-700 dark:text-gray-200">NEPSE Journal</p>
+                    <p className="text-[10px] text-gray-400">Write & track your NEPSE trades</p>
+                  </div>
                 </div>
-                <div>
-                  <p className="text-xs font-semibold text-gray-900 dark:text-white group-hover:text-blue-600 transition-colors">Add NEPSE Journal Entry</p>
-                  <p className="text-xs text-gray-400">Write & track your NEPSE journey</p>
-                </div>
+                <svg className="w-3 h-3 text-gray-300 group-hover:text-green-400 transition-colors" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
+                </svg>
               </Link>
-              <Link to="/trader" className="flex items-center gap-3 p-3 rounded-xl bg-gray-50 dark:bg-gray-700 hover:bg-purple-50 dark:hover:bg-gray-600 transition-colors group">
-                <div className="w-10 h-10 bg-purple-100 dark:bg-purple-900 rounded-xl flex items-center justify-center flex-shrink-0">
-                  <span className="text-xl">💹</span>
+              <Link to="/trader" className="flex items-center justify-between px-3 py-2.5 rounded-xl hover:bg-gray-50 dark:hover:bg-gray-800 transition-colors group">
+                <div className="flex items-center gap-2.5">
+                  <span className="w-1.5 h-1.5 rounded-full bg-purple-400 flex-shrink-0" />
+                  <div>
+                    <p className="text-[11px] font-medium text-gray-700 dark:text-gray-200">Forex Journal</p>
+                    <p className="text-[10px] text-gray-400">Write & track your Forex trades</p>
+                  </div>
                 </div>
-                <div>
-                  <p className="text-xs font-semibold text-gray-900 dark:text-white group-hover:text-purple-600 transition-colors">Add Forex Journal Entry</p>
-                  <p className="text-xs text-gray-400">Write & track your Forex journey</p>
-                </div>
+                <svg className="w-3 h-3 text-gray-300 group-hover:text-green-400 transition-colors" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
+                </svg>
               </Link>
             </div>
           </div>

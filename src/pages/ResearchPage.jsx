@@ -12,116 +12,168 @@ import {
 
 const ADMIN_USER_ID = 1
 
+const formatDate = (dateStr) =>
+  new Date(dateStr).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })
+
+function Avatar({ person, size = 'w-7 h-7' }) {
+  return (
+    <div className={`${size} rounded-full bg-gradient-to-br from-blue-400 to-indigo-500 flex items-center justify-center flex-shrink-0 overflow-hidden`}>
+      {person?.avatar_url ? (
+        <img src={person.avatar_url} alt={person.name} className="w-full h-full object-cover" />
+      ) : (
+        <span className="text-white text-[10px] font-bold">
+          {person?.name?.[0]?.toUpperCase() || '?'}
+        </span>
+      )}
+    </div>
+  )
+}
+
 function ResearchCard({ post, onDelete, onVerify, onPin, isAdmin, currentUserId }) {
   const navigate = useNavigate()
 
-  const formatDate = (dateStr) => {
-    return new Date(dateStr).toLocaleDateString('en-US', {
-      year: 'numeric', month: 'short', day: 'numeric'
-    })
-  }
-
   return (
-    <div className={`bg-white dark:bg-gray-800 rounded-xl shadow-sm border ${
-      post.is_pinned
-        ? 'border-green-200 dark:border-green-800'
-        : post.is_verified
-        ? 'border-blue-200 dark:border-blue-800'
-        : 'border-gray-100 dark:border-gray-700'
-    } overflow-hidden hover:shadow-md transition-shadow`}>
-
+    <div
+      className={`group relative bg-white dark:bg-gray-900 rounded-2xl border transition-all duration-200 overflow-hidden cursor-pointer
+        hover:shadow-md hover:-translate-y-0.5
+        ${post.is_pinned
+          ? 'border-emerald-200 dark:border-emerald-800/60'
+          : post.is_verified
+          ? 'border-blue-200 dark:border-blue-800/60'
+          : 'border-gray-100 dark:border-gray-800'
+        }`}
+      onClick={() => navigate(`/research/${post.id}`)}
+    >
+      {/* Status bar */}
       {post.is_pinned && (
-        <div className="bg-green-500 px-4 py-1 flex items-center gap-2">
-          <span className="text-white text-xs font-semibold">📌 Distinguished Research by Admin</span>
-        </div>
+        <div className="h-0.5 bg-gradient-to-r from-emerald-400 to-teal-400" />
       )}
       {post.is_verified && !post.is_pinned && (
-        <div className="bg-blue-500 px-4 py-1 flex items-center gap-2">
-          <span className="text-white text-xs font-semibold">✓ Verified Research</span>
-        </div>
+        <div className="h-0.5 bg-gradient-to-r from-blue-400 to-indigo-400" />
       )}
 
-      <div
-        className="p-5 cursor-pointer"
-        onClick={() => navigate(`/research/${post.id}`)}
-      >
-        <div className="flex items-start justify-between mb-3">
-          <div className="flex-1">
-            <h3 className="text-base font-bold text-gray-900 dark:text-white mb-1 hover:text-blue-600 transition-colors">
-              {post.title}
-            </h3>
-            <div className="flex items-center gap-2 flex-wrap">
-              <div className="w-6 h-6 rounded-full bg-blue-500 flex items-center justify-center overflow-hidden">
-  {post.author?.avatar_url ? (
-    <img
-      src={post.author.avatar_url}
-      alt={post.author.name}
-      className="w-full h-full object-cover"
-    />
-  ) : (
-    <span className="text-white text-xs font-bold">
-      {post.author?.name?.[0]?.toUpperCase() || '?'}
-    </span>
-  )}
-</div>
-              <span className="text-sm text-gray-600 dark:text-gray-300 font-medium">
-                {post.author?.name || 'Unknown'}
-              </span>
-              {post.is_verified && (
-                <span className="bg-blue-100 dark:bg-blue-900 text-blue-600 dark:text-blue-300 text-xs px-2 py-0.5 rounded-full font-medium">
-                  ✓ Verified
-                </span>
-              )}
-              {post.is_admin_post && (
-                <span className="bg-green-100 dark:bg-green-900 text-green-600 dark:text-green-300 text-xs px-2 py-0.5 rounded-full font-medium">
-                  👑 Admin
-                </span>
-              )}
-              <span className="text-xs text-gray-400">
-                {formatDate(post.created_at)}
-              </span>
-            </div>
-          </div>
+      <div className="p-4">
+        {/* Badge row */}
+        <div className="flex items-center gap-1.5 mb-3">
+          {post.is_pinned && (
+            <span className="text-[9px] font-semibold px-2 py-0.5 rounded-full bg-emerald-50 dark:bg-emerald-900/30 text-emerald-600 dark:text-emerald-400 tracking-wide uppercase">
+              Distinguished
+            </span>
+          )}
+          {post.is_verified && !post.is_pinned && (
+            <span className="text-[9px] font-semibold px-2 py-0.5 rounded-full bg-blue-50 dark:bg-blue-900/30 text-blue-600 dark:text-blue-400 tracking-wide uppercase">
+              Verified
+            </span>
+          )}
+          {post.is_admin_post && (
+            <span className="text-[9px] font-semibold px-2 py-0.5 rounded-full bg-purple-50 dark:bg-purple-900/30 text-purple-600 dark:text-purple-400 tracking-wide uppercase">
+              Admin
+            </span>
+          )}
         </div>
 
-        <p className="text-sm text-gray-600 dark:text-gray-300 leading-relaxed line-clamp-3">
+        {/* Title */}
+        <h3 className="text-[13px] font-semibold text-gray-900 dark:text-white leading-snug mb-2 line-clamp-2 group-hover:text-blue-600 dark:group-hover:text-blue-400 transition-colors">
+          {post.title}
+        </h3>
+
+        {/* Excerpt */}
+        <p className="text-[11px] text-gray-500 dark:text-gray-400 leading-relaxed line-clamp-3 mb-3">
           {post.excerpt || 'Click to read the full research...'}
         </p>
-      </div>
 
-      <div className="px-5 pb-4 flex items-center justify-between border-t border-gray-50 dark:border-gray-700 pt-3">
-        <button
-          onClick={() => navigate(`/research/${post.id}`)}
-          className="text-sm text-blue-600 hover:text-blue-700 font-medium"
-        >
-          Read Full Research →
-        </button>
-        <div className="flex items-center gap-2">
-          {isAdmin && !post.is_verified && (
-            <button
-              onClick={(e) => { e.stopPropagation(); onVerify(post.id) }}
-              className="text-xs bg-blue-50 dark:bg-blue-900 text-blue-600 dark:text-blue-300 px-2 py-1 rounded-lg hover:bg-blue-100 transition-colors"
-            >
-              ✓ Verify
-            </button>
-          )}
-          {isAdmin && !post.is_pinned && (
-            <button
-              onClick={(e) => { e.stopPropagation(); onPin(post.id) }}
-              className="text-xs bg-green-50 dark:bg-green-900 text-green-600 dark:text-green-300 px-2 py-1 rounded-lg hover:bg-green-100 transition-colors"
-            >
-              📌 Pin
-            </button>
-          )}
+        {/* Footer */}
+        <div className="flex items-center justify-between pt-2.5 border-t border-gray-50 dark:border-gray-800">
+          <div className="flex items-center gap-2">
+            <Avatar person={post.author} />
+            <div>
+              <p className="text-[10px] font-medium text-gray-700 dark:text-gray-300 leading-none">{post.author?.name || 'Unknown'}</p>
+              <p className="text-[9px] text-gray-400 mt-0.5">{formatDate(post.created_at)}</p>
+            </div>
+          </div>
+
+          {/* Admin actions */}
           {(isAdmin || post.user_id === currentUserId) && (
-            <button
-              onClick={(e) => { e.stopPropagation(); onDelete(post.id) }}
-              className="text-xs text-red-400 hover:text-red-600 px-2 py-1 rounded-lg"
-            >
-              Delete
-            </button>
+            <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity" onClick={e => e.stopPropagation()}>
+              {isAdmin && !post.is_verified && (
+                <button
+                  onClick={() => onVerify(post.id)}
+                  className="text-[9px] px-2 py-1 rounded-lg bg-blue-50 dark:bg-blue-900/30 text-blue-500 hover:bg-blue-100 transition-colors font-medium"
+                >
+                  Verify
+                </button>
+              )}
+              {isAdmin && !post.is_pinned && (
+                <button
+                  onClick={() => onPin(post.id)}
+                  className="text-[9px] px-2 py-1 rounded-lg bg-emerald-50 dark:bg-emerald-900/30 text-emerald-500 hover:bg-emerald-100 transition-colors font-medium"
+                >
+                  Pin
+                </button>
+              )}
+              <button
+                onClick={() => onDelete(post.id)}
+                className="text-[9px] px-2 py-1 rounded-lg text-red-400 hover:bg-red-50 dark:hover:bg-red-900/30 transition-colors"
+              >
+                Delete
+              </button>
+            </div>
+          )}
+
+          {!isAdmin && post.user_id !== currentUserId && (
+            <span className="text-[9px] text-blue-500 dark:text-blue-400 font-medium group-hover:underline">
+              Read →
+            </span>
           )}
         </div>
+      </div>
+    </div>
+  )
+}
+
+function EligibilityBanner({ eligibility }) {
+  const s = eligibility.stats
+  const bars = [
+    { label: 'Trades', val: s.totalTrades, max: 14, suffix: '/14' },
+    { label: 'Profitable', val: s.profitableTrades || 0, max: 5, suffix: '/5' },
+    { label: 'Win Rate', val: s.winRate || 0, max: 33, suffix: '%', target: 33 },
+    { label: 'Avg R:R', val: s.avgRR || 0, max: 3, suffix: '', prefix: '1:', target: 3 },
+  ]
+
+  return (
+    <div className="bg-white dark:bg-gray-900 border border-amber-200 dark:border-amber-800/50 rounded-2xl p-4 mb-6">
+      <div className="flex items-start gap-3 mb-4">
+        <div className="w-8 h-8 rounded-xl bg-amber-50 dark:bg-amber-900/30 flex items-center justify-center flex-shrink-0">
+          <svg className="w-4 h-4 text-amber-500" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4M7.835 4.697a3.42 3.42 0 001.946-.806 3.42 3.42 0 014.438 0 3.42 3.42 0 001.946.806 3.42 3.42 0 013.138 3.138 3.42 3.42 0 00.806 1.946 3.42 3.42 0 010 4.438 3.42 3.42 0 00-.806 1.946 3.42 3.42 0 01-3.138 3.138 3.42 3.42 0 00-1.946.806 3.42 3.42 0 01-4.438 0 3.42 3.42 0 00-1.946-.806 3.42 3.42 0 01-3.138-3.138 3.42 3.42 0 00-.806-1.946 3.42 3.42 0 010-4.438 3.42 3.42 0 00.806-1.946 3.42 3.42 0 013.138-3.138z" />
+          </svg>
+        </div>
+        <div>
+          <p className="text-[12px] font-semibold text-gray-800 dark:text-gray-200">Posting Eligibility Progress</p>
+          <p className="text-[10px] text-gray-400 mt-0.5">{eligibility.reason}</p>
+        </div>
+      </div>
+      <div className="grid grid-cols-4 gap-3">
+        {bars.map(({ label, val, max, suffix, prefix, target }) => {
+          const pct = Math.min((val / max) * 100, 100)
+          const met = val >= (target ?? max)
+          return (
+            <div key={label} className="space-y-1.5">
+              <div className="flex items-baseline justify-between">
+                <span className="text-[9px] uppercase tracking-wider text-gray-400">{label}</span>
+                <span className={`text-[11px] font-bold ${met ? 'text-emerald-500' : 'text-gray-600 dark:text-gray-300'}`}>
+                  {prefix}{val}{suffix}
+                </span>
+              </div>
+              <div className="h-1 bg-gray-100 dark:bg-gray-800 rounded-full overflow-hidden">
+                <div
+                  className={`h-full rounded-full transition-all duration-700 ${met ? 'bg-emerald-400' : 'bg-amber-400'}`}
+                  style={{ width: `${pct}%` }}
+                />
+              </div>
+            </div>
+          )
+        })}
       </div>
     </div>
   )
@@ -171,38 +223,25 @@ function ResearchPage() {
   }
 
   const handleVerify = async (id) => {
-    try {
-      await verifyResearchPost(id)
-      fetchData()
-    } catch (err) {
-      console.error(err)
-    }
+    try { await verifyResearchPost(id); fetchData() } catch (err) { console.error(err) }
   }
 
   const handlePin = async (id) => {
-    try {
-      await pinResearchPost(id)
-      fetchData()
-    } catch (err) {
-      console.error(err)
-    }
+    try { await pinResearchPost(id); fetchData() } catch (err) { console.error(err) }
   }
 
   if (!user) {
     return (
-      <div className="min-h-screen bg-gray-100 dark:bg-gray-900 flex items-center justify-center">
-        <div className="bg-white dark:bg-gray-800 rounded-2xl p-8 shadow-sm text-center max-w-md">
-          <span className="text-4xl mb-4 block">🔒</span>
-          <h2 className="text-xl font-bold text-gray-900 dark:text-white mb-2">
-            Private Research Hub
-          </h2>
-          <p className="text-gray-500 dark:text-gray-400 text-sm mb-6">
-            This area is only accessible to verified Tradeo members.
-          </p>
-          <Link
-            to="/login"
-            className="bg-blue-600 text-white px-6 py-2 rounded-xl text-sm font-medium hover:bg-blue-700"
-          >
+      <div className="min-h-screen bg-gray-50 dark:bg-gray-950 flex items-center justify-center p-6">
+        <div className="bg-white dark:bg-gray-900 rounded-2xl border border-gray-100 dark:border-gray-800 p-10 text-center max-w-sm">
+          <div className="w-12 h-12 rounded-2xl bg-gray-50 dark:bg-gray-800 flex items-center justify-center mx-auto mb-4">
+            <svg className="w-6 h-6 text-gray-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z" />
+            </svg>
+          </div>
+          <h2 className="text-sm font-semibold text-gray-900 dark:text-white mb-1">Members Only</h2>
+          <p className="text-[11px] text-gray-400 mb-5">This research hub is only accessible to verified Tradeo members.</p>
+          <Link to="/login" className="bg-blue-600 text-white px-5 py-2 rounded-xl text-xs font-semibold hover:bg-blue-700 transition-colors">
             Login to Access
           </Link>
         </div>
@@ -213,199 +252,138 @@ function ResearchPage() {
   const pinnedPosts = posts.filter(p => p.is_pinned)
   const feedPosts = posts.filter(p => !p.is_pinned)
 
-  return (
-    <div className="w-full px-6 py-6">
+  const cardProps = { onDelete: handleDelete, onVerify: handleVerify, onPin: handlePin, isAdmin, currentUserId: user?.id }
 
-      <div className="flex items-center justify-between mb-6">
+  return (
+    <div className="w-full px-6 py-6 max-w-6xl mx-auto">
+
+      {/* Header */}
+      <div className="flex items-start justify-between mb-6">
         <div>
-          <h1 className="text-2xl font-bold text-gray-900 dark:text-white">
-            Research Hub
-          </h1>
-          <p className="text-sm text-gray-400 mt-0.5">
-            Private trading research — members only
-          </p>
+          <h1 className="text-lg font-semibold text-gray-900 dark:text-white tracking-tight">Research Hub</h1>
+          <p className="text-[11px] text-gray-400 mt-0.5">Private trading research — members only</p>
         </div>
-        <div className="flex items-center gap-3">
+        <div className="flex items-center gap-2">
           {isAdmin && (
             <button
               onClick={() => setActiveTab(activeTab === 'pending' ? 'feed' : 'pending')}
-              className={`text-sm px-4 py-2 rounded-lg font-medium transition-colors ${
+              className={`text-[11px] px-3 py-1.5 rounded-xl font-medium transition-colors ${
                 activeTab === 'pending'
-                  ? 'bg-orange-500 text-white'
-                  : 'bg-orange-50 dark:bg-orange-900 text-orange-600 dark:text-orange-300'
+                  ? 'bg-amber-500 text-white'
+                  : 'bg-amber-50 dark:bg-amber-900/20 text-amber-600 dark:text-amber-400 hover:bg-amber-100 dark:hover:bg-amber-900/40'
               }`}
             >
-              ⏳ Pending ({pendingPosts.length})
+              Pending {pendingPosts.length > 0 && `(${pendingPosts.length})`}
             </button>
           )}
           {eligibility?.eligible ? (
             <button
               onClick={() => navigate('/research/new')}
-              className="bg-blue-600 text-white px-4 py-2 rounded-xl text-sm font-semibold hover:bg-blue-700 transition-colors"
+              className="bg-blue-600 hover:bg-blue-700 text-white px-4 py-1.5 rounded-xl text-[11px] font-semibold transition-colors"
             >
               + Post Research
             </button>
           ) : (
             <div className="text-right">
-              <button
-                disabled
-                className="bg-gray-200 dark:bg-gray-700 text-gray-400 px-4 py-2 rounded-xl text-sm font-semibold cursor-not-allowed"
-              >
+              <button disabled className="bg-gray-100 dark:bg-gray-800 text-gray-400 px-4 py-1.5 rounded-xl text-[11px] font-semibold cursor-not-allowed">
                 + Post Research
               </button>
-              <p className="text-xs text-gray-400 mt-1">
-                Not yet eligible
-              </p>
+              <p className="text-[9px] text-gray-400 mt-1">Not yet eligible</p>
             </div>
           )}
         </div>
       </div>
 
+      {/* Eligibility progress banner */}
       {!eligibility?.eligible && !eligibility?.isAdmin && eligibility?.stats && (
-        <div className="bg-yellow-50 dark:bg-yellow-900 border border-yellow-200 dark:border-yellow-700 rounded-xl p-4 mb-6">
-          <p className="text-sm font-semibold text-yellow-800 dark:text-yellow-200 mb-2">
-            📊 Your Eligibility Progress
-          </p>
-          <p className="text-xs text-yellow-700 dark:text-yellow-300 mb-3">
-            {eligibility.reason}
-          </p>
-          <div className="grid grid-cols-4 gap-3">
-            <div className="bg-white dark:bg-gray-800 rounded-lg p-2 text-center">
-              <p className={`text-lg font-bold ${
-                eligibility.stats.totalTrades >= 14 ? 'text-green-500' : 'text-red-400'
-              }`}>
-                {eligibility.stats.totalTrades}/14
-              </p>
-              <p className="text-xs text-gray-400">Total Trades</p>
-            </div>
-            <div className="bg-white dark:bg-gray-800 rounded-lg p-2 text-center">
-              <p className={`text-lg font-bold ${
-                eligibility.stats.profitableTrades >= 5 ? 'text-green-500' : 'text-red-400'
-              }`}>
-                {eligibility.stats.profitableTrades || 0}/5
-              </p>
-              <p className="text-xs text-gray-400">Profit Trades</p>
-            </div>
-            <div className="bg-white dark:bg-gray-800 rounded-lg p-2 text-center">
-              <p className={`text-lg font-bold ${
-                (eligibility.stats.winRate || 0) >= 33 ? 'text-green-500' : 'text-red-400'
-              }`}>
-                {eligibility.stats.winRate || 0}%
-              </p>
-              <p className="text-xs text-gray-400">Win Rate</p>
-            </div>
-            <div className="bg-white dark:bg-gray-800 rounded-lg p-2 text-center">
-              <p className={`text-lg font-bold ${
-                (eligibility.stats.avgRR || 0) >= 3 ? 'text-green-500' : 'text-red-400'
-              }`}>
-                1:{eligibility.stats.avgRR || 0}
-              </p>
-              <p className="text-xs text-gray-400">Avg RR</p>
-            </div>
-          </div>
-        </div>
+        <EligibilityBanner eligibility={eligibility} />
       )}
 
+      {/* Pending tab (admin) */}
       {activeTab === 'pending' && isAdmin && (
         <div className="mb-6">
-          <h2 className="text-base font-semibold text-gray-900 dark:text-white mb-3">
-            ⏳ Pending Verification
-          </h2>
+          <p className="text-[11px] font-semibold uppercase tracking-widest text-gray-400 mb-3">Pending Verification</p>
           {pendingPosts.length === 0 ? (
-            <div className="bg-white dark:bg-gray-800 rounded-xl p-6 text-center">
-              <p className="text-gray-400 text-sm">No posts pending verification</p>
+            <div className="bg-white dark:bg-gray-900 border border-gray-100 dark:border-gray-800 rounded-2xl py-10 text-center">
+              <p className="text-[12px] text-gray-400">No posts pending verification</p>
             </div>
           ) : (
-            <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+            <div className="grid grid-cols-1 lg:grid-cols-2 xl:grid-cols-3 gap-3">
               {pendingPosts.map(post => (
-                <ResearchCard
-                  key={post.id}
-                  post={post}
-                  onDelete={handleDelete}
-                  onVerify={handleVerify}
-                  onPin={handlePin}
-                  isAdmin={isAdmin}
-                  currentUserId={user?.id}
-                />
+                <ResearchCard key={post.id} post={post} {...cardProps} />
               ))}
             </div>
           )}
         </div>
       )}
 
+      {/* Feed tab */}
       {activeTab === 'feed' && (
-        <>
+        <div className="space-y-6">
+
+          {/* Pinned / distinguished */}
           {pinnedPosts.length > 0 && (
-            <div className="mb-6">
+            <div>
               <div className="flex items-center gap-2 mb-3">
-                <span className="text-green-500">📌</span>
-                <h2 className="text-base font-semibold text-gray-900 dark:text-white">
-                  Distinguished Research
-                </h2>
+                <span className="w-1.5 h-1.5 rounded-full bg-emerald-400" />
+                <p className="text-[11px] font-semibold uppercase tracking-widest text-gray-400">Distinguished Research</p>
               </div>
-              <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+              <div className="grid grid-cols-1 lg:grid-cols-2 xl:grid-cols-3 gap-3">
                 {pinnedPosts.map(post => (
-                  <ResearchCard
-                    key={post.id}
-                    post={post}
-                    onDelete={handleDelete}
-                    onVerify={handleVerify}
-                    onPin={handlePin}
-                    isAdmin={isAdmin}
-                    currentUserId={user?.id}
-                  />
+                  <ResearchCard key={post.id} post={post} {...cardProps} />
                 ))}
               </div>
             </div>
           )}
 
+          {/* Research feed */}
           <div>
             <div className="flex items-center gap-2 mb-3">
-              <span className="text-blue-500">📚</span>
-              <h2 className="text-base font-semibold text-gray-900 dark:text-white">
-                Research Feed
-              </h2>
-              <span className="text-xs text-gray-400">
-                {feedPosts.length} post{feedPosts.length !== 1 ? 's' : ''}
-              </span>
+              <span className="w-1.5 h-1.5 rounded-full bg-blue-400" />
+              <p className="text-[11px] font-semibold uppercase tracking-widest text-gray-400">Research Feed</p>
+              <span className="text-[10px] text-gray-400">· {feedPosts.length} post{feedPosts.length !== 1 ? 's' : ''}</span>
             </div>
 
             {loading ? (
-              <div className="space-y-4">
-                {[1, 2, 3].map(i => (
-                  <div key={i} className="bg-white dark:bg-gray-800 rounded-xl p-5 shadow-sm animate-pulse">
-                    <div className="h-5 bg-gray-100 dark:bg-gray-700 rounded w-3/4 mb-3" />
-                    <div className="h-4 bg-gray-100 dark:bg-gray-700 rounded w-1/4 mb-4" />
-                    <div className="h-4 bg-gray-100 dark:bg-gray-700 rounded w-full mb-2" />
-                    <div className="h-4 bg-gray-100 dark:bg-gray-700 rounded w-5/6" />
+              <div className="grid grid-cols-1 lg:grid-cols-2 xl:grid-cols-3 gap-3">
+                {[1,2,3,4,5,6].map(i => (
+                  <div key={i} className="bg-white dark:bg-gray-900 rounded-2xl border border-gray-100 dark:border-gray-800 p-4 animate-pulse">
+                    <div className="h-2 bg-gray-100 dark:bg-gray-800 rounded w-1/4 mb-3" />
+                    <div className="h-3.5 bg-gray-100 dark:bg-gray-800 rounded w-3/4 mb-2" />
+                    <div className="h-3 bg-gray-100 dark:bg-gray-800 rounded w-full mb-1" />
+                    <div className="h-3 bg-gray-100 dark:bg-gray-800 rounded w-5/6 mb-4" />
+                    <div className="flex items-center gap-2 pt-2 border-t border-gray-50 dark:border-gray-800">
+                      <div className="w-6 h-6 rounded-full bg-gray-100 dark:bg-gray-800" />
+                      <div className="h-2 bg-gray-100 dark:bg-gray-800 rounded w-20" />
+                    </div>
                   </div>
                 ))}
               </div>
             ) : feedPosts.length === 0 ? (
-              <div className="bg-white dark:bg-gray-800 rounded-xl p-12 text-center">
-                <span className="text-4xl mb-4 block">📭</span>
-                <p className="text-gray-400 text-sm">No research posts yet</p>
-                <p className="text-gray-400 text-xs mt-1">
-                  Be the first to share your research with the community
-                </p>
+              <div className="bg-white dark:bg-gray-900 border border-gray-100 dark:border-gray-800 rounded-2xl py-14 text-center">
+                <div className="w-10 h-10 rounded-2xl bg-gray-50 dark:bg-gray-800 flex items-center justify-center mx-auto mb-3">
+                  <svg className="w-5 h-5 text-gray-300" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+                  </svg>
+                </div>
+                <p className="text-[12px] text-gray-400">No research posts yet</p>
+                <p className="text-[10px] text-gray-400 mt-1">Be the first to share your analysis</p>
               </div>
             ) : (
-              <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
-                {feedPosts.map(post => (
-                  <ResearchCard
+              <div className="grid grid-cols-1 lg:grid-cols-2 xl:grid-cols-3 gap-3">
+                {feedPosts.map((post, i) => (
+                  <div
                     key={post.id}
-                    post={post}
-                    onDelete={handleDelete}
-                    onVerify={handleVerify}
-                    onPin={handlePin}
-                    isAdmin={isAdmin}
-                    currentUserId={user?.id}
-                  />
+                    className="animate-fade-up"
+                    style={{ animationDelay: `${Math.min(i, 8) * 40}ms` }}
+                  >
+                    <ResearchCard post={post} {...cardProps} />
+                  </div>
                 ))}
               </div>
             )}
           </div>
-        </>
+        </div>
       )}
     </div>
   )

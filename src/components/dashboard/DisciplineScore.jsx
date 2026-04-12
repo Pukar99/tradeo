@@ -1,127 +1,156 @@
 import { useState, useEffect } from 'react'
 import { getDiscipline } from '../../api'
-import { useLanguage } from '../../context/LanguageContext'
+
+const GRADE = (s) => {
+  if (s >= 85) return { letter: 'A+', color: 'text-emerald-500', ring: '#10b981' }
+  if (s >= 70) return { letter: 'A',  color: 'text-green-500',   ring: '#22c55e' }
+  if (s >= 55) return { letter: 'B',  color: 'text-blue-500',    ring: '#3b82f6' }
+  if (s >= 40) return { letter: 'C',  color: 'text-yellow-500',  ring: '#eab308' }
+  if (s >= 25) return { letter: 'D',  color: 'text-orange-500',  ring: '#f97316' }
+  return               { letter: 'F',  color: 'text-red-400',     ring: '#f87171' }
+}
+
+const BAR_COLOR = (s) => {
+  if (s >= 70) return 'bg-emerald-400'
+  if (s >= 50) return 'bg-blue-400'
+  if (s >= 30) return 'bg-yellow-400'
+  return 'bg-red-400'
+}
+
+function Ring({ score, size = 88 }) {
+  const r = 34
+  const circ = 2 * Math.PI * r
+  const offset = circ - (score / 100) * circ
+  const grade = GRADE(score)
+
+  return (
+    <div className="relative flex-shrink-0" style={{ width: size, height: size }}>
+      <svg width={size} height={size} viewBox="0 0 88 88" className="-rotate-90">
+        <circle cx="44" cy="44" r={r} fill="none" stroke="currentColor"
+          className="text-gray-100 dark:text-gray-800" strokeWidth="7" />
+        <circle cx="44" cy="44" r={r} fill="none"
+          stroke={grade.ring} strokeWidth="7" strokeLinecap="round"
+          strokeDasharray={circ} strokeDashoffset={offset}
+          style={{ transition: 'stroke-dashoffset 0.9s ease' }} />
+      </svg>
+      <div className="absolute inset-0 flex flex-col items-center justify-center">
+        <span className={`text-lg font-bold leading-none ${grade.color}`}>{score}</span>
+        <span className={`text-[10px] font-semibold ${grade.color}`}>{grade.letter}</span>
+      </div>
+    </div>
+  )
+}
+
+function DimBar({ label, score, extra }) {
+  return (
+    <div className="space-y-1">
+      <div className="flex items-center justify-between">
+        <div className="flex items-center gap-1.5">
+          <span className="text-[10px] text-gray-500 dark:text-gray-400">{label}</span>
+          {extra && <span className="text-[9px] text-gray-400 dark:text-gray-600">({extra})</span>}
+        </div>
+        <div className="flex items-center gap-1.5">
+          <span className="text-[10px] font-semibold text-gray-700 dark:text-gray-200">{score}%</span>
+        </div>
+      </div>
+      <div className="h-1.5 bg-gray-100 dark:bg-gray-800 rounded-full overflow-hidden">
+        <div
+          className={`h-full rounded-full transition-all duration-700 ${BAR_COLOR(score)}`}
+          style={{ width: `${score}%` }}
+        />
+      </div>
+    </div>
+  )
+}
 
 function DisciplineScore() {
-  const { t } = useLanguage()
   const [data, setData] = useState(null)
   const [loading, setLoading] = useState(true)
 
   useEffect(() => {
     getDiscipline()
       .then(res => setData(res.data))
-      .catch(err => console.error(err))
+      .catch(console.error)
       .finally(() => setLoading(false))
   }, [])
 
-  const getScoreColor = (score) => {
-    if (score >= 80) return 'text-green-500'
-    if (score >= 50) return 'text-blue-500'
-    if (score >= 30) return 'text-yellow-500'
-    return 'text-red-400'
-  }
-
-  const getCircleStyle = (score) => {
-    const circumference = 2 * Math.PI * 30
-    const offset = circumference - (score / 100) * circumference
-    return { strokeDasharray: circumference, strokeDashoffset: offset }
-  }
-
-  const getCircleColor = (score) => {
-    if (score >= 80) return '#22c55e'
-    if (score >= 50) return '#3b82f6'
-    if (score >= 30) return '#eab308'
-    return '#f87171'
-  }
-
   if (loading) return (
-    <div className="bg-white dark:bg-gray-800 rounded-xl p-4 shadow-sm h-full">
-      <p className="text-sm text-gray-400">Loading...</p>
+    <div className="bg-white dark:bg-gray-900 rounded-2xl border border-gray-100 dark:border-gray-800 p-4 space-y-3 animate-pulse">
+      <div className="h-3 bg-gray-100 dark:bg-gray-800 rounded w-1/2" />
+      <div className="flex gap-4">
+        <div className="w-20 h-20 rounded-full bg-gray-100 dark:bg-gray-800 flex-shrink-0" />
+        <div className="flex-1 space-y-2 pt-1">
+          {[1,2,3,4,5].map(i => <div key={i} className="h-2 bg-gray-100 dark:bg-gray-800 rounded" />)}
+        </div>
+      </div>
     </div>
   )
 
+  const score = data?.finalScore ?? data?.monthlyScore ?? 0
+  const bd = data?.breakdown || {}
+  const dims = [
+    { key: 'taskCompletion',    extra: null },
+    { key: 'journalConsistency',extra: null },
+    { key: 'winRate',           extra: bd.winRate?.raw != null ? `${bd.winRate.raw}% WR` : null },
+    { key: 'slUsage',           extra: null },
+    { key: 'rrConsistency',     extra: bd.rrConsistency?.raw != null ? `${bd.rrConsistency.raw}R avg` : null },
+  ]
+
   return (
-    <div className="bg-white dark:bg-gray-800 rounded-xl shadow-sm p-4 h-full flex flex-col">
+    <div className="bg-white dark:bg-gray-900 rounded-2xl border border-gray-100 dark:border-gray-800 p-4 flex flex-col gap-3">
 
-      <h2 className="text-base font-semibold text-gray-900 dark:text-white mb-4">
-        {t('discipline.title')}
-      </h2>
+      {/* Header */}
+      <div className="flex items-center justify-between">
+        <h3 className="text-[11px] font-semibold uppercase tracking-widest text-gray-400 dark:text-gray-500">
+          Discipline Score
+        </h3>
+        {data?.streak > 0 && (
+          <span className="text-[10px] text-orange-400 font-medium">
+            🔥 {data.streak}d streak
+          </span>
+        )}
+      </div>
 
-      <div className="flex items-center justify-center mb-3">
-        <div className="relative w-24 h-24">
-          <svg
-            className="w-24 h-24 transform -rotate-90"
-            viewBox="0 0 80 80"
-          >
-            <circle
-              cx="40" cy="40" r="30"
-              fill="none"
-              stroke="#f3f4f6"
-              strokeWidth="8"
-            />
-            <circle
-              cx="40" cy="40" r="30"
-              fill="none"
-              stroke={getCircleColor(data?.monthlyScore || 0)}
-              strokeWidth="8"
-              strokeLinecap="round"
-              style={getCircleStyle(data?.monthlyScore || 0)}
-              className="transition-all duration-700"
-            />
-          </svg>
-          <div className="absolute inset-0 flex items-center justify-center">
-            <span className={`text-xl font-bold ${getScoreColor(data?.monthlyScore || 0)}`}>
-              {data?.monthlyScore || 0}%
-            </span>
-          </div>
+      {/* Ring + bars side by side */}
+      <div className="flex items-start gap-4">
+        <div className="flex flex-col items-center gap-1">
+          <Ring score={score} />
+          <span className="text-[9px] text-gray-400 text-center leading-tight">
+            composite<br/>score
+          </span>
+        </div>
+
+        <div className="flex-1 space-y-2.5 pt-1">
+          {dims.map(({ key, extra }) => {
+            const dim = bd[key]
+            if (!dim) return null
+            return (
+              <DimBar
+                key={key}
+                label={dim.label}
+                score={dim.score}
+                weight={dim.weight}
+                extra={extra}
+              />
+            )
+          })}
         </div>
       </div>
 
-      <p className="text-xs text-center text-gray-400 dark:text-gray-500 mb-4">
-        Monthly Average
-      </p>
-
-      <div className="space-y-3 flex-1">
-        <div className="flex justify-between items-center py-2 border-b border-gray-50 dark:border-gray-700">
-          <span className="text-xs text-gray-500 dark:text-gray-400">
-            Today's Score
-          </span>
-          <span className={`text-sm font-bold ${getScoreColor(data?.todayScore || 0)}`}>
-            {data?.todayScore || 0}%
-          </span>
-        </div>
-
-        <div className="flex justify-between items-center py-2 border-b border-gray-50 dark:border-gray-700">
-          <span className="text-xs text-gray-500 dark:text-gray-400">
-            Streak
-          </span>
-          <span className="text-sm font-bold text-gray-900 dark:text-white">
-            {data?.streak > 0 ? `🔥 ${data.streak} days` : '—'}
-          </span>
-        </div>
-
-        <div className="flex justify-between items-center py-2">
-          <span className="text-xs text-gray-500 dark:text-gray-400">
-            Total Days Tracked
-          </span>
-          <span className="text-sm font-bold text-gray-900 dark:text-white">
-            {data?.logs?.length || 0}
-          </span>
-        </div>
-      </div>
-
-      {data?.impactTag && (
-        <div className={`mt-4 p-3 rounded-lg text-xs text-center font-medium ${
-          (data.todayScore || 0) >= 80
-            ? 'bg-green-50 text-green-700 dark:bg-green-900 dark:text-green-300'
-            : (data.todayScore || 0) <= 40
-            ? 'bg-red-50 text-red-600 dark:bg-red-900 dark:text-red-300'
-            : 'bg-blue-50 text-blue-600 dark:bg-blue-900 dark:text-blue-300'
-        }`}>
-          {data.impactTag}
+      {/* Streak bonus chip */}
+      {data?.streakBonus > 0 && (
+        <div className="flex items-center justify-between px-2.5 py-1.5 bg-orange-50 dark:bg-orange-900/20 rounded-xl">
+          <span className="text-[10px] text-orange-500 font-medium">Streak bonus</span>
+          <span className="text-[10px] text-orange-500 font-semibold">+{data.streakBonus} pts</span>
         </div>
       )}
 
+      {/* Impact tag */}
+      {data?.impactTag && (
+        <p className="text-[10px] text-gray-400 dark:text-gray-500 leading-snug border-t border-gray-50 dark:border-gray-800 pt-2">
+          {data.impactTag}
+        </p>
+      )}
     </div>
   )
 }
