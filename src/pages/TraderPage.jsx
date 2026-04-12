@@ -5,7 +5,7 @@ import { useLanguage } from '../context/LanguageContext'
 import {
   getTradeLog, addTradeLog, updateTradeLog,
   closeTradeLog, partialCloseTradeLog, deleteTradeLog,
-  getTradeJournal, addTradeJournal, deleteTradeJournal
+  getTradeJournal, addTradeJournal, updateTradeJournal, deleteTradeJournal
 } from '../api'
 import { useContextMenu } from '../components/ContextMenu'
 
@@ -335,8 +335,15 @@ function CloseTradeModal({ trade, onClose, onSave, isPartial }) {
 }
 
 // ── Journal Modal ─────────────────────────────────────────────────────────────
-function JournalModal({ onClose, onSave, tradeId, tradeName }) {
-  const [form, setForm] = useState({ date: new Date().toISOString().split('T')[0], emotional_state: '', market_condition: '', pre_trade_reasoning: '', post_trade_evaluation: '', notes: '' })
+function JournalModal({ onClose, onSave, tradeId, tradeName, editJournal }) {
+  const [form, setForm] = useState({
+    date: editJournal?.date || new Date().toISOString().split('T')[0],
+    emotional_state: editJournal?.emotional_state || '',
+    market_condition: editJournal?.market_condition || '',
+    pre_trade_reasoning: editJournal?.pre_trade_reasoning || '',
+    post_trade_evaluation: editJournal?.post_trade_evaluation || '',
+    notes: editJournal?.notes || '',
+  })
   const [saving, setSaving] = useState(false)
 
   const handleSubmit = async (e) => {
@@ -348,7 +355,7 @@ function JournalModal({ onClose, onSave, tradeId, tradeName }) {
 
   return (
     <Modal onClose={onClose} wide>
-      <ModalHeader title="Trade Journal" sub={tradeName ? `Linked to: ${tradeName}` : 'General journal entry'} onClose={onClose} />
+      <ModalHeader title={editJournal ? 'Edit Journal' : 'Trade Journal'} sub={tradeName ? `Linked to: ${tradeName}` : 'General journal entry'} onClose={onClose} />
       <form onSubmit={handleSubmit} className="p-5 space-y-4">
 
         <div className="grid grid-cols-2 gap-3">
@@ -408,7 +415,7 @@ function JournalModal({ onClose, onSave, tradeId, tradeName }) {
         <div className="flex gap-2">
           <button type="button" onClick={onClose} className="flex-1 py-2.5 rounded-xl border border-gray-200 dark:border-gray-700 text-[11px] font-medium text-gray-500 hover:bg-gray-50 dark:hover:bg-gray-800 transition-colors">Cancel</button>
           <button type="submit" disabled={saving} className="flex-1 py-2.5 rounded-xl bg-blue-600 hover:bg-blue-700 text-white text-[11px] font-semibold disabled:opacity-50 transition-colors">
-            {saving ? 'Saving…' : 'Save Journal'}
+            {saving ? 'Saving…' : editJournal ? 'Update Journal' : 'Save Journal'}
           </button>
         </div>
       </form>
@@ -449,30 +456,30 @@ function TradeRow({ trade, onEdit, onClose, onPartialClose, onDelete, onJournal 
         className="border-b border-gray-50 dark:border-gray-800/60 hover:bg-gray-50 dark:hover:bg-gray-800/40 transition-colors cursor-pointer"
         onClick={() => setExpanded(!expanded)}
       >
-        <td className="px-4 py-3 text-[10px] text-gray-400">{trade.date}</td>
-        <td className="px-4 py-3">
+        <td className="px-4 py-3 text-[10px] text-gray-400" translate="no">{trade.date}</td>
+        <td className="px-4 py-3" translate="no">
           <span className="text-[12px] font-bold text-gray-900 dark:text-white tracking-tight">{trade.symbol}</span>
         </td>
-        <td className="px-4 py-3">
+        <td className="px-4 py-3" translate="no">
           <span className={`text-[10px] font-semibold px-2 py-0.5 rounded-full ${trade.position === 'LONG' ? 'text-emerald-600 bg-emerald-50 dark:bg-emerald-900/20' : 'text-red-500 bg-red-50 dark:bg-red-900/20'}`}>
             {trade.position === 'LONG' ? '↑ Long' : '↓ Short'}
           </span>
         </td>
-        <td className="px-4 py-3 text-[11px] text-gray-600 dark:text-gray-400">{remaining}<span className="text-gray-300 dark:text-gray-700">/{trade.quantity}</span></td>
-        <td className="px-4 py-3 text-[11px] text-gray-700 dark:text-gray-300 font-medium">Rs.{parseFloat(trade.entry_price).toFixed(2)}</td>
-        <td className="px-4 py-3">
+        <td className="px-4 py-3 text-[11px] text-gray-600 dark:text-gray-400" translate="no">{remaining}<span className="text-gray-300 dark:text-gray-700">/{trade.quantity}</span></td>
+        <td className="px-4 py-3 text-[11px] text-gray-700 dark:text-gray-300 font-medium" translate="no">Rs.{parseFloat(trade.entry_price).toFixed(2)}</td>
+        <td className="px-4 py-3" translate="no">
           <div className="text-[10px] space-y-0.5">
             {trade.sl && <div className="text-red-400">SL {trade.sl}</div>}
             {trade.tp && <div className="text-emerald-400">TP {trade.tp}</div>}
             {!trade.sl && !trade.tp && <span className="text-gray-300 dark:text-gray-700">—</span>}
           </div>
         </td>
-        <td className="px-4 py-3">
+        <td className="px-4 py-3" translate="no">
           <span className={`text-[11px] font-bold ${pnl > 0 ? 'text-emerald-500' : pnl < 0 ? 'text-red-400' : 'text-gray-400'}`}>
             {pnl !== 0 ? `${pnl > 0 ? '+' : ''}Rs.${Math.round(pnl).toLocaleString()}` : '—'}
           </span>
         </td>
-        <td className="px-4 py-3">
+        <td className="px-4 py-3" translate="no">
           <span className={`text-[10px] font-semibold px-2 py-0.5 rounded-full ${statusPill}`}>{trade.status}</span>
         </td>
         <td className="px-4 py-3 text-[9px] text-gray-300 dark:text-gray-700 select-none">⋯</td>
@@ -524,6 +531,7 @@ function TraderPage() {
   const [closeTrade, setCloseTrade] = useState(null)
   const [partialTrade, setPartialTrade] = useState(null)
   const [journalTrade, setJournalTrade] = useState(null)
+  const [editJournal, setEditJournal]   = useState(null)
   const [filterStatus, setFilterStatus] = useState('ALL')
   const [searchSymbol, setSearchSymbol] = useState('')
   const { onContextMenu: journalCtx, ContextMenuPortal: JournalMenuPortal } = useContextMenu()
@@ -548,6 +556,7 @@ function TraderPage() {
   const handlePartialClose  = async ({ exit_price, exit_quantity, reason }) => { const res = await partialCloseTradeLog(partialTrade.id, { exit_price, exit_quantity, reason }); setTrades(prev => prev.map(t => t.id === partialTrade.id ? res.data : t)); setPartialTrade(null) }
   const handleDelete        = async (id) => { await deleteTradeLog(id); setTrades(prev => prev.filter(t => t.id !== id)) }
   const handleAddJournal    = async (form) => { const res = await addTradeJournal(form); setJournals(prev => [res.data, ...prev]); setJournalTrade(null) }
+  const handleUpdateJournal = async (form) => { const res = await updateTradeJournal(editJournal.id, form); setJournals(prev => prev.map(j => j.id === editJournal.id ? res.data : j)); setEditJournal(null) }
   const handleDeleteJournal = async (id) => { await deleteTradeJournal(id); setJournals(prev => prev.filter(j => j.id !== id)) }
 
   const filteredTrades = trades.filter(t => (filterStatus === 'ALL' || t.status === filterStatus) && (!searchSymbol || t.symbol.includes(searchSymbol.toUpperCase())))
@@ -594,6 +603,7 @@ function TraderPage() {
       {closeTrade      && <CloseTradeModal trade={closeTrade}   onClose={() => setCloseTrade(null)}   onSave={handleCloseTrade}   isPartial={false} />}
       {partialTrade    && <CloseTradeModal trade={partialTrade} onClose={() => setPartialTrade(null)} onSave={handlePartialClose} isPartial={true} />}
       {journalTrade !== null && <JournalModal onClose={() => setJournalTrade(null)} onSave={handleAddJournal} tradeId={journalTrade?.id} tradeName={journalTrade?.symbol ? `${journalTrade.symbol} ${journalTrade.position}` : null} />}
+      {editJournal && <JournalModal onClose={() => setEditJournal(null)} onSave={handleUpdateJournal} editJournal={editJournal} />}
 
       {/* Header */}
       <div className="flex items-start justify-between mb-5">
@@ -728,6 +738,8 @@ function TraderPage() {
                 return (
                   <div key={j.id}
                     onContextMenu={journalCtx([
+                      { label: 'Edit', icon: '✏️', action: () => setEditJournal(j) },
+                      { separator: true },
                       { label: 'Delete', icon: '🗑️', danger: true, action: () => handleDeleteJournal(j.id) },
                     ])}
                     className="bg-white dark:bg-gray-900 rounded-2xl border border-gray-100 dark:border-gray-800 p-3.5 flex flex-col gap-2 hover:border-gray-200 dark:hover:border-gray-700 transition-colors animate-fade-up"

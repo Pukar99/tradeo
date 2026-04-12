@@ -35,6 +35,8 @@ const ACTION_META = {
   CALC_BROKER_FEE:    { icon: '🧮', label: 'Fee Breakdown',            color: 'border-sky-400 bg-sky-50 dark:bg-sky-900/30' },
   DRAFT_JOURNAL:      { icon: '✏️', label: 'Journal Draft',            color: 'border-amber-400 bg-amber-50 dark:bg-amber-900/30' },
   MORNING_BRIEF:      { icon: '☀️', label: 'Morning Brief',            color: 'border-yellow-400 bg-yellow-50 dark:bg-yellow-900/30' },
+  UPDATE_WATCHLIST:   { icon: '✏️', label: 'Watchlist Updated',        color: 'border-purple-400 bg-purple-50 dark:bg-purple-900/30' },
+  STOCK_PRICE:        { icon: '💹', label: 'Stock Price',               color: 'border-emerald-400 bg-emerald-50 dark:bg-emerald-900/30' },
 }
 
 // ── Standard action card (trade, watchlist, goal, journal, etc.) ─────────────
@@ -64,6 +66,13 @@ function ActionCard({ type, result }) {
   if (type === 'ADD_GOAL' && result.goal) rows.push(result.goal.title)
   if (type === 'ADD_JOURNAL') rows.push('Entry saved to journal')
   if (type === 'REMOVE_WATCHLIST') rows.push(`${result.symbol} removed`)
+  if (type === 'UPDATE_WATCHLIST' && result.item) {
+    rows.push(result.item.symbol)
+    if (result.item.price_alert) rows.push(`Price Alert: Rs.${result.item.price_alert}`)
+    if (result.item.alert_date) rows.push(`Date Reminder: ${result.item.alert_date}`)
+    if (result.item.category) rows.push(`Category: ${result.item.category}`)
+  }
+  if (type === 'STOCK_PRICE') rows.push(`${result.symbol}: Rs.${result.ltp}`)
   if (type === 'CONFIRM_DELETE') rows.push(`${result.count} trade(s) for ${result.symbol} permanently removed`)
   if (type === 'BULK_ADD_WATCHLIST' && result.items) {
     rows.push(`${result.items.length} stocks → ${result.category}`)
@@ -76,7 +85,7 @@ function ActionCard({ type, result }) {
         <span className="text-[11px] font-semibold text-gray-700 dark:text-gray-200">✅ {meta.label}</span>
       </div>
       {rows.map((r, i) => (
-        <p key={i} className="text-[10px] text-gray-500 dark:text-gray-400 leading-snug">{r}</p>
+        <p key={i} className="text-[10px] text-gray-500 dark:text-gray-400 leading-snug" translate="no">{r}</p>
       ))}
     </div>
   )
@@ -90,7 +99,7 @@ function BrokerFeeCard({ fee }) {
     <div className="border-l-2 border-sky-400 bg-sky-50 dark:bg-sky-900/30 rounded-xl px-3 py-2 mb-1.5">
       <div className="flex items-center gap-1.5 mb-2">
         <span className="text-sm">🧮</span>
-        <span className="text-[11px] font-semibold text-gray-700 dark:text-gray-200">
+        <span className="text-[11px] font-semibold text-gray-700 dark:text-gray-200" translate="no">
           NEPSE Fee Breakdown — {fee.transaction === 'buy' ? 'BUY' : 'SELL'} {fee.quantity} kittas{fee.symbol ? ` of ${fee.symbol}` : ''} @ Rs.{fee.price?.toLocaleString()}
         </span>
       </div>
@@ -114,7 +123,7 @@ function FeeRow({ label, value, dim, accent }) {
   return (
     <div className="flex justify-between items-center">
       <span className={`text-[10px] ${dim ? 'text-gray-400 dark:text-gray-500' : 'text-gray-600 dark:text-gray-300'}`}>{label}</span>
-      <span className={`text-[10px] ${accent || (dim ? 'text-gray-400 dark:text-gray-500' : 'text-gray-700 dark:text-gray-200')}`}>{value}</span>
+      <span className={`text-[10px] ${accent || (dim ? 'text-gray-400 dark:text-gray-500' : 'text-gray-700 dark:text-gray-200')}`} translate="no">{value}</span>
     </div>
   )
 }
@@ -222,7 +231,31 @@ function MorningBriefCard({ brief }) {
         <div className="bg-green-50 dark:bg-green-900/20 border border-green-200 dark:border-green-800 rounded-lg px-2 py-1.5 mb-1.5">
           <p className="text-[10px] font-semibold text-green-600 mb-0.5">🎯 Near Target — Consider booking profit</p>
           {brief.nearTarget.map((a, i) => (
-            <p key={i} className="text-[10px] text-green-500">{a.symbol} → TP: Rs.{a.tp}</p>
+            <p key={i} className="text-[10px] text-green-500" translate="no">{a.symbol} → TP: Rs.{a.tp}</p>
+          ))}
+        </div>
+      )}
+
+      {/* Watchlist alerts */}
+      {brief.watchAlerts?.length > 0 && (
+        <div className="bg-purple-50 dark:bg-purple-900/20 border border-purple-200 dark:border-purple-800 rounded-lg px-2 py-1.5 mb-1.5">
+          <p className="text-[10px] font-semibold text-purple-600 dark:text-purple-400 mb-1">👁️ Watchlist Alerts</p>
+          {brief.watchAlerts.map((w, i) => (
+            <div key={i} className="flex items-center justify-between text-[10px]">
+              <span className="font-medium text-gray-700 dark:text-gray-300" translate="no">{w.symbol}</span>
+              <span className="text-gray-400" translate="no">{w.ltp ? `Rs.${w.ltp}` : '—'}</span>
+              {w.alertStatus && <span className="text-purple-500">{w.alertStatus}</span>}
+            </div>
+          ))}
+        </div>
+      )}
+
+      {/* Pending goals */}
+      {brief.pendingGoals?.length > 0 && (
+        <div className="mb-1.5">
+          <p className="text-[10px] font-semibold text-gray-500 dark:text-gray-400 mb-0.5">🏆 Pending Goals</p>
+          {brief.pendingGoals.map((g, i) => (
+            <p key={i} className="text-[10px] text-gray-500 dark:text-gray-400">• {g}</p>
           ))}
         </div>
       )}
@@ -550,11 +583,13 @@ const QUICK_CHIPS = [
 
 const PRESET_PROMPTS = [
   { icon: '📊', text: 'Show my open positions' },
-  { icon: '📈', text: 'What\'s my win rate this month?' },
+  { icon: '📈', text: "What's my win rate this month?" },
   { icon: '🔥', text: 'Top gainers today on NEPSE' },
   { icon: '⚠️', text: 'Any risk alerts on my trades?' },
   { icon: '🎯', text: 'Suggest SL for my open trades' },
   { icon: '💼', text: 'Portfolio summary' },
+  { icon: '🧮', text: 'Calculate broker fee for buying 100 kittas at Rs.500' },
+  { icon: '📝', text: 'Draft a journal for my latest trade' },
 ]
 
 // ── Main AIChat component ────────────────────────────────────────────────────
@@ -710,7 +745,20 @@ function AIChat({ isFullPage = false, onClose }) {
           }`}>
             <p className="whitespace-pre-wrap">{msg.content}</p>
           </div>
-          <span className="text-gray-400 text-[10px] mt-0.5 px-1">{formatTime(msg.time)}</span>
+          <div className="flex items-center gap-2 mt-0.5 px-1">
+            <span className="text-gray-400 text-[10px]">{formatTime(msg.time)}</span>
+            {msg.role === 'assistant' && msg.content && (
+              <button
+                onClick={() => navigator.clipboard.writeText(msg.content)}
+                className="text-gray-300 dark:text-gray-600 hover:text-gray-500 dark:hover:text-gray-400 transition-colors"
+                title="Copy"
+              >
+                <svg className="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z" />
+                </svg>
+              </button>
+            )}
+          </div>
         </div>
         {msg.role === 'user' && (
           <div className="w-5 h-5 rounded-full overflow-hidden flex-shrink-0 mt-0.5">
@@ -822,7 +870,7 @@ function AIChat({ isFullPage = false, onClose }) {
             <p className="text-gray-400 text-[11px] text-center max-w-[200px] leading-relaxed mb-4">{t('chat.greetingSub')}</p>
             <div className="w-full grid grid-cols-2 gap-1.5">
               {(suggestions.length > 0
-                ? suggestions.slice(0, 6).map((s, i) => ({ icon: PRESET_PROMPTS[i]?.icon || '💬', text: s }))
+                ? suggestions.slice(0, 8).map((s, i) => ({ icon: PRESET_PROMPTS[i]?.icon || '💬', text: s }))
                 : PRESET_PROMPTS
               ).map((p, i) => (
                 <button
