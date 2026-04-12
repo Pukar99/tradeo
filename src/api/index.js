@@ -75,6 +75,13 @@ export const sendChatMessage = (data) => API.post('/api/chat/message', data)
 export const sendAgentMessage = (data) => API.post('/api/chat/agent', data)
 export const getChatSuggestions = () => API.get('/api/chat/suggestions')
 
+// Market — new DB-backed endpoints
+export const getMarketSymbols  = ()             => API.get('/api/market/symbols')
+export const getIndexChart     = (params)       => API.get('/api/market/index-chart', { params })
+export const getStockChart     = (params)       => API.get('/api/market/stock-chart', { params })
+export const getTopVolume      = (params)       => API.get('/api/market/top-volume', { params })
+export const getLatestDate     = ()             => API.get('/api/market/latest-date')
+
 // Trade Log (new system)
 export const getTradeLog = () => API.get('/api/tradelog')
 export const addTradeLog = (data) => API.post('/api/tradelog', data)
