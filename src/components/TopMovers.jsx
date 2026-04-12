@@ -27,35 +27,28 @@ function TopMovers() {
       })
   }, [selectedDate])
 
-  const handleToday = () => setSelectedDate(latestDate)
-
   return (
-    <div className="bg-white dark:bg-gray-800 rounded-xl p-4 shadow-sm mt-6">
-
-      <div className="flex justify-between items-center mb-4">
-        <div>
-          <h2 className="text-lg font-semibold text-gray-900 dark:text-white">
-            Top Movers
-          </h2>
+    <div className="space-y-3">
+      {/* Controls */}
+      <div className="flex items-center justify-between">
+        <div className="flex items-center gap-2">
           {data && (
-            <p className="text-xs text-gray-400">
-              {data.total} stocks traded on {selectedDate}
-            </p>
+            <span className="text-[10px] text-gray-400">{data.total} stocks · {selectedDate}</span>
           )}
         </div>
-        <div className="flex gap-2 items-center">
+        <div className="flex items-center gap-2">
           <select
             value={selectedDate}
             onChange={e => setSelectedDate(e.target.value)}
-            className="border border-gray-200 dark:border-gray-600 dark:bg-gray-700 dark:text-white rounded-lg px-2 py-1 text-sm text-gray-700 focus:outline-none focus:border-blue-500 max-w-36"
+            className="bg-gray-50 dark:bg-gray-800 border border-gray-200 dark:border-gray-700 text-[11px] text-gray-700 dark:text-gray-300 rounded-xl px-2.5 py-1.5 focus:outline-none focus:border-blue-400"
           >
             {dates.map(d => (
               <option key={d} value={d}>{d}</option>
             ))}
           </select>
           <button
-            onClick={handleToday}
-            className="bg-blue-600 text-white px-3 py-1 rounded-lg text-sm hover:bg-blue-700"
+            onClick={() => setSelectedDate(latestDate)}
+            className="text-[10px] font-semibold text-blue-500 border border-blue-200 dark:border-blue-900 bg-blue-50 dark:bg-blue-950 px-2.5 py-1.5 rounded-xl hover:bg-blue-100 dark:hover:bg-blue-900 transition-colors"
           >
             Latest
           </button>
@@ -63,36 +56,35 @@ function TopMovers() {
       </div>
 
       {loading ? (
-        <p className="text-sm text-gray-400">Loading...</p>
+        <div className="grid grid-cols-2 gap-3 animate-pulse">
+          {[0, 1].map(i => (
+            <div key={i} className="space-y-2">
+              {[1,2,3,4,5].map(j => (
+                <div key={j} className="h-8 bg-gray-100 dark:bg-gray-800 rounded-xl" />
+              ))}
+            </div>
+          ))}
+        </div>
       ) : (
         <div className="grid grid-cols-2 gap-4">
-
+          {/* Gainers */}
           <div>
-            <h3 className="text-sm font-semibold text-green-600 mb-2">
-              Top Gainers
-            </h3>
-            <table className="w-full text-sm">
+            <p className="text-[9px] font-semibold uppercase tracking-widest text-emerald-500 mb-2">Top Gainers</p>
+            <table className="w-full">
               <thead>
-                <tr className="text-xs text-gray-400 border-b dark:border-gray-700">
-                  <th className="text-left py-1">Symbol</th>
-                  <th className="text-right py-1">Price</th>
-                  <th className="text-right py-1">Change</th>
+                <tr>
+                  <th className="text-left text-[9px] font-semibold uppercase tracking-wider text-gray-400 pb-1.5">Symbol</th>
+                  <th className="text-right text-[9px] font-semibold uppercase tracking-wider text-gray-400 pb-1.5">Price</th>
+                  <th className="text-right text-[9px] font-semibold uppercase tracking-wider text-gray-400 pb-1.5">Chg%</th>
                 </tr>
               </thead>
-              <tbody>
+              <tbody className="divide-y divide-gray-50 dark:divide-gray-800">
                 {data?.gainers.map((stock, i) => (
-                  <tr
-                    key={i}
-                    className="border-b border-gray-50 dark:border-gray-700 hover:bg-gray-50 dark:hover:bg-gray-700"
-                  >
-                    <td className="py-1 font-medium text-gray-900 dark:text-white">
-                      {stock.s}
-                    </td>
-                    <td className="py-1 text-right text-gray-600 dark:text-gray-300">
-                      {stock.c.toLocaleString()}
-                    </td>
-                    <td className="py-1 text-right text-green-500 font-medium">
-                      +{stock.p}%
+                  <tr key={i} className="group hover:bg-gray-50 dark:hover:bg-gray-800/50 transition-colors">
+                    <td className="py-1.5 text-[11px] font-semibold text-gray-800 dark:text-gray-100">{stock.s}</td>
+                    <td className="py-1.5 text-right text-[11px] text-gray-500 dark:text-gray-400">{stock.c.toLocaleString()}</td>
+                    <td className="py-1.5 text-right">
+                      <span className="text-[10px] font-semibold text-emerald-500">+{stock.p}%</span>
                     </td>
                   </tr>
                 ))}
@@ -100,39 +92,30 @@ function TopMovers() {
             </table>
           </div>
 
+          {/* Losers */}
           <div>
-            <h3 className="text-sm font-semibold text-red-500 mb-2">
-              Top Losers
-            </h3>
-            <table className="w-full text-sm">
+            <p className="text-[9px] font-semibold uppercase tracking-widest text-red-400 mb-2">Top Losers</p>
+            <table className="w-full">
               <thead>
-                <tr className="text-xs text-gray-400 border-b dark:border-gray-700">
-                  <th className="text-left py-1">Symbol</th>
-                  <th className="text-right py-1">Price</th>
-                  <th className="text-right py-1">Change</th>
+                <tr>
+                  <th className="text-left text-[9px] font-semibold uppercase tracking-wider text-gray-400 pb-1.5">Symbol</th>
+                  <th className="text-right text-[9px] font-semibold uppercase tracking-wider text-gray-400 pb-1.5">Price</th>
+                  <th className="text-right text-[9px] font-semibold uppercase tracking-wider text-gray-400 pb-1.5">Chg%</th>
                 </tr>
               </thead>
-              <tbody>
+              <tbody className="divide-y divide-gray-50 dark:divide-gray-800">
                 {data?.losers.map((stock, i) => (
-                  <tr
-                    key={i}
-                    className="border-b border-gray-50 dark:border-gray-700 hover:bg-gray-50 dark:hover:bg-gray-700"
-                  >
-                    <td className="py-1 font-medium text-gray-900 dark:text-white">
-                      {stock.s}
-                    </td>
-                    <td className="py-1 text-right text-gray-600 dark:text-gray-300">
-                      {stock.c.toLocaleString()}
-                    </td>
-                    <td className="py-1 text-right text-red-500 font-medium">
-                      {stock.p}%
+                  <tr key={i} className="group hover:bg-gray-50 dark:hover:bg-gray-800/50 transition-colors">
+                    <td className="py-1.5 text-[11px] font-semibold text-gray-800 dark:text-gray-100">{stock.s}</td>
+                    <td className="py-1.5 text-right text-[11px] text-gray-500 dark:text-gray-400">{stock.c.toLocaleString()}</td>
+                    <td className="py-1.5 text-right">
+                      <span className="text-[10px] font-semibold text-red-400">{stock.p}%</span>
                     </td>
                   </tr>
                 ))}
               </tbody>
             </table>
           </div>
-
         </div>
       )}
     </div>
