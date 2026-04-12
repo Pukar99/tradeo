@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react'
 import { getTrades, addTrade, deleteTrade, getTradeSummary } from '../../api'
+import { useContextMenu } from '../ContextMenu'
 
 function TradeLog() {
   const [trades, setTrades] = useState([])
@@ -64,8 +65,9 @@ function TradeLog() {
     }
   }
 
+  const { onContextMenu, ContextMenuPortal } = useContextMenu()
+
   const handleDelete = async (id) => {
-    if (!window.confirm('Delete this trade?')) return
     try {
       await deleteTrade(id)
       fetchData()
@@ -80,6 +82,7 @@ function TradeLog() {
 
   return (
     <div>
+      <ContextMenuPortal />
       {summary && (
         <div className="grid grid-cols-4 gap-4 mb-6">
           <div className="bg-white dark:bg-gray-800 rounded-xl p-4 shadow-sm text-center">
@@ -270,6 +273,9 @@ function TradeLog() {
                 {trades.map(trade => (
                   <tr
                     key={trade.id}
+                    onContextMenu={onContextMenu([
+                      { label: 'Delete', icon: '🗑️', danger: true, action: () => handleDelete(trade.id) },
+                    ])}
                     className="border-b border-gray-50 dark:border-gray-700 hover:bg-gray-50 dark:hover:bg-gray-700"
                   >
                     <td className="px-4 py-3 text-sm text-gray-600 dark:text-gray-300">
@@ -299,14 +305,7 @@ function TradeLog() {
                     <td className="px-4 py-3 text-xs text-gray-400 max-w-32 truncate">
                       {trade.notes || '—'}
                     </td>
-                    <td className="px-4 py-3">
-                      <button
-                        onClick={() => handleDelete(trade.id)}
-                        className="text-red-400 hover:text-red-600 text-xs"
-                      >
-                        Delete
-                      </button>
-                    </td>
+                    <td className="px-4 py-3"></td>
                   </tr>
                 ))}
               </tbody>

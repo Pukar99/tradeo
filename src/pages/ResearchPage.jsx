@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react'
 import { useAuth } from '../context/AuthContext'
 import { Link, useNavigate } from 'react-router-dom'
+import { useContextMenu } from '../components/ContextMenu'
 import {
   getResearchPosts,
   getResearchEligibility,
@@ -31,10 +32,19 @@ function Avatar({ person, size = 'w-7 h-7' }) {
 
 function ResearchCard({ post, onDelete, onVerify, onPin, isAdmin, currentUserId }) {
   const navigate = useNavigate()
+  const { onContextMenu, ContextMenuPortal } = useContextMenu()
+
+  const canAct = isAdmin || post.user_id === currentUserId
+  const ctxItems = canAct ? [
+    ...(isAdmin && !post.is_verified ? [{ label: 'Verify', icon: '✅', action: () => onVerify(post.id) }] : []),
+    ...(isAdmin && !post.is_pinned   ? [{ label: 'Pin',    icon: '📌', action: () => onPin(post.id)    }] : []),
+    ...(canAct ? [{ separator: true }, { label: 'Delete', icon: '🗑️', danger: true, action: () => onDelete(post.id) }] : []),
+  ] : null
 
   return (
     <div
-      className={`group relative bg-white dark:bg-gray-900 rounded-2xl border transition-all duration-200 overflow-hidden cursor-pointer
+      onContextMenu={ctxItems ? onContextMenu(ctxItems) : undefined}
+      className={`relative bg-white dark:bg-gray-900 rounded-2xl border transition-all duration-200 overflow-hidden cursor-pointer
         hover:shadow-md hover:-translate-y-0.5
         ${post.is_pinned
           ? 'border-emerald-200 dark:border-emerald-800/60'
@@ -44,6 +54,7 @@ function ResearchCard({ post, onDelete, onVerify, onPin, isAdmin, currentUserId 
         }`}
       onClick={() => navigate(`/research/${post.id}`)}
     >
+      <ContextMenuPortal />
       {/* Status bar */}
       {post.is_pinned && (
         <div className="h-0.5 bg-gradient-to-r from-emerald-400 to-teal-400" />
@@ -92,33 +103,6 @@ function ResearchCard({ post, onDelete, onVerify, onPin, isAdmin, currentUserId 
             </div>
           </div>
 
-          {/* Admin actions */}
-          {(isAdmin || post.user_id === currentUserId) && (
-            <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity" onClick={e => e.stopPropagation()}>
-              {isAdmin && !post.is_verified && (
-                <button
-                  onClick={() => onVerify(post.id)}
-                  className="text-[9px] px-2 py-1 rounded-lg bg-blue-50 dark:bg-blue-900/30 text-blue-500 hover:bg-blue-100 transition-colors font-medium"
-                >
-                  Verify
-                </button>
-              )}
-              {isAdmin && !post.is_pinned && (
-                <button
-                  onClick={() => onPin(post.id)}
-                  className="text-[9px] px-2 py-1 rounded-lg bg-emerald-50 dark:bg-emerald-900/30 text-emerald-500 hover:bg-emerald-100 transition-colors font-medium"
-                >
-                  Pin
-                </button>
-              )}
-              <button
-                onClick={() => onDelete(post.id)}
-                className="text-[9px] px-2 py-1 rounded-lg text-red-400 hover:bg-red-50 dark:hover:bg-red-900/30 transition-colors"
-              >
-                Delete
-              </button>
-            </div>
-          )}
 
           {!isAdmin && post.user_id !== currentUserId && (
             <span className="text-[9px] text-blue-500 dark:text-blue-400 font-medium group-hover:underline">
@@ -213,7 +197,6 @@ function ResearchPage() {
   useEffect(() => { fetchData() }, [])
 
   const handleDelete = async (id) => {
-    if (!window.confirm('Delete this research post?')) return
     try {
       await deleteResearchPost(id)
       setPosts(prev => prev.filter(p => p.id !== id))
