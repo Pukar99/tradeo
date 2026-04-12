@@ -1,7 +1,7 @@
 import { useAnalysis } from '../../context/AnalysisContext'
 
 const TIMEFRAMES  = ['1D', '1W', '1M', '6M', '1Y', '3Y', 'ALL']
-const INDICATORS  = ['MA', 'RSI', 'MACD', 'VOL']
+const INDICATORS  = ['MA', 'RSI', 'MACD']
 
 export default function ChartControls() {
   const { chartType, setChartType, timeframe, setTimeframe, activeIndicators, toggleIndicator } = useAnalysis()
