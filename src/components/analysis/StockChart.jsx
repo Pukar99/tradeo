@@ -393,22 +393,26 @@ export default function StockChart() {
         const startIdx = entryStr ? chartData.findIndex(d => d.time >= entryStr) : 0
         const fromData = (startIdx >= 0 ? chartData.slice(startIdx) : chartData)
 
-        const addPosLine = (price, color, lineStyle) => {
+        // Draw a horizontal line from entry date → last bar, with a small
+        // label at the right end showing price. No axis clutter on left.
+        const addPosLine = (price, color, lineStyle, label) => {
           if (!price || !fromData.length) return
+          const val = parseFloat(price)
           const s = main.addLineSeries({
             color,
-            lineWidth:              1,
+            lineWidth:              2,
             lineStyle,
             priceLineVisible:       false,
-            lastValueVisible:       false,   // no label on price axis
+            lastValueVisible:       true,    // small label at right end of line
+            title:                  label,   // shown next to label
             crosshairMarkerVisible: false,
           })
-          s.setData(fromData.map(d => ({ time: d.time, value: parseFloat(price) })))
+          s.setData(fromData.map(d => ({ time: d.time, value: val })))
         }
 
-        addPosLine(entry_price, '#60a5fa', 0)  // solid blue — entry
-        addPosLine(sl,          '#f87171', 1)  // dotted red — SL
-        addPosLine(tp,          '#34d399', 1)  // dotted green — TP
+        addPosLine(entry_price, '#60a5fa', 0, 'Entry')  // solid blue
+        addPosLine(sl,          '#f87171', 2, 'SL')      // dashed red  (LineStyle 2 = dashed)
+        addPosLine(tp,          '#34d399', 2, 'TP')      // dashed green
 
         // Arrow marker at entry candle
         if (fromData.length) {
@@ -423,14 +427,14 @@ export default function StockChart() {
         }
       }
 
-      // Volume bars
+      // Volume bars (use turnover for indexes which have no volume field)
       const volSeries = main.addHistogramSeries({
         priceFormat: { type: 'volume' },
         priceScaleId: 'vol',
       })
       main.priceScale('vol').applyOptions({ scaleMargins: { top: 0.88, bottom: 0 } })
       volSeries.setData(chartData.map(d => ({
-        time: d.time, value: d.volume || 0,
+        time: d.time, value: d.volume || d.turnover || 0,
         color: d.close >= d.open ? C.up + '44' : C.down + '44',
       })))
 
@@ -499,7 +503,7 @@ export default function StockChart() {
         })
         chartsRef.current.vol = vc
         vc.addHistogramSeries({ priceLineVisible: false }).setData(
-          chartData.map(d => ({ time: d.time, value: d.volume || 0, color: d.close >= d.open ? C.up + '99' : C.down + '99' }))
+          chartData.map(d => ({ time: d.time, value: d.volume || d.turnover || 0, color: d.close >= d.open ? C.up + '99' : C.down + '99' }))
         )
         main.timeScale().subscribeVisibleLogicalRangeChange(r => { if (r) vc.timeScale().setVisibleLogicalRange(r) })
         vc.timeScale().subscribeVisibleLogicalRangeChange(r => { if (r) main.timeScale().setVisibleLogicalRange(r) })
