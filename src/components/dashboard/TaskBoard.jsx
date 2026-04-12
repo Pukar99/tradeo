@@ -9,7 +9,6 @@ import {
 import { useContextMenu } from '../ContextMenu'
 
 const FIXED_TASKS = [
-  { id: 'fixed_1', title: 'Read Mindset Reminder', type: 'mindset',   icon: '🧠' },
   { id: 'fixed_2', title: 'Check Forex Factory',   type: 'external',  url: 'https://www.forexfactory.com',             icon: '📅' },
   { id: 'fixed_3', title: 'Check Merolagni News',  type: 'external',  url: 'https://merolagani.com/NewsList.aspx',      icon: '📰' },
   { id: 'fixed_4', title: 'Journal NEPSE',          type: 'internal',  path: '/trader', icon: '📈' },
