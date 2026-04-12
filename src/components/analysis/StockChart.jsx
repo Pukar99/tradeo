@@ -1,8 +1,7 @@
 import { useEffect, useRef, useState, useCallback } from 'react'
 import { useTheme } from '../../context/ThemeContext'
 import { useAnalysis } from '../../context/AnalysisContext'
-import { getIndexChart, getStockChart } from '../../api'
-import axios from 'axios'
+import { getIndexChart, getStockChart, getTopMovers } from '../../api'
 
 // ── Indicator math ────────────────────────────────────────────────────────────
 
@@ -272,7 +271,6 @@ export default function StockChart() {
   const mainRef = useRef(null)
   const rsiRef  = useRef(null)
   const macdRef = useRef(null)
-  const volRef  = useRef(null)
   const chartsRef = useRef({})
   const seriesRef = useRef({})
   const moversCache = useRef({})   // date → movers data
@@ -302,7 +300,7 @@ export default function StockChart() {
     if (!date) return null
     if (moversCache.current[date]) return moversCache.current[date]
     try {
-      const r = await axios.get(`http://localhost:5000/api/market/top-movers?date=${date}`)
+      const r = await getTopMovers(date)
       moversCache.current[date] = r.data
       return r.data
     } catch { return null }
@@ -495,21 +493,6 @@ export default function StockChart() {
         }
       }
 
-      // VOL sub-chart
-      if (activeIndicators.includes('VOL') && volRef.current) {
-        const vc = createChart(volRef.current, {
-          ...base, width: volRef.current.clientWidth, height: volRef.current.clientHeight,
-          rightPriceScale: { ...base.rightPriceScale, scaleMargins: { top: 0.1, bottom: 0 } },
-          timeScale: { ...base.timeScale, visible: false },
-        })
-        chartsRef.current.vol = vc
-        vc.addHistogramSeries({ priceLineVisible: false }).setData(
-          chartData.map(d => ({ time: d.time, value: d.volume || d.turnover || 0, color: d.close >= d.open ? C.up + '99' : C.down + '99' }))
-        )
-        main.timeScale().subscribeVisibleLogicalRangeChange(r => { if (r) vc.timeScale().setVisibleLogicalRange(r) })
-        vc.timeScale().subscribeVisibleLogicalRangeChange(r => { if (r) main.timeScale().setVisibleLogicalRange(r) })
-      }
-
       main.timeScale().fitContent()
 
       // Resize
@@ -517,7 +500,6 @@ export default function StockChart() {
         if (mainRef.current)  main.applyOptions({ width: mainRef.current.clientWidth })
         if (rsiRef.current  && chartsRef.current.rsi)  chartsRef.current.rsi.applyOptions({ width: rsiRef.current.clientWidth })
         if (macdRef.current && chartsRef.current.macd) chartsRef.current.macd.applyOptions({ width: macdRef.current.clientWidth })
-        if (volRef.current  && chartsRef.current.vol)  chartsRef.current.vol.applyOptions({ width: volRef.current.clientWidth })
       })
       ro.observe(mainRef.current)
       return () => ro.disconnect()
@@ -538,8 +520,7 @@ export default function StockChart() {
 
   const showRSI  = activeIndicators.includes('RSI')
   const showMACD = activeIndicators.includes('MACD')
-  const showVOL  = activeIndicators.includes('VOL')
-  const indCount = (showRSI ? 1 : 0) + (showMACD ? 1 : 0) + (showVOL ? 1 : 0)
+  const indCount = (showRSI ? 1 : 0) + (showMACD ? 1 : 0)
   const mainPct  = indCount === 0 ? 100 : indCount === 1 ? 70 : indCount === 2 ? 55 : 44
 
   if (error) return (
@@ -608,14 +589,6 @@ export default function StockChart() {
             </div>
           )}
 
-          {showVOL && (
-            <div className="w-full border-t border-gray-100 dark:border-gray-800 shrink-0">
-              <div className="flex items-center gap-2 px-3 pt-1">
-                <span className="text-[8px] font-bold text-teal-400 uppercase tracking-widest">Volume</span>
-              </div>
-              <div ref={volRef} style={{ height: '72px' }} className="w-full" />
-            </div>
-          )}
         </>
       )}
     </div>
