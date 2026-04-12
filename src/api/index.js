@@ -81,6 +81,11 @@ export const getIndexChart     = (params)       => API.get('/api/market/index-ch
 export const getStockChart     = (params)       => API.get('/api/market/stock-chart', { params })
 export const getTopVolume      = (params)       => API.get('/api/market/top-volume', { params })
 export const getLatestDate     = ()             => API.get('/api/market/latest-date')
+export const getMarketDates    = ()             => API.get('/api/market/dates')
+export const getTopMovers      = (date)         => API.get('/api/market/top-movers', { params: { date } })
+export const getAIReport       = ()             => API.get('/api/market/ai-report')
+export const getIPOs           = ()             => API.get('/api/market/ipos')
+export const getMarketNews     = ()             => API.get('/api/market/news')
 
 // Trade Log (new system)
 export const getTradeLog = () => API.get('/api/tradelog')

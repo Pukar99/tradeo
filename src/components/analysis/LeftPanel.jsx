@@ -148,10 +148,8 @@ export default function LeftPanel() {
   const [tab,       setTab]       = useState('portfolio')
 
   // Modal state
-  const [tradeModal,  setTradeModal]  = useState(null)  // 'BUY' | 'SELL' | null
-  const [closeTarget, setCloseTarget] = useState(null)  // position to close
-
-  // Smart alerts: positions where current price is within 2% of SL or TP
+  const [tradeModal,    setTradeModal]    = useState(null)
+  const [closeTarget,   setCloseTarget]   = useState(null)
   const [alertPositions, setAlertPositions] = useState([])
 
   const loadData = () => {
@@ -163,7 +161,7 @@ export default function LeftPanel() {
       .catch(() => {})
     getTodayTasks()
       .then(r => {
-        const fixed  = (r.data.fixedTasks || []).map(t => ({ ...t, label: t.label || t.id }))
+        const fixed  = (r.data.fixedTasks || []).map(t => ({ ...t, label: t.title || t.label || t.id }))
         const custom = r.data.customTasks || []
         setTasks([...fixed, ...custom])
       })
@@ -172,36 +170,29 @@ export default function LeftPanel() {
 
   useEffect(() => { loadData() }, [])
 
-  // Compute smart alerts: fetch latest price for each position, check within 2% of SL or TP
+  // Within 2% of SL or TP
   useEffect(() => {
     if (!positions.length) { setAlertPositions([]); return }
     let cancelled = false
     Promise.all(
-      positions
-        .filter(p => p.sl || p.tp)
-        .map(async p => {
-          try {
-            const r = await getStockPrice(p.symbol)
-            const price = parseFloat(r.data?.close || r.data?.price || 0)
-            if (!price) return null
-            const alerts = []
-            if (p.sl) {
-              const slV = parseFloat(p.sl)
-              const pct = Math.abs((price - slV) / slV * 100)
-              if (pct <= 2) alerts.push({ type: 'SL', label: 'Near Stop Loss', price, threshold: slV })
-            }
-            if (p.tp) {
-              const tpV = parseFloat(p.tp)
-              const pct = Math.abs((price - tpV) / tpV * 100)
-              if (pct <= 2) alerts.push({ type: 'TP', label: 'Near Target', price, threshold: tpV })
-            }
-            if (!alerts.length) return null
-            return { ...p, _latestPrice: price, _alerts: alerts }
-          } catch { return null }
-        })
-    ).then(results => {
-      if (!cancelled) setAlertPositions(results.filter(Boolean))
-    })
+      positions.filter(p => p.sl || p.tp).map(async p => {
+        try {
+          const r = await getStockPrice(p.symbol)
+          const price = parseFloat(r.data?.close || r.data?.price || 0)
+          if (!price) return null
+          const alerts = []
+          if (p.sl) {
+            const slV = parseFloat(p.sl)
+            if (Math.abs((price - slV) / slV * 100) <= 2) alerts.push({ type: 'SL', label: 'Near SL', threshold: slV })
+          }
+          if (p.tp) {
+            const tpV = parseFloat(p.tp)
+            if (Math.abs((price - tpV) / tpV * 100) <= 2) alerts.push({ type: 'TP', label: 'Near TP', threshold: tpV })
+          }
+          return alerts.length ? { ...p, _latestPrice: price, _alerts: alerts } : null
+        } catch { return null }
+      })
+    ).then(res => { if (!cancelled) setAlertPositions(res.filter(Boolean)) })
     return () => { cancelled = true }
   }, [positions])
 
@@ -307,7 +298,7 @@ export default function LeftPanel() {
         )}
 
         {/* BUY / SELL — disabled for index */}
-        <div className="grid grid-cols-2 gap-1 mb-2">
+        <div className="grid grid-cols-2 gap-1">
           <button
             onClick={() => canTrade && setTradeModal('BUY')}
             disabled={!canTrade}
@@ -332,36 +323,9 @@ export default function LeftPanel() {
           </button>
         </div>
 
-        <div className="space-y-1 max-h-20 overflow-y-auto">
-          {tasks.length === 0
-            ? <p className="text-[9px] text-gray-400">No tasks today</p>
-            : tasks.slice(0, 5).map((t, i) => (
-              <div key={t.id || i} className="flex items-center gap-1.5">
-                <div className={`w-3 h-3 rounded border flex items-center justify-center shrink-0 ${
-                  t.completed ? 'bg-emerald-500 border-emerald-500' : 'border-gray-300 dark:border-gray-600'
-                }`}>
-                  {t.completed && (
-                    <svg className="w-2 h-2 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M5 13l4 4L19 7" />
-                    </svg>
-                  )}
-                </div>
-                <p className={`text-[9px] leading-tight truncate ${
-                  t.completed ? 'line-through text-gray-400' : 'text-gray-700 dark:text-gray-300'
-                }`}>{t.label || t.title}</p>
-              </div>
-            ))
-          }
-        </div>
-      </div>
-
-      {/* ── Smart Alerts: within 2% of SL or TP ──────────────────────── */}
-      {alertPositions.length > 0 && (
-        <div className="shrink-0 border-t border-gray-100 dark:border-gray-800 px-2 py-2">
-          <span className="text-[8px] font-bold uppercase tracking-widest text-gray-400 flex items-center gap-1 mb-1.5">
-            🔔 Alerts
-          </span>
-          <div className="space-y-1.5">
+        {/* ── Alerts: within 2% of SL or TP ── */}
+        {alertPositions.length > 0 && (
+          <div className="mt-2 space-y-1.5">
             {alertPositions.map((p, i) => (
               <div key={i} className="rounded-xl border border-orange-200 dark:border-orange-900 bg-orange-50 dark:bg-orange-950/30 px-2 py-1.5">
                 <div className="flex items-center justify-between mb-0.5">
@@ -369,8 +333,7 @@ export default function LeftPanel() {
                     className="text-[10px] font-bold text-gray-800 dark:text-gray-100 hover:text-blue-500 transition-colors">
                     {p.symbol}
                   </button>
-                  <button
-                    onClick={e => { e.stopPropagation(); setCloseTarget(p) }}
+                  <button onClick={e => { e.stopPropagation(); setCloseTarget(p) }}
                     className="text-[7px] font-semibold px-1.5 py-0.5 rounded bg-red-100 dark:bg-red-950 text-red-500 hover:bg-red-200 dark:hover:bg-red-900 transition-colors">
                     Close
                   </button>
@@ -383,8 +346,8 @@ export default function LeftPanel() {
               </div>
             ))}
           </div>
-        </div>
-      )}
+        )}
+      </div>
 
       {/* ── Modals ────────────────────────────────────────────────────── */}
       {tradeModal && (
