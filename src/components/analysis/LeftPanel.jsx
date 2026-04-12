@@ -87,7 +87,7 @@ export default function LeftPanel() {
           ) : positions.map(p => (
             <div
               key={p.id}
-              onClick={() => selectSymbol(p.symbol)}
+              onClick={() => selectSymbol(p.symbol, null, p)}
               className={`cursor-pointer rounded-xl px-2.5 py-2 transition-all border ${
                 selectedSymbol === p.symbol
                   ? 'bg-blue-50 dark:bg-blue-950/50 border-blue-200 dark:border-blue-800'
