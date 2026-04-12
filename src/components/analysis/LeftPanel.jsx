@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react'
-import { getTradeLog, getWatchlist, removeFromWatchlist, getTodayTasks, addTradeLog, closeTradeLog, getStockPrice } from '../../api'
+import { getTradeLog, getWatchlist, removeFromWatchlist, updateWatchlist, addTradeLog, closeTradeLog, getStockPrice } from '../../api'
 import { useContextMenu } from '../ContextMenu'
 import { useAnalysis } from '../../context/AnalysisContext'
 
@@ -139,19 +139,83 @@ function CloseConfirm({ position, onClose, onDone }) {
   )
 }
 
+// ── Edit Watchlist Item Form ──────────────────────────────────────────────────
+
+function EditWatchItemForm({ item, onClose, onSaved }) {
+  const [form, setForm] = useState({
+    watch_low:   item.watch_low   || '',
+    watch_high:  item.watch_high  || '',
+    price_alert: item.price_alert || '',
+    alert_date:  item.alert_date  ? item.alert_date.slice(0, 10) : '',
+    notes:       item.notes       || '',
+    category:    item.category    || 'active',
+  })
+  const [saving, setSaving] = useState(false)
+
+  const handleSave = async (e) => {
+    e.preventDefault()
+    setSaving(true)
+    try {
+      await updateWatchlist(item.id, {
+        watch_low:   form.watch_low   !== '' ? parseFloat(form.watch_low)   : null,
+        watch_high:  form.watch_high  !== '' ? parseFloat(form.watch_high)  : null,
+        price_alert: form.price_alert !== '' ? parseFloat(form.price_alert) : null,
+        alert_date:  form.alert_date  || null,
+        notes:       form.notes       || null,
+        category:    form.category,
+      })
+      onSaved()
+    } catch (e) {
+      console.error(e)
+    } finally {
+      setSaving(false)
+    }
+  }
+
+  const inp = 'w-full bg-gray-50 dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-xl px-3 py-2 text-[12px] text-gray-800 dark:text-gray-200 outline-none focus:ring-2 focus:ring-blue-300 dark:focus:ring-blue-800'
+
+  return (
+    <form onSubmit={handleSave} className="px-4 py-4 space-y-3">
+      <div className="grid grid-cols-2 gap-2">
+        {[['Watch Low (Rs)', 'watch_low', 'number'], ['Watch High (Rs)', 'watch_high', 'number'], ['Price Alert (Rs)', 'price_alert', 'number'], ['Alert Date', 'alert_date', 'date']].map(([label, key, type]) => (
+          <div key={key}>
+            <label className="block text-[9px] font-bold uppercase tracking-widest text-gray-400 mb-1">{label}</label>
+            <input type={type} value={form[key]} onChange={e => setForm(f => ({ ...f, [key]: e.target.value }))} className={inp} />
+          </div>
+        ))}
+      </div>
+      <div>
+        <label className="block text-[9px] font-bold uppercase tracking-widest text-gray-400 mb-1">Notes</label>
+        <input type="text" value={form.notes} onChange={e => setForm(f => ({ ...f, notes: e.target.value }))} placeholder="Why are you watching this?" className={inp} />
+      </div>
+      <div>
+        <label className="block text-[9px] font-bold uppercase tracking-widest text-gray-400 mb-1">Category</label>
+        <select value={form.category} onChange={e => setForm(f => ({ ...f, category: e.target.value }))} className={inp}>
+          <option value="active">Active</option>
+          <option value="pre">Pre-Watch</option>
+        </select>
+      </div>
+      <div className="flex gap-2 pt-1">
+        <button type="button" onClick={onClose} className="flex-1 py-2 rounded-xl border border-gray-200 dark:border-gray-700 text-[11px] font-medium text-gray-500 hover:bg-gray-50 dark:hover:bg-gray-800 transition-colors">Cancel</button>
+        <button type="submit" disabled={saving} className="flex-1 py-2 rounded-xl bg-blue-600 hover:bg-blue-700 text-white text-[11px] font-semibold disabled:opacity-50 transition-colors">{saving ? 'Saving…' : 'Save'}</button>
+      </div>
+    </form>
+  )
+}
+
 // ── Main ──────────────────────────────────────────────────────────────────────
 
 export default function LeftPanel() {
   const { selectedSymbol, selectSymbol, isIndex } = useAnalysis()
   const [positions, setPositions] = useState([])
   const [watchlist, setWatchlist] = useState([])
-  const [tasks,     setTasks]     = useState([])
   const [tab,       setTab]       = useState('portfolio')
 
   // Modal state
   const [tradeModal,    setTradeModal]    = useState(null)
   const [closeTarget,   setCloseTarget]   = useState(null)
   const [alertPositions, setAlertPositions] = useState([])
+  const [editWatchItem, setEditWatchItem] = useState(null)
 
   const loadData = () => {
     getTradeLog()
@@ -159,13 +223,6 @@ export default function LeftPanel() {
       .catch(() => {})
     getWatchlist()
       .then(r => setWatchlist((r.data || []).filter(w => w.category === 'active' || w.category === 'pre' || w.category === 'pre-watch')))
-      .catch(() => {})
-    getTodayTasks()
-      .then(r => {
-        const fixed  = (r.data.fixedTasks || []).map(t => ({ ...t, label: t.title || t.label || t.id }))
-        const custom = r.data.customTasks || []
-        setTasks([...fixed, ...custom])
-      })
       .catch(() => {})
   }
 
@@ -203,121 +260,133 @@ export default function LeftPanel() {
     return () => { cancelled = true }
   }, [positions])
 
-  const completedTasks = tasks.filter(t => t.completed).length
-  const canTrade       = !isIndex(selectedSymbol)
+  const canTrade = !isIndex(selectedSymbol)
   const { onContextMenu, ContextMenuPortal } = useContextMenu()
 
   return (
     <div className="flex flex-col h-full overflow-hidden">
       <ContextMenuPortal />
 
-      {/* ── P / W tabs ────────────────────────────────────────────────── */}
-      <div className="flex bg-gray-100 dark:bg-gray-800 rounded-xl p-0.5 m-2 shrink-0">
-        {[['portfolio', 'P'], ['watchlist', 'W']].map(([key, label]) => (
-          <button key={key} onClick={() => setTab(key)}
-            className={`flex-1 py-1 rounded-lg text-[9px] font-bold transition-colors relative ${
-              tab === key ? 'bg-white dark:bg-gray-700 text-gray-900 dark:text-white shadow-sm' : 'text-gray-500 dark:text-gray-400'
-            }`}>
-            {label}
-            {key === 'portfolio' && positions.length > 0 && (
-              <span className="absolute -top-0.5 -right-0.5 w-2 h-2 bg-blue-500 rounded-full" />
-            )}
-          </button>
-        ))}
-      </div>
-
-      {/* ── Portfolio ────────────────────────────────────────────────── */}
-      {tab === 'portfolio' && (
-        <div className="flex-1 overflow-y-auto min-h-0 px-2 space-y-1">
-          {positions.length === 0 ? (
-            <p className="text-center text-[9px] text-gray-400 py-4">No open positions</p>
-          ) : positions.map(p => (
-            <div key={p.id} onClick={() => selectSymbol(p.symbol, null, p)}
-              className={`cursor-pointer rounded-xl px-2 py-2 transition-all border ${
-                selectedSymbol === p.symbol
-                  ? 'bg-blue-50 dark:bg-blue-950/50 border-blue-200 dark:border-blue-800'
-                  : 'hover:bg-gray-50 dark:hover:bg-gray-800/50 border-transparent'
-              }`}>
-              <div className="flex items-center justify-between mb-1">
-                <span className="text-[11px] font-bold text-gray-800 dark:text-gray-100">{p.symbol}</span>
-                <span className={`text-[7px] font-bold px-1 py-0.5 rounded ${
-                  p.position === 'LONG' ? 'bg-emerald-100 dark:bg-emerald-950 text-emerald-600' : 'bg-red-100 dark:bg-red-950 text-red-500'
-                }`}>{p.position}</span>
+      {/* Edit watchlist modal */}
+      {editWatchItem && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+          <div className="absolute inset-0 bg-black/40 backdrop-blur-sm" onClick={() => setEditWatchItem(null)} />
+          <div className="relative bg-white dark:bg-gray-900 rounded-2xl shadow-2xl border border-gray-200 dark:border-gray-700 w-full max-w-sm z-10 overflow-hidden">
+            <div className="flex items-center justify-between px-4 py-3 border-b border-gray-100 dark:border-gray-800">
+              <div>
+                <p className="text-[13px] font-bold text-gray-800 dark:text-gray-100">Edit Watchlist</p>
+                <p className="text-[10px] text-gray-400" translate="no">{editWatchItem.symbol}</p>
               </div>
-              <div className="text-[8px] text-gray-500 space-y-0.5">
-                <div>Qty: <span className="text-gray-700 dark:text-gray-300 font-medium">{p.remaining_quantity ?? p.quantity}</span></div>
-                <div>Entry: <span className="text-blue-400 font-medium">{p.entry_price?.toLocaleString()}</span></div>
-                {p.sl && <div>SL: <span className="text-red-400 font-medium">{p.sl}</span></div>}
-                {p.tp && <div>TP: <span className="text-emerald-500 font-medium">{p.tp}</span></div>}
-              </div>
-              {p.sl && p.tp && (
-                <div className="mt-1.5 h-1 rounded-full bg-gray-100 dark:bg-gray-800 overflow-hidden">
-                  <div className="h-full bg-gradient-to-r from-red-400 via-gray-300 dark:via-gray-600 to-emerald-400 rounded-full" />
-                </div>
-              )}
+              <button onClick={() => setEditWatchItem(null)} className="w-6 h-6 flex items-center justify-center rounded-full hover:bg-gray-100 dark:hover:bg-gray-800 text-gray-400 text-[16px]">×</button>
             </div>
-          ))}
+            <EditWatchItemForm item={editWatchItem} onClose={() => setEditWatchItem(null)} onSaved={() => { setEditWatchItem(null); loadData() }} />
+          </div>
         </div>
       )}
 
-      {/* ── Watchlist ─────────────────────────────────────────────────── */}
-      {tab === 'watchlist' && (
-        <div className="flex-1 overflow-y-auto min-h-0 px-2 space-y-1">
-          {watchlist.length === 0 ? (
-            <p className="text-center text-[9px] text-gray-400 py-4">No watchlist stocks</p>
-          ) : watchlist.map(w => (
-            <div key={w.id}
-              onClick={() => selectSymbol(w.symbol)}
-              onContextMenu={onContextMenu([
-                { label: 'Delete', icon: '🗑️', danger: true, action: () =>
-                    removeFromWatchlist(w.id).then(() => setWatchlist(prev => prev.filter(x => x.id !== w.id)))
-                },
-              ])}
-              className={`cursor-pointer rounded-xl px-2 py-2 transition-all border ${
-                selectedSymbol === w.symbol
-                  ? 'bg-blue-50 dark:bg-blue-950/50 border-blue-200 dark:border-blue-800'
-                  : 'hover:bg-gray-50 dark:hover:bg-gray-800/50 border-transparent'
+      {/* ── Top half: Portfolio / Watchlist ──────────────────────────── */}
+      <div className="h-1/2 flex flex-col min-h-0 border-b border-gray-100 dark:border-gray-800">
+
+        {/* Tab bar */}
+        <div className="flex bg-gray-100 dark:bg-gray-800 rounded-xl p-0.5 m-2 shrink-0">
+          {[['portfolio', 'P'], ['watchlist', 'W']].map(([key, label]) => (
+            <button key={key} onClick={() => setTab(key)}
+              className={`flex-1 py-1 rounded-lg text-[9px] font-bold transition-colors relative ${
+                tab === key ? 'bg-white dark:bg-gray-700 text-gray-900 dark:text-white shadow-sm' : 'text-gray-500 dark:text-gray-400'
               }`}>
-              <div className="flex items-center justify-between">
-                <span className="text-[11px] font-bold text-gray-800 dark:text-gray-100">{w.symbol}</span>
-                <span className={`text-[7px] font-semibold px-1.5 py-0.5 rounded-md ${
-                  (w.category === 'pre' || w.category === 'pre-watch')
-                    ? 'bg-amber-100 dark:bg-amber-950 text-amber-600 dark:text-amber-400'
-                    : 'bg-emerald-100 dark:bg-emerald-950 text-emerald-600 dark:text-emerald-400'
-                }`}>{(w.category === 'pre' || w.category === 'pre-watch') ? 'Pre' : 'Active'}</span>
-              </div>
-              {(w.watch_low || w.watch_high) && (
-                <div className="flex gap-2 mt-0.5 text-[7px] text-gray-400">
-                  {w.watch_low  && <span>L: <span className="text-red-400">{w.watch_low}</span></span>}
-                  {w.watch_high && <span>H: <span className="text-emerald-500">{w.watch_high}</span></span>}
-                </div>
+              {label}
+              {key === 'portfolio' && positions.length > 0 && (
+                <span className="absolute -top-0.5 -right-0.5 w-2 h-2 bg-blue-500 rounded-full" />
               )}
-              {w.notes && <p className="text-[7px] text-gray-400 mt-0.5 truncate">{w.notes}</p>}
-            </div>
+            </button>
           ))}
         </div>
-      )}
 
-      {/* ── Today's Plan + BUY/SELL ───────────────────────────────────── */}
-      <div className="shrink-0 border-t border-gray-100 dark:border-gray-800 px-2 pt-2 pb-1 mt-1">
-        <div className="flex items-center justify-between mb-1">
-          <span className="text-[8px] font-bold uppercase tracking-widest text-gray-400">Today's Plan</span>
-          <span className="text-[8px] text-gray-400">{completedTasks}/{tasks.length}</span>
-        </div>
-        {tasks.length > 0 && (
-          <div className="h-1 rounded-full bg-gray-100 dark:bg-gray-800 mb-2 overflow-hidden">
-            <div className="h-full bg-emerald-400 rounded-full transition-all"
-              style={{ width: `${tasks.length ? (completedTasks / tasks.length) * 100 : 0}%` }} />
+        {/* Portfolio */}
+        {tab === 'portfolio' && (
+          <div className="flex-1 overflow-y-auto min-h-0 px-2 space-y-1">
+            {positions.length === 0 ? (
+              <p className="text-center text-[9px] text-gray-400 py-4">No open positions</p>
+            ) : positions.map(p => (
+              <div key={p.id} onClick={() => selectSymbol(p.symbol, null, p)}
+                className={`cursor-pointer rounded-xl px-2 py-2 transition-all border ${
+                  selectedSymbol === p.symbol
+                    ? 'bg-blue-50 dark:bg-blue-950/50 border-blue-200 dark:border-blue-800'
+                    : 'hover:bg-gray-50 dark:hover:bg-gray-800/50 border-transparent'
+                }`}>
+                <div className="flex items-center justify-between mb-1" translate="no">
+                  <span className="text-[11px] font-bold text-gray-800 dark:text-gray-100">{p.symbol}</span>
+                  <span className={`text-[7px] font-bold px-1 py-0.5 rounded ${
+                    p.position === 'LONG' ? 'bg-emerald-100 dark:bg-emerald-950 text-emerald-600' : 'bg-red-100 dark:bg-red-950 text-red-500'
+                  }`}>{p.position}</span>
+                </div>
+                <div className="text-[8px] text-gray-500 space-y-0.5" translate="no">
+                  <div>Qty: <span className="text-gray-700 dark:text-gray-300 font-medium">{p.remaining_quantity ?? p.quantity}</span></div>
+                  <div>Entry: <span className="text-blue-400 font-medium">{p.entry_price?.toLocaleString()}</span></div>
+                  {p.sl && <div>SL: <span className="text-red-400 font-medium">{p.sl}</span></div>}
+                  {p.tp && <div>TP: <span className="text-emerald-500 font-medium">{p.tp}</span></div>}
+                </div>
+                {p.sl && p.tp && (
+                  <div className="mt-1.5 h-1 rounded-full bg-gray-100 dark:bg-gray-800 overflow-hidden">
+                    <div className="h-full bg-gradient-to-r from-red-400 via-gray-300 dark:via-gray-600 to-emerald-400 rounded-full" />
+                  </div>
+                )}
+              </div>
+            ))}
           </div>
         )}
 
-        {/* BUY / SELL — disabled for index */}
-        <div className="grid grid-cols-2 gap-1">
+        {/* Watchlist */}
+        {tab === 'watchlist' && (
+          <div className="flex-1 overflow-y-auto min-h-0 px-2 space-y-1">
+            {watchlist.length === 0 ? (
+              <p className="text-center text-[9px] text-gray-400 py-4">No watchlist stocks</p>
+            ) : watchlist.map(w => (
+              <div key={w.id}
+                onClick={() => selectSymbol(w.symbol)}
+                onContextMenu={onContextMenu([
+                  { label: 'Edit', icon: '✏️', action: () => setEditWatchItem(w) },
+                  { separator: true },
+                  { label: 'Delete', icon: '🗑️', danger: true, action: () =>
+                      removeFromWatchlist(w.id).then(() => setWatchlist(prev => prev.filter(x => x.id !== w.id)))
+                  },
+                ])}
+                className={`cursor-pointer rounded-xl px-2 py-2 transition-all border ${
+                  selectedSymbol === w.symbol
+                    ? 'bg-blue-50 dark:bg-blue-950/50 border-blue-200 dark:border-blue-800'
+                    : 'hover:bg-gray-50 dark:hover:bg-gray-800/50 border-transparent'
+                }`}>
+                <div className="flex items-center justify-between" translate="no">
+                  <span className="text-[11px] font-bold text-gray-800 dark:text-gray-100">{w.symbol}</span>
+                  <span className={`text-[7px] font-semibold px-1.5 py-0.5 rounded-md ${
+                    (w.category === 'pre' || w.category === 'pre-watch')
+                      ? 'bg-amber-100 dark:bg-amber-950 text-amber-600 dark:text-amber-400'
+                      : 'bg-emerald-100 dark:bg-emerald-950 text-emerald-600 dark:text-emerald-400'
+                  }`}>{(w.category === 'pre' || w.category === 'pre-watch') ? 'Pre' : 'Active'}</span>
+                </div>
+                {(w.watch_low || w.watch_high) && (
+                  <div className="flex gap-2 mt-0.5 text-[7px] text-gray-400">
+                    {w.watch_low  && <span>L: <span className="text-red-400">{w.watch_low}</span></span>}
+                    {w.watch_high && <span>H: <span className="text-emerald-500">{w.watch_high}</span></span>}
+                  </div>
+                )}
+                {w.notes && <p className="text-[7px] text-gray-400 mt-0.5 truncate">{w.notes}</p>}
+              </div>
+            ))}
+          </div>
+        )}
+      </div>
+
+      {/* ── Bottom half: BUY/SELL + Alerts ──────────────────────────── */}
+      <div className="h-1/2 flex flex-col justify-center gap-2 px-2 py-3">
+
+        {/* BUY / SELL */}
+        <div className="grid grid-cols-2 gap-1 shrink-0">
           <button
             onClick={() => canTrade && setTradeModal('BUY')}
             disabled={!canTrade}
             title={!canTrade ? 'Not available for indexes' : ''}
-            className={`py-1.5 rounded-lg text-[10px] font-bold transition-colors shadow-sm ${
+            className={`py-2 rounded-lg text-[10px] font-bold transition-colors shadow-sm ${
               canTrade
                 ? 'bg-emerald-500 hover:bg-emerald-600 text-white'
                 : 'bg-gray-100 dark:bg-gray-800 text-gray-400 cursor-not-allowed'
@@ -328,7 +397,7 @@ export default function LeftPanel() {
             onClick={() => canTrade && setTradeModal('SELL')}
             disabled={!canTrade}
             title={!canTrade ? 'Not available for indexes' : ''}
-            className={`py-1.5 rounded-lg text-[10px] font-bold transition-colors shadow-sm ${
+            className={`py-2 rounded-lg text-[10px] font-bold transition-colors shadow-sm ${
               canTrade
                 ? 'bg-red-500 hover:bg-red-600 text-white'
                 : 'bg-gray-100 dark:bg-gray-800 text-gray-400 cursor-not-allowed'
@@ -337,9 +406,9 @@ export default function LeftPanel() {
           </button>
         </div>
 
-        {/* ── Alerts: within 2% of SL or TP ── */}
+        {/* SL/TP Alerts */}
         {alertPositions.length > 0 && (
-          <div className="mt-2 space-y-1.5">
+          <div className="overflow-y-auto space-y-1.5">
             {alertPositions.map((p, i) => (
               <div key={i} className="rounded-xl border border-orange-200 dark:border-orange-900 bg-orange-50 dark:bg-orange-950/30 px-2 py-1.5">
                 <div className="flex items-center justify-between mb-0.5">
@@ -360,6 +429,10 @@ export default function LeftPanel() {
               </div>
             ))}
           </div>
+        )}
+
+        {alertPositions.length === 0 && (
+          <p className="text-center text-[8px] text-gray-300 dark:text-gray-700">No SL/TP alerts</p>
         )}
       </div>
 
