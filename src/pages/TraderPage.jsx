@@ -596,7 +596,7 @@ function TraderPage() {
   )
 
   return (
-    <div className="w-full px-6 py-6 max-w-7xl mx-auto">
+    <div className="w-full px-6 pt-6 pb-10 max-w-7xl mx-auto">
 
       {/* Modals */}
       {showAddModal    && <AddTradeModal onClose={() => { setShowAddModal(false); setEditTrade(null) }} onSave={handleAddTrade} editTrade={editTrade} />}

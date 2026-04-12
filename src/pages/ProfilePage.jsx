@@ -166,7 +166,7 @@ function ProfilePage() {
   const isAdmin = profile.user.id === ADMIN_USER_ID
 
   return (
-    <div className="w-full px-6 py-6 max-w-5xl mx-auto">
+    <div className="w-full px-6 pt-6 pb-10 max-w-5xl mx-auto">
 
       <div className="relative bg-gradient-to-br from-gray-900 via-blue-950 to-gray-900 rounded-2xl overflow-hidden mb-6 shadow-xl">
         <div className="absolute inset-0 opacity-10">
