@@ -1,26 +1,160 @@
 import { useState, useEffect } from 'react'
-import { getTradeLog, getWatchlist, getTodayTasks } from '../../api'
+import { getTradeLog, getWatchlist, getTodayTasks, addTradeLog, closeTradeLog, getStockPrice } from '../../api'
 import { useAnalysis } from '../../context/AnalysisContext'
 
-function SectionHeader({ title, count }) {
+// ── BUY / SELL Modal ──────────────────────────────────────────────────────────
+
+function TradeModal({ side, symbol, onClose, onSaved }) {
+  const [form, setForm] = useState({ entry_price: '', sl: '', tp: '', quantity: '', notes: '' })
+  const [saving, setSaving] = useState(false)
+  const [err, setErr]       = useState(null)
+
+  const isBuy = side === 'BUY'
+  const set   = (k, v) => setForm(f => ({ ...f, [k]: v }))
+
+  const handleSave = async () => {
+    if (!form.entry_price || !form.quantity) { setErr('Entry price and quantity are required'); return }
+    setSaving(true); setErr(null)
+    try {
+      await addTradeLog({
+        symbol,
+        position:    isBuy ? 'LONG' : 'SHORT',
+        entry_price: parseFloat(form.entry_price),
+        sl:          form.sl       ? parseFloat(form.sl)       : null,
+        tp:          form.tp       ? parseFloat(form.tp)       : null,
+        quantity:    parseInt(form.quantity),
+        notes:       form.notes || null,
+        entry_date:  new Date().toISOString().slice(0, 10),
+        status:      'OPEN',
+      })
+      onSaved()
+      onClose()
+    } catch (e) {
+      setErr(e.response?.data?.error || 'Failed to save trade')
+    } finally {
+      setSaving(false)
+    }
+  }
+
   return (
-    <div className="flex items-center justify-between mb-1.5">
-      <span className="text-[8px] font-bold uppercase tracking-widest text-gray-400">{title}</span>
-      {count != null && count > 0 && (
-        <span className="text-[7px] bg-gray-100 dark:bg-gray-800 text-gray-500 px-1.5 py-0.5 rounded-full">{count}</span>
-      )}
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+      <div className="absolute inset-0 bg-black/50 backdrop-blur-sm" onClick={onClose} />
+      <div className="relative bg-white dark:bg-gray-900 rounded-2xl shadow-2xl border border-gray-200 dark:border-gray-700 w-full max-w-sm z-10 overflow-hidden">
+
+        {/* Header */}
+        <div className={`flex items-center justify-between px-4 py-3 ${isBuy ? 'bg-emerald-500' : 'bg-red-500'}`}>
+          <div className="flex items-center gap-2">
+            <span className="text-[13px] font-bold text-white">{isBuy ? 'BUY' : 'SELL'}</span>
+            <span className="text-[11px] font-semibold text-white/80">{symbol}</span>
+          </div>
+          <button onClick={onClose} className="w-6 h-6 flex items-center justify-center rounded-full bg-white/20 hover:bg-white/30 transition-colors">
+            <span className="text-white text-[14px] leading-none">×</span>
+          </button>
+        </div>
+
+        {/* Form */}
+        <div className="px-4 py-4 space-y-3">
+          {[
+            ['Entry Price', 'entry_price', 'e.g. 1234'],
+            ['Stop Loss (SL)', 'sl', 'e.g. 1100'],
+            ['Target Price (TP)', 'tp', 'e.g. 1400'],
+            ['Quantity', 'quantity', 'No. of shares'],
+          ].map(([label, key, ph]) => (
+            <div key={key}>
+              <label className="block text-[9px] font-bold uppercase tracking-widest text-gray-400 mb-1">{label}</label>
+              <input
+                type="number"
+                value={form[key]}
+                onChange={e => set(key, e.target.value)}
+                placeholder={ph}
+                className="w-full bg-gray-50 dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-xl px-3 py-2 text-[12px] text-gray-800 dark:text-gray-200 outline-none focus:ring-2 focus:ring-blue-300 dark:focus:ring-blue-800"
+              />
+            </div>
+          ))}
+          <div>
+            <label className="block text-[9px] font-bold uppercase tracking-widest text-gray-400 mb-1">Notes</label>
+            <input
+              type="text"
+              value={form.notes}
+              onChange={e => set('notes', e.target.value)}
+              placeholder="Optional notes..."
+              className="w-full bg-gray-50 dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-xl px-3 py-2 text-[12px] text-gray-800 dark:text-gray-200 outline-none focus:ring-2 focus:ring-blue-300 dark:focus:ring-blue-800"
+            />
+          </div>
+
+          {err && <p className="text-[10px] text-red-500 bg-red-50 dark:bg-red-950 px-3 py-1.5 rounded-lg">{err}</p>}
+
+          <button
+            onClick={handleSave}
+            disabled={saving}
+            className={`w-full py-2.5 rounded-xl text-[12px] font-bold text-white transition-colors ${
+              isBuy
+                ? 'bg-emerald-500 hover:bg-emerald-600 disabled:bg-emerald-300'
+                : 'bg-red-500 hover:bg-red-600 disabled:bg-red-300'
+            }`}
+          >
+            {saving ? 'Saving...' : `Confirm ${side}`}
+          </button>
+        </div>
+      </div>
     </div>
   )
 }
 
+// ── Close Position Confirm ────────────────────────────────────────────────────
+
+function CloseConfirm({ position, onClose, onDone }) {
+  const [saving, setSaving] = useState(false)
+
+  const handleClose = async () => {
+    setSaving(true)
+    try {
+      const latestClose = position._latestPrice || position.entry_price
+      await closeTradeLog(position.id, { exit_price: latestClose, exit_date: new Date().toISOString().slice(0, 10) })
+      onDone()
+      onClose()
+    } catch { setSaving(false) }
+  }
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+      <div className="absolute inset-0 bg-black/40 backdrop-blur-sm" onClick={onClose} />
+      <div className="relative bg-white dark:bg-gray-900 rounded-2xl shadow-2xl border border-gray-200 dark:border-gray-700 w-full max-w-xs z-10 p-5 text-center">
+        <p className="text-[13px] font-bold text-gray-800 dark:text-gray-100 mb-1">Close Position?</p>
+        <p className="text-[11px] text-gray-500 mb-4">
+          {position.symbol} · {position.position} · Qty {position.remaining_quantity ?? position.quantity}
+        </p>
+        <div className="flex gap-2">
+          <button onClick={onClose} className="flex-1 py-2 rounded-xl border border-gray-200 dark:border-gray-700 text-[11px] font-semibold text-gray-500 hover:bg-gray-50 dark:hover:bg-gray-800 transition-colors">
+            Cancel
+          </button>
+          <button onClick={handleClose} disabled={saving}
+            className="flex-1 py-2 rounded-xl bg-red-500 hover:bg-red-600 text-white text-[11px] font-bold transition-colors disabled:opacity-50">
+            {saving ? '...' : 'Close Now'}
+          </button>
+        </div>
+      </div>
+    </div>
+  )
+}
+
+// ── Main ──────────────────────────────────────────────────────────────────────
+
 export default function LeftPanel() {
-  const { selectedSymbol, selectSymbol } = useAnalysis()
+  const { selectedSymbol, selectSymbol, isIndex } = useAnalysis()
   const [positions, setPositions] = useState([])
   const [watchlist, setWatchlist] = useState([])
   const [tasks,     setTasks]     = useState([])
   const [tab,       setTab]       = useState('portfolio')
 
-  useEffect(() => {
+  // Modal state
+  const [tradeModal,  setTradeModal]  = useState(null)  // 'BUY' | 'SELL' | null
+  const [closeTarget, setCloseTarget] = useState(null)  // position to close
+
+  // Smart alerts: positions where current price is within 2% of SL or TP
+  const [alertPositions, setAlertPositions] = useState([])
+
+  const loadData = () => {
     getTradeLog()
       .then(r => setPositions((r.data || []).filter(t => t.status === 'OPEN' || t.status === 'PARTIAL')))
       .catch(() => {})
@@ -34,30 +168,56 @@ export default function LeftPanel() {
         setTasks([...fixed, ...custom])
       })
       .catch(() => {})
-  }, [])
+  }
+
+  useEffect(() => { loadData() }, [])
+
+  // Compute smart alerts: fetch latest price for each position, check within 2% of SL or TP
+  useEffect(() => {
+    if (!positions.length) { setAlertPositions([]); return }
+    let cancelled = false
+    Promise.all(
+      positions
+        .filter(p => p.sl || p.tp)
+        .map(async p => {
+          try {
+            const r = await getStockPrice(p.symbol)
+            const price = parseFloat(r.data?.close || r.data?.price || 0)
+            if (!price) return null
+            const alerts = []
+            if (p.sl) {
+              const slV = parseFloat(p.sl)
+              const pct = Math.abs((price - slV) / slV * 100)
+              if (pct <= 2) alerts.push({ type: 'SL', label: 'Near Stop Loss', price, threshold: slV })
+            }
+            if (p.tp) {
+              const tpV = parseFloat(p.tp)
+              const pct = Math.abs((price - tpV) / tpV * 100)
+              if (pct <= 2) alerts.push({ type: 'TP', label: 'Near Target', price, threshold: tpV })
+            }
+            if (!alerts.length) return null
+            return { ...p, _latestPrice: price, _alerts: alerts }
+          } catch { return null }
+        })
+    ).then(results => {
+      if (!cancelled) setAlertPositions(results.filter(Boolean))
+    })
+    return () => { cancelled = true }
+  }, [positions])
 
   const completedTasks = tasks.filter(t => t.completed).length
-
-  // Derive alerts from positions that have SL/TP
-  const alerts = positions
-    .filter(p => p.sl || p.tp)
-    .map(p => ({ symbol: p.symbol, sl: p.sl, tp: p.tp }))
+  const canTrade       = !isIndex(selectedSymbol)
 
   return (
     <div className="flex flex-col h-full overflow-hidden">
 
-      {/* ── Tab switcher ─────────────────────────────────────────────── */}
+      {/* ── P / W tabs ────────────────────────────────────────────────── */}
       <div className="flex bg-gray-100 dark:bg-gray-800 rounded-xl p-0.5 m-2 shrink-0">
         {[['portfolio', 'P'], ['watchlist', 'W']].map(([key, label]) => (
-          <button
-            key={key}
-            onClick={() => setTab(key)}
+          <button key={key} onClick={() => setTab(key)}
             className={`flex-1 py-1 rounded-lg text-[9px] font-bold transition-colors relative ${
-              tab === key
-                ? 'bg-white dark:bg-gray-700 text-gray-900 dark:text-white shadow-sm'
-                : 'text-gray-500 dark:text-gray-400'
-            }`}
-          >
+              tab === key ? 'bg-white dark:bg-gray-700 text-gray-900 dark:text-white shadow-sm' : 'text-gray-500 dark:text-gray-400'
+            }`}>
             {label}
             {key === 'portfolio' && positions.length > 0 && (
               <span className="absolute -top-0.5 -right-0.5 w-2 h-2 bg-blue-500 rounded-full" />
@@ -66,29 +226,22 @@ export default function LeftPanel() {
         ))}
       </div>
 
-      {/* ── Portfolio tab ─────────────────────────────────────────────── */}
+      {/* ── Portfolio ────────────────────────────────────────────────── */}
       {tab === 'portfolio' && (
         <div className="flex-1 overflow-y-auto min-h-0 px-2 space-y-1">
           {positions.length === 0 ? (
-            <div className="flex flex-col items-center justify-center py-4 text-center">
-              <p className="text-[9px] text-gray-400">No open positions</p>
-            </div>
+            <p className="text-center text-[9px] text-gray-400 py-4">No open positions</p>
           ) : positions.map(p => (
-            <div
-              key={p.id}
-              onClick={() => selectSymbol(p.symbol, null, p)}
+            <div key={p.id} onClick={() => selectSymbol(p.symbol, null, p)}
               className={`cursor-pointer rounded-xl px-2 py-2 transition-all border ${
                 selectedSymbol === p.symbol
                   ? 'bg-blue-50 dark:bg-blue-950/50 border-blue-200 dark:border-blue-800'
                   : 'hover:bg-gray-50 dark:hover:bg-gray-800/50 border-transparent'
-              }`}
-            >
+              }`}>
               <div className="flex items-center justify-between mb-1">
                 <span className="text-[11px] font-bold text-gray-800 dark:text-gray-100">{p.symbol}</span>
                 <span className={`text-[7px] font-bold px-1 py-0.5 rounded ${
-                  p.position === 'LONG'
-                    ? 'bg-emerald-100 dark:bg-emerald-950 text-emerald-600'
-                    : 'bg-red-100 dark:bg-red-950 text-red-500'
+                  p.position === 'LONG' ? 'bg-emerald-100 dark:bg-emerald-950 text-emerald-600' : 'bg-red-100 dark:bg-red-950 text-red-500'
                 }`}>{p.position}</span>
               </div>
               <div className="text-[8px] text-gray-500 space-y-0.5">
@@ -97,8 +250,7 @@ export default function LeftPanel() {
                 {p.sl && <div>SL: <span className="text-red-400 font-medium">{p.sl}</span></div>}
                 {p.tp && <div>TP: <span className="text-emerald-500 font-medium">{p.tp}</span></div>}
               </div>
-              {/* SL/TP progress bar */}
-              {p.sl && p.tp && p.entry_price && (
+              {p.sl && p.tp && (
                 <div className="mt-1.5 h-1 rounded-full bg-gray-100 dark:bg-gray-800 overflow-hidden">
                   <div className="h-full bg-gradient-to-r from-red-400 via-gray-300 dark:via-gray-600 to-emerald-400 rounded-full" />
                 </div>
@@ -108,32 +260,25 @@ export default function LeftPanel() {
         </div>
       )}
 
-      {/* ── Watchlist tab ──────────────────────────────────────────────── */}
+      {/* ── Watchlist ─────────────────────────────────────────────────── */}
       {tab === 'watchlist' && (
         <div className="flex-1 overflow-y-auto min-h-0 px-2 space-y-1">
           {watchlist.length === 0 ? (
-            <div className="flex flex-col items-center justify-center py-4 text-center">
-              <p className="text-[9px] text-gray-400">No stocks</p>
-            </div>
+            <p className="text-center text-[9px] text-gray-400 py-4">No stocks</p>
           ) : watchlist.map(w => (
-            <div
-              key={w.id}
-              onClick={() => selectSymbol(w.symbol)}
+            <div key={w.id} onClick={() => selectSymbol(w.symbol)}
               className={`cursor-pointer rounded-xl px-2 py-2 transition-all border ${
                 selectedSymbol === w.symbol
                   ? 'bg-blue-50 dark:bg-blue-950/50 border-blue-200 dark:border-blue-800'
                   : 'hover:bg-gray-50 dark:hover:bg-gray-800/50 border-transparent'
-              }`}
-            >
+              }`}>
               <div className="flex items-center justify-between">
                 <span className="text-[11px] font-bold text-gray-800 dark:text-gray-100">{w.symbol}</span>
                 {w.notes && (
                   <span className={`text-[7px] font-semibold px-1 py-0.5 rounded ${
-                    w.notes.toUpperCase().includes('BUY')
-                      ? 'bg-emerald-100 dark:bg-emerald-950 text-emerald-600'
-                      : w.notes.toUpperCase().includes('SELL')
-                        ? 'bg-red-100 dark:bg-red-950 text-red-500'
-                        : 'bg-gray-100 dark:bg-gray-800 text-gray-400'
+                    w.notes.toUpperCase().includes('BUY') ? 'bg-emerald-100 dark:bg-emerald-950 text-emerald-600'
+                    : w.notes.toUpperCase().includes('SELL') ? 'bg-red-100 dark:bg-red-950 text-red-500'
+                    : 'bg-gray-100 dark:bg-gray-800 text-gray-400'
                   }`}>{w.notes.slice(0, 6)}</span>
                 )}
               </div>
@@ -148,27 +293,41 @@ export default function LeftPanel() {
         </div>
       )}
 
-      {/* ── Today's Action Plan ────────────────────────────────────────── */}
+      {/* ── Today's Plan + BUY/SELL ───────────────────────────────────── */}
       <div className="shrink-0 border-t border-gray-100 dark:border-gray-800 px-2 pt-2 pb-1 mt-1">
         <div className="flex items-center justify-between mb-1">
-          <SectionHeader title="Today's Plan" />
+          <span className="text-[8px] font-bold uppercase tracking-widest text-gray-400">Today's Plan</span>
           <span className="text-[8px] text-gray-400">{completedTasks}/{tasks.length}</span>
         </div>
         {tasks.length > 0 && (
-          <div className="h-1 rounded-full bg-gray-100 dark:bg-gray-800 mb-1.5 overflow-hidden">
-            <div
-              className="h-full bg-emerald-400 rounded-full transition-all duration-500"
-              style={{ width: `${(completedTasks / tasks.length) * 100}%` }}
-            />
+          <div className="h-1 rounded-full bg-gray-100 dark:bg-gray-800 mb-2 overflow-hidden">
+            <div className="h-full bg-emerald-400 rounded-full transition-all"
+              style={{ width: `${tasks.length ? (completedTasks / tasks.length) * 100 : 0}%` }} />
           </div>
         )}
 
-        {/* BUY / SELL action buttons */}
-        <div className="grid grid-cols-2 gap-1 mb-1.5">
-          <button className="py-1 rounded-lg bg-emerald-500 hover:bg-emerald-600 text-white text-[9px] font-bold transition-colors shadow-sm">
+        {/* BUY / SELL — disabled for index */}
+        <div className="grid grid-cols-2 gap-1 mb-2">
+          <button
+            onClick={() => canTrade && setTradeModal('BUY')}
+            disabled={!canTrade}
+            title={!canTrade ? 'Not available for indexes' : ''}
+            className={`py-1.5 rounded-lg text-[10px] font-bold transition-colors shadow-sm ${
+              canTrade
+                ? 'bg-emerald-500 hover:bg-emerald-600 text-white'
+                : 'bg-gray-100 dark:bg-gray-800 text-gray-400 cursor-not-allowed'
+            }`}>
             BUY
           </button>
-          <button className="py-1 rounded-lg bg-red-500 hover:bg-red-600 text-white text-[9px] font-bold transition-colors shadow-sm">
+          <button
+            onClick={() => canTrade && setTradeModal('SELL')}
+            disabled={!canTrade}
+            title={!canTrade ? 'Not available for indexes' : ''}
+            className={`py-1.5 rounded-lg text-[10px] font-bold transition-colors shadow-sm ${
+              canTrade
+                ? 'bg-red-500 hover:bg-red-600 text-white'
+                : 'bg-gray-100 dark:bg-gray-800 text-gray-400 cursor-not-allowed'
+            }`}>
             SELL
           </button>
         </div>
@@ -196,35 +355,52 @@ export default function LeftPanel() {
         </div>
       </div>
 
-      {/* ── Alerts ────────────────────────────────────────────────────── */}
-      {alerts.length > 0 && (
+      {/* ── Smart Alerts: within 2% of SL or TP ──────────────────────── */}
+      {alertPositions.length > 0 && (
         <div className="shrink-0 border-t border-gray-100 dark:border-gray-800 px-2 py-2">
-          <SectionHeader title="Alerts" />
-          <div className="space-y-1">
-            {alerts.map((a, i) => (
-              <div key={i} className="flex items-center justify-between text-[8px]">
-                <span
-                  onClick={() => selectSymbol(a.symbol)}
-                  className="font-bold text-gray-700 dark:text-gray-300 cursor-pointer hover:text-blue-500 transition-colors"
-                >
-                  {a.symbol}
-                </span>
-                <div className="flex flex-col items-end gap-0.5">
-                  {a.sl && (
-                    <span className="flex items-center gap-0.5 text-red-400">
-                      <span>🔔</span> {a.sl}
-                    </span>
-                  )}
-                  {a.tp && (
-                    <span className="flex items-center gap-0.5 text-emerald-500">
-                      <span>🎯</span> {a.tp}
-                    </span>
-                  )}
+          <span className="text-[8px] font-bold uppercase tracking-widest text-gray-400 flex items-center gap-1 mb-1.5">
+            🔔 Alerts
+          </span>
+          <div className="space-y-1.5">
+            {alertPositions.map((p, i) => (
+              <div key={i} className="rounded-xl border border-orange-200 dark:border-orange-900 bg-orange-50 dark:bg-orange-950/30 px-2 py-1.5">
+                <div className="flex items-center justify-between mb-0.5">
+                  <button onClick={() => selectSymbol(p.symbol, null, p)}
+                    className="text-[10px] font-bold text-gray-800 dark:text-gray-100 hover:text-blue-500 transition-colors">
+                    {p.symbol}
+                  </button>
+                  <button
+                    onClick={e => { e.stopPropagation(); setCloseTarget(p) }}
+                    className="text-[7px] font-semibold px-1.5 py-0.5 rounded bg-red-100 dark:bg-red-950 text-red-500 hover:bg-red-200 dark:hover:bg-red-900 transition-colors">
+                    Close
+                  </button>
                 </div>
+                {p._alerts.map((a, j) => (
+                  <p key={j} className={`text-[8px] font-medium ${a.type === 'SL' ? 'text-red-500' : 'text-emerald-500'}`}>
+                    → {a.label} ({a.threshold?.toLocaleString()})
+                  </p>
+                ))}
               </div>
             ))}
           </div>
         </div>
+      )}
+
+      {/* ── Modals ────────────────────────────────────────────────────── */}
+      {tradeModal && (
+        <TradeModal
+          side={tradeModal}
+          symbol={selectedSymbol}
+          onClose={() => setTradeModal(null)}
+          onSaved={() => loadData()}
+        />
+      )}
+      {closeTarget && (
+        <CloseConfirm
+          position={closeTarget}
+          onClose={() => setCloseTarget(null)}
+          onDone={() => loadData()}
+        />
       )}
 
     </div>
