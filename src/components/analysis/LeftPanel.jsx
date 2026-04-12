@@ -168,7 +168,13 @@ export default function LeftPanel() {
       .catch(() => {})
   }
 
-  useEffect(() => { loadData() }, [])
+  useEffect(() => {
+    loadData()
+    // Refetch when user returns to this tab (e.g. after deleting from Dashboard)
+    const onFocus = () => loadData()
+    window.addEventListener('focus', onFocus)
+    return () => window.removeEventListener('focus', onFocus)
+  }, [])
 
   // Within 2% of SL or TP
   useEffect(() => {
