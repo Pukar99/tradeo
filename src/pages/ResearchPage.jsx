@@ -255,7 +255,7 @@ function ResearchPage() {
   const cardProps = { onDelete: handleDelete, onVerify: handleVerify, onPin: handlePin, isAdmin, currentUserId: user?.id }
 
   return (
-    <div className="w-full px-6 py-6 max-w-6xl mx-auto">
+    <div className="w-full px-6 pt-6 pb-10 max-w-6xl mx-auto">
 
       {/* Header */}
       <div className="flex items-start justify-between mb-6">

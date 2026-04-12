@@ -89,7 +89,7 @@ function PortfolioPage() {
   const statusPill = { OPEN: 'text-blue-500 bg-blue-50 dark:bg-blue-900/20', PARTIAL: 'text-amber-500 bg-amber-50 dark:bg-amber-900/20', CLOSED: 'text-gray-400 bg-gray-100 dark:bg-gray-800' }
 
   return (
-    <div className="max-w-6xl mx-auto px-6 py-6 space-y-5">
+    <div className="max-w-6xl mx-auto px-6 pt-6 pb-10 space-y-5">
 
       {/* Header */}
       <div className="flex items-start justify-between">
