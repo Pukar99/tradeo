@@ -33,7 +33,16 @@
   stroke: #374151;
 }
 
-/* ── Hide scrollbar everywhere it's unwanted ─────────────────────────────── */
+/* ── Hide scrollbars globally — scroll still works via mouse/touch ───────── */
+* {
+  -ms-overflow-style: none;
+  scrollbar-width: none;
+}
+*::-webkit-scrollbar {
+  display: none;
+}
+
+/* keep .no-scrollbar for explicit use */
 .no-scrollbar {
   -ms-overflow-style: none;
   scrollbar-width: none;
