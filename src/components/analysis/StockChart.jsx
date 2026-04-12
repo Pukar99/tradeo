@@ -56,6 +56,113 @@ function calcMACD(data, fast = 12, slow = 26, sig = 9) {
 
 async function loadLC() { return import('lightweight-charts') }
 
+// ── Active position badge ─────────────────────────────────────────────────────
+
+function PositionBadge({ position, latestClose }) {
+  if (!position) return null
+  const { symbol, entry_price, sl, tp, quantity, remaining_quantity, position: dir, entry_date, status } = position
+  const entry  = parseFloat(entry_price) || 0
+  const close  = parseFloat(latestClose)  || entry
+  const qty    = remaining_quantity ?? quantity ?? 0
+  const pnl    = ((close - entry) / entry * 100)
+  const isPos  = pnl >= 0
+  const isLong = dir !== 'SHORT'
+
+  const rr = sl && tp
+    ? (Math.abs(parseFloat(tp) - entry) / Math.abs(entry - parseFloat(sl))).toFixed(1)
+    : null
+
+  return (
+    <div className="absolute bottom-8 left-3 z-20 pointer-events-none">
+      <div className="bg-white/96 dark:bg-gray-900/96 backdrop-blur-sm border border-gray-200 dark:border-gray-700 rounded-2xl shadow-lg overflow-hidden w-56">
+        {/* Header */}
+        <div className={`flex items-center justify-between px-3 py-1.5 ${isLong ? 'bg-blue-50 dark:bg-blue-950/40' : 'bg-red-50 dark:bg-red-950/40'}`}>
+          <div className="flex items-center gap-1.5">
+            <span className={`text-[8px] font-bold uppercase px-1.5 py-0.5 rounded-md ${
+              isLong ? 'bg-blue-100 dark:bg-blue-900 text-blue-600' : 'bg-red-100 dark:bg-red-900 text-red-500'
+            }`}>{dir}</span>
+            <span className="text-[10px] font-bold text-gray-800 dark:text-gray-100">{symbol}</span>
+          </div>
+          <span className={`text-[11px] font-bold ${isPos ? 'text-emerald-500' : 'text-red-400'}`}>
+            {isPos ? '+' : ''}{pnl.toFixed(2)}%
+          </span>
+        </div>
+
+        {/* Body */}
+        <div className="px-3 py-2 grid grid-cols-2 gap-x-4 gap-y-1">
+          <div>
+            <p className="text-[7px] text-gray-400 uppercase tracking-widest mb-0.5">Entry</p>
+            <p className="text-[10px] font-semibold text-blue-400">{entry.toLocaleString()}</p>
+          </div>
+          <div>
+            <p className="text-[7px] text-gray-400 uppercase tracking-widest mb-0.5">Qty</p>
+            <p className="text-[10px] font-semibold text-gray-700 dark:text-gray-300">{qty}</p>
+          </div>
+          {sl && (
+            <div>
+              <p className="text-[7px] text-gray-400 uppercase tracking-widest mb-0.5">Stop Loss</p>
+              <p className="text-[10px] font-semibold text-red-400">{parseFloat(sl).toLocaleString()}</p>
+            </div>
+          )}
+          {tp && (
+            <div>
+              <p className="text-[7px] text-gray-400 uppercase tracking-widest mb-0.5">Take Profit</p>
+              <p className="text-[10px] font-semibold text-emerald-400">{parseFloat(tp).toLocaleString()}</p>
+            </div>
+          )}
+          {entry_date && (
+            <div>
+              <p className="text-[7px] text-gray-400 uppercase tracking-widest mb-0.5">Since</p>
+              <p className="text-[10px] font-semibold text-gray-500">{entry_date.slice(0, 10)}</p>
+            </div>
+          )}
+          {rr && (
+            <div>
+              <p className="text-[7px] text-gray-400 uppercase tracking-widest mb-0.5">R:R</p>
+              <p className="text-[10px] font-semibold text-violet-400">1 : {rr}</p>
+            </div>
+          )}
+        </div>
+
+        {/* SL–TP progress bar */}
+        {sl && tp && entry && (
+          <div className="px-3 pb-2.5">
+            {(() => {
+              const slV = parseFloat(sl), tpV = parseFloat(tp)
+              const range = tpV - slV
+              const entryPct = Math.min(100, Math.max(0, ((entry - slV) / range) * 100))
+              const closePct = Math.min(100, Math.max(0, ((close - slV) / range) * 100))
+              return (
+                <>
+                  <div className="relative h-1.5 rounded-full bg-gray-100 dark:bg-gray-800 overflow-visible mb-1">
+                    {/* SL→TP gradient fill */}
+                    <div className="absolute inset-0 rounded-full bg-gradient-to-r from-red-400 via-gray-200 to-emerald-400 dark:via-gray-700" />
+                    {/* Entry tick */}
+                    <div
+                      className="absolute top-1/2 -translate-y-1/2 w-0.5 h-3 bg-blue-400 rounded-full"
+                      style={{ left: `${entryPct}%` }}
+                    />
+                    {/* Current price dot */}
+                    <div
+                      className={`absolute top-1/2 -translate-y-1/2 w-2.5 h-2.5 rounded-full border-2 border-white dark:border-gray-900 shadow ${isPos ? 'bg-emerald-400' : 'bg-red-400'}`}
+                      style={{ left: `${closePct}%`, transform: 'translate(-50%, -50%)' }}
+                    />
+                  </div>
+                  <div className="flex justify-between text-[7px] text-gray-400">
+                    <span className="text-red-400">{slV.toLocaleString()}</span>
+                    <span className={`font-semibold ${isPos ? 'text-emerald-400' : 'text-red-400'}`}>{close.toLocaleString()}</span>
+                    <span className="text-emerald-400">{tpV.toLocaleString()}</span>
+                  </div>
+                </>
+              )
+            })()}
+          </div>
+        )}
+      </div>
+    </div>
+  )
+}
+
 // ── Hover movers overlay ──────────────────────────────────────────────────────
 
 function MoversOverlay({ movers, date, pinned, onClear }) {
@@ -174,6 +281,7 @@ export default function StockChart() {
   const [error,       setError]       = useState(null)
   const [tooltip,     setTooltip]     = useState(null)
   const [overlayData, setOverlayData] = useState(null)  // { date, movers, pinned }
+  const [latestClose, setLatestClose] = useState(null)
 
   const C = {
     bg:       isDark ? '#111827' : '#ffffff',
@@ -211,7 +319,12 @@ export default function StockChart() {
       : getStockChart({ symbol: selectedSymbol, timeframe })
 
     req
-      .then(r => { setChartData(r.data.data || []); setLoading(false) })
+      .then(r => {
+        const data = r.data.data || []
+        setChartData(data)
+        setLatestClose(data.length ? data[data.length - 1].close : null)
+        setLoading(false)
+      })
       .catch(e => { setError(e.response?.data?.error || 'Failed to load data'); setLoading(false) })
   }, [selectedSymbol, selectedIndexId, timeframe])
 
@@ -276,47 +389,47 @@ export default function StockChart() {
 
         if (entry_price) {
           priceSeries.createPriceLine({
-            price:     parseFloat(entry_price),
-            color:     '#3b82f6',
-            lineWidth: 1,
-            lineStyle: 2,   // dashed
+            price:            parseFloat(entry_price),
+            color:            '#60a5fa',        // blue-400
+            lineWidth:        2,
+            lineStyle:        0,                // solid
             axisLabelVisible: true,
-            title: `Entry ${dir || ''}`.trim(),
+            title:            `● Entry`,
           })
         }
         if (sl) {
           priceSeries.createPriceLine({
-            price:     parseFloat(sl),
-            color:     '#ef4444',
-            lineWidth: 1,
-            lineStyle: 2,
+            price:            parseFloat(sl),
+            color:            '#f87171',        // red-400
+            lineWidth:        1,
+            lineStyle:        1,                // dotted
             axisLabelVisible: true,
-            title: 'SL',
+            title:            '▼ SL',
           })
         }
         if (tp) {
           priceSeries.createPriceLine({
-            price:     parseFloat(tp),
-            color:     '#10b981',
-            lineWidth: 1,
-            lineStyle: 2,
+            price:            parseFloat(tp),
+            color:            '#34d399',        // emerald-400
+            lineWidth:        1,
+            lineStyle:        1,                // dotted
             axisLabelVisible: true,
-            title: 'TP',
+            title:            '▲ TP',
           })
         }
 
-        // Entry date arrow marker on the chart
+        // Entry date: clean arrow marker, no text (text shown in React overlay)
         if (entry_date) {
           const entryStr = entry_date.slice(0, 10)
           const entryBar = chartData.find(d => d.time >= entryStr)
           if (entryBar) {
             priceSeries.setMarkers([{
               time:     entryBar.time,
-              position: 'belowBar',
-              color:    '#3b82f6',
-              shape:    'arrowUp',
-              text:     `Entry ${parseFloat(entry_price || 0).toLocaleString()}`,
-              size:     1,
+              position: dir === 'SHORT' ? 'aboveBar' : 'belowBar',
+              color:    '#60a5fa',
+              shape:    dir === 'SHORT' ? 'arrowDown' : 'arrowUp',
+              text:     '',
+              size:     2,
             }])
           }
         }
@@ -431,6 +544,9 @@ export default function StockChart() {
   return (
     <div className="relative flex flex-col w-full h-full">
       <OHLCTooltip bar={tooltip} change={tooltip?.change} />
+
+      {/* Active position badge */}
+      <PositionBadge position={activePosition} latestClose={latestClose} />
 
       {/* Hover/click movers overlay */}
       {overlayData?.movers && (
