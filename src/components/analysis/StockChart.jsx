@@ -414,10 +414,10 @@ export default function StockChart() {
   const [latestClose, setLatestClose] = useState(null)
 
   const C = {
-    bg:     isDark ? '#111827' : '#ffffff',
-    grid:   isDark ? '#1f2937' : '#f9fafb',
+    bg:     isDark ? '#030712' : '#ffffff',
+    grid:   'transparent',
     text:   isDark ? '#6b7280' : '#9ca3af',
-    border: isDark ? '#1f2937' : '#f3f4f6',
+    border: isDark ? '#111827' : '#f3f4f6',
     up:     '#10b981',
     down:   '#ef4444',
     ma:     '#3b82f6',
@@ -613,7 +613,7 @@ export default function StockChart() {
       Object.values(chartsRef.current).forEach(c => { try { c.remove() } catch (_) {} })
       chartsRef.current = {}
     }
-  }, [chartData, chartType, activeIndicators, activePosition])
+  }, [chartData, isDark, chartType, activeIndicators, activePosition])
 
   useEffect(() => {
     if (!pinnedDate) setOverlayData(prev => prev ? { ...prev, pinned: false } : null)
@@ -634,7 +634,7 @@ export default function StockChart() {
   )
 
   return (
-    <div className="relative flex flex-col w-full h-full bg-white dark:bg-gray-900">
+    <div className="relative flex flex-col w-full h-full bg-white dark:bg-gray-950">
 
       {/* ── Embedded HUD — top-left: symbol + price ── */}
       <div className="absolute top-2 left-3 z-30 flex flex-col gap-1.5 pointer-events-none">
