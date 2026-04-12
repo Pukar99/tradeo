@@ -8,109 +8,92 @@ import MarketStatusBadge from '../components/analysis/MarketStatusBadge'
 import LeftPanel         from '../components/analysis/LeftPanel'
 import RightPanel        from '../components/analysis/RightPanel'
 
-// ── Live price bar for selected symbol ───────────────────────────────────────
-function SymbolStatsBar({ symbol }) {
-  const { isIndex, selectedIndexId } = useAnalysis()
+// ── Inline price display (no extra row) ──────────────────────────────────────
+function LivePrice() {
+  const { selectedSymbol, selectedIndexId, isIndex } = useAnalysis()
   const [stats, setStats] = useState(null)
 
   useEffect(() => {
-    if (!symbol) return
     setStats(null)
-
-    const fetchData = async () => {
+    const fetch = async () => {
       try {
-        if (isIndex(symbol)) {
+        if (isIndex(selectedSymbol)) {
           const r = await axios.get(`http://localhost:5000/api/market/index-chart?index_id=${selectedIndexId}&timeframe=1D`)
-          const last = r.data.data?.[r.data.data.length - 1]
-          if (last) setStats({ close: last.close, change: last.per_change, date: last.time, type: 'index', name: r.data.name })
+          const last = r.data.data?.at(-1)
+          if (last) setStats({ close: last.close, change: last.per_change })
         } else {
-          const r = await axios.get(`http://localhost:5000/api/market/stock-chart?symbol=${symbol}&timeframe=1D`)
-          const last = r.data.data?.[r.data.data.length - 1]
-          if (last) setStats({ close: last.close, change: last.diff_pct, date: last.time, type: 'stock' })
+          const r = await axios.get(`http://localhost:5000/api/market/stock-chart?symbol=${selectedSymbol}&timeframe=1D`)
+          const last = r.data.data?.at(-1)
+          if (last) setStats({ close: last.close, change: last.diff_pct })
         }
       } catch { /* silent */ }
     }
+    fetch()
+  }, [selectedSymbol, selectedIndexId])
 
-    fetchData()
-  }, [symbol, selectedIndexId])
-
-  if (!stats) {
-    return (
-      <div className="flex items-center gap-3 px-4 pt-2 pb-1 shrink-0">
-        <span className="text-[14px] font-bold text-gray-900 dark:text-white">{symbol}</span>
-        <span className="text-[10px] text-gray-300 dark:text-gray-600 animate-pulse">Loading...</span>
-      </div>
-    )
-  }
-
-  const isPos  = parseFloat(stats.change) >= 0
-  const change = parseFloat(stats.change)
+  const isPos  = parseFloat(stats?.change) >= 0
+  const change = parseFloat(stats?.change) || 0
 
   return (
-    <div className="flex items-center gap-4 px-4 pt-2 pb-1 shrink-0">
-      {/* Symbol + type badge */}
-      <div className="flex items-center gap-2">
-        <span className="text-[14px] font-bold text-gray-900 dark:text-white">{symbol}</span>
-        <span className="text-[8px] font-semibold uppercase px-1.5 py-0.5 rounded-md bg-gray-100 dark:bg-gray-800 text-gray-400">
-          {stats.type === 'index' ? 'Index' : 'Stock'}
-        </span>
-      </div>
-
-      {/* Separator */}
-      <div className="h-4 w-px bg-gray-200 dark:bg-gray-700" />
-
-      {/* Price */}
-      <div className="flex items-baseline gap-1.5">
-        <span className="text-[18px] font-bold tracking-tight text-gray-900 dark:text-white">
-          {stats.close?.toLocaleString('en-NP', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
-        </span>
-        <span className="text-[10px] text-gray-400">Rs</span>
-      </div>
-
-      {/* Change */}
-      <div className={`flex items-center gap-1 text-[11px] font-semibold ${isPos ? 'text-emerald-500' : 'text-red-500'}`}>
-        <span>{isPos ? '▲' : '▼'}</span>
-        <span>{Math.abs(change).toFixed(2)}%</span>
-      </div>
-
-      {/* Date */}
-      <span className="text-[9px] text-gray-400 hidden sm:inline">as of {stats.date}</span>
+    <div className="flex items-center gap-2 shrink-0">
+      <span className="text-[13px] font-bold text-gray-900 dark:text-white">{selectedSymbol}</span>
+      {stats ? (
+        <>
+          <span className="text-[13px] font-bold tabular-nums text-gray-800 dark:text-gray-100">
+            {parseFloat(stats.close).toLocaleString('en-NP', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+          </span>
+          <span className={`text-[10px] font-semibold ${isPos ? 'text-emerald-500' : 'text-red-400'}`}>
+            {isPos ? '▲' : '▼'}{Math.abs(change).toFixed(2)}%
+          </span>
+        </>
+      ) : (
+        <span className="text-[10px] text-gray-300 dark:text-gray-600 animate-pulse">—</span>
+      )}
     </div>
   )
 }
 
-// ── Inner page ────────────────────────────────────────────────────────────────
+// ── Page ─────────────────────────────────────────────────────────────────────
 function AnalysisInner() {
-  const { selectedSymbol } = useAnalysis()
-  const [mode, setMode] = useState('simple')   // 'simple' | 'complex'
+  const [mode, setMode] = useState('simple')
 
   return (
     <div className="flex flex-col h-[calc(100vh-56px)] overflow-hidden">
 
-      {/* ── Top bar ─────────────────────────────────────────────────────── */}
-      <div className="flex items-center justify-between px-4 py-2 border-b border-gray-100 dark:border-gray-800 shrink-0">
-        <div className="flex items-center gap-3">
-          <h1 className="text-[13px] font-semibold text-gray-900 dark:text-white">Analysis</h1>
+      {/* ── Single compact top bar — all controls in one row ─────────────── */}
+      <div className="flex items-center gap-2 px-3 py-1.5 border-b border-gray-100 dark:border-gray-800 shrink-0">
 
-          {/* Mode toggle */}
-          <div className="flex items-center bg-gray-100 dark:bg-gray-800 rounded-lg p-0.5">
-            {['simple', 'complex'].map(m => (
-              <button
-                key={m}
-                onClick={() => setMode(m)}
-                className={`px-3 py-1 rounded-md text-[10px] font-semibold capitalize transition-colors ${
-                  mode === m
-                    ? 'bg-white dark:bg-gray-700 text-gray-900 dark:text-white shadow-sm'
-                    : 'text-gray-500 dark:text-gray-400'
-                }`}
-              >
-                {m}
-              </button>
-            ))}
-          </div>
+        {/* Simple / Complex */}
+        <div className="flex items-center bg-gray-100 dark:bg-gray-800 rounded-lg p-0.5 shrink-0">
+          {['simple', 'complex'].map(m => (
+            <button key={m} onClick={() => setMode(m)}
+              className={`px-2.5 py-0.5 rounded-md text-[9px] font-semibold capitalize transition-colors ${
+                mode === m ? 'bg-white dark:bg-gray-700 text-gray-900 dark:text-white shadow-sm' : 'text-gray-500 dark:text-gray-400'
+              }`}>
+              {m}
+            </button>
+          ))}
         </div>
 
-        <MarketStatusBadge />
+        {/* Divider */}
+        <div className="h-4 w-px bg-gray-200 dark:bg-gray-700 shrink-0" />
+
+        {/* Symbol search */}
+        <SymbolSearch />
+
+        {/* Live price */}
+        <LivePrice />
+
+        {/* Divider */}
+        <div className="h-4 w-px bg-gray-200 dark:bg-gray-700 shrink-0" />
+
+        {/* Chart controls (candle/line, timeframes, MA/RSI/MACD) */}
+        <ChartControls />
+
+        {/* Market status badge — right side */}
+        <div className="ml-auto shrink-0">
+          <MarketStatusBadge />
+        </div>
       </div>
 
       {mode === 'complex' ? (
@@ -118,32 +101,19 @@ function AnalysisInner() {
           Complex mode coming soon
         </div>
       ) : (
-        /* ── 3-panel layout ──────────────────────────────────────────────── */
         <div className="flex-1 flex overflow-hidden">
 
-          {/* LEFT — 15% */}
+          {/* LEFT */}
           <div className="w-[15%] min-w-[140px] border-r border-gray-100 dark:border-gray-800 p-3 overflow-y-auto hidden lg:block">
             <LeftPanel />
           </div>
 
-          {/* MIDDLE — 65% */}
-          <div className="flex-1 flex flex-col overflow-hidden">
-            {/* Controls bar */}
-            <div className="flex flex-wrap items-center gap-3 px-4 py-2.5 border-b border-gray-100 dark:border-gray-800 shrink-0">
-              <SymbolSearch />
-              <ChartControls />
-            </div>
-
-            {/* Symbol stats bar */}
-            <SymbolStatsBar symbol={selectedSymbol} />
-
-            {/* Chart area — fills remaining space */}
-            <div className="flex-1 px-2 pb-2 min-h-0">
-              <StockChart />
-            </div>
+          {/* MIDDLE — chart fills all remaining space */}
+          <div className="flex-1 min-h-0 overflow-hidden">
+            <StockChart />
           </div>
 
-          {/* RIGHT — 20% */}
+          {/* RIGHT */}
           <div className="w-[20%] min-w-[160px] border-l border-gray-100 dark:border-gray-800 p-3 overflow-y-auto hidden md:block">
             <RightPanel />
           </div>

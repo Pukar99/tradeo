@@ -388,10 +388,11 @@ export default function StockChart() {
       if (activePosition) {
         const { entry_price, sl, tp, entry_date, position: dir } = activePosition
 
-        // Slice chartData from entry date onward
+        // Slice chartData from entry date onward (right side only)
         const entryStr = entry_date ? entry_date.slice(0, 10) : null
         const startIdx = entryStr ? chartData.findIndex(d => d.time >= entryStr) : 0
-        const fromData = (startIdx >= 0 ? chartData.slice(startIdx) : chartData)
+        // If startIdx is -1 the entry date is outside current timeframe — skip lines
+        const fromData = startIdx >= 0 ? chartData.slice(startIdx) : []
 
         // Draw a horizontal line from entry date → last bar, with a small
         // label at the right end showing price. No axis clutter on left.
