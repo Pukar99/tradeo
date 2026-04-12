@@ -15,6 +15,10 @@ export function AnalysisProvider({ children }) {
   const [hoveredMovers, setHoveredMovers] = useState(null)  // { gainers, losers }
   const [pinnedMovers,  setPinnedMovers]  = useState(null)
 
+  // Active position — set when user clicks a portfolio row (has SL/TP/entry)
+  // null when viewing watchlist or index
+  const [activePosition, setActivePosition] = useState(null)
+
   const isIndex = (sym) =>
     sym === 'NEPSE' ||
     sym.includes('Index') ||
@@ -23,12 +27,14 @@ export function AnalysisProvider({ children }) {
     sym.includes('Float') ||
     sym.includes('Sensitive')
 
-  const selectSymbol = useCallback((sym, indexId = null) => {
+  const selectSymbol = useCallback((sym, indexId = null, position = null) => {
     setSelectedSymbol(sym)
     if (indexId) setSelectedIndexId(indexId)
     // Clear any pin when switching symbol
     setPinnedDate(null)
     setPinnedMovers(null)
+    // Set active position (null when coming from watchlist / right panel)
+    setActivePosition(position)
   }, [])
 
   const toggleIndicator = useCallback((name) => {
@@ -68,6 +74,7 @@ export function AnalysisProvider({ children }) {
       hoveredDate, pinnedDate, activeDate,
       hoveredMovers, pinnedMovers, activeMovers,
       onHover, onPin, clearPin,
+      activePosition,
     }}>
       {children}
     </AnalysisContext.Provider>

@@ -159,6 +159,7 @@ export default function StockChart() {
   const {
     selectedSymbol, selectedIndexId, chartType, timeframe,
     activeIndicators, isIndex, onHover, onPin, pinnedDate, pinnedMovers, clearPin,
+    activePosition,
   } = useAnalysis()
 
   const mainRef = useRef(null)
@@ -269,6 +270,58 @@ export default function StockChart() {
         }
       }
 
+      // ── Position price lines (SL / TP / Entry) ──────────────────────────
+      if (activePosition) {
+        const { entry_price, sl, tp, entry_date, position: dir } = activePosition
+
+        if (entry_price) {
+          priceSeries.createPriceLine({
+            price:     parseFloat(entry_price),
+            color:     '#3b82f6',
+            lineWidth: 1,
+            lineStyle: 2,   // dashed
+            axisLabelVisible: true,
+            title: `Entry ${dir || ''}`.trim(),
+          })
+        }
+        if (sl) {
+          priceSeries.createPriceLine({
+            price:     parseFloat(sl),
+            color:     '#ef4444',
+            lineWidth: 1,
+            lineStyle: 2,
+            axisLabelVisible: true,
+            title: 'SL',
+          })
+        }
+        if (tp) {
+          priceSeries.createPriceLine({
+            price:     parseFloat(tp),
+            color:     '#10b981',
+            lineWidth: 1,
+            lineStyle: 2,
+            axisLabelVisible: true,
+            title: 'TP',
+          })
+        }
+
+        // Entry date arrow marker on the chart
+        if (entry_date) {
+          const entryStr = entry_date.slice(0, 10)
+          const entryBar = chartData.find(d => d.time >= entryStr)
+          if (entryBar) {
+            priceSeries.setMarkers([{
+              time:     entryBar.time,
+              position: 'belowBar',
+              color:    '#3b82f6',
+              shape:    'arrowUp',
+              text:     `Entry ${parseFloat(entry_price || 0).toLocaleString()}`,
+              size:     1,
+            }])
+          }
+        }
+      }
+
       // Volume bars
       const volSeries = main.addHistogramSeries({
         priceFormat: { type: 'volume' },
@@ -352,7 +405,7 @@ export default function StockChart() {
       Object.values(chartsRef.current).forEach(c => { try { c.remove() } catch (_) {} })
       chartsRef.current = {}
     }
-  }, [chartData, isDark, chartType, activeIndicators])
+  }, [chartData, isDark, chartType, activeIndicators, activePosition])
 
   // When pin is cleared externally, clear overlay too
   useEffect(() => {
