@@ -1,5 +1,5 @@
-import { useEffect, useRef, useState, useContext, useCallback } from 'react'
-import { ThemeContext } from '../../context/ThemeContext'
+import { useEffect, useRef, useState, useCallback } from 'react'
+import { useTheme } from '../../context/ThemeContext'
 import { useAnalysis } from '../../context/AnalysisContext'
 import { getIndexChart, getStockChart } from '../../api'
 import axios from 'axios'
@@ -155,7 +155,7 @@ function ChartSkeleton() {
 // ── Main ──────────────────────────────────────────────────────────────────────
 
 export default function StockChart() {
-  const { isDark } = useContext(ThemeContext)
+  const { isDark } = useTheme()
   const {
     selectedSymbol, selectedIndexId, chartType, timeframe,
     activeIndicators, isIndex, onHover, onPin, pinnedDate, pinnedMovers, clearPin,
