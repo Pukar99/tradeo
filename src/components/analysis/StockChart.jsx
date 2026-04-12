@@ -67,7 +67,9 @@ function ChartSymbolSearch() {
   const listRef  = useRef(null)
 
   useEffect(() => {
-    getMarketSymbols().then(r => setSymbols(r.data)).catch(() => {})
+    getMarketSymbols()
+      .then(r => { if (r.data?.stocks?.length) setSymbols(r.data) })
+      .catch(e => console.error('[symbols]', e?.response?.data || e?.message))
   }, [])
 
   const allItems = [
