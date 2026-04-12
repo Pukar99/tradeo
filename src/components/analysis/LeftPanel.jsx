@@ -157,7 +157,7 @@ export default function LeftPanel() {
       .then(r => setPositions((r.data || []).filter(t => t.status === 'OPEN' || t.status === 'PARTIAL')))
       .catch(() => {})
     getWatchlist()
-      .then(r => setWatchlist((r.data || []).filter(w => w.category === 'active' || w.category === 'pre-watch')))
+      .then(r => setWatchlist((r.data || []).filter(w => w.category === 'active' || w.category === 'pre' || w.category === 'pre-watch')))
       .catch(() => {})
     getTodayTasks()
       .then(r => {
@@ -266,10 +266,10 @@ export default function LeftPanel() {
               <div className="flex items-center justify-between">
                 <span className="text-[11px] font-bold text-gray-800 dark:text-gray-100">{w.symbol}</span>
                 <span className={`text-[7px] font-semibold px-1.5 py-0.5 rounded-md ${
-                  w.category === 'pre-watch'
+                  (w.category === 'pre' || w.category === 'pre-watch')
                     ? 'bg-amber-100 dark:bg-amber-950 text-amber-600 dark:text-amber-400'
                     : 'bg-emerald-100 dark:bg-emerald-950 text-emerald-600 dark:text-emerald-400'
-                }`}>{w.category === 'pre-watch' ? 'Pre' : 'Active'}</span>
+                }`}>{(w.category === 'pre' || w.category === 'pre-watch') ? 'Pre' : 'Active'}</span>
               </div>
               {(w.watch_low || w.watch_high) && (
                 <div className="flex gap-2 mt-0.5 text-[7px] text-gray-400">
