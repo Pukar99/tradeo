@@ -326,7 +326,7 @@ export default function RightPanel() {
     setLoading(true)
     Promise.all([
       axios.get(`http://localhost:5000/api/market/top-movers?date=${selectedDate}`),
-      getTopVolume({ limit: 10 }),
+      getTopVolume({ limit: 10, date: selectedDate }),
     ])
       .then(([mr, vr]) => {
         setMovers(mr.data)

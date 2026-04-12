@@ -272,6 +272,7 @@ export default function StockChart() {
   const mainRef = useRef(null)
   const rsiRef  = useRef(null)
   const macdRef = useRef(null)
+  const volRef  = useRef(null)
   const chartsRef = useRef({})
   const seriesRef = useRef({})
   const moversCache = useRef({})   // date → movers data
@@ -346,7 +347,7 @@ export default function StockChart() {
         grid:      { vertLines: { color: C.grid }, horzLines: { color: C.grid } },
         crosshair: { mode: CrosshairMode.Normal, vertLine: { width: 1, color: '#6b728060', style: LineStyle.Dashed }, horzLine: { width: 1, color: '#6b728060', style: LineStyle.Dashed } },
         rightPriceScale: { borderColor: C.border, scaleMargins: { top: 0.08, bottom: 0.12 } },
-        timeScale: { borderColor: C.border, timeVisible: true, fixLeftEdge: true, fixRightEdge: true },
+        timeScale: { borderColor: C.border, timeVisible: true, fixLeftEdge: true, fixRightEdge: false, rightOffset: 5 },
         handleScroll: true,
         handleScale: true,
       }
@@ -383,55 +384,42 @@ export default function StockChart() {
         }
       }
 
-      // ── Position price lines (SL / TP / Entry) ──────────────────────────
+      // ── Position lines: start from entry date, go right, no axis label ──
       if (activePosition) {
         const { entry_price, sl, tp, entry_date, position: dir } = activePosition
 
-        if (entry_price) {
-          priceSeries.createPriceLine({
-            price:            parseFloat(entry_price),
-            color:            '#60a5fa',        // blue-400
-            lineWidth:        2,
-            lineStyle:        0,                // solid
-            axisLabelVisible: true,
-            title:            `● Entry`,
+        // Slice chartData from entry date onward
+        const entryStr = entry_date ? entry_date.slice(0, 10) : null
+        const startIdx = entryStr ? chartData.findIndex(d => d.time >= entryStr) : 0
+        const fromData = (startIdx >= 0 ? chartData.slice(startIdx) : chartData)
+
+        const addPosLine = (price, color, lineStyle) => {
+          if (!price || !fromData.length) return
+          const s = main.addLineSeries({
+            color,
+            lineWidth:              1,
+            lineStyle,
+            priceLineVisible:       false,
+            lastValueVisible:       false,   // no label on price axis
+            crosshairMarkerVisible: false,
           })
-        }
-        if (sl) {
-          priceSeries.createPriceLine({
-            price:            parseFloat(sl),
-            color:            '#f87171',        // red-400
-            lineWidth:        1,
-            lineStyle:        1,                // dotted
-            axisLabelVisible: true,
-            title:            '▼ SL',
-          })
-        }
-        if (tp) {
-          priceSeries.createPriceLine({
-            price:            parseFloat(tp),
-            color:            '#34d399',        // emerald-400
-            lineWidth:        1,
-            lineStyle:        1,                // dotted
-            axisLabelVisible: true,
-            title:            '▲ TP',
-          })
+          s.setData(fromData.map(d => ({ time: d.time, value: parseFloat(price) })))
         }
 
-        // Entry date: clean arrow marker, no text (text shown in React overlay)
-        if (entry_date) {
-          const entryStr = entry_date.slice(0, 10)
-          const entryBar = chartData.find(d => d.time >= entryStr)
-          if (entryBar) {
-            priceSeries.setMarkers([{
-              time:     entryBar.time,
-              position: dir === 'SHORT' ? 'aboveBar' : 'belowBar',
-              color:    '#60a5fa',
-              shape:    dir === 'SHORT' ? 'arrowDown' : 'arrowUp',
-              text:     '',
-              size:     2,
-            }])
-          }
+        addPosLine(entry_price, '#60a5fa', 0)  // solid blue — entry
+        addPosLine(sl,          '#f87171', 1)  // dotted red — SL
+        addPosLine(tp,          '#34d399', 1)  // dotted green — TP
+
+        // Arrow marker at entry candle
+        if (fromData.length) {
+          priceSeries.setMarkers([{
+            time:     fromData[0].time,
+            position: dir === 'SHORT' ? 'aboveBar' : 'belowBar',
+            color:    '#60a5fa',
+            shape:    dir === 'SHORT' ? 'arrowDown' : 'arrowUp',
+            text:     '',
+            size:     2,
+          }])
         }
       }
 
@@ -502,6 +490,21 @@ export default function StockChart() {
         }
       }
 
+      // VOL sub-chart
+      if (activeIndicators.includes('VOL') && volRef.current) {
+        const vc = createChart(volRef.current, {
+          ...base, width: volRef.current.clientWidth, height: volRef.current.clientHeight,
+          rightPriceScale: { ...base.rightPriceScale, scaleMargins: { top: 0.1, bottom: 0 } },
+          timeScale: { ...base.timeScale, visible: false },
+        })
+        chartsRef.current.vol = vc
+        vc.addHistogramSeries({ priceLineVisible: false }).setData(
+          chartData.map(d => ({ time: d.time, value: d.volume || 0, color: d.close >= d.open ? C.up + '99' : C.down + '99' }))
+        )
+        main.timeScale().subscribeVisibleLogicalRangeChange(r => { if (r) vc.timeScale().setVisibleLogicalRange(r) })
+        vc.timeScale().subscribeVisibleLogicalRangeChange(r => { if (r) main.timeScale().setVisibleLogicalRange(r) })
+      }
+
       main.timeScale().fitContent()
 
       // Resize
@@ -509,6 +512,7 @@ export default function StockChart() {
         if (mainRef.current)  main.applyOptions({ width: mainRef.current.clientWidth })
         if (rsiRef.current  && chartsRef.current.rsi)  chartsRef.current.rsi.applyOptions({ width: rsiRef.current.clientWidth })
         if (macdRef.current && chartsRef.current.macd) chartsRef.current.macd.applyOptions({ width: macdRef.current.clientWidth })
+        if (volRef.current  && chartsRef.current.vol)  chartsRef.current.vol.applyOptions({ width: volRef.current.clientWidth })
       })
       ro.observe(mainRef.current)
       return () => ro.disconnect()
@@ -529,8 +533,9 @@ export default function StockChart() {
 
   const showRSI  = activeIndicators.includes('RSI')
   const showMACD = activeIndicators.includes('MACD')
-  const indCount = (showRSI ? 1 : 0) + (showMACD ? 1 : 0)
-  const mainPct  = indCount === 0 ? 100 : indCount === 1 ? 68 : 52
+  const showVOL  = activeIndicators.includes('VOL')
+  const indCount = (showRSI ? 1 : 0) + (showMACD ? 1 : 0) + (showVOL ? 1 : 0)
+  const mainPct  = indCount === 0 ? 100 : indCount === 1 ? 70 : indCount === 2 ? 55 : 44
 
   if (error) return (
     <div className="flex flex-col items-center justify-center h-full gap-2 text-center">
@@ -595,6 +600,15 @@ export default function StockChart() {
                 <span className="text-[8px] text-gray-400">Signal</span>
               </div>
               <div ref={macdRef} style={{ height: '88px' }} className="w-full" />
+            </div>
+          )}
+
+          {showVOL && (
+            <div className="w-full border-t border-gray-100 dark:border-gray-800 shrink-0">
+              <div className="flex items-center gap-2 px-3 pt-1">
+                <span className="text-[8px] font-bold text-teal-400 uppercase tracking-widest">Volume</span>
+              </div>
+              <div ref={volRef} style={{ height: '72px' }} className="w-full" />
             </div>
           )}
         </>
