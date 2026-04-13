@@ -230,65 +230,149 @@ function ChartHUDPrice({ latestClose, chartData }) {
   )
 }
 
-// ── Active position badge ─────────────────────────────────────────────────────
+// ── Active position badge — supports multiple entries ─────────────────────────
 
-function PositionBadge({ position, latestClose }) {
-  if (!position) return null
-  const { symbol, entry_price, sl, tp, quantity, remaining_quantity, position: dir, entry_date } = position
-  const entry  = parseFloat(entry_price) || 0
-  const close  = parseFloat(latestClose) || entry
-  const qty    = remaining_quantity ?? quantity ?? 0
-  const pnl    = entry ? ((close - entry) / entry * 100) : 0
-  const isPos  = pnl >= 0
-  const isLong = dir !== 'SHORT'
-  const rr     = sl && tp
-    ? (Math.abs(parseFloat(tp) - entry) / Math.abs(entry - parseFloat(sl))).toFixed(1)
-    : null
+const ENTRY_DOT_COLORS = ['bg-blue-400', 'bg-amber-400', 'bg-violet-400', 'bg-emerald-400', 'bg-pink-400']
+const ENTRY_TEXT_COLORS = ['text-blue-400', 'text-amber-400', 'text-violet-400', 'text-emerald-400', 'text-pink-400']
+
+function PositionBadge({ positions, latestClose }) {
+  if (!positions?.length) return null
+
+  const close = parseFloat(latestClose) || 0
+
+  // Aggregate: weighted avg entry, total qty, combined realized unreal P&L
+  const totalQty   = positions.reduce((s, p) => s + (p.quantity ?? 0), 0)
+  const avgEntry   = totalQty > 0
+    ? positions.reduce((s, p) => s + parseFloat(p.entry_price) * (p.quantity ?? 0), 0) / totalQty
+    : 0
+  const isLong     = positions[0]?.position !== 'SHORT'
+  const totalUnreal = close
+    ? positions.reduce((s, p) => {
+        const qty = p.quantity ?? 0
+        const e   = parseFloat(p.entry_price)
+        return s + (isLong ? (close - e) * qty : (e - close) * qty)
+      }, 0)
+    : 0
+  const pnlPct     = avgEntry ? ((close - avgEntry) / avgEntry * 100) * (isLong ? 1 : -1) : 0
+  const isPos      = totalUnreal >= 0
+  const isSingle   = positions.length === 1
 
   return (
     <div className="absolute bottom-8 left-3 z-20 pointer-events-none" translate="no">
-      <div className="bg-white/96 dark:bg-gray-900/96 backdrop-blur-sm border border-gray-200 dark:border-gray-700 rounded-2xl shadow-lg overflow-hidden w-56">
+      <div className="bg-white/96 dark:bg-gray-900/96 backdrop-blur-sm border border-gray-200 dark:border-gray-700 rounded-2xl shadow-lg overflow-hidden w-60">
+
+        {/* Header */}
         <div className={`flex items-center justify-between px-3 py-1.5 ${isLong ? 'bg-blue-50 dark:bg-blue-950/40' : 'bg-red-50 dark:bg-red-950/40'}`}>
           <div className="flex items-center gap-1.5">
             <span className={`text-[8px] font-bold uppercase px-1.5 py-0.5 rounded-md ${
               isLong ? 'bg-blue-100 dark:bg-blue-900 text-blue-600' : 'bg-red-100 dark:bg-red-900 text-red-500'
-            }`}>{dir}</span>
-            <span className="text-[10px] font-bold text-gray-800 dark:text-gray-100">{symbol}</span>
+            }`}>{positions[0]?.position}</span>
+            <span className="text-[10px] font-bold text-gray-800 dark:text-gray-100">
+              {isSingle ? positions[0].symbol ?? '' : `${positions.length} entries`}
+            </span>
           </div>
-          <span className={`text-[11px] font-bold ${isPos ? 'text-emerald-500' : 'text-red-400'}`}>
-            {isPos ? '+' : ''}{pnl.toFixed(2)}%
-          </span>
+          {close > 0 && (
+            <span className={`text-[11px] font-bold tabular-nums ${isPos ? 'text-emerald-500' : 'text-red-400'}`}>
+              {isPos ? '+' : ''}{pnlPct.toFixed(2)}%
+            </span>
+          )}
         </div>
-        <div className="px-3 py-2 grid grid-cols-2 gap-x-4 gap-y-1">
-          <div><p className="text-[7px] text-gray-400 uppercase tracking-widest mb-0.5">Entry</p>
-            <p className="text-[10px] font-semibold text-blue-400">{entry.toLocaleString()}</p></div>
-          <div><p className="text-[7px] text-gray-400 uppercase tracking-widest mb-0.5">Qty</p>
-            <p className="text-[10px] font-semibold text-gray-700 dark:text-gray-300">{qty}</p></div>
-          {sl && <div><p className="text-[7px] text-gray-400 uppercase tracking-widest mb-0.5">Stop Loss</p>
-            <p className="text-[10px] font-semibold text-red-400">{parseFloat(sl).toLocaleString()}</p></div>}
-          {tp && <div><p className="text-[7px] text-gray-400 uppercase tracking-widest mb-0.5">Take Profit</p>
-            <p className="text-[10px] font-semibold text-emerald-400">{parseFloat(tp).toLocaleString()}</p></div>}
-          {entry_date && <div><p className="text-[7px] text-gray-400 uppercase tracking-widest mb-0.5">Since</p>
-            <p className="text-[10px] font-semibold text-gray-500">{entry_date.slice(0, 10)}</p></div>}
-          {rr && <div><p className="text-[7px] text-gray-400 uppercase tracking-widest mb-0.5">R:R</p>
-            <p className="text-[10px] font-semibold text-violet-400">1 : {rr}</p></div>}
+
+        {/* Summary row (always shown) */}
+        <div className="px-3 pt-2 pb-1 grid grid-cols-3 gap-x-3 gap-y-1 border-b border-gray-100 dark:border-gray-800">
+          <div>
+            <p className="text-[7px] text-gray-400 uppercase tracking-widest mb-0.5">Avg Entry</p>
+            <p className="text-[10px] font-semibold text-blue-400 tabular-nums">{avgEntry.toFixed(2)}</p>
+          </div>
+          <div>
+            <p className="text-[7px] text-gray-400 uppercase tracking-widest mb-0.5">Total Qty</p>
+            <p className="text-[10px] font-semibold text-gray-700 dark:text-gray-300 tabular-nums">{totalQty}</p>
+          </div>
+          {close > 0 && (
+            <div>
+              <p className="text-[7px] text-gray-400 uppercase tracking-widest mb-0.5">Unrealized</p>
+              <p className={`text-[10px] font-semibold tabular-nums ${isPos ? 'text-emerald-500' : 'text-red-400'}`}>
+                {isPos ? '+' : '−'}Rs.{Math.abs(Math.round(totalUnreal)).toLocaleString()}
+              </p>
+            </div>
+          )}
         </div>
-        {sl && tp && entry && (() => {
-          const slV = parseFloat(sl), tpV = parseFloat(tp), range = tpV - slV
-          const entryPct = Math.min(100, Math.max(0, ((entry - slV) / range) * 100))
-          const closePct = Math.min(100, Math.max(0, ((close - slV) / range) * 100))
+
+        {/* Per-entry breakdown */}
+        <div className="px-3 py-2 space-y-2">
+          {positions.map((pos, idx) => {
+            const e     = parseFloat(pos.entry_price)
+            const qty   = pos.quantity ?? 0
+            const u     = close ? (isLong ? (close - e) * qty : (e - close) * qty) : null
+            const rr    = pos.sl && pos.tp
+              ? (Math.abs(parseFloat(pos.tp) - e) / Math.abs(e - parseFloat(pos.sl))).toFixed(1)
+              : null
+            return (
+              <div key={pos.id ?? idx} className="flex items-start gap-2">
+                <div className={`w-1.5 h-1.5 rounded-full mt-1 flex-shrink-0 ${ENTRY_DOT_COLORS[idx % ENTRY_DOT_COLORS.length]}`} />
+                <div className="flex-1 grid grid-cols-3 gap-x-3 gap-y-0.5">
+                  <div>
+                    <p className="text-[7px] text-gray-400 uppercase tracking-widest">Entry</p>
+                    <p className={`text-[10px] font-semibold tabular-nums ${ENTRY_TEXT_COLORS[idx % ENTRY_TEXT_COLORS.length]}`}>{e.toFixed(2)}</p>
+                  </div>
+                  <div>
+                    <p className="text-[7px] text-gray-400 uppercase tracking-widest">Qty</p>
+                    <p className="text-[10px] font-semibold text-gray-600 dark:text-gray-400 tabular-nums">{qty}</p>
+                  </div>
+                  {u !== null && (
+                    <div>
+                      <p className="text-[7px] text-gray-400 uppercase tracking-widest">P&L</p>
+                      <p className={`text-[10px] font-semibold tabular-nums ${u >= 0 ? 'text-emerald-500' : 'text-red-400'}`}>
+                        {u >= 0 ? '+' : '−'}{Math.abs(Math.round(u)).toLocaleString()}
+                      </p>
+                    </div>
+                  )}
+                  {pos.sl && (
+                    <div>
+                      <p className="text-[7px] text-gray-400 uppercase tracking-widest">SL</p>
+                      <p className="text-[10px] font-semibold text-red-400 tabular-nums">{parseFloat(pos.sl).toFixed(2)}</p>
+                    </div>
+                  )}
+                  {pos.tp && (
+                    <div>
+                      <p className="text-[7px] text-gray-400 uppercase tracking-widest">TP</p>
+                      <p className="text-[10px] font-semibold text-emerald-400 tabular-nums">{parseFloat(pos.tp).toFixed(2)}</p>
+                    </div>
+                  )}
+                  {rr && (
+                    <div>
+                      <p className="text-[7px] text-gray-400 uppercase tracking-widest">R:R</p>
+                      <p className="text-[10px] font-semibold text-violet-400">1:{rr}</p>
+                    </div>
+                  )}
+                </div>
+              </div>
+            )
+          })}
+        </div>
+
+        {/* Price range bar — use first position's SL/TP if single, skip if multiple and SLs differ */}
+        {isSingle && (() => {
+          const pos  = positions[0]
+          const sl   = pos.sl ? parseFloat(pos.sl) : null
+          const tp   = pos.tp ? parseFloat(pos.tp) : null
+          const e    = parseFloat(pos.entry_price)
+          if (!sl || !tp || !close) return null
+          const range    = tp - sl
+          const entryPct = Math.min(100, Math.max(0, ((e - sl) / range) * 100))
+          const closePct = Math.min(100, Math.max(0, ((close - sl) / range) * 100))
           return (
             <div className="px-3 pb-2.5">
               <div className="relative h-1.5 rounded-full bg-gray-100 dark:bg-gray-800 overflow-visible mb-1">
                 <div className="absolute inset-0 rounded-full bg-gradient-to-r from-red-400 via-gray-200 to-emerald-400 dark:via-gray-700" />
                 <div className="absolute top-1/2 -translate-y-1/2 w-0.5 h-3 bg-blue-400 rounded-full" style={{ left: `${entryPct}%` }} />
-                <div className={`absolute top-1/2 -translate-y-1/2 w-2.5 h-2.5 rounded-full border-2 border-white dark:border-gray-900 shadow ${isPos ? 'bg-emerald-400' : 'bg-red-400'}`}
-                  style={{ left: `${closePct}%`, transform: 'translate(-50%, -50%)' }} />
+                <div className={`absolute w-2.5 h-2.5 rounded-full border-2 border-white dark:border-gray-900 shadow ${isPos ? 'bg-emerald-400' : 'bg-red-400'}`}
+                  style={{ left: `${closePct}%`, top: '50%', transform: 'translate(-50%, -50%)' }} />
               </div>
-              <div className="flex justify-between text-[7px] text-gray-400">
-                <span className="text-red-400">{slV.toLocaleString()}</span>
-                <span className={`font-semibold ${isPos ? 'text-emerald-400' : 'text-red-400'}`}>{close.toLocaleString()}</span>
-                <span className="text-emerald-400">{tpV.toLocaleString()}</span>
+              <div className="flex justify-between text-[7px]">
+                <span className="text-red-400">{sl.toFixed(2)}</span>
+                <span className={`font-semibold tabular-nums ${isPos ? 'text-emerald-400' : 'text-red-400'}`}>{close.toFixed(2)}</span>
+                <span className="text-emerald-400">{tp.toFixed(2)}</span>
               </div>
             </div>
           )
@@ -398,7 +482,7 @@ export default function StockChart() {
   const {
     selectedSymbol, selectedIndexId, chartType, timeframe,
     activeIndicators, isIndex, onHover, onPin, pinnedDate, clearPin,
-    activePosition,
+    activePositions,
   } = useAnalysis()
 
   const mainRef   = useRef(null)
@@ -507,33 +591,57 @@ export default function StockChart() {
         }
       }
 
-      // Position lines from entry date rightward
-      if (activePosition) {
-        const { entry_price, sl, tp, entry_date, position: dir } = activePosition
-        const entryStr = entry_date ? entry_date.slice(0, 10) : null
-        const startIdx = entryStr ? chartData.findIndex(d => d.time >= entryStr) : 0
-        const fromData = startIdx >= 0 ? chartData.slice(startIdx) : []
+      // Position lines — supports multiple entries for the same symbol
+      // Each position gets its own entry line color; SL/TP share red/green
+      const ENTRY_COLORS = ['#60a5fa', '#f59e0b', '#a78bfa', '#34d399', '#f472b6']
+      const markers = []
 
-        const addPosLine = (price, color, lineStyle, label) => {
-          if (!price || !fromData.length) return
-          const s = main.addLineSeries({
-            color, lineWidth: 2, lineStyle,
-            priceLineVisible: false, lastValueVisible: true,
-            title: label, crosshairMarkerVisible: false,
-          })
-          s.setData(fromData.map(d => ({ time: d.time, value: parseFloat(price) })))
-        }
-        addPosLine(entry_price, '#60a5fa', 0, 'Entry')
-        addPosLine(sl,          '#f87171', 2, 'SL')
-        addPosLine(tp,          '#34d399', 2, 'TP')
+      if (activePositions?.length) {
+        activePositions.forEach((pos, idx) => {
+          const { entry_price, sl, tp, entry_date, position: dir } = pos
+          const entryColor = ENTRY_COLORS[idx % ENTRY_COLORS.length]
+          const entryStr   = entry_date ? entry_date.slice(0, 10) : null
+          const startIdx   = entryStr ? chartData.findIndex(d => d.time >= entryStr) : 0
+          const fromData   = startIdx >= 0 ? chartData.slice(startIdx) : chartData.slice(-Math.min(chartData.length, 60))
 
-        if (fromData.length) {
-          priceSeries.setMarkers([{
-            time: fromData[0].time,
-            position: dir === 'SHORT' ? 'aboveBar' : 'belowBar',
-            color: '#60a5fa', shape: dir === 'SHORT' ? 'arrowDown' : 'arrowUp',
-            text: '', size: 2,
-          }])
+          const addPosLine = (price, color, lineStyle, label, dashed = false) => {
+            if (!price || !fromData.length) return
+            const s = main.addLineSeries({
+              color,
+              lineWidth:             dashed ? 1 : 2,
+              lineStyle,
+              priceLineVisible:      false,
+              lastValueVisible:      true,
+              title:                 activePositions.length > 1 ? `${label}${idx + 1}` : label,
+              crosshairMarkerVisible: false,
+            })
+            s.setData(fromData.map(d => ({ time: d.time, value: parseFloat(price) })))
+          }
+
+          // Entry — solid, unique color per position
+          addPosLine(entry_price, entryColor, 0, 'Entry')
+          // SL — dashed red (slightly different shade per position to distinguish)
+          addPosLine(sl, idx === 0 ? '#f87171' : '#fca5a5', 2, 'SL')
+          // TP — dashed green
+          addPosLine(tp, idx === 0 ? '#34d399' : '#6ee7b7', 2, 'TP')
+
+          // Arrow marker at entry candle
+          if (fromData.length) {
+            markers.push({
+              time:     fromData[0].time,
+              position: dir === 'SHORT' ? 'aboveBar' : 'belowBar',
+              color:    entryColor,
+              shape:    dir === 'SHORT' ? 'arrowDown' : 'arrowUp',
+              text:     activePositions.length > 1 ? `E${idx + 1}` : '',
+              size:     2,
+            })
+          }
+        })
+
+        if (markers.length) {
+          // sort markers by time (required by lightweight-charts)
+          markers.sort((a, b) => a.time < b.time ? -1 : 1)
+          priceSeries.setMarkers(markers)
         }
       }
 
@@ -616,7 +724,7 @@ export default function StockChart() {
       Object.values(chartsRef.current).forEach(c => { try { c.remove() } catch (_) {} })
       chartsRef.current = {}
     }
-  }, [chartData, isDark, chartType, activeIndicators, activePosition])
+  }, [chartData, isDark, chartType, activeIndicators, activePositions])
 
   useEffect(() => {
     if (!pinnedDate) setOverlayData(prev => prev ? { ...prev, pinned: false } : null)
@@ -652,7 +760,7 @@ export default function StockChart() {
       </div>
 
       {/* ── Position badge ── */}
-      <PositionBadge position={activePosition} latestClose={latestClose} />
+      <PositionBadge positions={activePositions} latestClose={latestClose} />
 
       {/* ── OHLC tooltip on hover ── */}
       <OHLCTooltip bar={tooltip} change={tooltip?.change} />

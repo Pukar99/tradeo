@@ -12,7 +12,7 @@ export function dispatchChatAction(action) {
 
 // Which actions should trigger a refresh per data domain
 export const REFRESH_MAP = {
-  trades:   ['ADD_TRADE', 'CLOSE_TRADE', 'UPDATE_SL_TP', 'CONFIRM_DELETE', 'PARTIAL_CLOSE', 'UNDO'],
+  trades:   ['ADD_TRADE', 'CLOSE_TRADE', 'UPDATE_SL_TP', 'CONFIRM_DELETE', 'PARTIAL_CLOSE', 'SELECT_TRADE', 'UNDO'],
   watchlist:['ADD_WATCHLIST', 'REMOVE_WATCHLIST', 'UPDATE_WATCHLIST', 'BULK_ADD_WATCHLIST', 'UNDO'],
   goals:    ['ADD_GOAL', 'UPDATE_GOAL', 'DELETE_GOAL', 'UNDO'],
   journal:  ['ADD_JOURNAL', 'UNDO'],
