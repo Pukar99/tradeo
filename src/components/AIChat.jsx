@@ -37,6 +37,9 @@ const ACTION_META = {
   MORNING_BRIEF:      { icon: '☀️', label: 'Morning Brief',            color: 'border-yellow-400 bg-yellow-50 dark:bg-yellow-900/30' },
   UPDATE_WATCHLIST:   { icon: '✏️', label: 'Watchlist Updated',        color: 'border-purple-400 bg-purple-50 dark:bg-purple-900/30' },
   STOCK_PRICE:        { icon: '💹', label: 'Stock Price',               color: 'border-emerald-400 bg-emerald-50 dark:bg-emerald-900/30' },
+  PARTIAL_CLOSE:      { icon: '½',  label: 'Partial Close',             color: 'border-blue-400 bg-blue-50 dark:bg-blue-900/30' },
+  UPDATE_GOAL:        { icon: '🏆', label: 'Goal Updated',              color: 'border-teal-400 bg-teal-50 dark:bg-teal-900/30' },
+  DELETE_GOAL:        { icon: '🗑️', label: 'Goal Removed',              color: 'border-gray-400 bg-gray-50 dark:bg-gray-700/50' },
 }
 
 // ── Standard action card (trade, watchlist, goal, journal, etc.) ─────────────
@@ -73,6 +76,12 @@ function ActionCard({ type, result }) {
     if (result.item.category) rows.push(`Category: ${result.item.category}`)
   }
   if (type === 'STOCK_PRICE') rows.push(`${result.symbol}: Rs.${result.ltp}`)
+  if (type === 'PARTIAL_CLOSE' && result.trade) {
+    rows.push(`${result.trade.symbol} — sold ${result.qty} kittas`)
+    rows.push(`P&L: ${result.pnl >= 0 ? '+' : ''}Rs.${Math.abs(result.pnl).toLocaleString()} | ${result.remaining} kittas remaining`)
+  }
+  if (type === 'UPDATE_GOAL' && result.goal) rows.push(result.goal.completed ? `✅ ${result.goal.title}` : result.goal.title)
+  if (type === 'DELETE_GOAL') rows.push(result.title)
   if (type === 'CONFIRM_DELETE') rows.push(`${result.count} trade(s) for ${result.symbol} permanently removed`)
   if (type === 'BULK_ADD_WATCHLIST' && result.items) {
     rows.push(`${result.items.length} stocks → ${result.category}`)
@@ -637,8 +646,59 @@ function AIChat({ isFullPage = false, onClose }) {
     setLoading(true)
 
     try {
-      const res = await sendAgentMessage({ message: text, history: messages.slice(-6), lastAction, lang })
-      const data = res.data
+      const token = localStorage.getItem('token')
+      const response = await fetch('http://localhost:5000/api/chat/agent', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
+        body: JSON.stringify({ message: text, history: messages.slice(-6), lastAction, lang }),
+      })
+
+      const contentType = response.headers.get('content-type') || ''
+
+      // ── Streaming chat response ──────────────────────────────────────────────
+      if (contentType.includes('text/event-stream')) {
+        const msgId = Date.now()
+        // Add a placeholder bubble immediately
+        setMessages(prev => [...prev, { id: msgId, role: 'assistant', content: '', time: new Date(), streaming: true }])
+        setLoading(false)
+
+        const reader = response.body.getReader()
+        const decoder = new TextDecoder()
+        let buffer = ''
+        let fullText = ''
+
+        while (true) {
+          const { done, value } = await reader.read()
+          if (done) break
+          buffer += decoder.decode(value, { stream: true })
+          const lines = buffer.split('\n')
+          buffer = lines.pop() // keep incomplete line in buffer
+          for (const line of lines) {
+            if (!line.startsWith('data: ')) continue
+            try {
+              const event = JSON.parse(line.slice(6))
+              if (event.type === 'chunk' && event.text) {
+                fullText += event.text
+                setMessages(prev => prev.map(m => m.id === msgId ? { ...m, content: fullText } : m))
+              } else if (event.type === 'done') {
+                setMessages(prev => prev.map(m => m.id === msgId ? { ...m, streaming: false } : m))
+                // Check discipline nudge in full text
+                const disciplineMatch = fullText.match(/discipline.*?(\d+)%/i)
+                if (disciplineMatch) {
+                  const score = parseInt(disciplineMatch[1])
+                  if (score < 70) setDisciplineNudge(score)
+                }
+                setLastAction(null)
+              }
+            } catch { /* skip malformed lines */ }
+          }
+        }
+        inputRef.current?.focus()
+        return
+      }
+
+      // ── JSON action / non-streaming response ─────────────────────────────────
+      const data = await response.json()
 
       // Frontend-only: theme toggle
       if (data.type === 'action' && data.action === 'TOGGLE_THEME') {
@@ -649,16 +709,6 @@ function AIChat({ isFullPage = false, onClose }) {
       // Journal draft — show interactive card instead of plain bubble
       if (data.type === 'action' && data.action === 'DRAFT_JOURNAL' && data.result?.draft) {
         setJournalDraft(data.result.draft)
-      }
-
-      // Morning brief — result embedded in message bubble via custom card
-      // Discipline nudge: scan reply for low discipline mention
-      if (data.type === 'chat' && data.reply) {
-        const disciplineMatch = data.reply.match(/discipline.*?(\d+)%/i)
-        if (disciplineMatch) {
-          const score = parseInt(disciplineMatch[1])
-          if (score < 70) setDisciplineNudge(score)
-        }
       }
 
       // Keep lastAction alive for follow-ups
@@ -743,7 +793,10 @@ function AIChat({ isFullPage = false, onClose }) {
               ? 'bg-red-50 dark:bg-red-900/20 text-red-500 border border-red-200 dark:border-red-800 rounded-tl-sm'
               : 'bg-white dark:bg-gray-900 border border-gray-100 dark:border-gray-800 text-gray-800 dark:text-gray-200 rounded-tl-sm shadow-sm'
           }`}>
-            <p className="whitespace-pre-wrap">{msg.content}</p>
+            <p className="whitespace-pre-wrap">
+              {msg.content}
+              {msg.streaming && <span className="inline-block w-0.5 h-3 bg-green-500 ml-0.5 animate-pulse align-middle" />}
+            </p>
           </div>
           <div className="flex items-center gap-2 mt-0.5 px-1">
             <span className="text-gray-400 text-[10px]">{formatTime(msg.time)}</span>
