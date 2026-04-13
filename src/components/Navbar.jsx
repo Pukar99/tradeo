@@ -24,7 +24,31 @@ function TradeoLogo() {
 function Navbar() {
   const { user, logout } = useAuth()
   const { isDark, toggleTheme } = useTheme()
-  const { t, lang, toggleLang } = useLanguage()
+  const { t } = useLanguage()
+
+  const getCookieLang = () => {
+    const match = document.cookie.match(/googtrans=\/en\/(\w+)/)
+    return match ? match[1] : 'en'
+  }
+
+  const [isNepali, setIsNepali] = useState(() => getCookieLang() === 'ne')
+
+  const setGoogTransCookie = (lang) => {
+    const value = lang === 'en' ? '/en/en' : '/en/ne'
+    document.cookie = `googtrans=${value}; path=/`
+    document.cookie = `googtrans=${value}; domain=${window.location.hostname}; path=/`
+  }
+
+  const toggleGoogleTranslate = () => {
+    if (isNepali) {
+      setGoogTransCookie('en')
+      setIsNepali(false)
+    } else {
+      setGoogTransCookie('ne')
+      setIsNepali(true)
+    }
+    window.location.reload()
+  }
   const location = useLocation()
   const [dropdownOpen, setDropdownOpen] = useState(false)
   const dropdownRef = useRef(null)
@@ -90,14 +114,14 @@ function Navbar() {
       </div>
 
       <div className="flex items-center gap-2">
-        {/* Language toggle */}
+        {/* Language toggle — Google Translate */}
         <button
-          onClick={toggleLang}
+          onClick={toggleGoogleTranslate}
           className="flex items-center gap-1 px-2.5 py-1 rounded-lg border border-gray-200 dark:border-gray-700 text-xs font-semibold text-gray-600 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors"
-          title={lang === 'en' ? 'नेपालीमा हेर्नुस्' : 'Switch to English'}
+          title={isNepali ? 'Switch to English' : 'नेपालीमा हेर्नुस्'}
         >
-          <span>{lang === 'en' ? '🇳🇵' : '🇬🇧'}</span>
-          <span>{lang === 'en' ? 'नेपाली' : 'EN'}</span>
+          <span>{isNepali ? '🇬🇧' : '🇳🇵'}</span>
+          <span>{isNepali ? 'EN' : 'नेपाली'}</span>
         </button>
 
         {/* Theme toggle */}

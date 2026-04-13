@@ -19,17 +19,11 @@ function ChangeBar({ value }) {
 // ── Explore News Modal ────────────────────────────────────────────────────────
 
 function ExploreModal({ items, onClose }) {
-  // Combine all items for the modal
   const all = items.slice(0, 10)
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
-      {/* Backdrop */}
       <div className="absolute inset-0 bg-black/40 backdrop-blur-sm" onClick={onClose} />
-
-      {/* Panel */}
       <div className="relative bg-white dark:bg-gray-900 rounded-2xl shadow-2xl border border-gray-200 dark:border-gray-700 w-full max-w-md max-h-[80vh] flex flex-col overflow-hidden z-10">
-
-        {/* Header */}
         <div className="flex items-center justify-between px-4 py-3 border-b border-gray-100 dark:border-gray-800">
           <div className="flex items-center gap-2">
             <span className="text-[11px] font-bold text-gray-800 dark:text-gray-100">Market Intelligence</span>
@@ -39,8 +33,6 @@ function ExploreModal({ items, onClose }) {
             <span className="text-gray-400 text-[14px] leading-none">×</span>
           </button>
         </div>
-
-        {/* List */}
         <div className="flex-1 overflow-y-auto px-4 py-3 space-y-3">
           {all.length === 0 ? (
             <p className="text-[11px] text-gray-400 text-center py-6">No data available yet</p>
@@ -80,8 +72,6 @@ function ExploreModal({ items, onClose }) {
             </div>
           ))}
         </div>
-
-        {/* Footer */}
         <div className="px-4 py-3 border-t border-gray-100 dark:border-gray-800 text-center">
           <p className="text-[9px] text-gray-400">Data sourced from SEBON, MeroShare & Sharesansar</p>
         </div>
@@ -130,72 +120,6 @@ function FeedRow({ item, onClick }) {
           <p className="text-[8px] text-gray-400 mt-0.5 truncate">{item.sub}</p>
         )}
       </div>
-    </div>
-  )
-}
-
-// ── AI Report card ────────────────────────────────────────────────────────────
-
-function AIReportCard() {
-  const [report, setReport]   = useState(null)
-  const [loading, setLoading] = useState(false)
-  const [open, setOpen]       = useState(false)
-
-  const generate = async () => {
-    if (report) { setOpen(o => !o); return }
-    setLoading(true)
-    setOpen(true)
-    try {
-      const r = await getAIReport()
-      setReport(r.data)
-    } catch {
-      setReport({ summary: 'AI report unavailable.', sentiment: 'neutral' })
-    } finally {
-      setLoading(false)
-    }
-  }
-
-  const sentimentColor = {
-    bullish:  'text-emerald-500',
-    bearish:  'text-red-400',
-    neutral:  'text-yellow-500',
-    cautious: 'text-orange-400',
-  }[report?.sentiment] || 'text-gray-400'
-
-  return (
-    <div className="rounded-xl border border-gray-100 dark:border-gray-800 overflow-hidden">
-      <button
-        onClick={generate}
-        className="w-full flex items-center justify-between px-2.5 py-2 bg-gradient-to-r from-violet-50 to-blue-50 dark:from-violet-950/40 dark:to-blue-950/40 hover:from-violet-100 dark:hover:from-violet-900/40 transition-colors"
-      >
-        <div className="flex items-center gap-1.5">
-          <span className="text-[10px]">✦</span>
-          <span className="text-[9px] font-bold text-violet-600 dark:text-violet-400">AI Report</span>
-        </div>
-        <div className="flex items-center gap-1.5">
-          {report && <span className={`text-[7px] font-semibold uppercase ${sentimentColor}`}>{report.sentiment}</span>}
-          {loading
-            ? <span className="w-3 h-3 border-2 border-violet-400 border-t-transparent rounded-full animate-spin" />
-            : <span className="text-[9px] text-gray-400">{open ? '▲' : '▼'}</span>
-          }
-        </div>
-      </button>
-
-      {open && !loading && report && (
-        <div className="px-2.5 py-2 bg-white dark:bg-gray-900 space-y-1.5">
-          <p className="text-[9px] leading-relaxed text-gray-600 dark:text-gray-400">{report.summary}</p>
-          {report.keyPoints?.length > 0 && (
-            <ul className="space-y-0.5">
-              {report.keyPoints.map((pt, i) => (
-                <li key={i} className="flex items-start gap-1 text-[8px] text-gray-500 dark:text-gray-500">
-                  <span className="text-violet-400 mt-0.5">•</span>
-                  <span>{pt}</span>
-                </li>
-              ))}
-            </ul>
-          )}
-        </div>
-      )}
     </div>
   )
 }
@@ -257,10 +181,8 @@ export default function RightPanel() {
           sentiment: ipo.status === 'open' ? 'positive' : 'neutral',
           date:      ipo.closeDate,
           url:       ipo.url,
-          // pass through for modal
           icon: '📢', tag: 'IPO', tagColor: 'bg-emerald-100 dark:bg-emerald-950 text-emerald-600',
         }))
-
         const newsItems = (nr.data.news || []).map(n => ({
           type:      n.type || 'news',
           title:     n.title || n.headline,
@@ -270,7 +192,6 @@ export default function RightPanel() {
           url:       n.url,
           summary:   n.summary,
         }))
-
         setFeedItems([...ipoItems, ...newsItems])
       })
       .catch(() => {})
@@ -282,7 +203,6 @@ export default function RightPanel() {
   const maxTurnover = volData.length > 0 ? volData[0].t : 1
   const isLatest  = selectedDate === latestDate
 
-  // Items shown in feed (max 4 in sidebar, full list in modal)
   const visibleFeed = feedItems.slice(0, 4)
 
   return (
@@ -350,7 +270,7 @@ export default function RightPanel() {
                 <th className="text-right text-[7px] text-gray-400 pb-1">Chg%</th>
               </tr>
             </thead>
-            <tbody>
+            <tbody translate="no">
               {moverTab === 'gainers' && gainers.slice(0, 10).map((s, i) => (
                 <tr key={i} onClick={() => selectSymbol(s.s)} className="cursor-pointer hover:bg-gray-50 dark:hover:bg-gray-800/60 group">
                   <td className="py-1 pr-1 text-[7px] text-gray-300 dark:text-gray-600">{i + 1}</td>
@@ -400,14 +320,6 @@ export default function RightPanel() {
       {/* ── Divider ───────────────────────────────────────────────────────── */}
       <div className="border-t border-gray-100 dark:border-gray-800 mx-2 my-2" />
 
-      {/* ── AI Market Report ──────────────────────────────────────────────── */}
-      <div className="px-2 shrink-0">
-        <AIReportCard />
-      </div>
-
-      {/* ── Divider ───────────────────────────────────────────────────────── */}
-      <div className="border-t border-gray-100 dark:border-gray-800 mx-2 my-2" />
-
       {/* ── Market Intelligence Feed ──────────────────────────────────────── */}
       <div className="px-2 shrink-0">
         <div className="flex items-center justify-between mb-1.5">
@@ -431,7 +343,6 @@ export default function RightPanel() {
           </div>
         )}
 
-        {/* Explore link */}
         <button
           onClick={() => setShowExplore(true)}
           className="w-full mt-2 py-1.5 rounded-xl border border-gray-200 dark:border-gray-700 text-[9px] font-semibold text-gray-500 dark:text-gray-400 hover:border-blue-300 hover:text-blue-500 transition-colors flex items-center justify-center gap-1"

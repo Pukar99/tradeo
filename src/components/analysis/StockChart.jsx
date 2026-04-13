@@ -212,7 +212,7 @@ function ChartHUDPrice({ latestClose, chartData }) {
   const close   = latestClose ?? lastBar?.close
 
   return (
-    <div className="flex items-baseline gap-2">
+    <div className="flex items-baseline gap-2" translate="no">
       <span className="text-[13px] font-bold text-gray-900 dark:text-white tracking-wide">{selectedSymbol}</span>
       {close && (
         <>
@@ -246,7 +246,7 @@ function PositionBadge({ position, latestClose }) {
     : null
 
   return (
-    <div className="absolute bottom-8 left-3 z-20 pointer-events-none">
+    <div className="absolute bottom-8 left-3 z-20 pointer-events-none" translate="no">
       <div className="bg-white/96 dark:bg-gray-900/96 backdrop-blur-sm border border-gray-200 dark:border-gray-700 rounded-2xl shadow-lg overflow-hidden w-56">
         <div className={`flex items-center justify-between px-3 py-1.5 ${isLong ? 'bg-blue-50 dark:bg-blue-950/40' : 'bg-red-50 dark:bg-red-950/40'}`}>
           <div className="flex items-center gap-1.5">
@@ -303,7 +303,7 @@ function PositionBadge({ position, latestClose }) {
 function MoversOverlay({ movers, date, pinned, onClear }) {
   if (!movers || (!movers.gainers?.length && !movers.losers?.length)) return null
   return (
-    <div className={`absolute top-14 right-2 z-20 w-52 rounded-2xl border shadow-lg backdrop-blur-sm text-[10px] overflow-hidden
+    <div translate="no" className={`absolute top-14 right-2 z-20 w-52 rounded-2xl border shadow-lg backdrop-blur-sm text-[10px] overflow-hidden
       ${pinned
         ? 'bg-white dark:bg-gray-900 border-blue-200 dark:border-blue-800 ring-1 ring-blue-400/30'
         : 'bg-white/95 dark:bg-gray-900/95 border-gray-200 dark:border-gray-700'
@@ -346,7 +346,7 @@ function OHLCTooltip({ bar, change }) {
   if (!bar) return null
   const isUp = (bar.close ?? bar.value) >= (bar.open ?? bar.value)
   return (
-    <div className="absolute top-14 left-3 z-10 pointer-events-none">
+    <div className="absolute top-14 left-3 z-10 pointer-events-none" translate="no">
       <div className="bg-white/95 dark:bg-gray-900/95 border border-gray-200 dark:border-gray-700 rounded-xl px-3 py-2 shadow-sm">
         <div className="text-[9px] text-gray-400 mb-1">{bar.time}</div>
         <div className="flex items-baseline gap-2 mb-1">
@@ -467,6 +467,7 @@ export default function StockChart() {
     loadLC().then(({ createChart, CrosshairMode, LineStyle }) => {
       const base = {
         layout:    { background: { color: C.bg }, textColor: C.text, fontSize: 11 },
+        attributionLogo: false,
         grid:      { vertLines: { color: C.grid }, horzLines: { color: C.grid } },
         crosshair: { mode: CrosshairMode.Normal,
           vertLine: { width: 1, color: '#363a45', style: LineStyle.Solid },
@@ -538,7 +539,7 @@ export default function StockChart() {
 
       // Volume inline
       const volSeries = main.addHistogramSeries({ priceFormat: { type: 'volume' }, priceScaleId: 'vol' })
-      main.priceScale('vol').applyOptions({ scaleMargins: { top: 0.88, bottom: 0 } })
+      main.priceScale('vol').applyOptions({ scaleMargins: { top: 0.78, bottom: 0.02 } })
       volSeries.setData(chartData.map(d => ({
         time: d.time, value: d.volume || d.turnover || 0,
         color: d.close >= d.open ? C.up + '44' : C.down + '44',
@@ -644,7 +645,7 @@ export default function StockChart() {
       </div>
 
       {/* ── Embedded HUD — top bar: search + controls ── */}
-      <div className="absolute top-0 left-0 right-0 z-30 flex items-center gap-2 px-3 py-1.5 bg-white/90 dark:bg-gray-900/90 backdrop-blur-sm border-b border-gray-100 dark:border-gray-800">
+      <div className="absolute top-0 left-0 right-0 z-30 flex items-center gap-2 px-3 py-0.5 bg-white/90 dark:bg-gray-900/90 backdrop-blur-sm border-b border-gray-100 dark:border-gray-800">
         <ChartSymbolSearch />
         <div className="w-px h-4 bg-white/10 shrink-0" />
         <ChartHUDControls />
@@ -679,8 +680,7 @@ export default function StockChart() {
         <ChartSkeleton />
       ) : (
         <>
-          {/* Extra top padding so chart content starts below the HUD bar (~36px) */}
-          <div ref={mainRef} style={{ height: `${mainPct}%`, paddingTop: '36px', boxSizing: 'border-box' }} className="w-full" />
+          <div ref={mainRef} style={{ height: `${mainPct}%`, paddingTop: '2px', boxSizing: 'border-box' }} className="w-full" />
 
           {showRSI && (
             <div className="w-full border-t border-gray-100 dark:border-gray-800 shrink-0">

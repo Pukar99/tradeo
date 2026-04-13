@@ -1,5 +1,6 @@
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useCallback } from 'react'
 import { getTradeLog, getStockPrice } from '../../api'
+import { useChatRefresh } from '../../utils/chatEvents'
 import {
   LineChart, Line, XAxis, YAxis, CartesianGrid,
   Tooltip, ResponsiveContainer
@@ -14,8 +15,7 @@ function PerformanceDashboard() {
   const [showHoldings, setShowHoldings] = useState(false)
   const [openPositions, setOpenPositions] = useState([])
 
-  useEffect(() => {
-    const fetchData = async () => {
+  const fetchData = useCallback(async () => {
       try {
         const tradesRes = await getTradeLog()
         const tradeData = tradesRes.data
@@ -47,14 +47,15 @@ function PerformanceDashboard() {
 
         calculateStats(tradeData, openWithPrices, closed)
         buildEquityCurve(tradeData, openWithPrices)
-      } catch (err) {
-        console.error(err)
-      } finally {
-        setLoading(false)
-      }
+    } catch (err) {
+      console.error(err)
+    } finally {
+      setLoading(false)
     }
-    fetchData()
   }, [])
+
+  useEffect(() => { fetchData() }, [fetchData])
+  useChatRefresh(['trades'], fetchData)
 
   const calculateStats = (tradeData, openWithPrices, closedTrades) => {
     const realizedPnl = closedTrades.reduce((sum, t) => sum + (t.realized_pnl || 0), 0)

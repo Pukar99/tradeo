@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react'
 import { getTradeLog, getWatchlist, removeFromWatchlist, updateWatchlist, addTradeLog, closeTradeLog, getStockPrice } from '../../api'
 import { useContextMenu } from '../ContextMenu'
+import { useChatRefresh } from '../../utils/chatEvents'
 import { useAnalysis } from '../../context/AnalysisContext'
 
 // ── BUY / SELL Modal ──────────────────────────────────────────────────────────
@@ -233,6 +234,7 @@ export default function LeftPanel() {
     window.addEventListener('focus', onFocus)
     return () => window.removeEventListener('focus', onFocus)
   }, [])
+  useChatRefresh(['trades', 'watchlist'], loadData)
 
   // Within 2% of SL or TP
   useEffect(() => {

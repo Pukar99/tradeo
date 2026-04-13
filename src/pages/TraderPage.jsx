@@ -8,6 +8,7 @@ import {
   getTradeJournal, addTradeJournal, updateTradeJournal, deleteTradeJournal
 } from '../api'
 import { useContextMenu } from '../components/ContextMenu'
+import { useChatRefresh } from '../utils/chatEvents'
 
 const NEPSE_SYMBOLS = [
   'NTC','NABIL','SCB','EBL','NICA','HBL','KBL','MBL','CZBIL','SBI',
@@ -536,8 +537,6 @@ function TraderPage() {
   const [searchSymbol, setSearchSymbol] = useState('')
   const { onContextMenu: journalCtx, ContextMenuPortal: JournalMenuPortal } = useContextMenu()
 
-  useEffect(() => { fetchData() }, [])
-
   const fetchData = async () => {
     try {
       const [tradesRes, journalsRes] = await Promise.all([getTradeLog(), getTradeJournal()])
@@ -546,6 +545,9 @@ function TraderPage() {
     } catch (err) { console.error(err) }
     finally { setLoading(false) }
   }
+
+  useEffect(() => { fetchData() }, [])
+  useChatRefresh(['trades', 'journal'], fetchData)
 
   const handleAddTrade = async (form) => {
     if (editTrade) { const res = await updateTradeLog(editTrade.id, form); setTrades(prev => prev.map(t => t.id === editTrade.id ? res.data : t)); setEditTrade(null) }

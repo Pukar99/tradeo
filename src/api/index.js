@@ -41,6 +41,7 @@ export const updateGoal = (id, data) => API.put(`/api/dashboard/goals/${id}`, ty
 export const deleteGoal = (id) => API.delete(`/api/dashboard/goals/${id}`)
 export const getWatchlist = () => API.get('/api/dashboard/watchlist')
 export const addToWatchlist = (data) => API.post('/api/dashboard/watchlist', data)
+export const updateWatchlist = (id, data) => API.put(`/api/dashboard/watchlist/${id}`, data)
 export const removeFromWatchlist = (id) => API.delete(`/api/dashboard/watchlist/${id}`)
 export const getMindset = () => API.get('/api/dashboard/mindset')
 export const saveMindset = (content) => API.post('/api/dashboard/mindset', { content })

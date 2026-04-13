@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react'
 import { getGoals, addGoal, updateGoal, deleteGoal } from '../../api'
 import { useLanguage } from '../../context/LanguageContext'
 import { useContextMenu } from '../ContextMenu'
+import { useChatRefresh } from '../../utils/chatEvents'
 
 function MonthlyGoals() {
   const { t } = useLanguage()
@@ -27,6 +28,7 @@ function MonthlyGoals() {
   }
 
   useEffect(() => { fetchGoals() }, [])
+  useChatRefresh(['goals'], fetchGoals)
 
   const completedCount = goals.filter(g => g.completed).length
   const progress = goals.length > 0 ? Math.round((completedCount / goals.length) * 100) : 0

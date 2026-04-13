@@ -1,6 +1,7 @@
 import { useAuth } from '../context/AuthContext'
 import { useLanguage } from '../context/LanguageContext'
 import { useContextMenu } from '../components/ContextMenu'
+import { useChatRefresh } from '../utils/chatEvents'
 import TaskBoard from '../components/dashboard/TaskBoard'
 import DisciplineScore from '../components/dashboard/DisciplineScore'
 import MonthlyGoals from '../components/dashboard/MonthlyGoals'
@@ -135,7 +136,7 @@ function LoggedOutHome() {
               </div>
               <div className="divide-y divide-gray-50 dark:divide-gray-700">
                 {dummyTrades.map((t, i) => (
-                  <div key={i} className="flex items-center justify-between px-5 py-2.5">
+                  <div key={i} className="flex items-center justify-between px-5 py-2.5" translate="no">
                     <div className="flex items-center gap-2">
                       <StockAvatar symbol={t.symbol} size="w-7 h-7" />
                       <div>
@@ -300,8 +301,6 @@ function CenterDashboard({ navigate }) {
     notes: ''
   })
 
-  useEffect(() => { fetchData() }, [])
-
   const fetchData = async () => {
     try {
       const [tradesRes, watchRes] = await Promise.all([
@@ -385,6 +384,9 @@ function CenterDashboard({ navigate }) {
       setLoading(false)
     }
   }
+
+  useEffect(() => { fetchData() }, [])
+  useChatRefresh(['trades', 'watchlist'], fetchData)
 
   const handleSymbolSearch = async () => {
     if (!newSymbol.trim()) return
@@ -549,7 +551,7 @@ function CenterDashboard({ navigate }) {
                     : null
 
                   return (
-                    <div key={t.id} className="px-5 py-3 hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors">
+                    <div key={t.id} className="px-5 py-3 hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors" translate="no">
                       <div className="flex items-center justify-between">
                         <div className="flex items-center gap-3">
                           <StockAvatar symbol={t.symbol} />

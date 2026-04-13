@@ -12,7 +12,7 @@ function AnalysisInner() {
     <div className="flex flex-col h-[calc(100vh-56px)] overflow-hidden bg-white dark:bg-gray-950">
 
       {/* ── Minimal top strip: mode toggle + market status only ─────────── */}
-      <div className="flex items-center justify-between px-3 py-1 border-b border-gray-100 dark:border-gray-800 shrink-0">
+      <div className="flex items-center justify-between px-3 py-0.5 border-b border-gray-100 dark:border-gray-800 shrink-0">
         <div className="flex items-center bg-gray-100 dark:bg-gray-800 rounded-lg p-0.5">
           {['simple', 'complex'].map(m => (
             <button key={m} onClick={() => setMode(m)}
