@@ -2,6 +2,18 @@
 @tailwind components;
 @tailwind utilities;
 
+/* ── Hide Google Translate toolbar / banner ──────────────────────────────── */
+.goog-te-banner-frame.skiptranslate { display: none !important; }
+.goog-te-menu-value span { display: none; }
+body { top: 0 !important; position: static !important; }
+#goog-gt-tt, .goog-te-balloon-frame, .goog-tooltip { display: none !important; }
+.goog-text-highlight { background: none !important; box-shadow: none !important; }
+
+/* ── Global font size: bump up 1 level for readability ──────────────────── */
+html {
+  font-size: 106.25%; /* 1rem = ~17px instead of 16px — shifts all rem-based text ~1 size up */
+}
+
 /* ── BlockNote dark theme ───────────────────────────────────────────────── */
 .dark .bn-editor {
   background-color: #111827 !important;

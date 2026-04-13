@@ -4,9 +4,81 @@
     <meta charset="UTF-8" />
     <link rel="icon" type="image/svg+xml" href="/vite.svg" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>Vite + React</title>
+    <title>Tradeo</title>
+
+    <style>
+      /* Push Google Translate widget off-screen — must exist in DOM to work */
+      #google_translate_element {
+        position: absolute;
+        top: -9999px;
+        left: -9999px;
+        visibility: hidden;
+      }
+      /* Kill the top toolbar banner entirely */
+      .goog-te-banner-frame,
+      .goog-te-banner-frame.skiptranslate,
+      #goog-gt-tt,
+      .goog-te-balloon-frame,
+      .goog-te-ftab-float,
+      .goog-te-menu-frame {
+        display: none !important;
+        visibility: hidden !important;
+        height: 0 !important;
+      }
+      /* Prevent body shift that happens when banner appears */
+      body {
+        top: 0 !important;
+        position: static !important;
+        min-height: 100% !important;
+      }
+      /* Remove yellow highlight on translated text */
+      .goog-text-highlight {
+        background: none !important;
+        box-shadow: none !important;
+      }
+      /* Hide the iframe Google injects for the toolbar */
+      iframe.skiptranslate {
+        display: none !important;
+        visibility: hidden !important;
+      }
+    </style>
+
+    <script type="text/javascript">
+      function googleTranslateElementInit() {
+        new google.translate.TranslateElement(
+          {
+            pageLanguage: 'en',
+            includedLanguages: 'ne,en',
+            autoDisplay: false,
+          },
+          'google_translate_element'
+        )
+      }
+    </script>
+    <script type="text/javascript"
+      src="//translate.google.com/translate_a/element.js?cb=googleTranslateElementInit">
+    </script>
+
+    <script>
+      // Force-remove Google Translate toolbar whenever it appears in the DOM
+      const observer = new MutationObserver(() => {
+        // Remove banner iframe
+        document.querySelectorAll('iframe.skiptranslate, .goog-te-banner-frame').forEach(el => {
+          el.style.display = 'none'
+          el.style.visibility = 'hidden'
+        })
+        // Reset body top shift
+        if (document.body.style.top && document.body.style.top !== '0px') {
+          document.body.style.top = '0'
+        }
+      })
+      observer.observe(document.documentElement, { childList: true, subtree: true, attributes: true })
+    </script>
   </head>
   <body>
+    <!-- Google Translate mount — kept in DOM but hidden off-screen -->
+    <div id="google_translate_element"></div>
+
     <div id="root"></div>
     <script type="module" src="/src/main.jsx"></script>
   </body>

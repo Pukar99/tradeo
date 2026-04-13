@@ -3,6 +3,7 @@ import { useAuth } from '../context/AuthContext'
 import { useTheme } from '../context/ThemeContext'
 import { useLanguage } from '../context/LanguageContext'
 import { sendAgentMessage, getChatSuggestions } from '../api'
+import { dispatchChatAction } from '../utils/chatEvents'
 import { useNavigate } from 'react-router-dom'
 
 // ── Tradeo logo SVG (reused everywhere in chat) ──────────────────────────────
@@ -40,6 +41,7 @@ const ACTION_META = {
   PARTIAL_CLOSE:      { icon: '½',  label: 'Partial Close',             color: 'border-blue-400 bg-blue-50 dark:bg-blue-900/30' },
   UPDATE_GOAL:        { icon: '🏆', label: 'Goal Updated',              color: 'border-teal-400 bg-teal-50 dark:bg-teal-900/30' },
   DELETE_GOAL:        { icon: '🗑️', label: 'Goal Removed',              color: 'border-gray-400 bg-gray-50 dark:bg-gray-700/50' },
+  UNDO:               { icon: '↩️', label: 'Action Undone',             color: 'border-indigo-400 bg-indigo-50 dark:bg-indigo-900/30' },
 }
 
 // ── Standard action card (trade, watchlist, goal, journal, etc.) ─────────────
@@ -83,6 +85,12 @@ function ActionCard({ type, result }) {
   if (type === 'UPDATE_GOAL' && result.goal) rows.push(result.goal.completed ? `✅ ${result.goal.title}` : result.goal.title)
   if (type === 'DELETE_GOAL') rows.push(result.title)
   if (type === 'CONFIRM_DELETE') rows.push(`${result.count} trade(s) for ${result.symbol} permanently removed`)
+  if (type === 'UNDO') {
+    if (result.undid) rows.push(`Reversed: ${result.undid}`)
+    if (result.symbol) rows.push(`Symbol: ${result.symbol}`)
+    if (result.title) rows.push(result.title)
+    if (result.count) rows.push(`${result.count} items removed`)
+  }
   if (type === 'BULK_ADD_WATCHLIST' && result.items) {
     rows.push(`${result.items.length} stocks → ${result.category}`)
     rows.push(result.items.map(i => i.symbol).join(', '))
@@ -709,6 +717,11 @@ function AIChat({ isFullPage = false, onClose }) {
       // Journal draft — show interactive card instead of plain bubble
       if (data.type === 'action' && data.action === 'DRAFT_JOURNAL' && data.result?.draft) {
         setJournalDraft(data.result.draft)
+      }
+
+      // Dispatch event so other components re-fetch instantly
+      if (data.type === 'action' && data.action) {
+        dispatchChatAction(data.action)
       }
 
       // Keep lastAction alive for follow-ups

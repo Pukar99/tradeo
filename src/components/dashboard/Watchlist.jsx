@@ -2,11 +2,112 @@ import { useState, useEffect } from 'react'
 import {
   getWatchlist,
   addToWatchlist,
+  updateWatchlist,
   removeFromWatchlist,
   getStockPrice,
   getTradeLog
 } from '../../api'
 import { useContextMenu } from '../ContextMenu'
+import { useChatRefresh } from '../../utils/chatEvents'
+
+function EditWatchlistModal({ item, onClose, onSaved }) {
+  const [form, setForm] = useState({
+    watch_low:   item.watch_low   || '',
+    watch_high:  item.watch_high  || '',
+    price_alert: item.price_alert || '',
+    alert_date:  item.alert_date  ? item.alert_date.slice(0, 10) : '',
+    notes:       item.notes       || '',
+    category:    item.category    || 'active',
+  })
+  const [saving, setSaving] = useState(false)
+  const [err, setErr] = useState(null)
+
+  const handleSave = async (e) => {
+    e.preventDefault()
+    setSaving(true); setErr(null)
+    try {
+      await updateWatchlist(item.id, {
+        watch_low:   form.watch_low   !== '' ? parseFloat(form.watch_low)   : null,
+        watch_high:  form.watch_high  !== '' ? parseFloat(form.watch_high)  : null,
+        price_alert: form.price_alert !== '' ? parseFloat(form.price_alert) : null,
+        alert_date:  form.alert_date  || null,
+        notes:       form.notes       || null,
+        category:    form.category,
+      })
+      onSaved()
+      onClose()
+    } catch (e) {
+      setErr(e.response?.data?.error || 'Failed to save')
+    } finally {
+      setSaving(false)
+    }
+  }
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+      <div className="absolute inset-0 bg-black/40 backdrop-blur-sm" onClick={onClose} />
+      <div className="relative bg-white dark:bg-gray-900 rounded-2xl shadow-2xl border border-gray-200 dark:border-gray-700 w-full max-w-sm z-10 overflow-hidden">
+        <div className="flex items-center justify-between px-4 py-3 border-b border-gray-100 dark:border-gray-800">
+          <div>
+            <p className="text-[13px] font-bold text-gray-800 dark:text-gray-100">Edit Watchlist</p>
+            <p className="text-[10px] text-gray-400" translate="no">{item.symbol}</p>
+          </div>
+          <button onClick={onClose} className="w-6 h-6 flex items-center justify-center rounded-full hover:bg-gray-100 dark:hover:bg-gray-800 text-gray-400 text-[16px]">×</button>
+        </div>
+        <form onSubmit={handleSave} className="px-4 py-4 space-y-3">
+          <div className="grid grid-cols-2 gap-2">
+            {[
+              ['Watch Low (Rs)', 'watch_low', 'number'],
+              ['Watch High (Rs)', 'watch_high', 'number'],
+              ['Price Alert (Rs)', 'price_alert', 'number'],
+              ['Alert Date', 'alert_date', 'date'],
+            ].map(([label, key, type]) => (
+              <div key={key}>
+                <label className="block text-[9px] font-bold uppercase tracking-widest text-gray-400 mb-1">{label}</label>
+                <input
+                  type={type}
+                  value={form[key]}
+                  onChange={e => setForm(f => ({ ...f, [key]: e.target.value }))}
+                  className="w-full bg-gray-50 dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-xl px-3 py-2 text-[12px] text-gray-800 dark:text-gray-200 outline-none focus:ring-2 focus:ring-blue-300 dark:focus:ring-blue-800"
+                />
+              </div>
+            ))}
+          </div>
+          <div>
+            <label className="block text-[9px] font-bold uppercase tracking-widest text-gray-400 mb-1">Notes</label>
+            <input
+              type="text"
+              value={form.notes}
+              onChange={e => setForm(f => ({ ...f, notes: e.target.value }))}
+              placeholder="Why are you watching this?"
+              className="w-full bg-gray-50 dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-xl px-3 py-2 text-[12px] text-gray-800 dark:text-gray-200 outline-none focus:ring-2 focus:ring-blue-300 dark:focus:ring-blue-800"
+            />
+          </div>
+          <div>
+            <label className="block text-[9px] font-bold uppercase tracking-widest text-gray-400 mb-1">Category</label>
+            <select
+              value={form.category}
+              onChange={e => setForm(f => ({ ...f, category: e.target.value }))}
+              className="w-full bg-gray-50 dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-xl px-3 py-2 text-[12px] text-gray-800 dark:text-gray-200 outline-none focus:ring-2 focus:ring-blue-300"
+            >
+              {CATEGORIES.filter(c => c.value !== 'portfolio').map(c => (
+                <option key={c.value} value={c.value}>{c.label}</option>
+              ))}
+            </select>
+          </div>
+          {err && <p className="text-[10px] text-red-500 bg-red-50 dark:bg-red-950 px-3 py-1.5 rounded-lg">{err}</p>}
+          <button
+            type="submit"
+            disabled={saving}
+            className="w-full bg-blue-600 hover:bg-blue-700 disabled:opacity-50 text-white py-2.5 rounded-xl text-[12px] font-bold transition-colors"
+          >
+            {saving ? 'Saving...' : 'Save Changes'}
+          </button>
+        </form>
+      </div>
+    </div>
+  )
+}
 
 const CATEGORIES = [
   { value: 'active', label: '⭐ Active' },
@@ -79,6 +180,7 @@ function Watchlist() {
   const [activeTab, setActiveTab] = useState('active')
   const [showForm, setShowForm] = useState(false)
   const { onContextMenu, ContextMenuPortal } = useContextMenu()
+  const [editItem, setEditItem] = useState(null)
   const [form, setForm] = useState({
     symbol: '',
     watch_low: '',
@@ -170,6 +272,7 @@ function Watchlist() {
   }
 
   useEffect(() => { fetchWatchlist() }, [])
+  useChatRefresh(['watchlist', 'trades'], fetchWatchlist)
 
   const handleSymbolSearch = async () => {
     if (!form.symbol.trim()) return
@@ -231,6 +334,13 @@ function Watchlist() {
   return (
     <div className="bg-white dark:bg-gray-800 rounded-xl shadow-sm">
       <ContextMenuPortal />
+      {editItem && (
+        <EditWatchlistModal
+          item={editItem}
+          onClose={() => setEditItem(null)}
+          onSaved={() => { setEditItem(null); fetchWatchlist() }}
+        />
+      )}
 
       <div className="p-4 border-b border-gray-100 dark:border-gray-700">
         <div className="flex justify-between items-center mb-3">
@@ -428,11 +538,13 @@ function Watchlist() {
               <div
                 key={item.id}
                 onContextMenu={!item.isPortfolio ? onContextMenu([
+                  { label: 'Edit', icon: '✏️', action: () => setEditItem(item) },
+                  { separator: true },
                   { label: 'Delete', icon: '🗑️', danger: true, action: () => handleRemove(item.id) },
                 ]) : undefined}
                 className="px-4 py-3 hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors"
               >
-                <div className="flex items-center justify-between">
+                <div className="flex items-center justify-between" translate="no">
                   <div>
                     <div className="flex items-center gap-2">
                       <p className="text-sm font-semibold text-gray-900 dark:text-white">
