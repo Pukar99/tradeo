@@ -108,6 +108,49 @@ function ActionCard({ type, result }) {
   )
 }
 
+// ── Disambiguation card — shown when multiple open entries exist for a symbol ──
+function DisambiguationCard({ result, onPick }) {
+  if (!result?.entries?.length) return null
+  const actionLabel = {
+    CLOSE_TRADE:   'Close which entry?',
+    UPDATE_SL_TP:  'Update SL/TP for which entry?',
+    PARTIAL_CLOSE: 'Partial close which entry?',
+  }[result.original_action] || 'Which entry?'
+
+  return (
+    <div className="border-l-2 border-amber-400 bg-amber-50 dark:bg-amber-900/20 rounded-xl px-3 py-2 mb-1.5 w-full">
+      <div className="flex items-center gap-1.5 mb-2">
+        <span className="text-sm">⚠️</span>
+        <span className="text-[11px] font-semibold text-gray-700 dark:text-gray-200">
+          Multiple {result.symbol} entries — {actionLabel}
+        </span>
+      </div>
+      <div className="space-y-1">
+        {result.entries.map((e, i) => (
+          <button
+            key={e.id}
+            onClick={() => onPick(e, result)}
+            className="w-full flex items-center justify-between px-2.5 py-2 rounded-lg bg-white dark:bg-gray-900 border border-gray-100 dark:border-gray-800 hover:border-amber-400 dark:hover:border-amber-500 hover:bg-amber-50 dark:hover:bg-amber-900/30 transition-all text-left group"
+          >
+            <div className="flex items-center gap-2">
+              <span className="text-[10px] font-bold text-gray-400 w-4">{i + 1}</span>
+              <div>
+                <p className="text-[11px] font-semibold text-gray-800 dark:text-white" translate="no">
+                  {e.position} · Rs.{parseFloat(e.entry_price).toFixed(2)} · {e.quantity} kittas
+                </p>
+                <p className="text-[9px] text-gray-400">{e.date}</p>
+              </div>
+            </div>
+            <svg className="w-3.5 h-3.5 text-gray-300 group-hover:text-amber-500 transition-colors" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
+            </svg>
+          </button>
+        ))}
+      </div>
+    </div>
+  )
+}
+
 // ── Broker fee result card ────────────────────────────────────────────────────
 function BrokerFeeCard({ fee }) {
   if (!fee) return null
@@ -725,7 +768,7 @@ function AIChat({ isFullPage = false, onClose }) {
       }
 
       // Keep lastAction alive for follow-ups
-      const keepAliveActions = ['ADD_TRADE', 'CLOSE_TRADE', 'DELETE_TRADE', 'DRAFT_JOURNAL']
+      const keepAliveActions = ['ADD_TRADE', 'CLOSE_TRADE', 'DELETE_TRADE', 'DRAFT_JOURNAL', 'NEEDS_DISAMBIGUATION']
       if (data.type === 'pending' || (data.type === 'action' && keepAliveActions.includes(data.action))) {
         setLastAction({ action: data.action, result: data.result })
       } else {
@@ -775,12 +818,29 @@ function AIChat({ isFullPage = false, onClose }) {
 
   const formatTime = (date) => new Date(date).toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' })
 
+  // Disambiguation pick — user clicked an entry card
+  const handleDisambiguationPick = (entry, result) => {
+    const { original_action, exit_price, sl, tp, exit_quantity } = result
+    // Build a natural language message so the AI routes it as SELECT_TRADE
+    let msg = `Select trade ${entry.id} for ${original_action}`
+    if (original_action === 'CLOSE_TRADE')   msg += ` at exit price ${exit_price}`
+    if (original_action === 'UPDATE_SL_TP')  msg += `${sl != null ? ` sl ${sl}` : ''}${tp != null ? ` tp ${tp}` : ''}`
+    if (original_action === 'PARTIAL_CLOSE') msg += ` exit ${exit_quantity} at ${exit_price}`
+    // Inject trade_id directly into lastAction context for the backend
+    setLastAction(prev => ({
+      ...(prev || {}),
+      _disambiguate: { trade_id: entry.id, original_action, exit_price, sl, tp, exit_quantity }
+    }))
+    handleSend(msg)
+  }
+
   // Render a single message bubble + any special cards attached
   const renderMessage = (msg, i) => {
-    const showBrokerFee = msg.actionType === 'CALC_BROKER_FEE' && msg.actionResult?.fee
-    const showMorningBrief = msg.actionType === 'MORNING_BRIEF' && msg.actionResult?.brief
-    const showStandardCard = msg.actionType && msg.actionResult && !showBrokerFee && !showMorningBrief
-      && !['DRAFT_JOURNAL'].includes(msg.actionType)
+    const showBrokerFee      = msg.actionType === 'CALC_BROKER_FEE' && msg.actionResult?.fee
+    const showMorningBrief   = msg.actionType === 'MORNING_BRIEF' && msg.actionResult?.brief
+    const showDisambiguation = msg.actionType === 'NEEDS_DISAMBIGUATION' && msg.actionResult?.entries?.length
+    const showStandardCard   = msg.actionType && msg.actionResult && !showBrokerFee && !showMorningBrief
+      && !showDisambiguation && !['DRAFT_JOURNAL'].includes(msg.actionType)
 
     return (
       <div
@@ -792,6 +852,8 @@ function AIChat({ isFullPage = false, onClose }) {
           <div className="flex-shrink-0 mt-0.5"><TradeoLogo size={20} /></div>
         )}
         <div className={`max-w-[85%] flex flex-col ${msg.role === 'user' ? 'items-end' : 'items-start'}`}>
+          {/* Disambiguation picker */}
+          {showDisambiguation && <DisambiguationCard result={msg.actionResult} onPick={handleDisambiguationPick} />}
           {/* Standard action card */}
           {showStandardCard && <ActionCard type={msg.actionType} result={msg.actionResult} />}
           {/* Broker fee breakdown card */}

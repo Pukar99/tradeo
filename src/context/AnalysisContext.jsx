@@ -1,4 +1,5 @@
-import { createContext, useContext, useState, useCallback } from 'react'
+import { createContext, useContext, useState, useCallback, useEffect } from 'react'
+import { useLocation } from 'react-router-dom'
 
 const AnalysisContext = createContext(null)
 
@@ -15,9 +16,12 @@ export function AnalysisProvider({ children }) {
   const [hoveredMovers, setHoveredMovers] = useState(null)  // { gainers, losers }
   const [pinnedMovers,  setPinnedMovers]  = useState(null)
 
-  // Active position — set when user clicks a portfolio row (has SL/TP/entry)
+  // Active positions array — supports multiple entries for same symbol
+  // Each: { id, entry_price, sl, tp, position, quantity }
   // null when viewing watchlist or index
-  const [activePosition, setActivePosition] = useState(null)
+  const [activePositions, setActivePositions] = useState(null)
+
+  const location = useLocation()
 
   const isIndex = (sym) =>
     sym === 'NEPSE' ||
@@ -27,15 +31,33 @@ export function AnalysisProvider({ children }) {
     sym.includes('Float') ||
     sym.includes('Sensitive')
 
-  const selectSymbol = useCallback((sym, indexId = null, position = null) => {
+  const selectSymbol = useCallback((sym, indexId = null, positions = null) => {
     setSelectedSymbol(sym)
     if (indexId) setSelectedIndexId(indexId)
-    // Clear any pin when switching symbol
     setPinnedDate(null)
     setPinnedMovers(null)
-    // Set active position (null when coming from watchlist / right panel)
-    setActivePosition(position)
+    // positions can be null, a single object (legacy), or an array
+    if (positions === null) {
+      setActivePositions(null)
+    } else if (Array.isArray(positions)) {
+      setActivePositions(positions)
+    } else {
+      setActivePositions([positions])
+    }
   }, [])
+
+  // On mount: read navigate state from TraderPage "Go to Chart"
+  useEffect(() => {
+    const state = location.state
+    if (state?.symbol) {
+      setSelectedSymbol(state.symbol)
+      setPinnedDate(null)
+      setPinnedMovers(null)
+      setActivePositions(state.positions?.length > 0 ? state.positions : null)
+      // Clear the navigation state so back-navigation doesn't re-trigger
+      window.history.replaceState({}, '')
+    }
+  }, []) // eslint-disable-line react-hooks/exhaustive-deps
 
   const toggleIndicator = useCallback((name) => {
     setActiveIndicators(prev =>
@@ -74,7 +96,9 @@ export function AnalysisProvider({ children }) {
       hoveredDate, pinnedDate, activeDate,
       hoveredMovers, pinnedMovers, activeMovers,
       onHover, onPin, clearPin,
-      activePosition,
+      activePositions,
+      // backwards-compat: components that read activePosition get the first entry
+      activePosition: activePositions?.[0] ?? null,
     }}>
       {children}
     </AnalysisContext.Provider>
