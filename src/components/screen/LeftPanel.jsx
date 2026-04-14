@@ -11,6 +11,12 @@ function TradeModal({ side, symbol, onClose, onSaved }) {
   const [saving, setSaving] = useState(false)
   const [err, setErr]       = useState(null)
 
+  useEffect(() => {
+    const fn = (e) => { if (e.key === 'Escape') onClose() }
+    document.addEventListener('keydown', fn)
+    return () => document.removeEventListener('keydown', fn)
+  }, [onClose])
+
   const isBuy = side === 'BUY'
   const set   = (k, v) => setForm(f => ({ ...f, [k]: v }))
 
@@ -109,6 +115,12 @@ function CloseConfirm({ position, onClose, onDone }) {
   const [saving, setSaving] = useState(false)
   const [err,    setErr]    = useState(null)
 
+  useEffect(() => {
+    const fn = (e) => { if (e.key === 'Escape') onClose() }
+    document.addEventListener('keydown', fn)
+    return () => document.removeEventListener('keydown', fn)
+  }, [onClose])
+
   const handleClose = async () => {
     setSaving(true); setErr(null)
     try {
@@ -157,10 +169,11 @@ function EditWatchItemForm({ item, onClose, onSaved }) {
     category:    item.category    || 'active',
   })
   const [saving, setSaving] = useState(false)
+  const [saveErr, setSaveErr] = useState(null)
 
   const handleSave = async (e) => {
     e.preventDefault()
-    setSaving(true)
+    setSaving(true); setSaveErr(null)
     try {
       await updateWatchlist(item.id, {
         watch_low:   form.watch_low   !== '' ? parseFloat(form.watch_low)   : null,
@@ -172,7 +185,7 @@ function EditWatchItemForm({ item, onClose, onSaved }) {
       })
       onSaved()
     } catch (err) {
-      console.error(err)
+      setSaveErr(err.response?.data?.error || 'Failed to save')
     } finally {
       setSaving(false)
     }
@@ -182,6 +195,7 @@ function EditWatchItemForm({ item, onClose, onSaved }) {
 
   return (
     <form onSubmit={handleSave} className="px-4 py-4 space-y-3">
+      {saveErr && <p className="text-[10px] text-red-500 bg-red-50 dark:bg-red-950 px-3 py-1.5 rounded-lg">{saveErr}</p>}
       <div className="grid grid-cols-2 gap-2">
         {[['Watch Low (Rs)', 'watch_low', 'number'], ['Watch High (Rs)', 'watch_high', 'number'], ['Price Alert (Rs)', 'price_alert', 'number'], ['Alert Date', 'alert_date', 'date']].map(([label, key, type]) => (
           <div key={key}>
@@ -238,7 +252,7 @@ export default function LeftPanel() {
     const onFocus = () => loadData()
     window.addEventListener('focus', onFocus)
     return () => window.removeEventListener('focus', onFocus)
-  }, [])
+  }, [loadData])
   useChatRefresh(['trades', 'watchlist'], loadData)
 
   // Within 2% of SL or TP
@@ -269,6 +283,14 @@ export default function LeftPanel() {
 
   const canTrade = !isIndex(selectedSymbol)
   const { onContextMenu, ContextMenuPortal } = useContextMenu()
+
+  // Escape key closes edit watchlist modal
+  useEffect(() => {
+    if (!editWatchItem) return
+    const fn = (e) => { if (e.key === 'Escape') setEditWatchItem(null) }
+    document.addEventListener('keydown', fn)
+    return () => document.removeEventListener('keydown', fn)
+  }, [editWatchItem])
 
   return (
     <div className="flex flex-col h-full overflow-hidden">
@@ -329,7 +351,7 @@ export default function LeftPanel() {
                 </div>
                 <div className="text-[8px] text-gray-500 space-y-0.5" translate="no">
                   <div>Qty: <span className="text-gray-700 dark:text-gray-300 font-medium">{p.remaining_quantity ?? p.quantity}</span></div>
-                  <div>Entry: <span className="text-blue-400 font-medium">{p.entry_price?.toLocaleString()}</span></div>
+                  <div>Entry: <span className="text-blue-400 font-medium">{parseFloat(p.entry_price)?.toLocaleString()}</span></div>
                   {p.sl && <div>SL: <span className="text-red-400 font-medium">{p.sl}</span></div>}
                   {p.tp && <div>TP: <span className="text-emerald-500 font-medium">{p.tp}</span></div>}
                 </div>

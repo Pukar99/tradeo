@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useCallback } from 'react'
 import { getTopVolume, getMarketDates, getTopMovers, getAIReport, getIPOs, getMarketNews } from '../../api'
 import { useScreen } from '../../context/ScreenContext'
 
@@ -20,6 +20,13 @@ function ChangeBar({ value }) {
 
 function ExploreModal({ items, onClose }) {
   const all = items.slice(0, 10)
+
+  useEffect(() => {
+    const fn = (e) => { if (e.key === 'Escape') onClose() }
+    document.addEventListener('keydown', fn)
+    return () => document.removeEventListener('keydown', fn)
+  }, [onClose])
+
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
       <div className="absolute inset-0 bg-black/40 backdrop-blur-sm" onClick={onClose} />
@@ -135,10 +142,13 @@ export default function RightPanel() {
   const [latestDate, setLatestDate]     = useState('')
   const [moverTab, setMoverTab]         = useState('gainers')
   const [loading, setLoading]           = useState(false)
+  const [moversErr, setMoversErr]       = useState(null)
+  const [datesErr, setDatesErr]         = useState(null)
 
   // News/IPO feed state
   const [feedItems, setFeedItems]   = useState([])
   const [feedLoaded, setFeedLoaded] = useState(false)
+  const [feedErr, setFeedErr]       = useState(null)
   const [showExplore, setShowExplore] = useState(false)
 
   // Load dates once
@@ -148,14 +158,15 @@ export default function RightPanel() {
         setDates(r.data.dates)
         setLatestDate(r.data.latestDate)
         setSelectedDate(r.data.latestDate)
+        setDatesErr(null)
       })
-      .catch(() => {})
+      .catch(() => setDatesErr('Failed to load market dates'))
   }, [])
 
   // Load movers + volume when date changes
   useEffect(() => {
     if (!selectedDate) return
-    setLoading(true)
+    setLoading(true); setMoversErr(null)
     Promise.all([
       getTopMovers(selectedDate),
       getTopVolume({ limit: 10, date: selectedDate }),
@@ -164,13 +175,14 @@ export default function RightPanel() {
         setMovers(mr.data)
         setVolume(vr.data)
       })
-      .catch(() => {})
+      .catch(() => setMoversErr('Failed to load market data'))
       .finally(() => setLoading(false))
   }, [selectedDate])
 
-  // Load IPO + news feed (once on success, retried if still not loaded)
+  // Load IPO + news feed — mark loaded (true or error) so we don't retry infinitely
   useEffect(() => {
     if (feedLoaded) return
+    setFeedErr(null)
     Promise.all([getIPOs(), getMarketNews()])
       .then(([ir, nr]) => {
         setFeedLoaded(true)
@@ -194,13 +206,16 @@ export default function RightPanel() {
         }))
         setFeedItems([...ipoItems, ...newsItems])
       })
-      .catch(() => {})
+      .catch(() => {
+        setFeedLoaded(true)  // stop infinite retry; user can see the error
+        setFeedErr('Failed to load market intel')
+      })
   }, [feedLoaded])
 
   const gainers   = movers?.gainers || []
   const losers    = movers?.losers  || []
   const volData   = volume?.data    || []
-  const maxTurnover = (volData.length > 0 && volData[0].t > 0) ? volData[0].t : 1
+  const maxTurnover = (volData.length > 0 && parseFloat(volData[0].t) > 0) ? parseFloat(volData[0].t) : 1
   const isLatest  = selectedDate === latestDate
 
   const visibleFeed = feedItems.slice(0, 4)
@@ -210,20 +225,26 @@ export default function RightPanel() {
 
       {/* ── Date selector ─────────────────────────────────────────────────── */}
       <div className="flex items-center gap-1 px-2 pt-2 pb-1.5 shrink-0">
-        <select
-          value={selectedDate}
-          onChange={e => setSelectedDate(e.target.value)}
-          className="flex-1 bg-gray-50 dark:bg-gray-800 border border-gray-200 dark:border-gray-700 text-[9px] text-gray-700 dark:text-gray-300 rounded-lg px-1.5 py-1 focus:outline-none focus:ring-1 focus:ring-blue-300"
-        >
-          {dates.map(d => <option key={d} value={d}>{d}</option>)}
-        </select>
-        {!isLatest && (
-          <button
-            onClick={() => setSelectedDate(latestDate)}
-            className="text-[8px] font-semibold text-blue-500 border border-blue-200 dark:border-blue-900 bg-blue-50 dark:bg-blue-950 px-1.5 py-1 rounded-lg whitespace-nowrap hover:bg-blue-100 transition-colors"
-          >
-            Latest
-          </button>
+        {datesErr ? (
+          <p className="text-[8px] text-red-400 px-1">{datesErr}</p>
+        ) : (
+          <>
+            <select
+              value={selectedDate}
+              onChange={e => setSelectedDate(e.target.value)}
+              className="flex-1 bg-gray-50 dark:bg-gray-800 border border-gray-200 dark:border-gray-700 text-[9px] text-gray-700 dark:text-gray-300 rounded-lg px-1.5 py-1 focus:outline-none focus:ring-1 focus:ring-blue-300"
+            >
+              {dates.map(d => <option key={d} value={d}>{d}</option>)}
+            </select>
+            {!isLatest && (
+              <button
+                onClick={() => setSelectedDate(latestDate)}
+                className="text-[8px] font-semibold text-blue-500 border border-blue-200 dark:border-blue-900 bg-blue-50 dark:bg-blue-950 px-1.5 py-1 rounded-lg whitespace-nowrap hover:bg-blue-100 transition-colors"
+              >
+                Latest
+              </button>
+            )}
+          </>
         )}
       </div>
 
@@ -254,11 +275,14 @@ export default function RightPanel() {
 
       {/* ── Table area ────────────────────────────────────────────────────── */}
       <div className="px-2 shrink-0">
+        {moversErr && !loading && (
+          <p className="text-[8px] text-red-400 text-center py-2">{moversErr}</p>
+        )}
         {loading ? (
           <div className="flex items-center justify-center py-4">
             <div className="w-4 h-4 border-2 border-blue-400 border-t-transparent rounded-full animate-spin" />
           </div>
-        ) : (
+        ) : !moversErr && (
           <table className="w-full">
             <thead>
               <tr className="border-b border-gray-100 dark:border-gray-800">
@@ -294,11 +318,11 @@ export default function RightPanel() {
                     <div>
                       <span className="text-[9px] font-bold text-gray-800 dark:text-gray-100 group-hover:text-blue-500 transition-colors">{s.s}</span>
                       <div className="h-0.5 bg-gray-100 dark:bg-gray-800 rounded-full mt-0.5 overflow-hidden w-full">
-                        <div className="h-full bg-blue-400 rounded-full" style={{ width: `${(s.t / maxTurnover) * 100}%` }} />
+                        <div className="h-full bg-blue-400 rounded-full" style={{ width: `${(parseFloat(s.t) / maxTurnover) * 100}%` }} />
                       </div>
                     </div>
                   </td>
-                  <td className="py-1 text-right text-[8px] text-gray-500 whitespace-nowrap">{(s.t / 1e6).toFixed(1)}M</td>
+                  <td className="py-1 text-right text-[8px] text-gray-500 whitespace-nowrap">{(parseFloat(s.t) / 1e6).toFixed(1)}M</td>
                   <td className="py-1 text-right"><ChangeBar value={s.p} /></td>
                 </tr>
               ))}
@@ -329,7 +353,9 @@ export default function RightPanel() {
           )}
         </div>
 
-        {feedItems.length === 0 && feedLoaded ? (
+        {feedErr ? (
+          <p className="text-[8px] text-red-400 py-2 text-center">{feedErr}</p>
+        ) : feedItems.length === 0 && feedLoaded ? (
           <p className="text-[9px] text-gray-400 py-2 text-center">No data available</p>
         ) : feedItems.length === 0 ? (
           <div className="flex items-center justify-center py-3">
