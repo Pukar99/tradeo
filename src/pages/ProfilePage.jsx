@@ -1,9 +1,11 @@
-import { useState, useEffect, useRef } from 'react'
+import { useState, useEffect, useRef, useCallback } from 'react'
 import { useAuth } from '../context/AuthContext'
 import { useNavigate } from 'react-router-dom'
 import { getProfile, updateProfile, uploadAvatar, changePassword } from '../api'
 
 const ADMIN_USER_ID = 1
+const MAX_AVATAR_SIZE = 5 * 1024 * 1024 // 5 MB
+const ALLOWED_IMAGE_TYPES = ['image/jpeg', 'image/jpg', 'image/png', 'image/gif', 'image/webp']
 
 function StatCard({ label, value, color = 'text-gray-900 dark:text-white', sub }) {
   return (
@@ -21,9 +23,12 @@ function ProfilePage() {
   const fileInputRef = useRef(null)
   const [profile, setProfile] = useState(null)
   const [loading, setLoading] = useState(true)
+  const [fetchError, setFetchError] = useState('')
   const [editing, setEditing] = useState(false)
   const [uploadingAvatar, setUploadingAvatar] = useState(false)
+  const [avatarError, setAvatarError] = useState('')
   const [saving, setSaving] = useState(false)
+  const [saveError, setSaveError] = useState('')
   const [activeTab, setActiveTab] = useState('overview')
   const [form, setForm] = useState({
     name: '',
@@ -31,6 +36,7 @@ function ProfilePage() {
     location: '',
     trading_since: ''
   })
+  const [formErrors, setFormErrors] = useState({})
   const [showPasswordForm, setShowPasswordForm] = useState(false)
   const [passwordForm, setPasswordForm] = useState({
     currentPassword: '',
@@ -41,12 +47,13 @@ function ProfilePage() {
   const [passwordSuccess, setPasswordSuccess] = useState('')
   const [savingPassword, setSavingPassword] = useState(false)
 
+  // Auth redirect — use useEffect, never navigate during render
   useEffect(() => {
-    if (!user) { navigate('/login'); return }
-    fetchProfile()
-  }, [])
+    if (!user) navigate('/login')
+  }, [user, navigate])
 
-  const fetchProfile = async () => {
+  const fetchProfile = useCallback(async () => {
+    setFetchError('')
     try {
       const res = await getProfile()
       setProfile(res.data)
@@ -57,15 +64,34 @@ function ProfilePage() {
         trading_since: res.data.user.trading_since || ''
       })
     } catch (err) {
-      console.error(err)
+      console.error('fetchProfile error:', err)
+      setFetchError(err.response?.data?.message || 'Failed to load profile. Please try again.')
     } finally {
       setLoading(false)
     }
-  }
+  }, [])
+
+  useEffect(() => {
+    if (user) fetchProfile()
+  }, [user, fetchProfile])
 
   const handleAvatarUpload = async (e) => {
     const file = e.target.files[0]
     if (!file) return
+
+    // Client-side validation before hitting the network
+    setAvatarError('')
+    if (!ALLOWED_IMAGE_TYPES.includes(file.type)) {
+      setAvatarError('Only JPG, PNG, GIF or WebP images are allowed.')
+      e.target.value = ''
+      return
+    }
+    if (file.size > MAX_AVATAR_SIZE) {
+      setAvatarError('Image must be under 5 MB.')
+      e.target.value = ''
+      return
+    }
+
     setUploadingAvatar(true)
     try {
       const formData = new FormData()
@@ -77,24 +103,56 @@ function ProfilePage() {
       }))
       updateUser({ avatar_url: res.data.avatar_url })
     } catch (err) {
-      console.error(err)
+      console.error('Avatar upload error:', err)
+      setAvatarError(err.response?.data?.message || 'Failed to upload avatar. Please try again.')
     } finally {
       setUploadingAvatar(false)
+      // Reset input so the same file can be re-selected after an error
+      e.target.value = ''
     }
   }
 
+  const validateForm = () => {
+    const errors = {}
+    if (!form.name.trim()) errors.name = 'Name is required'
+    if (form.name.trim().length > 100) errors.name = 'Name must be under 100 characters'
+    if (form.bio.length > 500) errors.bio = 'Bio must be under 500 characters'
+    setFormErrors(errors)
+    return Object.keys(errors).length === 0
+  }
+
   const handleSave = async () => {
+    if (!validateForm()) return
     setSaving(true)
+    setSaveError('')
     try {
       const res = await updateProfile(form)
       setProfile(prev => ({ ...prev, user: { ...prev.user, ...res.data } }))
-      updateUser({ name: form.name })
+      updateUser({ name: form.name.trim() })
       setEditing(false)
+      setFormErrors({})
     } catch (err) {
-      console.error(err)
+      console.error('handleSave error:', err)
+      setSaveError(err.response?.data?.message || 'Failed to save changes. Please try again.')
     } finally {
       setSaving(false)
     }
+  }
+
+  const handleCancelEdit = () => {
+    // Reset form to current saved values
+    if (profile) {
+      setForm({
+        name: profile.user.name || '',
+        bio: profile.user.bio || '',
+        location: profile.user.location || '',
+        trading_since: profile.user.trading_since || ''
+      })
+    }
+    setEditing(false)
+    setFormErrors({})
+    setSaveError('')
+    setShowPasswordForm(false)
   }
 
   const handleChangePassword = async (e) => {
@@ -108,6 +166,10 @@ function ProfilePage() {
     }
     if (passwordForm.newPassword.length < 6) {
       setPasswordError('Password must be at least 6 characters')
+      return
+    }
+    if (passwordForm.currentPassword === passwordForm.newPassword) {
+      setPasswordError('New password must be different from current password')
       return
     }
 
@@ -137,9 +199,10 @@ function ProfilePage() {
 
   const formatDate = (dateStr) => {
     if (!dateStr) return 'Unknown'
-    return new Date(dateStr).toLocaleDateString('en-US', {
-      year: 'numeric', month: 'long', day: 'numeric'
-    })
+    // Use ISO string to avoid UTC vs local timezone off-by-one
+    const d = new Date(dateStr)
+    if (isNaN(d.getTime())) return dateStr
+    return d.toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric', timeZone: 'UTC' })
   }
 
   const getTraderLevel = () => {
@@ -160,6 +223,18 @@ function ProfilePage() {
     </div>
   )
 
+  if (fetchError) return (
+    <div className="w-full px-6 py-6 flex flex-col items-center justify-center min-h-64 gap-4">
+      <p className="text-red-400 text-sm">{fetchError}</p>
+      <button
+        onClick={() => { setLoading(true); fetchProfile() }}
+        className="px-4 py-2 bg-blue-600 text-white rounded-xl text-sm font-medium hover:bg-blue-700 transition-colors"
+      >
+        Retry
+      </button>
+    </div>
+  )
+
   if (!profile) return null
 
   const level = getTraderLevel()
@@ -168,6 +243,7 @@ function ProfilePage() {
   return (
     <div className="w-full px-6 pt-6 pb-10 max-w-5xl mx-auto">
 
+      {/* ── Hero Banner ── */}
       <div className="relative bg-gradient-to-br from-gray-900 via-blue-950 to-gray-900 rounded-2xl overflow-hidden mb-6 shadow-xl">
         <div className="absolute inset-0 opacity-10">
           <div className="absolute top-0 left-0 w-64 h-64 bg-blue-500 rounded-full filter blur-3xl" />
@@ -180,7 +256,12 @@ function ProfilePage() {
               <div className="relative">
                 <div className="w-24 h-24 rounded-2xl overflow-hidden border-4 border-white border-opacity-20 shadow-xl">
                   {profile.user.avatar_url ? (
-                    <img src={profile.user.avatar_url} alt={profile.user.name} className="w-full h-full object-cover" />
+                    <img
+                      src={profile.user.avatar_url}
+                      alt={profile.user.name}
+                      className="w-full h-full object-cover"
+                      onError={e => { e.target.style.display = 'none' }}
+                    />
                   ) : (
                     <div className="w-full h-full bg-gradient-to-br from-blue-500 to-purple-600 flex items-center justify-center">
                       <span className="text-white text-3xl font-bold">{getInitials(profile.user.name)}</span>
@@ -190,7 +271,8 @@ function ProfilePage() {
                 <button
                   onClick={() => fileInputRef.current?.click()}
                   disabled={uploadingAvatar}
-                  className="absolute -bottom-2 -right-2 w-8 h-8 bg-blue-600 hover:bg-blue-500 rounded-lg flex items-center justify-center shadow-lg transition-colors"
+                  title="Change avatar"
+                  className="absolute -bottom-2 -right-2 w-8 h-8 bg-blue-600 hover:bg-blue-500 disabled:opacity-50 rounded-lg flex items-center justify-center shadow-lg transition-colors"
                 >
                   {uploadingAvatar ? (
                     <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" />
@@ -201,7 +283,13 @@ function ProfilePage() {
                     </svg>
                   )}
                 </button>
-                <input ref={fileInputRef} type="file" accept="image/*" onChange={handleAvatarUpload} className="hidden" />
+                <input
+                  ref={fileInputRef}
+                  type="file"
+                  accept="image/jpeg,image/jpg,image/png,image/gif,image/webp"
+                  onChange={handleAvatarUpload}
+                  className="hidden"
+                />
               </div>
 
               <div>
@@ -226,11 +314,17 @@ function ProfilePage() {
                   <span className="text-gray-500 text-xs">Member since {formatDate(profile.user.created_at)}</span>
                 </div>
                 {profile.user.bio && <p className="text-gray-300 text-sm mt-2 max-w-md">{profile.user.bio}</p>}
+                {/* Avatar error shown near the avatar area */}
+                {avatarError && (
+                  <p className="text-red-400 text-xs mt-1">{avatarError}
+                    <button onClick={() => setAvatarError('')} className="ml-2 underline">Dismiss</button>
+                  </p>
+                )}
               </div>
             </div>
 
             <button
-              onClick={() => { setEditing(!editing); setShowPasswordForm(false) }}
+              onClick={() => editing ? handleCancelEdit() : setEditing(true)}
               className={`px-4 py-2 rounded-xl text-sm font-medium transition-colors ${
                 editing
                   ? 'bg-gray-700 text-gray-300 hover:bg-gray-600'
@@ -241,6 +335,7 @@ function ProfilePage() {
             </button>
           </div>
 
+          {/* Quick stats strip */}
           <div className="grid grid-cols-4 gap-4 mt-6">
             <div className="bg-white bg-opacity-5 rounded-xl p-3 text-center border border-white border-opacity-10">
               <p className="text-2xl font-bold text-white">{profile.stats.totalTrades}</p>
@@ -264,19 +359,35 @@ function ProfilePage() {
         </div>
       </div>
 
+      {/* ── Edit Panel ── */}
       {editing && (
         <div className="bg-white dark:bg-gray-800 rounded-2xl p-6 mb-6 shadow-sm border border-gray-100 dark:border-gray-700">
           <h2 className="text-base font-semibold text-gray-900 dark:text-white mb-4">Edit Profile</h2>
 
+          {saveError && (
+            <div className="bg-red-50 dark:bg-red-900/30 text-red-600 dark:text-red-300 px-4 py-3 rounded-xl text-sm mb-4 flex items-center justify-between">
+              <span>{saveError}</span>
+              <button onClick={() => setSaveError('')} className="text-red-400 hover:text-red-600 ml-2">✕</button>
+            </div>
+          )}
+
           <div className="grid grid-cols-2 gap-4 mb-4">
             <div>
-              <label className="block text-xs text-gray-500 dark:text-gray-400 mb-1">Full Name</label>
+              <label className="block text-xs text-gray-500 dark:text-gray-400 mb-1">
+                Full Name <span className="text-red-400">*</span>
+              </label>
               <input
                 type="text"
                 value={form.name}
-                onChange={e => setForm({ ...form, name: e.target.value })}
-                className="w-full border border-gray-200 dark:border-gray-600 dark:bg-gray-700 dark:text-white rounded-xl px-3 py-2 text-sm focus:outline-none focus:border-blue-500"
+                onChange={e => { setForm({ ...form, name: e.target.value }); setFormErrors(p => ({ ...p, name: '' })) }}
+                maxLength={100}
+                className={`w-full border rounded-xl px-3 py-2 text-sm focus:outline-none dark:bg-gray-700 dark:text-white ${
+                  formErrors.name
+                    ? 'border-red-400 focus:border-red-400'
+                    : 'border-gray-200 dark:border-gray-600 focus:border-blue-500'
+                }`}
               />
+              {formErrors.name && <p className="text-red-400 text-xs mt-1">{formErrors.name}</p>}
             </div>
             <div>
               <label className="block text-xs text-gray-500 dark:text-gray-400 mb-1">Location</label>
@@ -299,14 +410,26 @@ function ProfilePage() {
               />
             </div>
             <div>
-              <label className="block text-xs text-gray-500 dark:text-gray-400 mb-1">Bio</label>
-              <input
-                type="text"
+              <label className="block text-xs text-gray-500 dark:text-gray-400 mb-1 flex items-center justify-between">
+                <span>Bio</span>
+                <span className={`text-xs ${form.bio.length > 450 ? 'text-red-400' : 'text-gray-400'}`}>
+                  {form.bio.length}/500
+                </span>
+              </label>
+              {/* textarea for multi-line bio — input was wrong here */}
+              <textarea
                 value={form.bio}
-                onChange={e => setForm({ ...form, bio: e.target.value })}
+                onChange={e => { setForm({ ...form, bio: e.target.value }); setFormErrors(p => ({ ...p, bio: '' })) }}
                 placeholder="Short bio about your trading style"
-                className="w-full border border-gray-200 dark:border-gray-600 dark:bg-gray-700 dark:text-white rounded-xl px-3 py-2 text-sm focus:outline-none focus:border-blue-500"
+                rows={3}
+                maxLength={500}
+                className={`w-full border rounded-xl px-3 py-2 text-sm focus:outline-none resize-none dark:bg-gray-700 dark:text-white ${
+                  formErrors.bio
+                    ? 'border-red-400 focus:border-red-400'
+                    : 'border-gray-200 dark:border-gray-600 focus:border-blue-500'
+                }`}
               />
+              {formErrors.bio && <p className="text-red-400 text-xs mt-1">{formErrors.bio}</p>}
             </div>
           </div>
 
@@ -314,14 +437,14 @@ function ProfilePage() {
             <button
               onClick={handleSave}
               disabled={saving}
-              className="bg-blue-600 text-white px-6 py-2 rounded-xl text-sm font-medium hover:bg-blue-700 disabled:opacity-50"
+              className="bg-blue-600 text-white px-6 py-2 rounded-xl text-sm font-medium hover:bg-blue-700 disabled:opacity-50 transition-colors"
             >
               {saving ? 'Saving...' : 'Save Changes'}
             </button>
             <button
               type="button"
               onClick={() => setShowPasswordForm(!showPasswordForm)}
-              className="bg-gray-100 dark:bg-gray-700 text-gray-600 dark:text-gray-300 px-6 py-2 rounded-xl text-sm font-medium hover:bg-gray-200 dark:hover:bg-gray-600"
+              className="bg-gray-100 dark:bg-gray-700 text-gray-600 dark:text-gray-300 px-6 py-2 rounded-xl text-sm font-medium hover:bg-gray-200 dark:hover:bg-gray-600 transition-colors"
             >
               {showPasswordForm ? 'Cancel Password Change' : '🔒 Change Password'}
             </button>
@@ -329,25 +452,25 @@ function ProfilePage() {
 
           {showPasswordForm && (
             <div className="mt-4 pt-4 border-t border-gray-100 dark:border-gray-700">
-              <h3 className="text-sm font-semibold text-gray-900 dark:text-white mb-3">
-                Change Password
-              </h3>
+              <h3 className="text-sm font-semibold text-gray-900 dark:text-white mb-3">Change Password</h3>
               {passwordError && (
-                <div className="bg-red-50 dark:bg-red-900 text-red-600 dark:text-red-300 p-3 rounded-xl text-sm mb-3">
-                  {passwordError}
+                <div className="bg-red-50 dark:bg-red-900/30 text-red-600 dark:text-red-300 px-3 py-2 rounded-xl text-sm mb-3 flex items-center justify-between">
+                  <span>{passwordError}</span>
+                  <button onClick={() => setPasswordError('')} className="ml-2 text-red-400 hover:text-red-600">✕</button>
                 </div>
               )}
               {passwordSuccess && (
-                <div className="bg-green-50 dark:bg-green-900 text-green-600 dark:text-green-300 p-3 rounded-xl text-sm mb-3">
+                <div className="bg-green-50 dark:bg-green-900/30 text-green-600 dark:text-green-300 px-3 py-2 rounded-xl text-sm mb-3">
                   ✓ {passwordSuccess}
                 </div>
               )}
-              <form onSubmit={handleChangePassword}>
+              <form onSubmit={handleChangePassword} autoComplete="off">
                 <div className="grid grid-cols-3 gap-4 mb-4">
                   <div>
                     <label className="block text-xs text-gray-500 dark:text-gray-400 mb-1">Current Password</label>
                     <input
                       type="password"
+                      autoComplete="current-password"
                       value={passwordForm.currentPassword}
                       onChange={e => setPasswordForm({ ...passwordForm, currentPassword: e.target.value })}
                       placeholder="••••••••"
@@ -359,6 +482,7 @@ function ProfilePage() {
                     <label className="block text-xs text-gray-500 dark:text-gray-400 mb-1">New Password</label>
                     <input
                       type="password"
+                      autoComplete="new-password"
                       value={passwordForm.newPassword}
                       onChange={e => setPasswordForm({ ...passwordForm, newPassword: e.target.value })}
                       placeholder="••••••••"
@@ -370,6 +494,7 @@ function ProfilePage() {
                     <label className="block text-xs text-gray-500 dark:text-gray-400 mb-1">Confirm New Password</label>
                     <input
                       type="password"
+                      autoComplete="new-password"
                       value={passwordForm.confirmPassword}
                       onChange={e => setPasswordForm({ ...passwordForm, confirmPassword: e.target.value })}
                       placeholder="••••••••"
@@ -381,7 +506,7 @@ function ProfilePage() {
                 <button
                   type="submit"
                   disabled={savingPassword}
-                  className="bg-red-500 text-white px-6 py-2 rounded-xl text-sm font-medium hover:bg-red-600 disabled:opacity-50"
+                  className="bg-red-500 text-white px-6 py-2 rounded-xl text-sm font-medium hover:bg-red-600 disabled:opacity-50 transition-colors"
                 >
                   {savingPassword ? 'Changing...' : 'Change Password'}
                 </button>
@@ -391,6 +516,7 @@ function ProfilePage() {
         </div>
       )}
 
+      {/* ── Tabs ── */}
       <div className="flex gap-2 mb-6">
         {['overview', 'trading', 'discipline', 'research'].map(tab => (
           <button
@@ -411,6 +537,7 @@ function ProfilePage() {
         ))}
       </div>
 
+      {/* ── Overview Tab ── */}
       {activeTab === 'overview' && (
         <div className="grid grid-cols-3 gap-4">
           <div className="bg-white dark:bg-gray-800 rounded-2xl p-5 shadow-sm border border-gray-100 dark:border-gray-700">
@@ -423,6 +550,10 @@ function ProfilePage() {
                 <span className="text-sm font-bold text-gray-900 dark:text-white">{profile.stats.totalTrades}</span>
               </div>
               <div className="flex justify-between">
+                <span className="text-xs text-gray-500 dark:text-gray-400">Closed Trades</span>
+                <span className="text-sm font-bold text-gray-900 dark:text-white">{profile.stats.closedTrades}</span>
+              </div>
+              <div className="flex justify-between">
                 <span className="text-xs text-gray-500 dark:text-gray-400">Win Rate</span>
                 <span className={`text-sm font-bold ${profile.stats.winRate >= 50 ? 'text-green-500' : 'text-red-400'}`}>
                   {profile.stats.winRate}%
@@ -431,6 +562,12 @@ function ProfilePage() {
               <div className="flex justify-between">
                 <span className="text-xs text-gray-500 dark:text-gray-400">Avg RR</span>
                 <span className="text-sm font-bold text-blue-500">1:{profile.stats.avgRR}</span>
+              </div>
+              <div className="flex justify-between">
+                <span className="text-xs text-gray-500 dark:text-gray-400">Realized P&L</span>
+                <span className={`text-sm font-bold ${profile.stats.totalRealizedPnl >= 0 ? 'text-green-500' : 'text-red-400'}`}>
+                  {profile.stats.totalRealizedPnl >= 0 ? '+' : ''}Rs.{Math.abs(profile.stats.totalRealizedPnl).toLocaleString()}
+                </span>
               </div>
               <div className="flex justify-between">
                 <span className="text-xs text-gray-500 dark:text-gray-400">Open Positions</span>
@@ -505,7 +642,11 @@ function ProfilePage() {
               <div>
                 <p className="text-xs text-gray-400 mb-2">Recent Posts</p>
                 {profile.research.recentPosts.map(post => (
-                  <div key={post.id} className="text-xs text-gray-600 dark:text-gray-300 py-1 border-b border-gray-50 dark:border-gray-700 truncate">
+                  <div
+                    key={post.id}
+                    onClick={() => navigate(`/research/${post.id}`)}
+                    className="text-xs text-gray-600 dark:text-gray-300 py-1 border-b border-gray-50 dark:border-gray-700 truncate cursor-pointer hover:text-blue-500 transition-colors"
+                  >
                     {post.is_verified && <span className="text-blue-500 mr-1">✓</span>}
                     {post.title}
                   </div>
@@ -516,31 +657,41 @@ function ProfilePage() {
         </div>
       )}
 
+      {/* ── Trading Tab ── */}
       {activeTab === 'trading' && (
         <div className="grid grid-cols-4 gap-4">
           <StatCard label="Total Trades" value={profile.stats.totalTrades} />
-          <StatCard label="Buy Orders" value={profile.stats.totalBuys} color="text-green-500" />
-          <StatCard label="Sell Orders" value={profile.stats.totalSells} color="text-red-400" />
+          <StatCard label="Closed Trades" value={profile.stats.closedTrades} color="text-blue-400" />
+          <StatCard label="Open Positions" value={profile.stats.openPositions} color="text-green-400" />
           <StatCard label="Win Rate" value={`${profile.stats.winRate}%`} color={profile.stats.winRate >= 50 ? 'text-green-500' : 'text-red-400'} />
           <StatCard label="Avg Risk/Reward" value={`1:${profile.stats.avgRR}`} color="text-blue-500" />
           <StatCard label="Profitable Trades" value={profile.stats.profitableTrades} color="text-green-500" />
-          <StatCard label="Open Positions" value={profile.stats.openPositions} />
-          <StatCard label="Total Invested" value={`Rs.${Math.round(profile.stats.totalInvested / 1000)}K`} color="text-purple-400" />
+          <StatCard
+            label="Realized P&L"
+            value={`${profile.stats.totalRealizedPnl >= 0 ? '+' : ''}Rs.${Math.abs(profile.stats.totalRealizedPnl).toLocaleString()}`}
+            color={profile.stats.totalRealizedPnl >= 0 ? 'text-green-500' : 'text-red-400'}
+          />
+          <StatCard
+            label="Capital at Risk"
+            value={profile.stats.totalInvested > 0 ? `Rs.${Math.round(profile.stats.totalInvested / 1000)}K` : '—'}
+            color="text-purple-400"
+          />
           <div className={`col-span-4 rounded-xl p-4 text-center ${
             profile.isEligible
-              ? 'bg-green-50 dark:bg-green-900 border border-green-200 dark:border-green-700'
-              : 'bg-yellow-50 dark:bg-yellow-900 border border-yellow-200 dark:border-yellow-700'
+              ? 'bg-green-50 dark:bg-green-900/30 border border-green-200 dark:border-green-700'
+              : 'bg-yellow-50 dark:bg-yellow-900/30 border border-yellow-200 dark:border-yellow-700'
           }`}>
             <p className={`text-sm font-semibold ${profile.isEligible ? 'text-green-700 dark:text-green-300' : 'text-yellow-700 dark:text-yellow-300'}`}>
               {profile.isEligible
                 ? '🎉 You are eligible to post research! Your trading metrics meet all requirements.'
-                : '⏳ Keep trading! You need 14+ trades, 5+ profitable, 33%+ win rate, and 1:3+ avg RR to post research.'
+                : `⏳ Keep trading! You need 14+ trades (${profile.stats.totalTrades}/14), 5+ profitable (${profile.stats.profitableTrades}/5), 33%+ win rate (${profile.stats.winRate}%), and 1:3+ avg RR (1:${profile.stats.avgRR}).`
               }
             </p>
           </div>
         </div>
       )}
 
+      {/* ── Discipline Tab ── */}
       {activeTab === 'discipline' && (
         <div className="grid grid-cols-3 gap-4">
           <StatCard label="Today's Score" value={`${profile.discipline.todayScore}%`} color={profile.discipline.todayScore >= 80 ? 'text-green-500' : profile.discipline.todayScore >= 50 ? 'text-blue-500' : 'text-red-400'} />
@@ -551,10 +702,10 @@ function ProfilePage() {
             <h3 className="text-sm font-semibold text-gray-900 dark:text-white mb-3">Discipline Impact</h3>
             <p className={`text-sm font-medium p-3 rounded-lg ${
               profile.discipline.todayScore >= 80
-                ? 'bg-green-50 dark:bg-green-900 text-green-700 dark:text-green-300'
+                ? 'bg-green-50 dark:bg-green-900/30 text-green-700 dark:text-green-300'
                 : profile.discipline.todayScore <= 40
-                ? 'bg-red-50 dark:bg-red-900 text-red-600 dark:text-red-300'
-                : 'bg-blue-50 dark:bg-blue-900 text-blue-600 dark:text-blue-300'
+                ? 'bg-red-50 dark:bg-red-900/30 text-red-600 dark:text-red-300'
+                : 'bg-blue-50 dark:bg-blue-900/30 text-blue-600 dark:text-blue-300'
             }`}>
               {profile.discipline.todayScore >= 80
                 ? '💎 Strong discipline — you are aligned.'
@@ -563,16 +714,20 @@ function ProfilePage() {
                 : '📈 Good progress — stay focused.'
               }
             </p>
+            {profile.discipline.totalDaysTracked === 0 && (
+              <p className="text-xs text-gray-400 mt-3">Complete your daily tasks on the Home page to start tracking discipline.</p>
+            )}
           </div>
         </div>
       )}
 
+      {/* ── Research Tab ── */}
       {activeTab === 'research' && (
         <div className="grid grid-cols-3 gap-4">
           <StatCard label="Posts Published" value={profile.research.totalPosts} color="text-blue-500" />
           <StatCard label="Verified Posts" value={profile.research.verifiedPosts} color="text-green-500" />
           <StatCard label="Research Status" value={profile.isEligible ? '✓ Eligible' : '✗ Not Yet'} color={profile.isEligible ? 'text-green-500' : 'text-red-400'} />
-          {profile.research.recentPosts.length > 0 && (
+          {profile.research.recentPosts.length > 0 ? (
             <div className="col-span-3 bg-white dark:bg-gray-800 rounded-xl p-5 shadow-sm border border-gray-100 dark:border-gray-700">
               <h3 className="text-sm font-semibold text-gray-900 dark:text-white mb-3">Recent Research Posts</h3>
               <div className="space-y-2">
@@ -580,16 +735,30 @@ function ProfilePage() {
                   <div
                     key={post.id}
                     onClick={() => navigate(`/research/${post.id}`)}
-                    className="flex items-center justify-between p-3 rounded-lg hover:bg-gray-50 dark:hover:bg-gray-700 cursor-pointer"
+                    className="flex items-center justify-between p-3 rounded-lg hover:bg-gray-50 dark:hover:bg-gray-700 cursor-pointer transition-colors"
                   >
                     <div className="flex items-center gap-2">
                       {post.is_verified && <span className="text-blue-500 text-xs">✓</span>}
                       <span className="text-sm text-gray-700 dark:text-gray-300">{post.title}</span>
                     </div>
-                    <span className="text-xs text-gray-400">{new Date(post.created_at).toLocaleDateString()}</span>
+                    <span className="text-xs text-gray-400">
+                      {new Date(post.created_at).toLocaleDateString('en-US', { timeZone: 'UTC' })}
+                    </span>
                   </div>
                 ))}
               </div>
+            </div>
+          ) : (
+            <div className="col-span-3 bg-white dark:bg-gray-800 rounded-xl p-8 shadow-sm border border-gray-100 dark:border-gray-700 text-center">
+              <p className="text-gray-400 text-sm">No published research posts yet.</p>
+              {profile.isEligible && (
+                <button
+                  onClick={() => navigate('/research/new')}
+                  className="mt-3 px-4 py-2 bg-blue-600 text-white rounded-xl text-sm font-medium hover:bg-blue-700 transition-colors"
+                >
+                  Write Your First Post
+                </button>
+              )}
             </div>
           )}
         </div>
