@@ -63,13 +63,15 @@ function ChartSymbolSearch() {
   const [open, setOpen]       = useState(false)
   const [symbols, setSymbols] = useState({ stocks: [], indexes: [] })
   const [cursor, setCursor]   = useState(-1)
-  const inputRef = useRef(null)
-  const listRef  = useRef(null)
+  const [loadErr, setLoadErr] = useState(null)
+  const inputRef       = useRef(null)
+  const listRef        = useRef(null)
+  const mouseDownInList = useRef(false)
 
   useEffect(() => {
     getMarketSymbols()
-      .then(r => { if (r.data?.stocks?.length) setSymbols(r.data) })
-      .catch(e => console.error('[symbols]', e?.response?.data || e?.message))
+      .then(r => { if (r.data?.stocks?.length) { setSymbols(r.data); setLoadErr(null) } })
+      .catch(() => setLoadErr('Symbols unavailable'))
   }, [])
 
   const allItems = [
@@ -110,7 +112,7 @@ function ChartSymbolSearch() {
           value={query}
           onChange={e => { setQuery(e.target.value); setOpen(true); setCursor(-1) }}
           onFocus={() => setOpen(true)}
-          onBlur={() => setTimeout(() => setOpen(false), 150)}
+          onBlur={() => { if (!mouseDownInList.current) setOpen(false) }}
           onKeyDown={handleKey}
           placeholder={selectedSymbol}
           className="bg-transparent text-[12px] text-gray-700 dark:text-gray-200 placeholder-gray-400 outline-none w-full cursor-pointer"
@@ -121,7 +123,7 @@ function ChartSymbolSearch() {
         <div className="absolute top-full mt-1 left-0 right-0 z-50 bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-700 rounded-xl shadow-lg max-h-64 overflow-y-auto">
           <ul ref={listRef}>
             {filtered.map((item, i) => (
-              <li key={item.label} onMouseDown={() => handleSelect(item)}
+              <li key={item.label} onMouseDown={() => { mouseDownInList.current = true; handleSelect(item); mouseDownInList.current = false }}
                 className={`flex items-center justify-between px-3 py-2 cursor-pointer transition-colors ${
                   i === cursor ? 'bg-blue-50 dark:bg-blue-950' : 'hover:bg-gray-50 dark:hover:bg-gray-800'
                 }`}>
@@ -139,7 +141,7 @@ function ChartSymbolSearch() {
 
       {open && filtered.length === 0 && query.length > 0 && (
         <div className="absolute top-full mt-1 left-0 right-0 z-50 bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-700 rounded-xl shadow-lg px-3 py-3 text-[11px] text-gray-400">
-          No results for "{query}"
+          {loadErr ? loadErr : `No results for "${query}"`}
         </div>
       )}
     </div>
