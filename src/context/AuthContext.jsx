@@ -2,10 +2,17 @@ import { createContext, useContext, useState } from 'react'
 
 const AuthContext = createContext()
 
+function safeParseUser() {
+  try {
+    return JSON.parse(localStorage.getItem('user')) || null
+  } catch {
+    localStorage.removeItem('user')
+    return null
+  }
+}
+
 export function AuthProvider({ children }) {
-  const [user, setUser] = useState(
-    JSON.parse(localStorage.getItem('user')) || null
-  )
+  const [user, setUser] = useState(safeParseUser)
 
   const login = (userData, token) => {
     localStorage.setItem('token', token)
@@ -14,7 +21,12 @@ export function AuthProvider({ children }) {
   }
 
   const updateUser = (updatedData) => {
-    const existing = JSON.parse(localStorage.getItem('user')) || {}
+    let existing = null
+    try {
+      existing = JSON.parse(localStorage.getItem('user')) || {}
+    } catch {
+      existing = {}
+    }
     const updated = { ...existing, ...updatedData }
     localStorage.setItem('user', JSON.stringify(updated))
     setUser(updated)
@@ -23,6 +35,8 @@ export function AuthProvider({ children }) {
   const logout = () => {
     localStorage.removeItem('token')
     localStorage.removeItem('user')
+    // Clear once-per-session flags so they fire again on next login
+    sessionStorage.removeItem('briefingShown')
     setUser(null)
   }
 

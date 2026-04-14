@@ -1,7 +1,7 @@
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useCallback, useRef } from 'react'
 import { useAuth } from '../context/AuthContext'
 import { useNavigate } from 'react-router-dom'
-import { getTradeLog, getStockPrice, getWatchlist, getDiscipline, getTodayTasks } from '../api'
+import { getTradeLog, getStockPrice, getWatchlist, getDiscipline, getTodayTasks, getTopMovers } from '../api'
 
 const NEPSE_QUOTES = [
   "The market rewards patience, not activity.",
@@ -19,13 +19,13 @@ function MorningBriefing({ onClose }) {
   const navigate = useNavigate()
   const [loading, setLoading] = useState(true)
   const [data, setData] = useState(null)
+  const [fetchError, setFetchError] = useState(null)
+  const containerRef = useRef(null)
   const quote = NEPSE_QUOTES[new Date().getDay() % NEPSE_QUOTES.length]
 
-  useEffect(() => {
-    fetchBriefingData()
-  }, [])
-
-  const fetchBriefingData = async () => {
+  const fetchBriefingData = useCallback(async () => {
+    setFetchError(null)
+    setLoading(true)
     try {
       const [tradesRes, watchRes, disciplineRes, tasksRes] = await Promise.all([
         getTradeLog(),
@@ -38,55 +38,55 @@ function MorningBriefing({ onClose }) {
       const open = trades.filter(t => t.status === 'OPEN' || t.status === 'PARTIAL')
       const closed = trades.filter(t => t.status === 'CLOSED')
 
-      // Fetch prices for open positions
-      const openWithPrices = await Promise.all(
-        open.map(async (t) => {
-          try {
-            const priceRes = await getStockPrice(t.symbol)
-            const qty = t.remaining_quantity || t.quantity
-            const ltp = priceRes.data.price
-            const pnl = t.position === 'LONG'
-              ? (ltp - t.entry_price) * qty
-              : (t.entry_price - ltp) * qty
-            const slDistPct = t.sl ? Math.abs(((ltp - t.sl) / ltp) * 100) : null
-            const tpDistPct = t.tp ? Math.abs(((t.tp - ltp) / ltp) * 100) : null
-            return {
-              ...t, currentPrice: ltp,
-              change: priceRes.data.change,
-              unrealizedPnl: Math.round(pnl),
-              slDistPct: slDistPct?.toFixed(1),
-              tpDistPct: tpDistPct?.toFixed(1),
-              nearSL: slDistPct && slDistPct < 3,
-              nearTP: tpDistPct && tpDistPct < 3,
-              noSL: !t.sl
-            }
-          } catch {
-            return { ...t, currentPrice: null, unrealizedPnl: null }
-          }
-        })
-      )
+      // Fetch prices for open positions — rate-limited to avoid hammering the API
+      // Sequential with a small gap rather than N concurrent requests
+      const openWithPrices = []
+      for (const t of open) {
+        try {
+          const priceRes = await getStockPrice(t.symbol)
+          const qty = parseFloat(t.remaining_quantity || t.quantity) || 0
+          const ltp = parseFloat(priceRes.data.price) || 0
+          const entryPrice = parseFloat(t.entry_price) || 0
+          const pnl = t.position === 'LONG'
+            ? (ltp - entryPrice) * qty
+            : (entryPrice - ltp) * qty
+          const slDistPct = t.sl ? Math.abs(((ltp - parseFloat(t.sl)) / ltp) * 100) : null
+          const tpDistPct = t.tp ? Math.abs(((parseFloat(t.tp) - ltp) / ltp) * 100) : null
+          openWithPrices.push({
+            ...t, currentPrice: ltp,
+            change: priceRes.data.change,
+            unrealizedPnl: Math.round(pnl),
+            slDistPct: slDistPct?.toFixed(1),
+            tpDistPct: tpDistPct?.toFixed(1),
+            nearSL: slDistPct != null && slDistPct < 3,
+            nearTP: tpDistPct != null && tpDistPct < 3,
+            noSL: !t.sl
+          })
+        } catch {
+          openWithPrices.push({ ...t, currentPrice: null, unrealizedPnl: null })
+        }
+      }
 
-      // Top movers from market API
+      // Top movers from market API — use the shared axios instance (no hardcoded URL)
       let topGainers = []
       let topLosers = []
       try {
-        const { default: axios } = await import('axios')
-        const mktRes = await axios.get('http://localhost:5000/api/market/top-movers')
+        const mktRes = await getTopMovers()
         topGainers = mktRes.data.gainers?.slice(0, 3) || []
         topLosers = mktRes.data.losers?.slice(0, 3) || []
-      } catch {}
+      } catch { /* market snapshot is non-critical */ }
 
-      // Watchlist alerts due today
-      const today = new Date()
+      // Watchlist alerts due today — compare ISO date strings to avoid UTC/local skew
+      const todayISO = new Date().toISOString().slice(0, 10)
       const watchAlerts = watchRes.data.filter(w => {
         if (!w.alert_date) return false
-        const days = Math.ceil((new Date(w.alert_date) - today) / (1000 * 60 * 60 * 24))
-        return days <= 1
+        const alertISO = w.alert_date.slice(0, 10)
+        return alertISO <= todayISO
       })
 
       // Tasks
       const { fixedTasks: ft, customTasks: ct } = tasksRes.data
-      const completedYesterday = ft.filter(f => f.completed).length
+      const completedYesterday = (ft || []).filter(f => f.completed).length
 
       // Risk alerts
       const riskAlerts = openWithPrices.filter(t => t.nearSL || t.noSL)
@@ -116,16 +116,32 @@ function MorningBriefing({ onClose }) {
         watchAlerts,
         riskAlerts, nearTPAlerts,
         discipline, unrealizedTotal,
-        completedYesterday, totalTasks: ft.length,
+        completedYesterday, totalTasks: (ft || []).length,
         aiSuggestion,
-        winRate: closed.length > 0 ? Math.round((closed.filter(t => (t.realized_pnl || 0) > 0).length / closed.length) * 100) : 0
+        winRate: closed.length > 0
+          ? Math.round((closed.filter(t => (parseFloat(t.realized_pnl) || 0) > 0).length / closed.length) * 100)
+          : 0
       })
     } catch (err) {
-      console.error(err)
+      console.error('MorningBriefing fetch error:', err)
+      setFetchError('Could not load your briefing. Please try again.')
     } finally {
       setLoading(false)
     }
-  }
+  }, [])
+
+  useEffect(() => {
+    fetchBriefingData()
+  }, [fetchBriefingData])
+
+  // Keyboard: Escape closes modal; trap focus inside overlay
+  useEffect(() => {
+    const handleKeyDown = (e) => {
+      if (e.key === 'Escape') onClose()
+    }
+    document.addEventListener('keydown', handleKeyDown)
+    return () => document.removeEventListener('keydown', handleKeyDown)
+  }, [onClose])
 
   const getGreeting = () => {
     const h = new Date().getHours()
@@ -138,14 +154,28 @@ function MorningBriefing({ onClose }) {
 
   const handleAction = (action) => {
     onClose()
-    if (action === 'trader') navigate('/trader')
+    if (action === 'logs') navigate('/logs')
     if (action === 'portfolio') navigate('/portfolio')
     if (action === 'chat') navigate('/chat')
     if (action === 'risklab') navigate('/risklab')
   }
 
+  // Format unrealized P&L — show full number for small values, K-suffix for large
+  const formatUnrealized = (val) => {
+    const abs = Math.abs(val)
+    const prefix = val >= 0 ? '+' : '-'
+    if (abs >= 10000) return `${prefix}${Math.round(abs / 1000)}K`
+    return `${prefix}Rs.${abs.toLocaleString()}`
+  }
+
   if (loading) return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center" style={{ background: 'rgba(0,0,0,0.8)' }}>
+    <div
+      className="fixed inset-0 z-50 flex items-center justify-center"
+      style={{ background: 'rgba(0,0,0,0.8)' }}
+      role="dialog"
+      aria-modal="true"
+      aria-label="Loading morning briefing"
+    >
       <div className="bg-white dark:bg-gray-900 rounded-3xl p-8 text-center w-80">
         <div className="w-12 h-12 border-4 border-blue-500 border-t-transparent rounded-full animate-spin mx-auto mb-4" />
         <p className="text-gray-500 dark:text-gray-400 text-sm">Preparing your briefing...</p>
@@ -153,10 +183,46 @@ function MorningBriefing({ onClose }) {
     </div>
   )
 
+  if (fetchError) return (
+    <div
+      className="fixed inset-0 z-50 flex items-center justify-center"
+      style={{ background: 'rgba(0,0,0,0.8)' }}
+      role="dialog"
+      aria-modal="true"
+    >
+      <div className="bg-white dark:bg-gray-900 rounded-3xl p-8 text-center w-80 space-y-4">
+        <div className="text-4xl">⚠️</div>
+        <p className="text-gray-700 dark:text-gray-200 font-semibold">Briefing Unavailable</p>
+        <p className="text-gray-500 dark:text-gray-400 text-sm">{fetchError}</p>
+        <div className="flex gap-3">
+          <button
+            onClick={fetchBriefingData}
+            className="flex-1 bg-blue-600 hover:bg-blue-700 text-white py-2 rounded-xl text-sm font-semibold transition-colors"
+          >
+            Retry
+          </button>
+          <button
+            onClick={onClose}
+            className="flex-1 bg-gray-100 dark:bg-gray-800 hover:bg-gray-200 dark:hover:bg-gray-700 text-gray-700 dark:text-gray-200 py-2 rounded-xl text-sm font-semibold transition-colors"
+          >
+            Skip
+          </button>
+        </div>
+      </div>
+    </div>
+  )
+
   if (!data) return null
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-4" style={{ background: 'rgba(0,0,0,0.75)' }}>
+    <div
+      className="fixed inset-0 z-50 flex items-center justify-center p-4"
+      style={{ background: 'rgba(0,0,0,0.75)' }}
+      role="dialog"
+      aria-modal="true"
+      aria-label="Morning briefing"
+      ref={containerRef}
+    >
       <div className="w-full max-w-2xl max-h-screen overflow-y-auto">
 
         {/* Main Card */}
@@ -186,6 +252,7 @@ function MorningBriefing({ onClose }) {
                 </div>
                 <button
                   onClick={onClose}
+                  aria-label="Close morning briefing"
                   className="w-8 h-8 rounded-xl bg-white bg-opacity-10 hover:bg-opacity-20 flex items-center justify-center text-white transition-colors"
                 >
                   <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
@@ -205,7 +272,7 @@ function MorningBriefing({ onClose }) {
                   { label: 'Open', value: data.openPositions.length, color: 'text-blue-400' },
                   { label: 'Win Rate', value: `${data.winRate}%`, color: data.winRate >= 50 ? 'text-green-400' : 'text-red-400' },
                   { label: 'Streak', value: `🔥${data.discipline?.streak || 0}`, color: 'text-orange-400' },
-                  { label: 'Unrealized', value: `${data.unrealizedTotal >= 0 ? '+' : ''}${Math.round(data.unrealizedTotal / 1000)}K`, color: data.unrealizedTotal >= 0 ? 'text-green-400' : 'text-red-400' },
+                  { label: 'Unrealized', value: formatUnrealized(data.unrealizedTotal), color: data.unrealizedTotal >= 0 ? 'text-green-400' : 'text-red-400' },
                 ].map((s, i) => (
                   <div key={i} className="bg-white bg-opacity-5 border border-white border-opacity-10 rounded-xl p-2 text-center">
                     <p className={`text-lg font-bold ${s.color}`}>{s.value}</p>
@@ -252,8 +319,8 @@ function MorningBriefing({ onClose }) {
                           </p>
                         </div>
                       </div>
-                      <span className={`text-xs font-medium px-2 py-1 rounded-lg ${t.unrealizedPnl >= 0 ? 'bg-green-100 text-green-700' : 'bg-red-100 text-red-700'}`}>
-                        {t.unrealizedPnl >= 0 ? '+' : ''}Rs.{Math.abs(t.unrealizedPnl || 0).toLocaleString()}
+                      <span className={`text-xs font-medium px-2 py-1 rounded-lg ${(t.unrealizedPnl || 0) >= 0 ? 'bg-green-100 text-green-700' : 'bg-red-100 text-red-700'}`}>
+                        {(t.unrealizedPnl || 0) >= 0 ? '+' : ''}Rs.{Math.abs(t.unrealizedPnl || 0).toLocaleString()}
                       </span>
                     </div>
                   ))}
@@ -375,7 +442,7 @@ function MorningBriefing({ onClose }) {
             {/* Action Buttons */}
             <div className="grid grid-cols-2 gap-3 pt-2">
               <button
-                onClick={() => handleAction('trader')}
+                onClick={() => handleAction('logs')}
                 className="flex items-center justify-center gap-2 bg-blue-600 hover:bg-blue-700 text-white py-3 rounded-2xl text-sm font-semibold transition-colors"
               >
                 <span>📈</span> Add Trade
