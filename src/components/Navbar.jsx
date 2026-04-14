@@ -1,5 +1,5 @@
-import { useState, useRef, useEffect } from 'react'
-import { Link, useLocation } from 'react-router-dom'
+import { useState, useRef, useEffect, useCallback } from 'react'
+import { Link, useLocation, useNavigate } from 'react-router-dom'
 import { useAuth } from '../context/AuthContext'
 import { useTheme } from '../context/ThemeContext'
 import { useLanguage } from '../context/LanguageContext'
@@ -21,22 +21,48 @@ function TradeoLogo() {
   )
 }
 
+// Safe initials — handles null, empty, extra whitespace
+function getInitials(name) {
+  if (!name || !name.trim()) return '?'
+  return name
+    .trim()
+    .split(/\s+/)
+    .filter(Boolean)
+    .map(n => n[0])
+    .join('')
+    .toUpperCase()
+    .slice(0, 2)
+}
+
 function Navbar() {
   const { user, logout } = useAuth()
   const { isDark, toggleTheme } = useTheme()
   const { t } = useLanguage()
+  const location = useLocation()
+  const navigate = useNavigate()
 
+  // ── Google Translate cookie toggle ─────────────────────────────────────────
   const getCookieLang = () => {
-    const match = document.cookie.match(/googtrans=\/en\/(\w+)/)
-    return match ? match[1] : 'en'
+    try {
+      const match = document.cookie.match(/googtrans=\/en\/(\w+)/)
+      return match ? match[1] : 'en'
+    } catch {
+      return 'en'
+    }
   }
 
   const [isNepali, setIsNepali] = useState(() => getCookieLang() === 'ne')
+  const [dropdownOpen, setDropdownOpen] = useState(false)
+  const [mobileMenuOpen, setMobileMenuOpen] = useState(false)
+  const [avatarError, setAvatarError] = useState(false)
+  const dropdownRef = useRef(null)
 
   const setGoogTransCookie = (lang) => {
     const value = lang === 'en' ? '/en/en' : '/en/ne'
-    document.cookie = `googtrans=${value}; path=/`
-    document.cookie = `googtrans=${value}; domain=${window.location.hostname}; path=/`
+    // Include max-age so the preference persists across sessions (1 year)
+    const maxAge = 'max-age=31536000; SameSite=Lax'
+    document.cookie = `googtrans=${value}; path=/; ${maxAge}`
+    document.cookie = `googtrans=${value}; domain=${window.location.hostname}; path=/; ${maxAge}`
   }
 
   const toggleGoogleTranslate = () => {
@@ -49,19 +75,18 @@ function Navbar() {
     }
     window.location.reload()
   }
-  const location = useLocation()
-  const [dropdownOpen, setDropdownOpen] = useState(false)
-  const dropdownRef = useRef(null)
 
+  // ── Nav links ───────────────────────────────────────────────────────────────
   const NAV_LINKS = [
     { path: '/', label: t('nav.home') },
-    { path: '/analysis', label: t('nav.analysis') },
-    { path: '/trader', label: t('nav.trader') },
+    { path: '/screen', label: t('nav.analysis') },
+    { path: '/logs', label: t('nav.trader') },
     { path: '/portfolio', label: t('nav.portfolio') },
     { path: '/research', label: t('nav.research') },
     { path: '/risklab', label: t('nav.risklab') },
   ]
 
+  // ── Close dropdown on outside click ────────────────────────────────────────
   useEffect(() => {
     const handleClickOutside = (e) => {
       if (dropdownRef.current && !dropdownRef.current.contains(e.target)) {
@@ -72,28 +97,58 @@ function Navbar() {
     return () => document.removeEventListener('mousedown', handleClickOutside)
   }, [])
 
-  const isActive = (path) => {
+  // ── Close dropdown + mobile menu on Escape ──────────────────────────────────
+  useEffect(() => {
+    const handleKeyDown = (e) => {
+      if (e.key === 'Escape') {
+        setDropdownOpen(false)
+        setMobileMenuOpen(false)
+      }
+    }
+    document.addEventListener('keydown', handleKeyDown)
+    return () => document.removeEventListener('keydown', handleKeyDown)
+  }, [])
+
+  // ── Close mobile menu + dropdown when route changes ─────────────────────────
+  useEffect(() => {
+    setDropdownOpen(false)
+    setMobileMenuOpen(false)
+  }, [location.pathname])
+
+  // ── Reset avatar error when user avatar_url changes ─────────────────────────
+  useEffect(() => {
+    setAvatarError(false)
+  }, [user?.avatar_url])
+
+  const isActive = useCallback((path) => {
     if (path === '/') return location.pathname === '/'
     return location.pathname.startsWith(path)
+  }, [location.pathname])
+
+  const handleLogout = () => {
+    setDropdownOpen(false)
+    setMobileMenuOpen(false)
+    logout()
+    navigate('/login')
   }
 
-  const getInitials = (name) => {
-    if (!name) return '?'
-    return name.split(' ').map(n => n[0]).join('').toUpperCase().slice(0, 2)
-  }
+  const displayName = user?.name?.trim() || user?.email || 'User'
+  const firstName = displayName.split(/\s+/)[0]
 
   return (
-    <nav className="bg-white dark:bg-gray-950 border-b border-gray-200 dark:border-gray-800 px-6 py-0 flex justify-between items-center sticky top-0 z-40 shadow-sm">
+    <nav className="bg-white dark:bg-gray-950 border-b border-gray-200 dark:border-gray-800 px-4 lg:px-6 py-0 flex justify-between items-center sticky top-0 z-40 shadow-sm">
 
-      <div className="flex items-center gap-8">
-        <Link to="/" className="flex items-center gap-2.5 py-3">
+      {/* ── Left: Logo + Desktop nav links ─────────────────────────────────── */}
+      <div className="flex items-center gap-6">
+        <Link to="/" className="flex items-center gap-2.5 py-3 flex-shrink-0">
           <TradeoLogo />
           <span className="text-gray-900 dark:text-white font-bold text-lg tracking-tight">
             Tradeo
           </span>
         </Link>
 
-        <div className="flex items-center gap-1">
+        {/* Desktop nav — hidden on small screens */}
+        <div className="hidden lg:flex items-center gap-1">
           {NAV_LINKS.map(link => (
             <Link
               key={link.path}
@@ -113,15 +168,18 @@ function Navbar() {
         </div>
       </div>
 
+      {/* ── Right: Controls ────────────────────────────────────────────────── */}
       <div className="flex items-center gap-2">
-        {/* Language toggle — Google Translate */}
+
+        {/* Language toggle */}
         <button
           onClick={toggleGoogleTranslate}
           className="flex items-center gap-1 px-2.5 py-1 rounded-lg border border-gray-200 dark:border-gray-700 text-xs font-semibold text-gray-600 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors"
           title={isNepali ? 'Switch to English' : 'नेपालीमा हेर्नुस्'}
+          aria-label={isNepali ? 'Switch to English' : 'Switch to Nepali'}
         >
           <span>{isNepali ? '🇬🇧' : '🇳🇵'}</span>
-          <span>{isNepali ? 'EN' : 'नेपाली'}</span>
+          <span className="hidden sm:inline">{isNepali ? 'EN' : 'नेपाली'}</span>
         </button>
 
         {/* Theme toggle */}
@@ -129,6 +187,7 @@ function Navbar() {
           onClick={toggleTheme}
           className="w-8 h-8 rounded-lg flex items-center justify-center text-gray-500 dark:text-gray-400 hover:text-gray-900 dark:hover:text-white hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors"
           title={isDark ? 'Switch to Light' : 'Switch to Dark'}
+          aria-label={isDark ? 'Switch to light mode' : 'Switch to dark mode'}
         >
           {isDark ? (
             <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
@@ -142,55 +201,75 @@ function Navbar() {
         </button>
 
         {user ? (
+          /* ── User profile dropdown ─────────────────────────────────────── */
           <div className="relative" ref={dropdownRef}>
             <button
-              onClick={() => setDropdownOpen(!dropdownOpen)}
+              onClick={() => setDropdownOpen(prev => !prev)}
+              aria-haspopup="true"
+              aria-expanded={dropdownOpen}
+              aria-label="Open user menu"
               className="flex items-center gap-2 px-2 py-1.5 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors group"
             >
-              <div className="w-7 h-7 rounded-full bg-green-500 flex items-center justify-center overflow-hidden">
-                {user.avatar_url ? (
-                  <img src={user.avatar_url} alt={user.name} className="w-full h-full object-cover" />
+              <div className="w-7 h-7 rounded-full bg-green-500 flex items-center justify-center overflow-hidden flex-shrink-0">
+                {user.avatar_url && !avatarError ? (
+                  <img
+                    src={user.avatar_url}
+                    alt={displayName}
+                    className="w-full h-full object-cover"
+                    onError={() => setAvatarError(true)}
+                  />
                 ) : (
                   <span className="text-white text-xs font-bold">{getInitials(user.name)}</span>
                 )}
               </div>
-              <span className="text-sm text-gray-700 dark:text-gray-300 group-hover:text-gray-900 dark:group-hover:text-white font-medium">
-                {user.name.split(' ')[0]}
+              <span className="hidden sm:inline text-sm text-gray-700 dark:text-gray-300 group-hover:text-gray-900 dark:group-hover:text-white font-medium">
+                {firstName}
               </span>
-              <svg className={`w-3 h-3 text-gray-400 transition-transform ${dropdownOpen ? 'rotate-180' : ''}`} fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <svg
+                className={`w-3 h-3 text-gray-400 transition-transform ${dropdownOpen ? 'rotate-180' : ''}`}
+                fill="none" viewBox="0 0 24 24" stroke="currentColor"
+                aria-hidden="true"
+              >
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
               </svg>
             </button>
 
             {dropdownOpen && (
-              <div className="absolute right-0 top-full mt-2 w-52 bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-700 rounded-xl shadow-lg overflow-hidden z-50">
+              <div
+                role="menu"
+                className="absolute right-0 top-full mt-2 w-52 bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-700 rounded-xl shadow-lg overflow-hidden z-50"
+              >
                 <div className="px-4 py-3 border-b border-gray-100 dark:border-gray-700">
-                  <p className="text-sm font-semibold text-gray-900 dark:text-white">{user.name}</p>
-                  <p className="text-xs text-gray-400 mt-0.5">{user.email}</p>
+                  <p className="text-sm font-semibold text-gray-900 dark:text-white truncate">
+                    {user.name || 'User'}
+                  </p>
+                  <p className="text-xs text-gray-400 mt-0.5 truncate">{user.email}</p>
                 </div>
                 <div className="p-1">
-                  <Link to="/" onClick={() => setDropdownOpen(false)} className="flex items-center gap-2 px-3 py-2 text-sm text-gray-600 dark:text-gray-300 hover:text-gray-900 dark:hover:text-white hover:bg-gray-50 dark:hover:bg-gray-800 rounded-lg transition-colors">
-                    <span>🏠</span> {t('nav.dashboard')}
-                  </Link>
-                  <Link to="/profile" onClick={() => setDropdownOpen(false)} className="flex items-center gap-2 px-3 py-2 text-sm text-gray-600 dark:text-gray-300 hover:text-gray-900 dark:hover:text-white hover:bg-gray-50 dark:hover:bg-gray-800 rounded-lg transition-colors">
-                    <span>👤</span> {t('nav.profile')}
-                  </Link>
-                  <Link to="/chat" onClick={() => setDropdownOpen(false)} className="flex items-center gap-2 px-3 py-2 text-sm text-gray-600 dark:text-gray-300 hover:text-gray-900 dark:hover:text-white hover:bg-gray-50 dark:hover:bg-gray-800 rounded-lg transition-colors">
-                    <span>🤖</span> {t('nav.aiChat')}
-                  </Link>
-                  <Link to="/trader" onClick={() => setDropdownOpen(false)} className="flex items-center gap-2 px-3 py-2 text-sm text-gray-600 dark:text-gray-300 hover:text-gray-900 dark:hover:text-white hover:bg-gray-50 dark:hover:bg-gray-800 rounded-lg transition-colors">
-                    <span>📈</span> {t('nav.tradeLog')}
-                  </Link>
-                  <Link to="/portfolio" onClick={() => setDropdownOpen(false)} className="flex items-center gap-2 px-3 py-2 text-sm text-gray-600 dark:text-gray-300 hover:text-gray-900 dark:hover:text-white hover:bg-gray-50 dark:hover:bg-gray-800 rounded-lg transition-colors">
-                    <span>💼</span> {t('nav.portfolio')}
-                  </Link>
+                  {[
+                    { to: '/', icon: '🏠', label: t('nav.dashboard') },
+                    { to: '/profile', icon: '👤', label: t('nav.profile') },
+                    { to: '/chat', icon: '🤖', label: t('nav.aiChat') },
+                    { to: '/logs', icon: '📈', label: t('nav.tradeLog') },
+                    { to: '/portfolio', icon: '💼', label: t('nav.portfolio') },
+                  ].map(item => (
+                    <Link
+                      key={item.to}
+                      to={item.to}
+                      role="menuitem"
+                      className="flex items-center gap-2 px-3 py-2 text-sm text-gray-600 dark:text-gray-300 hover:text-gray-900 dark:hover:text-white hover:bg-gray-50 dark:hover:bg-gray-800 rounded-lg transition-colors"
+                    >
+                      <span>{item.icon}</span> {item.label}
+                    </Link>
+                  ))}
                 </div>
                 <div className="p-1 border-t border-gray-100 dark:border-gray-700">
                   <button
-                    onClick={() => { logout(); setDropdownOpen(false) }}
+                    onClick={handleLogout}
+                    role="menuitem"
                     className="w-full flex items-center gap-2 px-3 py-2 text-sm text-red-500 hover:text-red-600 hover:bg-red-50 dark:hover:bg-red-900 rounded-lg transition-colors"
                   >
-                    <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" aria-hidden="true">
                       <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1" />
                     </svg>
                     {t('nav.logout')}
@@ -200,16 +279,62 @@ function Navbar() {
             )}
           </div>
         ) : (
+          /* ── Guest: Login / Signup ──────────────────────────────────────── */
           <div className="flex items-center gap-2">
-            <Link to="/login" className="text-sm text-gray-600 hover:text-gray-900 dark:text-gray-400 dark:hover:text-white px-3 py-1.5 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors font-medium">
+            <Link
+              to="/login"
+              className="text-sm text-gray-600 hover:text-gray-900 dark:text-gray-400 dark:hover:text-white px-3 py-1.5 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors font-medium"
+            >
               {t('nav.login')}
             </Link>
-            <Link to="/signup" className="text-sm bg-green-500 hover:bg-green-400 text-white px-3 py-1.5 rounded-lg font-medium transition-colors">
+            <Link
+              to="/signup"
+              className="text-sm bg-green-500 hover:bg-green-400 text-white px-3 py-1.5 rounded-lg font-medium transition-colors"
+            >
               {t('nav.getStarted')}
             </Link>
           </div>
         )}
+
+        {/* ── Mobile hamburger — only on small screens ───────────────────── */}
+        <button
+          onClick={() => setMobileMenuOpen(prev => !prev)}
+          aria-label={mobileMenuOpen ? 'Close menu' : 'Open menu'}
+          aria-expanded={mobileMenuOpen}
+          className="lg:hidden w-8 h-8 flex items-center justify-center rounded-lg text-gray-500 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors"
+        >
+          {mobileMenuOpen ? (
+            <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+            </svg>
+          ) : (
+            <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 6h16M4 12h16M4 18h16" />
+            </svg>
+          )}
+        </button>
       </div>
+
+      {/* ── Mobile menu drawer ──────────────────────────────────────────────── */}
+      {mobileMenuOpen && (
+        <div className="lg:hidden absolute top-full left-0 right-0 bg-white dark:bg-gray-950 border-b border-gray-200 dark:border-gray-800 shadow-lg z-40">
+          <div className="px-4 py-3 space-y-1">
+            {NAV_LINKS.map(link => (
+              <Link
+                key={link.path}
+                to={link.path}
+                className={`flex items-center px-3 py-2.5 rounded-lg text-sm font-medium transition-colors ${
+                  isActive(link.path)
+                    ? 'bg-green-50 dark:bg-green-900 text-green-600 dark:text-green-400'
+                    : 'text-gray-600 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-800 hover:text-gray-900 dark:hover:text-white'
+                }`}
+              >
+                {link.label}
+              </Link>
+            ))}
+          </div>
+        </div>
+      )}
     </nav>
   )
 }
