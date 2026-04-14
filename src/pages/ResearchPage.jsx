@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useCallback } from 'react'
 import { useAuth } from '../context/AuthContext'
 import { Link, useNavigate } from 'react-router-dom'
 import { useContextMenu } from '../components/ContextMenu'
@@ -13,8 +13,10 @@ import {
 
 const ADMIN_USER_ID = 1
 
-const formatDate = (dateStr) =>
-  new Date(dateStr).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })
+const formatDate = (dateStr) => {
+  if (!dateStr) return ''
+  return new Date(dateStr).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })
+}
 
 function Avatar({ person, size = 'w-7 h-7' }) {
   return (
@@ -172,45 +174,54 @@ function ResearchPage() {
   const [loading, setLoading] = useState(true)
   const [activeTab, setActiveTab] = useState('feed')
 
+  const [fetchError, setFetchError] = useState(null)
+  const [actionErr, setActionErr] = useState(null)
   const isAdmin = user?.id === ADMIN_USER_ID
 
-  const fetchData = async () => {
+  const fetchData = useCallback(async () => {
     try {
-      const [postsRes, eligRes] = await Promise.all([
+      setFetchError(null)
+      const [postsRes, eligRes] = await Promise.allSettled([
         getResearchPosts(),
         getResearchEligibility()
       ])
-      setPosts(postsRes.data)
-      setEligibility(eligRes.data)
+      if (postsRes.status === 'fulfilled') setPosts(postsRes.value.data)
+      else throw postsRes.reason
+      if (eligRes.status === 'fulfilled') setEligibility(eligRes.value.data)
 
       if (isAdmin) {
         const pendingRes = await getAdminPending()
         setPendingPosts(pendingRes.data)
       }
     } catch (err) {
-      console.error(err)
+      setFetchError(err.response?.data?.error || 'Failed to load research posts')
     } finally {
       setLoading(false)
     }
-  }
+  }, [isAdmin])
 
-  useEffect(() => { fetchData() }, [])
+  useEffect(() => { fetchData() }, [fetchData])
 
-  const handleDelete = async (id) => {
+  const handleDelete = async (postId) => {
     try {
-      await deleteResearchPost(id)
-      setPosts(prev => prev.filter(p => p.id !== id))
+      await deleteResearchPost(postId)
+      setPosts(prev => prev.filter(p => p.id !== postId))
+      setPendingPosts(prev => prev.filter(p => p.id !== postId))
     } catch (err) {
-      console.error(err)
+      setActionErr(err.response?.data?.error || 'Failed to delete post')
     }
   }
 
-  const handleVerify = async (id) => {
-    try { await verifyResearchPost(id); fetchData() } catch (err) { console.error(err) }
+  const handleVerify = async (postId) => {
+    try { await verifyResearchPost(postId); await fetchData() } catch (err) {
+      setActionErr(err.response?.data?.error || 'Failed to verify post')
+    }
   }
 
-  const handlePin = async (id) => {
-    try { await pinResearchPost(id); fetchData() } catch (err) { console.error(err) }
+  const handlePin = async (postId) => {
+    try { await pinResearchPost(postId); await fetchData() } catch (err) {
+      setActionErr(err.response?.data?.error || 'Failed to pin post')
+    }
   }
 
   if (!user) {
@@ -232,6 +243,18 @@ function ResearchPage() {
     )
   }
 
+  if (fetchError) return (
+    <div className="w-full px-6 py-10 max-w-6xl mx-auto text-center">
+      <p className="text-[12px] text-red-400 mb-3">{fetchError}</p>
+      <button
+        onClick={() => { setFetchError(null); setLoading(true); fetchData() }}
+        className="text-[11px] text-blue-500 hover:underline"
+      >
+        Retry
+      </button>
+    </div>
+  )
+
   const pinnedPosts = posts.filter(p => p.is_pinned)
   const feedPosts = posts.filter(p => !p.is_pinned)
 
@@ -239,6 +262,13 @@ function ResearchPage() {
 
   return (
     <div className="w-full px-6 pt-6 pb-10 max-w-6xl mx-auto">
+
+      {actionErr && (
+        <div className="mb-4 flex items-center justify-between bg-red-50 dark:bg-red-900/20 border border-red-100 dark:border-red-800/50 rounded-xl px-4 py-2.5">
+          <p className="text-[11px] text-red-500">{actionErr}</p>
+          <button onClick={() => setActionErr(null)} className="text-red-400 hover:text-red-600 text-xs ml-3">×</button>
+        </div>
+      )}
 
       {/* Header */}
       <div className="flex items-start justify-between mb-6">
