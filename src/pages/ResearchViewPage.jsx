@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useCallback } from 'react'
 import { useParams, useNavigate } from 'react-router-dom'
 import { useAuth } from '../context/AuthContext'
 import { useTheme } from '../context/ThemeContext'
@@ -17,11 +17,15 @@ import '@blocknote/mantine/style.css'
 
 const ADMIN_USER_ID = 1
 
-const formatDate = (dateStr) =>
-  new Date(dateStr).toLocaleDateString('en-US', { year: 'numeric', month: 'short', day: 'numeric' })
+const formatDate = (dateStr) => {
+  if (!dateStr) return ''
+  return new Date(dateStr).toLocaleDateString('en-US', { year: 'numeric', month: 'short', day: 'numeric' })
+}
 
-const formatDateTime = (dateStr) =>
-  new Date(dateStr).toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric', hour: '2-digit', minute: '2-digit' })
+const formatDateTime = (dateStr) => {
+  if (!dateStr) return ''
+  return new Date(dateStr).toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric', hour: '2-digit', minute: '2-digit' })
+}
 
 function Avatar({ person, size = 'w-8 h-8' }) {
   return (
@@ -44,14 +48,29 @@ function ResearchViewPage() {
   const navigate = useNavigate()
   const [post, setPost] = useState(null)
   const [loading, setLoading] = useState(true)
+  const [fetchError, setFetchError] = useState(null)
+  const [actionErr, setActionErr] = useState(null)
   const [comment, setComment] = useState('')
   const [submitting, setSubmitting] = useState(false)
+  const [commentErr, setCommentErr] = useState(null)
   const [editorReady, setEditorReady] = useState(false)
 
   const editor = useCreateBlockNote()
   const isAdmin = user?.id === ADMIN_USER_ID
 
-  useEffect(() => { fetchPost() }, [id])
+  const fetchPost = useCallback(async () => {
+    try {
+      setFetchError(null)
+      const res = await getResearchPost(id)
+      setPost(res.data)
+    } catch (err) {
+      setFetchError(err.response?.data?.message || 'Failed to load post')
+    } finally {
+      setLoading(false)
+    }
+  }, [id])
+
+  useEffect(() => { fetchPost() }, [fetchPost])
 
   useEffect(() => {
     if (post?.content && editor && !editorReady) {
@@ -62,52 +81,61 @@ function ResearchViewPage() {
         console.error('Editor error:', err)
       }
     }
-  }, [post, editor])
+  }, [post, editor, editorReady])
 
-  const fetchPost = async () => {
-    try {
-      const res = await getResearchPost(id)
-      setPost(res.data)
-    } catch (err) {
-      console.error(err)
-    } finally {
-      setLoading(false)
-    }
-  }
+  // Redirect to login if unauthenticated — must be in useEffect, not during render
+  useEffect(() => {
+    if (!user) navigate('/login')
+  }, [user, navigate])
 
   const handleComment = async (e) => {
     e.preventDefault()
     if (!comment.trim()) return
     setSubmitting(true)
+    setCommentErr(null)
     try {
       await addResearchComment({ post_id: id, content: comment })
       setComment('')
-      fetchPost()
+      await fetchPost()
     } catch (err) {
-      console.error(err)
+      setCommentErr(err.response?.data?.error || 'Failed to post comment')
     } finally {
       setSubmitting(false)
     }
   }
 
   const handleDeleteComment = async (commentId) => {
-    try { await deleteResearchComment(commentId); fetchPost() } catch (err) { console.error(err) }
+    try {
+      await deleteResearchComment(commentId)
+      await fetchPost()
+    } catch (err) {
+      setActionErr(err.response?.data?.error || 'Failed to delete comment')
+    }
   }
 
   const handleDelete = async () => {
     if (!window.confirm('Delete this research post?')) return
-    try { await deleteResearchPost(id); navigate('/research') } catch (err) { console.error(err) }
+    try {
+      await deleteResearchPost(id)
+      navigate('/research')
+    } catch (err) {
+      setActionErr(err.response?.data?.error || 'Failed to delete post')
+    }
   }
 
   const handleVerify = async () => {
-    try { await verifyResearchPost(id); fetchPost() } catch (err) { console.error(err) }
+    try { await verifyResearchPost(id); await fetchPost() } catch (err) {
+      setActionErr(err.response?.data?.error || 'Failed to verify post')
+    }
   }
 
   const handlePin = async () => {
-    try { await pinResearchPost(id); fetchPost() } catch (err) { console.error(err) }
+    try { await pinResearchPost(id); await fetchPost() } catch (err) {
+      setActionErr(err.response?.data?.error || 'Failed to pin post')
+    }
   }
 
-  if (!user) { navigate('/login'); return null }
+  if (!user) return null
 
   if (loading) return (
     <div className="w-full px-6 py-6 max-w-3xl mx-auto">
@@ -118,6 +146,18 @@ function ResearchViewPage() {
           {[1,2,3,4].map(i => <div key={i} className="h-3 bg-gray-100 dark:bg-gray-800 rounded" style={{ width: `${100 - i*7}%` }} />)}
         </div>
       </div>
+    </div>
+  )
+
+  if (fetchError) return (
+    <div className="w-full px-6 py-6 max-w-3xl mx-auto text-center pt-20">
+      <p className="text-[12px] text-red-400 mb-3">{fetchError}</p>
+      <button onClick={() => { setFetchError(null); setLoading(true); fetchPost() }} className="text-[11px] text-blue-500 hover:underline mr-3">
+        Retry
+      </button>
+      <button onClick={() => navigate('/research')} className="text-[11px] text-gray-400 hover:underline">
+        ← Back to Research Hub
+      </button>
     </div>
   )
 
@@ -132,6 +172,13 @@ function ResearchViewPage() {
 
   return (
     <div className="w-full px-6 py-6 max-w-3xl mx-auto space-y-4">
+
+      {actionErr && (
+        <div className="flex items-center justify-between bg-red-50 dark:bg-red-900/20 border border-red-100 dark:border-red-800/50 rounded-xl px-4 py-2.5">
+          <p className="text-[11px] text-red-500">{actionErr}</p>
+          <button onClick={() => setActionErr(null)} className="text-red-400 hover:text-red-600 text-xs ml-3">×</button>
+        </div>
+      )}
 
       {/* Back */}
       <button
@@ -257,6 +304,9 @@ function ResearchViewPage() {
 
         {/* Add comment */}
         <form onSubmit={handleComment} className="mb-5">
+          {commentErr && (
+            <p className="text-[10px] text-red-400 mb-2">{commentErr}</p>
+          )}
           <div className="flex gap-2.5">
             <Avatar person={user} size="w-7 h-7" />
             <div className="flex-1 flex gap-2">

@@ -123,6 +123,7 @@ function AddTradeModal({ onClose, onSave, editTrade, openTrades = [] }) {
   const [slWarning, setSlWarning]               = useState('')
   const [rrRatio, setRrRatio]                   = useState(null)
   const [saving, setSaving]                     = useState(false)
+  const [saveErr, setSaveErr]                   = useState(null)
   const [showBroker, setShowBroker]             = useState(false)
 
   useEffect(() => {
@@ -183,9 +184,9 @@ function AddTradeModal({ onClose, onSave, editTrade, openTrades = [] }) {
 
   const handleSubmit = async (e) => {
     e.preventDefault()
-    setSaving(true)
+    setSaving(true); setSaveErr(null)
     try { await onSave(form); onClose() }
-    catch (err) { console.error(err) }
+    catch (err) { setSaveErr(err.response?.data?.error || 'Failed to save trade') }
     finally { setSaving(false) }
   }
 
@@ -384,6 +385,11 @@ function AddTradeModal({ onClose, onSave, editTrade, openTrades = [] }) {
           </div>
 
           {/* Actions */}
+          {saveErr && (
+            <p className="text-[11px] text-red-400 bg-red-50 dark:bg-red-900/10 border border-red-200 dark:border-red-800/30 rounded-lg px-3 py-2">
+              {saveErr}
+            </p>
+          )}
           <div className="flex gap-2 pt-1">
             <button type="button" onClick={onClose}
               className="flex-1 py-2.5 rounded-xl border border-gray-200 dark:border-gray-700 text-[11px] font-medium text-gray-500 dark:text-gray-400 hover:bg-gray-50 dark:hover:bg-gray-800 transition-colors">
@@ -410,7 +416,6 @@ function CloseTradeModal({ trade, onClose, onSave, isPartial }) {
 
   const remaining = trade.remaining_quantity ?? trade.quantity
 
-  const [closeErr, setCloseErr] = useState(null)
   const entryPrice = parseFloat(trade.entry_price)
   const pnlPreview = exitPrice
     ? (trade.position === 'LONG'
@@ -418,6 +423,8 @@ function CloseTradeModal({ trade, onClose, onSave, isPartial }) {
         : (entryPrice - parseFloat(exitPrice))
       ) * (isPartial ? parseFloat(exitQty || 0) : remaining)
     : null
+
+  const [closeErr, setCloseErr] = useState(null)
 
   const handleSubmit = async (e) => {
     e.preventDefault()
@@ -447,7 +454,7 @@ function CloseTradeModal({ trade, onClose, onSave, isPartial }) {
     <Modal onClose={onClose}>
       <ModalHeader
         title={isPartial ? 'Partial Close' : 'Close Trade'}
-        sub={`${trade.symbol} · ${trade.position} · ${remaining} units @ Rs.${parseFloat(trade.entry_price).toFixed(2)}`}
+        sub={`${trade.symbol} · ${trade.position} · ${remaining} units @ Rs.${entryPrice.toFixed(2)}`}
         onClose={onClose}
       />
       <form onSubmit={handleSubmit} className="p-5 space-y-4">
@@ -776,8 +783,10 @@ function ImportCSVModal({ onClose, onImport }) {
               <button
                 onClick={() => {
                   const blob = new Blob([CSV_TEMPLATE], { type: 'text/csv' })
-                  const a = document.createElement('a'); a.href = URL.createObjectURL(blob)
-                  a.download = 'tradeo-template.csv'; a.click()
+                  const url  = URL.createObjectURL(blob)
+                  const a    = document.createElement('a')
+                  a.href = url; a.download = 'tradeo-template.csv'; a.click()
+                  URL.revokeObjectURL(url)
                 }}
                 className="text-[10px] font-semibold text-blue-500 hover:text-blue-400 px-2.5 py-1.5 rounded-lg border border-blue-200 dark:border-blue-800 hover:bg-blue-50 dark:hover:bg-blue-900/20 transition-all"
               >
@@ -969,10 +978,13 @@ function ImportCSVModal({ onClose, onImport }) {
 // ── Helpers ───────────────────────────────────────────────────────────────────
 
 function tradeDuration(dateStr) {
+  // Compare date strings directly to avoid UTC vs local timezone mismatch
+  // (new Date('YYYY-MM-DD') parses as UTC midnight, but new Date() is local time)
+  const today = new Date().toISOString().slice(0, 10)
+  if (dateStr === today) return 'Today'
   const start = new Date(dateStr)
-  const now   = new Date()
-  const days  = Math.floor((now - start) / 86400000)
-  if (days === 0) return 'Today'
+  const now   = new Date(today)
+  const days  = Math.round((now - start) / 86400000)
   if (days === 1) return '1d'
   return `${days}d`
 }
@@ -1286,7 +1298,9 @@ function GroupedTradeRow({ symbol, entries, ltp, onEdit, onClose, onPartialClose
   const { onContextMenu, ContextMenuPortal } = useContextMenu()
 
   const totalQty   = entries.reduce((s, t) => s + (t.remaining_quantity ?? t.quantity), 0)
-  const avgEntry   = entries.reduce((s, t) => s + parseFloat(t.entry_price) * (t.remaining_quantity ?? t.quantity), 0) / totalQty
+  const avgEntry   = totalQty > 0
+    ? entries.reduce((s, t) => s + parseFloat(t.entry_price) * (t.remaining_quantity ?? t.quantity), 0) / totalQty
+    : parseFloat(entries[0]?.entry_price) || 0
   const totalPnl   = entries.reduce((s, t) => s + (t.realized_pnl || 0), 0)
 
   // All same position direction? Show it; mixed → "Mixed"
@@ -1296,10 +1310,9 @@ function GroupedTradeRow({ symbol, entries, ltp, onEdit, onClose, onPartialClose
   const unrealized = ltp?.price
     ? entries.reduce((s, t) => {
         const qty = t.remaining_quantity ?? t.quantity
-        const ep = parseFloat(t.entry_price)
         return s + (t.position === 'LONG'
-          ? (ltp.price - ep) * qty
-          : (ep - ltp.price) * qty)
+          ? (ltp.price - t.entry_price) * qty
+          : (t.entry_price - ltp.price) * qty)
       }, 0)
     : null
 
@@ -1748,7 +1761,7 @@ function JournalCard({ journal, trades, onEdit, onDelete, idx }) {
 
 // ── Main Page ─────────────────────────────────────────────────────────────────
 
-function TraderPage() {
+function LogsPage() {
   const { user }   = useAuth()
   const { t: tr }  = useLanguage()
   const navigate   = useNavigate()
@@ -1952,16 +1965,18 @@ function TraderPage() {
     const allOpenForSymbol = trades.filter(
       t => t.symbol === trade.symbol && (t.status === 'OPEN' || t.status === 'PARTIAL')
     )
-    navigate('/analysis', {
+    navigate('/screen', {
       state: {
         symbol:    trade.symbol,
         positions: allOpenForSymbol.map(t => ({
-          id:          t.id,
-          entry_price: parseFloat(t.entry_price),
-          sl:          t.sl ? parseFloat(t.sl) : null,
-          tp:          t.tp ? parseFloat(t.tp) : null,
-          position:    t.position,
-          quantity:    t.remaining_quantity ?? t.quantity,
+          id:                 t.id,
+          entry_price:        parseFloat(t.entry_price),
+          sl:                 t.sl ? parseFloat(t.sl) : null,
+          tp:                 t.tp ? parseFloat(t.tp) : null,
+          position:           t.position,
+          quantity:           t.quantity,
+          remaining_quantity: t.remaining_quantity ?? t.quantity,
+          entry_date:         t.date,
         })),
       }
     })
@@ -2047,13 +2062,6 @@ function TraderPage() {
   return (
     <div className="w-full px-6 pt-6 pb-12 max-w-7xl mx-auto">
 
-      {actionErr && (
-        <div className="mb-4 flex items-center justify-between bg-red-50 dark:bg-red-900/20 border border-red-100 dark:border-red-800/50 rounded-xl px-4 py-2.5">
-          <p className="text-[11px] text-red-500">{actionErr}</p>
-          <button onClick={() => setActionErr(null)} className="text-red-400 hover:text-red-600 text-xs ml-3">×</button>
-        </div>
-      )}
-
       {/* ── Modals ── */}
       {showAddModal && (
         <AddTradeModal
@@ -2135,6 +2143,14 @@ function TraderPage() {
           onSave={handleUpdateJournal}
           editJournal={editJournal}
         />
+      )}
+
+      {/* ── Action error toast ── */}
+      {actionErr && (
+        <div className="mb-4 flex items-center justify-between gap-3 px-4 py-3 bg-red-50 dark:bg-red-900/15 border border-red-200 dark:border-red-800/30 rounded-xl">
+          <p className="text-[11px] text-red-500 font-medium">{actionErr}</p>
+          <button onClick={() => setActionErr(null)} className="text-red-400 hover:text-red-600 text-[14px] leading-none flex-shrink-0">×</button>
+        </div>
       )}
 
       {/* ── Page header ── */}
@@ -2567,4 +2583,4 @@ function TraderPage() {
   )
 }
 
-export default TraderPage
+export default LogsPage

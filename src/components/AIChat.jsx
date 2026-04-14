@@ -539,7 +539,7 @@ function QuickForm({ type, onSubmit, onCancel }) {
           <input placeholder="Symbol (e.g. NABIL)" value={form.symbol||''} onChange={e=>set('symbol',e.target.value.toUpperCase())}
             className="w-full border border-gray-200 dark:border-gray-700 dark:bg-gray-800 dark:text-white rounded-xl px-2.5 py-1.5 text-xs focus:outline-none focus:border-purple-400" />
           <div className="flex gap-1">
-            {['active','pre-watch'].map(cat => (
+            {['active','pre'].map(cat => (
               <button key={cat} onClick={() => set('cat', cat)}
                 className={`flex-1 py-1 rounded-lg text-[10px] font-medium border transition-colors ${form.cat===cat ? 'bg-purple-500 text-white border-purple-500' : 'border-gray-200 dark:border-gray-700 text-gray-500 dark:text-gray-400 hover:border-purple-400'}`}>
                 {cat === 'active' ? '⭐ Active' : '🟡 Pre-Watch'}
@@ -675,7 +675,7 @@ function AIChat({ isFullPage = false, onClose }) {
   useEffect(() => {
     if (user) {
       getChatSuggestions()
-        .then(res => setSuggestions(res.data.suggestions))
+        .then(res => setSuggestions(res.data?.suggestions || []))
         .catch(() => {})
     }
   }, [user])
@@ -701,7 +701,13 @@ function AIChat({ isFullPage = false, onClose }) {
       const response = await fetch('http://localhost:5000/api/chat/agent', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
-        body: JSON.stringify({ message: text, history: messages.slice(-6), lastAction, lang }),
+        body: JSON.stringify({
+          message: text,
+          // Exclude streaming/incomplete messages from history — they have empty content
+          history: messages.filter(m => !m.streaming && m.content).slice(-6).map(m => ({ role: m.role, content: m.content })),
+          lastAction,
+          lang,
+        }),
       })
 
       const contentType = response.headers.get('content-type') || ''
@@ -718,31 +724,39 @@ function AIChat({ isFullPage = false, onClose }) {
         let buffer = ''
         let fullText = ''
 
-        while (true) {
-          const { done, value } = await reader.read()
-          if (done) break
-          buffer += decoder.decode(value, { stream: true })
-          const lines = buffer.split('\n')
-          buffer = lines.pop() // keep incomplete line in buffer
-          for (const line of lines) {
-            if (!line.startsWith('data: ')) continue
-            try {
-              const event = JSON.parse(line.slice(6))
-              if (event.type === 'chunk' && event.text) {
-                fullText += event.text
-                setMessages(prev => prev.map(m => m.id === msgId ? { ...m, content: fullText } : m))
-              } else if (event.type === 'done') {
-                setMessages(prev => prev.map(m => m.id === msgId ? { ...m, streaming: false } : m))
-                // Check discipline nudge in full text
-                const disciplineMatch = fullText.match(/discipline.*?(\d+)%/i)
-                if (disciplineMatch) {
-                  const score = parseInt(disciplineMatch[1])
-                  if (score < 70) setDisciplineNudge(score)
+        try {
+          while (true) {
+            const { done, value } = await reader.read()
+            if (done) break
+            buffer += decoder.decode(value, { stream: true })
+            const lines = buffer.split('\n')
+            buffer = lines.pop() // keep incomplete line in buffer
+            for (const line of lines) {
+              if (!line.startsWith('data: ')) continue
+              try {
+                const event = JSON.parse(line.slice(6))
+                if (event.type === 'chunk' && event.text) {
+                  fullText += event.text
+                  setMessages(prev => prev.map(m => m.id === msgId ? { ...m, content: fullText } : m))
+                } else if (event.type === 'done') {
+                  setMessages(prev => prev.map(m => m.id === msgId ? { ...m, streaming: false } : m))
+                  // Check discipline nudge in full text
+                  const disciplineMatch = fullText.match(/discipline.*?(\d+)%/i)
+                  if (disciplineMatch) {
+                    const score = parseInt(disciplineMatch[1])
+                    if (score < 70) setDisciplineNudge(score)
+                  }
+                  // Do NOT clear lastAction after streaming — user may follow up
                 }
-                setLastAction(null)
-              }
-            } catch { /* skip malformed lines */ }
+              } catch { /* skip malformed SSE lines */ }
+            }
           }
+        } catch (streamErr) {
+          console.error('SSE stream read error:', streamErr)
+          // Mark message as complete even if stream was cut
+          setMessages(prev => prev.map(m => m.id === msgId
+            ? { ...m, streaming: false, content: fullText || 'Stream interrupted. Please try again.' }
+            : m))
         }
         inputRef.current?.focus()
         return
@@ -782,10 +796,13 @@ function AIChat({ isFullPage = false, onClose }) {
         actionType: data.type === 'action' ? data.action : null,
         actionResult: data.type === 'action' ? data.result : null,
       }])
-    } catch {
+    } catch (err) {
+      console.error('AIChat handleSend error:', err)
       setMessages(prev => [...prev, {
         role: 'assistant',
-        content: 'Something went wrong. Please try again.',
+        content: err?.message?.includes('Failed to fetch')
+          ? 'Cannot reach the server — check your connection and try again.'
+          : 'Something went wrong. Please try again.',
         time: new Date(),
         isError: true
       }])
@@ -822,15 +839,13 @@ function AIChat({ isFullPage = false, onClose }) {
   const handleDisambiguationPick = (entry, result) => {
     const { original_action, exit_price, sl, tp, exit_quantity } = result
     // Build a natural language message so the AI routes it as SELECT_TRADE
+    // The backend uses the NEEDS_DISAMBIGUATION context (still in lastAction) to match entry by trade_id
     let msg = `Select trade ${entry.id} for ${original_action}`
     if (original_action === 'CLOSE_TRADE')   msg += ` at exit price ${exit_price}`
     if (original_action === 'UPDATE_SL_TP')  msg += `${sl != null ? ` sl ${sl}` : ''}${tp != null ? ` tp ${tp}` : ''}`
     if (original_action === 'PARTIAL_CLOSE') msg += ` exit ${exit_quantity} at ${exit_price}`
-    // Inject trade_id directly into lastAction context for the backend
-    setLastAction(prev => ({
-      ...(prev || {}),
-      _disambiguate: { trade_id: entry.id, original_action, exit_price, sl, tp, exit_quantity }
-    }))
+    // lastAction still holds { action: 'NEEDS_DISAMBIGUATION', result: { entries, original_action, ... } }
+    // Backend uses this to build the disambiguation prompt context — no change needed
     handleSend(msg)
   }
 
@@ -839,8 +854,11 @@ function AIChat({ isFullPage = false, onClose }) {
     const showBrokerFee      = msg.actionType === 'CALC_BROKER_FEE' && msg.actionResult?.fee
     const showMorningBrief   = msg.actionType === 'MORNING_BRIEF' && msg.actionResult?.brief
     const showDisambiguation = msg.actionType === 'NEEDS_DISAMBIGUATION' && msg.actionResult?.entries?.length
+    // TOGGLE_THEME: handled inline, no card needed
+    // DELETE_TRADE: pending confirmation — no action card yet, text reply is the prompt
+    // DRAFT_JOURNAL: shown as interactive JournalDraftCard (not inline here, added to messages area separately)
     const showStandardCard   = msg.actionType && msg.actionResult && !showBrokerFee && !showMorningBrief
-      && !showDisambiguation && !['DRAFT_JOURNAL'].includes(msg.actionType)
+      && !showDisambiguation && !['DRAFT_JOURNAL', 'TOGGLE_THEME', 'DELETE_TRADE'].includes(msg.actionType)
 
     return (
       <div

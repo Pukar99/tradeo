@@ -68,8 +68,15 @@ function NEPSECalculator() {
 
   useEffect(() => {
     if (form.buyDate && form.sellDate) {
-      const days = Math.ceil((new Date(form.sellDate) - new Date(form.buyDate)) / (1000 * 60 * 60 * 24))
-      setHoldingPeriod(days)
+      const buy = new Date(form.buyDate)
+      const sell = new Date(form.sellDate)
+      if (isNaN(buy) || isNaN(sell)) return
+      const days = Math.ceil((sell - buy) / (1000 * 60 * 60 * 24))
+      // Negative means sell date is before buy date — treat as same-day short-term
+      setHoldingPeriod(Math.max(0, days))
+    } else if (!form.buyDate && !form.sellDate) {
+      // Both cleared — reset to manual button state
+      setHoldingPeriod(null)
     }
   }, [form.buyDate, form.sellDate])
 
@@ -94,15 +101,29 @@ function NEPSECalculator() {
     const sellBroker = getBrokerCommission(sellAmount)
     const sellSebon = getSEBON(sellAmount)
     const sellDp = getDP()
-    const isLongTerm = holdingPeriod ? holdingPeriod >= 365 : false
-    const capitalGain = sellAmount - buyAmount - totalBuyCharges
-    const cgt = getCGT(capitalGain, isLongTerm)
+    const isLongTerm = holdingPeriod !== null ? holdingPeriod >= 365 : false
+    // CGT is levied on net capital gain after all transaction costs (buy + sell excluding CGT itself)
+    const netCapitalGain = sellAmount - (kitta * buyPrice) - totalBuyCharges - sellBroker - sellSebon - sellDp
+    const cgt = getCGT(netCapitalGain, isLongTerm)
     const totalSellCharges = sellBroker + sellSebon + sellDp + cgt
     const totalCharges = totalBuyCharges + totalSellCharges
     const grossProfit = sellAmount - buyAmount
     const netProfit = grossProfit + cashDiv - totalCharges
-    const netProfitPct = (netProfit / buyAmount) * 100
-    const breakEven = (buyAmount + totalBuyCharges + sellBroker + sellSebon + sellDp) / totalShares
+    const netProfitPct = buyAmount > 0 ? (netProfit / buyAmount) * 100 : 0
+    // Break-even: price at which net profit = 0, solved for sellPrice
+    // sellAmount_be = buyAmount + totalBuyCharges + sellBroker(be) + sellSebon(be) + sellDp
+    // Approximate: ignore small change in sell-side charges at break-even price
+    const breakEven = totalShares > 0
+      ? (buyAmount + totalBuyCharges + sellBroker + sellSebon + sellDp) / totalShares
+      : 0
+    // Filter zero-value items from pie to avoid invisible Recharts slices
+    const rawPieData = [
+      { name: 'Buy Broker', value: Math.round(buyBroker) },
+      { name: 'Sell Broker', value: Math.round(sellBroker) },
+      { name: 'SEBON', value: Math.round(buySebon + sellSebon) },
+      { name: 'DP Charges', value: Math.round(buyDp + sellDp) },
+      { name: 'Capital Gain Tax', value: Math.round(cgt) },
+    ].filter(item => item.value > 0)
 
     setResult({
       kitta, totalShares, buyPrice, sellPrice,
@@ -114,13 +135,7 @@ function NEPSECalculator() {
       grossProfit, netProfit, netProfitPct,
       cashDiv, breakEven: breakEven.toFixed(2),
       isLongTerm, holdingPeriod,
-      pieData: [
-        { name: 'Buy Broker', value: Math.round(buyBroker) },
-        { name: 'Sell Broker', value: Math.round(sellBroker) },
-        { name: 'SEBON', value: Math.round(buySebon + sellSebon) },
-        { name: 'DP Charges', value: Math.round(buyDp + sellDp) },
-        { name: 'Capital Gain Tax', value: Math.round(cgt) },
-      ],
+      pieData: rawPieData,
     })
   }
 
@@ -189,7 +204,7 @@ function NEPSECalculator() {
             </div>
           )}
 
-          {!form.buyDate && (
+          {(!form.buyDate || !form.sellDate) && (
             <div className="flex gap-2">
               <button onClick={() => setHoldingPeriod(400)} className={`flex-1 py-1.5 rounded-xl text-[10px] font-semibold border transition-colors ${holdingPeriod === 400 ? 'bg-emerald-500 text-white border-emerald-500' : 'border-gray-200 dark:border-gray-700 text-gray-500 hover:border-emerald-400'}`}>
                 Long-term (≥1yr)
@@ -317,17 +332,30 @@ function PositionCalculator() {
   })
   const [result, setResult] = useState(null)
 
+  const [posErr, setPosErr] = useState(null)
+
   const calculate = () => {
+    setPosErr(null)
     const capital = parseFloat(form.capital) || 0
-    const riskPct = parseFloat(form.riskPct) || 2
+    const riskPct = Math.min(Math.max(parseFloat(form.riskPct) || 2, 0.01), 100)
     const entry = parseFloat(form.entryPrice) || 0
     const sl = parseFloat(form.slPrice) || 0
     const tp = parseFloat(form.tpPrice) || 0
     if (!capital || !entry || !sl) return
 
-    const riskAmount = (capital * riskPct) / 100
     const riskPerShare = Math.abs(entry - sl)
+    if (riskPerShare === 0) {
+      setPosErr('Entry price and stop loss cannot be the same — risk per share would be zero.')
+      return
+    }
+
+    const riskAmount = (capital * riskPct) / 100
     const positionSize = Math.floor(riskAmount / riskPerShare)
+    if (positionSize === 0) {
+      setPosErr(`Position size is 0 — your risk per share (Rs.${riskPerShare.toFixed(2)}) exceeds your risk amount (Rs.${riskAmount.toFixed(2)}). Increase capital or raise stop-loss distance.`)
+      return
+    }
+
     const positionValue = positionSize * entry
     const reward = tp ? Math.abs(tp - entry) * positionSize : null
     const rr = tp ? (Math.abs(tp - entry) / riskPerShare).toFixed(2) : null
@@ -336,7 +364,8 @@ function PositionCalculator() {
 
     const chartData = []
     for (let r = 0.5; r <= 5; r += 0.5) {
-      chartData.push({ rr: `1:${r}`, gain: Math.round(riskAmount * r), loss: Math.round(maxLoss) })
+      // Gain at each R multiple = actual shares * (riskPerShare * r)
+      chartData.push({ rr: `1:${r}`, gain: Math.round(riskPerShare * positionSize * r), loss: Math.round(maxLoss) })
     }
 
     setResult({ riskAmount, riskPerShare, positionSize, positionValue, reward, rr, maxLoss, potentialGain, chartData })
@@ -369,6 +398,11 @@ function PositionCalculator() {
             <input type="number" value={form.tpPrice} onChange={e => setForm(p => ({ ...p, tpPrice: e.target.value }))} placeholder="560" className={INPUT} />
           </div>
         </div>
+        {posErr && (
+          <div className="text-[10px] text-red-500 bg-red-50 dark:bg-red-900/20 rounded-xl px-3 py-2 border border-red-100 dark:border-red-800/50">
+            {posErr}
+          </div>
+        )}
         <button onClick={calculate} disabled={!form.capital || !form.entryPrice || !form.slPrice} className="w-full bg-blue-500 hover:bg-blue-600 text-white py-2.5 rounded-xl text-[11px] font-semibold disabled:opacity-40 transition-colors">
           Calculate
         </button>
@@ -416,35 +450,62 @@ function PerformanceCalculator() {
   })
   const [result, setResult] = useState(null)
 
+  const [perfErr, setPerfErr] = useState(null)
+
   const calculate = () => {
-    const trades = parseFloat(form.totalTrades) || 0
-    const wr = parseFloat(form.winRate) / 100 || 0
+    setPerfErr(null)
+    const trades = Math.floor(parseFloat(form.totalTrades) || 0)
+    const wrRaw = parseFloat(form.winRate) || 0
     const avgWin = parseFloat(form.avgWin) || 0
     const avgLoss = parseFloat(form.avgLoss) || 0
     const capital = parseFloat(form.capital) || 0
-    const riskPct = parseFloat(form.riskPct) / 100 || 0.02
-    if (!trades || !wr || !avgWin || !avgLoss) return
+    const riskPct = Math.min(Math.max(parseFloat(form.riskPct) / 100 || 0.02, 0.0001), 1)
+    if (!trades || !wrRaw || !avgWin || !avgLoss) return
 
+    if (wrRaw <= 0 || wrRaw >= 100) {
+      setPerfErr('Win rate must be between 1% and 99%.')
+      return
+    }
+    if (avgLoss <= 0) {
+      setPerfErr('Average loss must be greater than 0.')
+      return
+    }
+    if (avgWin <= 0) {
+      setPerfErr('Average win must be greater than 0.')
+      return
+    }
+
+    const wr = wrRaw / 100
     const expectancy = (wr * avgWin) - ((1 - wr) * avgLoss)
     const rr = (avgWin / avgLoss).toFixed(2)
     const wins = Math.round(trades * wr)
-    const losses = trades - wins
+    const losses = Math.max(0, trades - wins)
     const totalPnl = (wins * avgWin) - (losses * avgLoss)
-    const breakEvenWR = (avgLoss / (avgWin + avgLoss) * 100).toFixed(2)
-    const edge = wr - (1 - wr) * (avgLoss / avgWin)
-    const ror = edge > 0 ? Math.max(0, ((1 - edge) / (1 + edge)) ** (capital / (capital * riskPct)) * 100) : 100
+    const breakEvenWR = ((avgLoss / (avgWin + avgLoss)) * 100).toFixed(2)
 
+    // Risk of Ruin using Kelly-derived formula: RoR = ((1-edge)/(1+edge))^(1/riskPct)
+    // edge = expectancy / avgWin (fraction of capital edge)
+    const edgeFraction = expectancy > 0 ? expectancy / (avgWin + avgLoss) : 0
+    const ror = edgeFraction > 0
+      ? Math.min(100, Math.max(0, Math.pow((1 - edgeFraction) / (1 + edgeFraction), 1 / riskPct) * 100))
+      : 100
+
+    // Deterministic simulation: alternate wins/losses proportionally for reproducibility
     const chartData = []
     let equity = capital || 10000
     let peak = equity
     let maxDD = 0
-    for (let i = 0; i < Math.min(trades, 50); i++) {
-      const isWin = Math.random() < wr
+    const simTrades = Math.min(trades, 50)
+    // Use a deterministic sequence based on win rate pattern instead of Math.random
+    for (let i = 0; i < simTrades; i++) {
+      // Deterministic: treat fractional position in win/loss cycle
+      const cycleLen = 1 / wr
+      const isWin = (i % Math.max(1, Math.round(cycleLen))) < Math.round(cycleLen * wr)
       equity += isWin ? avgWin : -avgLoss
       if (equity > peak) peak = equity
-      const dd = ((peak - equity) / peak) * 100
+      const dd = peak > 0 ? ((peak - equity) / peak) * 100 : 0
       if (dd > maxDD) maxDD = dd
-      chartData.push({ trade: i + 1, equity: Math.round(equity), drawdown: -dd.toFixed(2) })
+      chartData.push({ trade: i + 1, equity: Math.round(equity), drawdown: parseFloat((-dd).toFixed(2)) })
     }
 
     setResult({ expectancy, rr, wins, losses, totalPnl, breakEvenWR, ror, maxDD: maxDD.toFixed(2), chartData })
@@ -480,6 +541,11 @@ function PerformanceCalculator() {
             <input type="number" value={form.riskPct} onChange={e => setForm(p => ({ ...p, riskPct: e.target.value }))} placeholder="2" className={INPUT} />
           </div>
         </div>
+        {perfErr && (
+          <div className="text-[10px] text-red-500 bg-red-50 dark:bg-red-900/20 rounded-xl px-3 py-2 border border-red-100 dark:border-red-800/50">
+            {perfErr}
+          </div>
+        )}
         <button onClick={calculate} disabled={!form.totalTrades || !form.winRate || !form.avgWin || !form.avgLoss} className="w-full bg-blue-500 hover:bg-blue-600 text-white py-2.5 rounded-xl text-[11px] font-semibold disabled:opacity-40 transition-colors">
           Analyze
         </button>
@@ -526,28 +592,51 @@ function SIPCalculator() {
   })
   const [result, setResult] = useState(null)
 
+  const [sipErr, setSipErr] = useState(null)
+
   const calculate = () => {
+    setSipErr(null)
     const monthly = parseFloat(form.monthly) || 0
-    const rate = (parseFloat(form.annualReturn) || 12) / 100 / 12
-    const months = (parseFloat(form.years) || 10) * 12
+    const annualReturnPct = parseFloat(form.annualReturn) ?? 12
+    const years = Math.floor(parseFloat(form.years) || 10)
     const lump = parseFloat(form.initialLump) || 0
     if (!monthly) return
 
-    const sipValue = monthly * ((Math.pow(1 + rate, months) - 1) / rate) * (1 + rate)
-    const lumpValue = lump * Math.pow(1 + rate * 12, parseFloat(form.years))
+    if (years <= 0) {
+      setSipErr('Investment period must be at least 1 year.')
+      return
+    }
+    if (annualReturnPct < 0) {
+      setSipErr('Annual return cannot be negative.')
+      return
+    }
+
+    const rate = annualReturnPct / 100 / 12
+    const months = years * 12
+
+    // Guard against rate = 0 (0% annual return): simple sum, no compounding
+    const sipValue = rate === 0
+      ? monthly * months
+      : monthly * ((Math.pow(1 + rate, months) - 1) / rate) * (1 + rate)
+
+    const annualRate = annualReturnPct / 100
+    const lumpValue = lump * Math.pow(1 + annualRate, years)
     const totalValue = sipValue + lumpValue
     const totalInvested = monthly * months + lump
     const totalGain = totalValue - totalInvested
+    const gainPct = totalInvested > 0 ? ((totalGain / totalInvested) * 100).toFixed(1) : '0.0'
 
     const chartData = []
-    for (let y = 1; y <= parseFloat(form.years); y++) {
+    for (let y = 1; y <= years; y++) {
       const m = y * 12
-      const sv = monthly * ((Math.pow(1 + rate, m) - 1) / rate) * (1 + rate)
-      const lv = lump * Math.pow(1 + rate * 12, y)
+      const sv = rate === 0
+        ? monthly * m
+        : monthly * ((Math.pow(1 + rate, m) - 1) / rate) * (1 + rate)
+      const lv = lump * Math.pow(1 + annualRate, y)
       chartData.push({ year: `Yr ${y}`, invested: Math.round(monthly * m + lump), value: Math.round(sv + lv) })
     }
 
-    setResult({ totalValue, totalInvested, totalGain, gainPct: ((totalGain / totalInvested) * 100).toFixed(1), chartData })
+    setResult({ totalValue, totalInvested, totalGain, gainPct, chartData })
   }
 
   return (
@@ -572,6 +661,11 @@ function SIPCalculator() {
             <input type="number" value={form.initialLump} onChange={e => setForm(p => ({ ...p, initialLump: e.target.value }))} placeholder="50000" className={INPUT} />
           </div>
         </div>
+        {sipErr && (
+          <div className="text-[10px] text-red-500 bg-red-50 dark:bg-red-900/20 rounded-xl px-3 py-2 border border-red-100 dark:border-red-800/50">
+            {sipErr}
+          </div>
+        )}
         <button onClick={calculate} disabled={!form.monthly} className="w-full bg-blue-500 hover:bg-blue-600 text-white py-2.5 rounded-xl text-[11px] font-semibold disabled:opacity-40 transition-colors">
           Calculate Growth
         </button>

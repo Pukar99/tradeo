@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef } from 'react'
+import { useState, useEffect, useRef, useCallback } from 'react'
 import { useNavigate, useParams } from 'react-router-dom'
 import { useAuth } from '../context/AuthContext'
 import { useTheme } from '../context/ThemeContext'
@@ -41,7 +41,8 @@ function ResearchEditorPage() {
         return res.data.url
       } catch (err) {
         console.error('Image upload failed:', err)
-        return ''
+        // Return undefined so BlockNote does not insert a broken image
+        return undefined
       }
     }
   })
@@ -58,17 +59,21 @@ function ResearchEditorPage() {
             setPdfUrl(post.pdf_url)
             setPdfName(post.pdf_name || 'Uploaded PDF')
           }
-          if (post.content && post.post_type !== 'pdf') {
+          if (post.content && post.post_type !== 'pdf' && editor) {
             try {
               await editor.replaceBlocks(editor.document, post.content)
             } catch (err) {
               console.error('Editor load error:', err)
+              setError('Failed to load post content into editor')
             }
           }
         })
-        .catch(err => console.error(err))
+        .catch(err => {
+          setError(err.response?.data?.message || 'Failed to load post for editing')
+        })
         .finally(() => setLoading(false))
     }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [id])
 
   const handlePdfDrop = async (e) => {
@@ -105,7 +110,8 @@ function ResearchEditorPage() {
 
   const getExcerpt = () => {
     try {
-      const blocks = editor.document
+      const blocks = editor?.document
+      if (!blocks) return ''
       let text = ''
       for (const block of blocks) {
         if (block.content) {
@@ -135,6 +141,7 @@ function ResearchEditorPage() {
     setError('')
 
     try {
+      const content = postType === 'editor' ? (editor?.document ?? null) : null
       const payload = {
         title,
         status: saveStatus || status,
@@ -142,7 +149,7 @@ function ResearchEditorPage() {
         excerpt: postType === 'pdf'
           ? `PDF Research: ${pdfName}`
           : getExcerpt(),
-        content: postType === 'editor' ? editor.document : null,
+        content,
         pdf_url: postType === 'pdf' ? pdfUrl : null,
         pdf_name: postType === 'pdf' ? pdfName : null,
       }
@@ -160,10 +167,11 @@ function ResearchEditorPage() {
     }
   }
 
-  if (!user) {
-    navigate('/login')
-    return null
-  }
+  useEffect(() => {
+    if (!user) navigate('/login')
+  }, [user, navigate])
+
+  if (!user) return null
 
   if (loading) return (
     <div className="w-full px-6 py-6 max-w-4xl mx-auto">

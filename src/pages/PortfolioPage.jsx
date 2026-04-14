@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useCallback } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { useAuth } from '../context/AuthContext'
 import { useLanguage } from '../context/LanguageContext'
@@ -95,7 +95,7 @@ function AllocationDonut({ openPositions }) {
   // Aggregate invested per symbol across all open positions
   const bySymbol = openPositions.reduce((map, t) => {
     const qty = t.remaining_quantity ?? t.quantity
-    const inv = t.entry_price * qty
+    const inv = parseFloat(t.entry_price) * qty
     map[t.symbol] = (map[t.symbol] || 0) + inv
     return map
   }, {})
@@ -370,8 +370,8 @@ function EquityCurve({ closedTrades }) {
     if (dd > maxDD) maxDD = dd
   }
 
-  // Gradient id — needs to be unique to avoid dark/light mode conflicts
-  const gradId = isPositive ? 'equityGradGreen' : 'equityGradRed'
+  // Gradient id — must be unique per render to avoid SVG id collisions when P&L sign changes
+  const gradId = `equityGrad_${isPositive ? 'pos' : 'neg'}_${sorted.length}`
   const lineColor  = isPositive ? '#10b981' : '#f87171'
   const gradTop    = isPositive ? '#10b98140' : '#f8717140'
   const gradBottom = isPositive ? '#10b98105' : '#f8717105'
@@ -662,8 +662,8 @@ function GroupCard({ symbol, entries, idx, onChart }) {
   const [expanded, setExpanded] = useState(false)
 
   const totalQty      = entries.reduce((s, t) => s + (t.remaining_quantity ?? t.quantity), 0)
-  const totalInvested = entries.reduce((s, t) => s + t.entry_price * (t.remaining_quantity ?? t.quantity), 0)
-  const weightedAvg   = totalInvested / totalQty
+  const totalInvested = entries.reduce((s, t) => s + parseFloat(t.entry_price) * (t.remaining_quantity ?? t.quantity), 0)
+  const weightedAvg   = totalQty > 0 ? totalInvested / totalQty : parseFloat(entries[0]?.entry_price) || 0
   const totalPnl      = entries.reduce((s, t) => s + (t.unrealizedPnl ?? 0), 0)
   const allHavePnl    = entries.every(t => t.unrealizedPnl != null)
   const ltp           = entries[0]?.currentPrice
@@ -681,8 +681,10 @@ function GroupCard({ symbol, entries, idx, onChart }) {
   // For risk gauge: use the tightest SL (worst case) and furthest TP across entries
   const slValues  = entries.map(t => t.sl).filter(Boolean).map(Number)
   const tpValues  = entries.map(t => t.tp).filter(Boolean).map(Number)
-  const groupSl   = slValues.length  > 0 ? (directions[0] === 'LONG' ? Math.max(...slValues)  : Math.min(...slValues))  : null
-  const groupTp   = tpValues.length  > 0 ? (directions[0] === 'LONG' ? Math.min(...tpValues)  : Math.max(...tpValues))  : null
+  // LONG: tightest SL = highest SL value (closest to entry from below), furthest TP = highest TP
+  // SHORT: tightest SL = lowest SL value (closest to entry from above), furthest TP = lowest TP
+  const groupSl   = slValues.length > 0 ? (directions[0] === 'LONG' ? Math.max(...slValues) : Math.min(...slValues)) : null
+  const groupTp   = tpValues.length > 0 ? (directions[0] === 'LONG' ? Math.max(...tpValues) : Math.min(...tpValues)) : null
   const groupDir  = directions.length === 1 ? directions[0] : 'LONG'
 
   return (
@@ -899,6 +901,7 @@ function PortfolioPage() {
   const [openPositions, setOpenPositions] = useState([])
   const [loading, setLoading]             = useState(true)
   const [ltpLoading, setLtpLoading]       = useState(false)
+  const [fetchError, setFetchError]       = useState(null)
 
   // History table controls
   const [filterStatus, setFilterStatus]   = useState('ALL')   // ALL | OPEN | PARTIAL | CLOSED
@@ -911,7 +914,7 @@ function PortfolioPage() {
 
   // ── Data fetch ─────────────────────────────────────────────────────────────
 
-  const fetchData = async () => {
+  const fetchData = useCallback(async () => {
     try {
       const res       = await getTradeLog()
       const allTrades = res.data ?? []
@@ -934,33 +937,45 @@ function PortfolioPage() {
       })
 
       setOpenPositions(open.map(tr => {
-        const p   = priceMap[tr.symbol]
-        const qty = tr.remaining_quantity ?? tr.quantity
+        const p      = priceMap[tr.symbol]
+        const qty    = tr.remaining_quantity ?? tr.quantity
+        const entry  = parseFloat(tr.entry_price)
         if (!p) return { ...tr, currentPrice: null, unrealizedPnl: null, pnlPct: null }
-        const ltp    = p.price
-        const pnl    = tr.position === 'LONG' ? (ltp - tr.entry_price) * qty : (tr.entry_price - ltp) * qty
-        const pnlPct = ((pnl / (tr.entry_price * qty)) * 100).toFixed(2)
+        const ltp      = p.price
+        const invested = entry * qty
+        const pnl      = tr.position === 'LONG' ? (ltp - entry) * qty : (entry - ltp) * qty
+        const pnlPct   = invested > 0 ? ((pnl / invested) * 100).toFixed(2) : '0.00'
         return { ...tr, currentPrice: ltp, change: p.change, latestDate: p.latestDate, unrealizedPnl: Math.round(pnl), pnlPct }
       }))
     } catch (err) {
       console.error('PortfolioPage fetch error:', err)
+      setFetchError('Failed to load portfolio data. Please refresh.')
     } finally {
       setLoading(false)
       setLtpLoading(false)
     }
-  }
+  }, [user])
 
-  useEffect(() => { if (user) fetchData() }, [user])
+  useEffect(() => { if (user) fetchData() }, [user, fetchData])
   useChatRefresh(['trades'], fetchData)
 
   // ── Navigation helpers ─────────────────────────────────────────────────────
 
-  const handleGoToChart = ({ symbol, entries, id, entry_price, sl, tp, position, remaining_quantity, quantity }) => {
+  const handleGoToChart = ({ symbol, entries, id, entry_price, sl, tp, position, remaining_quantity, quantity, date }) => {
     // Called from both GroupCard (passes { symbol, entries }) and PositionCard (passes a single trade)
     const positions = entries
-      ? entries.map(tr => ({ id: tr.id, entry_price: tr.entry_price, sl: tr.sl, tp: tr.tp, position: tr.position, quantity: tr.remaining_quantity ?? tr.quantity }))
-      : [{ id, entry_price, sl, tp, position, quantity: remaining_quantity ?? quantity }]
-    navigate('/analysis', { state: { symbol, positions } })
+      ? entries.map(tr => ({
+          id:                 tr.id,
+          entry_price:        parseFloat(tr.entry_price),
+          sl:                 tr.sl ? parseFloat(tr.sl) : null,
+          tp:                 tr.tp ? parseFloat(tr.tp) : null,
+          position:           tr.position,
+          quantity:           tr.quantity,
+          remaining_quantity: tr.remaining_quantity ?? tr.quantity,
+          entry_date:         tr.date,
+        }))
+      : [{ id, entry_price: parseFloat(entry_price), sl: sl ? parseFloat(sl) : null, tp: tp ? parseFloat(tp) : null, position, quantity, remaining_quantity: remaining_quantity ?? quantity, entry_date: date }]
+    navigate('/screen', { state: { symbol, positions } })
   }
 
   // ── Sort helper ────────────────────────────────────────────────────────────
@@ -1001,10 +1016,22 @@ function PortfolioPage() {
     </div>
   )
 
+  if (fetchError) return (
+    <div className="max-w-6xl mx-auto px-6 py-6 flex items-center justify-center min-h-64">
+      <div className="text-center space-y-3">
+        <p className="text-[13px] text-red-400 font-medium">{fetchError}</p>
+        <button onClick={() => { setFetchError(null); setLoading(true); fetchData() }}
+          className="text-[11px] text-blue-500 hover:text-blue-400 border border-blue-200 dark:border-blue-800 px-4 py-1.5 rounded-lg transition-colors">
+          Retry
+        </button>
+      </div>
+    </div>
+  )
+
   // ── Derived stats ──────────────────────────────────────────────────────────
 
   const closedTrades    = trades.filter(t => t.status === 'CLOSED')
-  const totalInvested   = openPositions.reduce((s, t) => s + t.entry_price * (t.remaining_quantity ?? t.quantity), 0)
+  const totalInvested   = openPositions.reduce((s, t) => s + parseFloat(t.entry_price) * (t.remaining_quantity ?? t.quantity), 0)
   const totalUnrealized = openPositions.reduce((s, t) => s + (t.unrealizedPnl ?? 0), 0)
   const totalRealized   = closedTrades.reduce((s, t) => s + (t.realized_pnl ?? 0), 0)
   const totalPnl        = totalRealized + totalUnrealized
@@ -1016,9 +1043,9 @@ function PortfolioPage() {
   const expectancy      = winRate != null && avgWin && avgLoss
     ? (winRate / 100) * avgWin - (1 - winRate / 100) * avgLoss
     : null
-  const profitFactor    = avgLoss > 0 && wins.length > 0
-    ? (wins.reduce((s, t) => s + t.realized_pnl, 0) / Math.abs(losses.reduce((s, t) => s + t.realized_pnl, 0) || 1)).toFixed(2)
-    : null
+  const grossWin        = wins.reduce((s, t) => s + (t.realized_pnl ?? 0), 0)
+  const grossLoss       = Math.abs(losses.reduce((s, t) => s + (t.realized_pnl ?? 0), 0))
+  const profitFactor    = grossLoss > 0 ? (grossWin / grossLoss).toFixed(2) : wins.length > 0 ? '∞' : null
 
   // ── Open positions: group by symbol ───────────────────────────────────────
 
@@ -1079,7 +1106,7 @@ function PortfolioPage() {
           <p className="text-[11px] text-gray-400 mt-0.5">Live positions & performance overview</p>
         </div>
         <button
-          onClick={() => navigate('/trader')}
+          onClick={() => navigate('/logs')}
           className="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-xl text-[11px] font-semibold transition-colors flex items-center gap-1.5"
         >
           <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
@@ -1132,7 +1159,7 @@ function PortfolioPage() {
 
           <div className="space-y-3">
             {[
-              { label: 'Investor',       value: user.name,                                                         vc: 'text-gray-800 dark:text-gray-200' },
+              { label: 'Investor',       value: user?.name || user?.email || 'Trader',                                                         vc: 'text-gray-800 dark:text-gray-200' },
               { label: 'Open Positions', value: openPositions.length,                                             vc: 'text-blue-500' },
               { label: 'Closed Trades',  value: closedTrades.length,                                              vc: 'text-gray-700 dark:text-gray-300' },
               { label: 'Total Trades',   value: trades.length,                                                    vc: 'text-gray-700 dark:text-gray-300' },
@@ -1188,7 +1215,7 @@ function PortfolioPage() {
               icon={<svg className="w-5 h-5 text-gray-300" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z" /></svg>}
               title="No open positions"
               action="Log a trade →"
-              onAction={() => navigate('/trader')}
+              onAction={() => navigate('/logs')}
             />
           ) : (
             <div className="p-3 space-y-2 overflow-y-auto no-scrollbar">
@@ -1259,7 +1286,7 @@ function PortfolioPage() {
             icon={<svg className="w-5 h-5 text-gray-300" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2" /></svg>}
             title="No trades yet"
             action="Add your first trade →"
-            onAction={() => navigate('/trader')}
+            onAction={() => navigate('/logs')}
           />
         ) : sorted.length === 0 ? (
           <EmptyState
