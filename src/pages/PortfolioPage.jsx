@@ -253,7 +253,7 @@ function MonthlyPnlChart({ closedTrades }) {
     if (!t.date || t.realized_pnl == null) return
     const key = t.date.slice(0, 7) // 'YYYY-MM'
     const m   = months.find(m => m.key === key)
-    if (m) m.value += t.realized_pnl
+    if (m) m.value += parseFloat(t.realized_pnl) || 0
   })
 
   // Round values
@@ -347,12 +347,13 @@ function EquityCurve({ closedTrades }) {
 
   let cumulative = 0
   const data = sorted.map((t, i) => {
-    cumulative += t.realized_pnl
+    const pnl = parseFloat(t.realized_pnl) || 0
+    cumulative += pnl
     return {
       tradeNum:   i + 1,
       date:       t.date,
       symbol:     t.symbol,
-      pnl:        t.realized_pnl,
+      pnl,
       cumulative: Math.round(cumulative),
     }
   })
@@ -441,7 +442,9 @@ function EquityCurve({ closedTrades }) {
 function BestWorstTrades({ closedTrades }) {
   if (closedTrades.length === 0) return null
 
-  const withPnl = closedTrades.filter(t => t.realized_pnl != null)
+  const withPnl = closedTrades
+    .filter(t => t.realized_pnl != null)
+    .map(t => ({ ...t, realized_pnl: parseFloat(t.realized_pnl) || 0 }))
   if (withPnl.length === 0) return null
 
   const best  = withPnl.reduce((a, b) => (b.realized_pnl > a.realized_pnl ? b : a))
@@ -658,7 +661,7 @@ function SortIcon({ col, sort }) {
 
 // ── Grouped position card (multiple entries, same symbol) ─────────────────────
 
-function GroupCard({ symbol, entries, idx, onChart }) {
+function GroupCard({ symbol, entries, idx, onChart, isFirstLoad }) {
   const [expanded, setExpanded] = useState(false)
 
   const totalQty      = entries.reduce((s, t) => s + (t.remaining_quantity ?? t.quantity), 0)
@@ -689,8 +692,8 @@ function GroupCard({ symbol, entries, idx, onChart }) {
 
   return (
     <div
-      className="animate-fade-up rounded-xl border border-gray-100 dark:border-gray-700/50 overflow-hidden"
-      style={{ animationDelay: `${idx * 35}ms` }}
+      className={`${isFirstLoad ? 'animate-fade-up' : ''} rounded-xl border border-gray-100 dark:border-gray-700/50 overflow-hidden`}
+      style={isFirstLoad ? { animationDelay: `${idx * 35}ms` } : undefined}
     >
       {/* Group header row */}
       <div
@@ -814,17 +817,17 @@ function GroupCard({ symbol, entries, idx, onChart }) {
 
 // ── Single position card ───────────────────────────────────────────────────────
 
-function PositionCard({ trade, idx, onChart }) {
-  const qty      = trade.remaining_quantity ?? trade.quantity
-  const invested = trade.entry_price * qty
+function PositionCard({ trade, idx, onChart, isFirstLoad }) {
+  const qty      = parseFloat(trade.remaining_quantity ?? trade.quantity) || 0
+  const invested = (parseFloat(trade.entry_price) || 0) * qty
   const isProfit = (trade.unrealizedPnl ?? 0) >= 0
   const pnlPct   = parseFloat(trade.pnlPct ?? 0)
   const barWidth = Math.min(Math.abs(pnlPct) * 4, 50)
 
   return (
     <div
-      className="group bg-gray-50/50 dark:bg-gray-800/40 hover:bg-white dark:hover:bg-gray-800/80 rounded-xl p-3.5 transition-all duration-200 border border-transparent hover:border-gray-100 dark:hover:border-gray-700/50 animate-fade-up"
-      style={{ animationDelay: `${idx * 35}ms` }}
+      className={`group bg-gray-50/50 dark:bg-gray-800/40 hover:bg-white dark:hover:bg-gray-800/80 rounded-xl p-3.5 transition-all duration-200 border border-transparent hover:border-gray-100 dark:hover:border-gray-700/50 ${isFirstLoad ? 'animate-fade-up' : ''}`}
+      style={isFirstLoad ? { animationDelay: `${idx * 35}ms` } : undefined}
     >
       <div className="flex items-start justify-between gap-2">
         <div className="flex items-center gap-2.5">
@@ -902,6 +905,7 @@ function PortfolioPage() {
   const [loading, setLoading]             = useState(true)
   const [ltpLoading, setLtpLoading]       = useState(false)
   const [fetchError, setFetchError]       = useState(null)
+  const [isFirstLoad, setIsFirstLoad]     = useState(true)   // controls entry animation — only on first paint
 
   // History table controls
   const [filterStatus, setFilterStatus]   = useState('ALL')   // ALL | OPEN | PARTIAL | CLOSED
@@ -921,11 +925,15 @@ function PortfolioPage() {
       setTrades(allTrades)
 
       const open = allTrades.filter(tr => tr.status === 'OPEN' || tr.status === 'PARTIAL')
-      // Show cards immediately with null prices
-      setOpenPositions(open.map(tr => ({ ...tr, currentPrice: null, unrealizedPnl: null, pnlPct: null })))
 
-      if (open.length === 0) { setLoading(false); return }
+      if (open.length === 0) {
+        setOpenPositions([])
+        setLoading(false)
+        return
+      }
 
+      // Fetch all prices in parallel before any state update — eliminates the
+      // double-render (null prices → real prices) that causes the flicker
       setLtpLoading(true)
       const uniqueSymbols = [...new Set(open.map(tr => tr.symbol))]
       const results       = await Promise.allSettled(uniqueSymbols.map(sym => getStockPrice(sym)))
@@ -936,12 +944,13 @@ function PortfolioPage() {
         if (r.status === 'fulfilled') priceMap[sym] = r.value.data
       })
 
+      // Single state update with complete data — no intermediate null-price render
       setOpenPositions(open.map(tr => {
         const p      = priceMap[tr.symbol]
-        const qty    = tr.remaining_quantity ?? tr.quantity
-        const entry  = parseFloat(tr.entry_price)
+        const qty    = parseFloat(tr.remaining_quantity ?? tr.quantity) || 0
+        const entry  = parseFloat(tr.entry_price) || 0
         if (!p) return { ...tr, currentPrice: null, unrealizedPnl: null, pnlPct: null }
-        const ltp      = p.price
+        const ltp      = parseFloat(p.price) || 0
         const invested = entry * qty
         const pnl      = tr.position === 'LONG' ? (ltp - entry) * qty : (entry - ltp) * qty
         const pnlPct   = invested > 0 ? ((pnl / invested) * 100).toFixed(2) : '0.00'
@@ -953,8 +962,9 @@ function PortfolioPage() {
     } finally {
       setLoading(false)
       setLtpLoading(false)
+      setIsFirstLoad(false)  // subsequent refreshes won't re-animate cards
     }
-  }, [user])
+  }, [user?.id])   // depend on id only — not full user object (avatar_url changes trigger flicker)
 
   useEffect(() => { if (user) fetchData() }, [user, fetchData])
   useChatRefresh(['trades'], fetchData)
@@ -1030,21 +1040,24 @@ function PortfolioPage() {
 
   // ── Derived stats ──────────────────────────────────────────────────────────
 
-  const closedTrades    = trades.filter(t => t.status === 'CLOSED')
-  const totalInvested   = openPositions.reduce((s, t) => s + parseFloat(t.entry_price) * (t.remaining_quantity ?? t.quantity), 0)
+  // Normalise closed trades once so every derived calc uses parseFloat'd PnL
+  const closedTrades    = trades
+    .filter(t => t.status === 'CLOSED')
+    .map(t => ({ ...t, realized_pnl: parseFloat(t.realized_pnl) || 0 }))
+  const totalInvested   = openPositions.reduce((s, t) => s + (parseFloat(t.entry_price) || 0) * (parseFloat(t.remaining_quantity ?? t.quantity) || 0), 0)
   const totalUnrealized = openPositions.reduce((s, t) => s + (t.unrealizedPnl ?? 0), 0)
-  const totalRealized   = closedTrades.reduce((s, t) => s + (t.realized_pnl ?? 0), 0)
+  const totalRealized   = closedTrades.reduce((s, t) => s + t.realized_pnl, 0)
   const totalPnl        = totalRealized + totalUnrealized
-  const wins            = closedTrades.filter(t => (t.realized_pnl ?? 0) > 0)
-  const losses          = closedTrades.filter(t => (t.realized_pnl ?? 0) < 0)
+  const wins            = closedTrades.filter(t => t.realized_pnl > 0)
+  const losses          = closedTrades.filter(t => t.realized_pnl < 0)
   const winRate         = closedTrades.length > 0 ? Math.round((wins.length / closedTrades.length) * 100) : null
   const avgWin          = wins.length   > 0 ? wins.reduce((s, t)   => s + t.realized_pnl, 0) / wins.length   : 0
   const avgLoss         = losses.length > 0 ? Math.abs(losses.reduce((s, t) => s + t.realized_pnl, 0) / losses.length) : 0
   const expectancy      = winRate != null && avgWin && avgLoss
     ? (winRate / 100) * avgWin - (1 - winRate / 100) * avgLoss
     : null
-  const grossWin        = wins.reduce((s, t) => s + (t.realized_pnl ?? 0), 0)
-  const grossLoss       = Math.abs(losses.reduce((s, t) => s + (t.realized_pnl ?? 0), 0))
+  const grossWin        = wins.reduce((s, t) => s + t.realized_pnl, 0)
+  const grossLoss       = Math.abs(losses.reduce((s, t) => s + t.realized_pnl, 0))
   const profitFactor    = grossLoss > 0 ? (grossWin / grossLoss).toFixed(2) : wins.length > 0 ? '∞' : null
 
   // ── Open positions: group by symbol ───────────────────────────────────────
@@ -1221,8 +1234,8 @@ function PortfolioPage() {
             <div className="p-3 space-y-2 overflow-y-auto no-scrollbar">
               {groupedEntries.map(([symbol, entries], idx) =>
                 entries.length > 1
-                  ? <GroupCard key={symbol} symbol={symbol} entries={entries} idx={idx} onChart={handleGoToChart} />
-                  : <PositionCard key={entries[0].id} trade={entries[0]} idx={idx} onChart={(tr) => handleGoToChart(tr)} />
+                  ? <GroupCard key={symbol} symbol={symbol} entries={entries} idx={idx} onChart={handleGoToChart} isFirstLoad={isFirstLoad} />
+                  : <PositionCard key={entries[0].id} trade={entries[0]} idx={idx} onChart={(tr) => handleGoToChart(tr)} isFirstLoad={isFirstLoad} />
               )}
             </div>
           )}
