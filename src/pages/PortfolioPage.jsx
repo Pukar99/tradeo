@@ -94,8 +94,8 @@ function AllocationDonut({ openPositions }) {
 
   // Aggregate invested per symbol across all open positions
   const bySymbol = openPositions.reduce((map, t) => {
-    const qty = t.remaining_quantity ?? t.quantity
-    const inv = parseFloat(t.entry_price) * qty
+    const qty = parseFloat(t.remaining_quantity ?? t.quantity) || 0
+    const inv = (parseFloat(t.entry_price) || 0) * qty
     map[t.symbol] = (map[t.symbol] || 0) + inv
     return map
   }, {})
@@ -1145,9 +1145,13 @@ function PortfolioPage() {
         />
         <StatCard
           label="Unrealized"
-          value={ltpLoading ? '…' : `${totalUnrealized >= 0 ? '+' : ''}${fmtRs(totalUnrealized)}`}
-          valueClass={ltpLoading ? 'text-gray-300 dark:text-gray-600' : signCls(totalUnrealized)}
-          sub={`${openPositions.length} open position${openPositions.length !== 1 ? 's' : ''}`}
+          value={ltpLoading
+            ? '—'
+            : `${totalUnrealized >= 0 ? '+' : ''}${fmtRs(totalUnrealized)}`}
+          valueClass={ltpLoading ? 'text-gray-400 dark:text-gray-600' : signCls(totalUnrealized)}
+          sub={ltpLoading
+            ? 'Fetching prices…'
+            : `${openPositions.length} open position${openPositions.length !== 1 ? 's' : ''}`}
         />
         <StatCard
           label="Win Rate"
@@ -1163,8 +1167,19 @@ function PortfolioPage() {
         {/* Left column: donut on top, summary below */}
         <div className="flex flex-col gap-4">
 
-          {/* Allocation donut — only when open positions exist */}
-          {openPositions.length > 0 && <AllocationDonut openPositions={openPositions} />}
+          {/* Allocation donut — only when positions are loaded and have data */}
+          {!ltpLoading && openPositions.length > 0 && <AllocationDonut openPositions={openPositions} />}
+          {ltpLoading && (
+            <div className="bg-white dark:bg-gray-900 rounded-2xl border border-gray-100 dark:border-gray-800 p-4 animate-pulse">
+              <div className="h-2.5 w-28 bg-gray-200 dark:bg-gray-700 rounded mb-4" />
+              <div className="flex items-center gap-4">
+                <div className="w-[140px] h-[140px] rounded-full bg-gray-100 dark:bg-gray-800 flex-shrink-0" />
+                <div className="flex-1 space-y-2.5">
+                  {[1,2,3].map(i => <div key={i} className="h-2 bg-gray-100 dark:bg-gray-800 rounded" />)}
+                </div>
+              </div>
+            </div>
+          )}
 
         {/* Summary card */}
         <div className="bg-white dark:bg-gray-900 rounded-2xl border border-gray-100 dark:border-gray-800 p-4">
@@ -1223,7 +1238,26 @@ function PortfolioPage() {
             }
           />
 
-          {openPositions.length === 0 ? (
+          {ltpLoading ? (
+            /* Loading skeleton — shown while prices are being fetched */
+            <div className="p-3 space-y-2">
+              {[1, 2].map(i => (
+                <div key={i} className="rounded-xl border border-gray-100 dark:border-gray-700/50 p-3.5 animate-pulse">
+                  <div className="flex items-center gap-2.5">
+                    <div className="w-8 h-8 rounded-lg bg-gray-200 dark:bg-gray-700 flex-shrink-0" />
+                    <div className="flex-1 space-y-1.5">
+                      <div className="h-3 w-24 bg-gray-200 dark:bg-gray-700 rounded" />
+                      <div className="h-2 w-36 bg-gray-100 dark:bg-gray-800 rounded" />
+                    </div>
+                    <div className="text-right space-y-1.5">
+                      <div className="h-3 w-16 bg-gray-200 dark:bg-gray-700 rounded" />
+                      <div className="h-2 w-12 bg-gray-100 dark:bg-gray-800 rounded ml-auto" />
+                    </div>
+                  </div>
+                </div>
+              ))}
+            </div>
+          ) : openPositions.length === 0 ? (
             <EmptyState
               icon={<svg className="w-5 h-5 text-gray-300" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z" /></svg>}
               title="No open positions"
