@@ -108,3 +108,6 @@ export const scanBreakdown = (data) => API.post('/api/breakdown/scan', data)
 
 // Complex Tab — Trade Behavior
 export const getBehaviorStats = (params) => API.get('/api/behavior/stats', { params })
+
+// Complex Tab — Market Regime
+export const getRegime = (params) => API.get('/api/regime/detect', { params })
