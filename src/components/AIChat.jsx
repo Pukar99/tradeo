@@ -42,6 +42,7 @@ const ACTION_META = {
   UPDATE_GOAL:        { icon: '🏆', label: 'Goal Updated',              color: 'border-teal-400 bg-teal-50 dark:bg-teal-900/30' },
   DELETE_GOAL:        { icon: '🗑️', label: 'Goal Removed',              color: 'border-gray-400 bg-gray-50 dark:bg-gray-700/50' },
   UNDO:               { icon: '↩️', label: 'Action Undone',             color: 'border-indigo-400 bg-indigo-50 dark:bg-indigo-900/30' },
+  TOGGLE_THEME:       { icon: '🌙', label: 'Theme Changed',             color: 'border-gray-400 bg-gray-50 dark:bg-gray-700/50' },
 }
 
 // ── Standard action card (trade, watchlist, goal, journal, etc.) ─────────────

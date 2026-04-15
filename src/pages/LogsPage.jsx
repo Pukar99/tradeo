@@ -355,7 +355,7 @@ function AddTradeModal({ onClose, onSave, editTrade, openTrades = [] }) {
                   You already have {duplicates.length} open {form.symbol} position{duplicates.length > 1 ? 's' : ''}
                 </p>
                 <p className="text-[10px] text-amber-600 dark:text-amber-500 mt-0.5">
-                  {dupTotalQty} units · Avg entry Rs.{dupWeightedAvg.toFixed(2)} · Adding a separate entry row
+                  {dupTotalQty} units · Avg entry Rs.{dupWeightedAvg?.toFixed(2) ?? '—'} · Adding a separate entry row
                 </p>
               </div>
             </div>
