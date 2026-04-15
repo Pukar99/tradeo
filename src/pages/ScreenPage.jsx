@@ -9,12 +9,14 @@ import BacktestPage               from '../components/backtest/BacktestPage'
 import InsightPage                from '../components/complex/InsightPage'
 import BreakdownPage              from '../components/complex/BreakdownPage'
 import TradeBehaviorPage          from '../components/complex/TradeBehaviorPage'
+import MarketRegimePage           from '../components/complex/MarketRegimePage'
 
 const COMPLEX_TABS = [
   { id: 'Backtesting',    label: 'Backtesting' },
   { id: 'Insight',        label: 'Insight'     },
   { id: 'Breakdown',      label: 'Breakdown'   },
   { id: 'TradeBehavior',  label: 'My Trades'   },
+  { id: 'MarketRegime',   label: 'Regime'      },
 ]
 
 function ComplexContent({ activeTab }) {
@@ -22,6 +24,7 @@ function ComplexContent({ activeTab }) {
   if (activeTab === 'Insight')       return <InsightPage />
   if (activeTab === 'Breakdown')     return <BreakdownPage />
   if (activeTab === 'TradeBehavior') return <TradeBehaviorPage />
+  if (activeTab === 'MarketRegime')  return <MarketRegimePage />
   return (
     <div className="flex-1 flex items-center justify-center text-[12px] text-gray-400">
       {activeTab} — coming soon
