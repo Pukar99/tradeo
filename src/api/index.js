@@ -111,3 +111,12 @@ export const getBehaviorStats = (params) => API.get('/api/behavior/stats', { par
 
 // Complex Tab — Market Regime
 export const getRegime = (params) => API.get('/api/regime/detect', { params })
+
+// Complex Tab — Swing Structure
+export const getSwings = (params) => API.get('/api/structure/swings', { params })
+
+// Complex Tab — Volatility
+export const getVolatilityClusters = (params) => API.get('/api/volatility/clusters', { params })
+
+// Complex Tab — Smart Screener
+export const runScreener = (params) => API.get('/api/screener/scan', { params })

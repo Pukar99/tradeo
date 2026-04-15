@@ -10,6 +10,9 @@ import InsightPage                from '../components/complex/InsightPage'
 import BreakdownPage              from '../components/complex/BreakdownPage'
 import TradeBehaviorPage          from '../components/complex/TradeBehaviorPage'
 import MarketRegimePage           from '../components/complex/MarketRegimePage'
+import SwingStructurePage         from '../components/complex/SwingStructurePage'
+import VolatilityMapPage          from '../components/complex/VolatilityMapPage'
+import SmartScreenerPage          from '../components/complex/SmartScreenerPage'
 
 const COMPLEX_TABS = [
   { id: 'Backtesting',    label: 'Backtesting' },
@@ -17,14 +20,20 @@ const COMPLEX_TABS = [
   { id: 'Breakdown',      label: 'Breakdown'   },
   { id: 'TradeBehavior',  label: 'My Trades'   },
   { id: 'MarketRegime',   label: 'Regime'      },
+  { id: 'SwingStructure', label: 'Structure'   },
+  { id: 'Volatility',     label: 'Volatility'  },
+  { id: 'Screener',       label: 'Screener'    },
 ]
 
 function ComplexContent({ activeTab }) {
-  if (activeTab === 'Backtesting')   return <BacktestPage />
-  if (activeTab === 'Insight')       return <InsightPage />
-  if (activeTab === 'Breakdown')     return <BreakdownPage />
-  if (activeTab === 'TradeBehavior') return <TradeBehaviorPage />
-  if (activeTab === 'MarketRegime')  return <MarketRegimePage />
+  if (activeTab === 'Backtesting')    return <BacktestPage />
+  if (activeTab === 'Insight')        return <InsightPage />
+  if (activeTab === 'Breakdown')      return <BreakdownPage />
+  if (activeTab === 'TradeBehavior')  return <TradeBehaviorPage />
+  if (activeTab === 'MarketRegime')   return <MarketRegimePage />
+  if (activeTab === 'SwingStructure') return <SwingStructurePage />
+  if (activeTab === 'Volatility')     return <VolatilityMapPage />
+  if (activeTab === 'Screener')       return <SmartScreenerPage />
   return (
     <div className="flex-1 flex items-center justify-center text-[12px] text-gray-400">
       {activeTab} — coming soon
