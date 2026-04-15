@@ -663,7 +663,10 @@ function AIChat({ isFullPage = false, onClose }) {
   const [input, setInput] = useState('')
   const [loading, setLoading] = useState(false)
   const [suggestions, setSuggestions] = useState([])
-  const [lastAction, setLastAction] = useState(null)
+  // P4-004: persist lastAction in sessionStorage so undo survives within the same tab session
+  const [lastAction, setLastAction] = useState(() => {
+    try { return JSON.parse(sessionStorage.getItem('chat_lastAction')) } catch { return null }
+  })
   const [activeForm, setActiveForm] = useState(null)
   // Inline special cards waiting for user action
   const [journalDraft, setJournalDraft] = useState(null)   // { symbol, trade, ltp, pnl, suggestedContent }
@@ -671,6 +674,18 @@ function AIChat({ isFullPage = false, onClose }) {
 
   const messagesEndRef = useRef(null)
   const inputRef = useRef(null)
+  const abortCtrlRef = useRef(null)
+
+  // Cancel any in-flight SSE stream on unmount
+  useEffect(() => {
+    return () => { abortCtrlRef.current?.abort() }
+  }, [])
+
+  // P4-004: sync lastAction to sessionStorage so undo survives in-tab refresh
+  useEffect(() => {
+    if (lastAction) sessionStorage.setItem('chat_lastAction', JSON.stringify(lastAction))
+    else sessionStorage.removeItem('chat_lastAction')
+  }, [lastAction])
 
   useEffect(() => {
     if (user) {
@@ -692,14 +707,20 @@ function AIChat({ isFullPage = false, onClose }) {
 
     setActiveForm(null)
     const userMessage = { role: 'user', content: text, time: new Date() }
-    setMessages(prev => [...prev, userMessage])
+    // P4-003: cap in-memory history at 100 messages to prevent memory bloat
+    setMessages(prev => [...prev, userMessage].slice(-100))
     setInput('')
     setLoading(true)
 
     try {
+      abortCtrlRef.current?.abort()
+      const ctrl = new AbortController()
+      abortCtrlRef.current = ctrl
+
       const token = localStorage.getItem('token')
       const response = await fetch('http://localhost:5000/api/chat/agent', {
         method: 'POST',
+        signal: ctrl.signal,
         headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
         body: JSON.stringify({
           message: text,
@@ -727,7 +748,7 @@ function AIChat({ isFullPage = false, onClose }) {
         try {
           while (true) {
             const { done, value } = await reader.read()
-            if (done) break
+            if (done || ctrl.signal.aborted) break
             buffer += decoder.decode(value, { stream: true })
             const lines = buffer.split('\n')
             buffer = lines.pop() // keep incomplete line in buffer
@@ -797,6 +818,7 @@ function AIChat({ isFullPage = false, onClose }) {
         actionResult: data.type === 'action' ? data.result : null,
       }])
     } catch (err) {
+      if (err?.name === 'AbortError') return // intentional cancel — no error message
       console.error('AIChat handleSend error:', err)
       setMessages(prev => [...prev, {
         role: 'assistant',

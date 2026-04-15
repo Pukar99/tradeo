@@ -38,34 +38,32 @@ function MorningBriefing({ onClose }) {
       const open = trades.filter(t => t.status === 'OPEN' || t.status === 'PARTIAL')
       const closed = trades.filter(t => t.status === 'CLOSED')
 
-      // Fetch prices for open positions — rate-limited to avoid hammering the API
-      // Sequential with a small gap rather than N concurrent requests
-      const openWithPrices = []
-      for (const t of open) {
-        try {
-          const priceRes = await getStockPrice(t.symbol)
-          const qty = parseFloat(t.remaining_quantity || t.quantity) || 0
-          const ltp = parseFloat(priceRes.data.price) || 0
-          const entryPrice = parseFloat(t.entry_price) || 0
-          const pnl = t.position === 'LONG'
-            ? (ltp - entryPrice) * qty
-            : (entryPrice - ltp) * qty
-          const slDistPct = t.sl ? Math.abs(((ltp - parseFloat(t.sl)) / ltp) * 100) : null
-          const tpDistPct = t.tp ? Math.abs(((parseFloat(t.tp) - ltp) / ltp) * 100) : null
-          openWithPrices.push({
-            ...t, currentPrice: ltp,
-            change: priceRes.data.change,
-            unrealizedPnl: Math.round(pnl),
-            slDistPct: slDistPct?.toFixed(1),
-            tpDistPct: tpDistPct?.toFixed(1),
-            nearSL: slDistPct != null && slDistPct < 3,
-            nearTP: tpDistPct != null && tpDistPct < 3,
-            noSL: !t.sl
-          })
-        } catch {
-          openWithPrices.push({ ...t, currentPrice: null, unrealizedPnl: null })
+      // P3-003: fetch all open position prices in parallel (Promise.allSettled)
+      const priceResults = await Promise.allSettled(open.map(t => getStockPrice(t.symbol)))
+      const openWithPrices = open.map((t, idx) => {
+        if (priceResults[idx].status === 'rejected') {
+          return { ...t, currentPrice: null, unrealizedPnl: null }
         }
-      }
+        const priceRes = priceResults[idx].value
+        const qty = parseFloat(t.remaining_quantity || t.quantity) || 0
+        const ltp = parseFloat(priceRes.data.price) || 0
+        const entryPrice = parseFloat(t.entry_price) || 0
+        const pnl = t.position === 'LONG'
+          ? (ltp - entryPrice) * qty
+          : (entryPrice - ltp) * qty
+        const slDistPct = t.sl ? Math.abs(((ltp - parseFloat(t.sl)) / ltp) * 100) : null
+        const tpDistPct = t.tp ? Math.abs(((parseFloat(t.tp) - ltp) / ltp) * 100) : null
+        return {
+          ...t, currentPrice: ltp,
+          change: priceRes.data.change,
+          unrealizedPnl: Math.round(pnl),
+          slDistPct: slDistPct?.toFixed(1),
+          tpDistPct: tpDistPct?.toFixed(1),
+          nearSL: slDistPct != null && slDistPct < 3,
+          nearTP: tpDistPct != null && tpDistPct < 3,
+          noSL: !t.sl
+        }
+      })
 
       // Top movers from market API — use the shared axios instance (no hardcoded URL)
       let topGainers = []

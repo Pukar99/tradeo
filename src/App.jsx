@@ -1,5 +1,5 @@
 import { BrowserRouter, Routes, Route, useLocation } from 'react-router-dom'
-import { useEffect, useState } from 'react'
+import { Component, useEffect, useState } from 'react'
 import Navbar from './components/Navbar'
 import HomePage from './pages/HomePage'
 import ScreenPage from './pages/ScreenPage'
@@ -18,6 +18,30 @@ import FloatingChat from './components/FloatingChat'
 import MorningBriefing from './components/MorningBriefing'
 import { useAuth } from './context/AuthContext'
 import { getProfile } from './api'
+
+// P4-005: catch uncaught render errors so the whole app doesn't white-screen
+class ErrorBoundary extends Component {
+  constructor(props) { super(props); this.state = { hasError: false, error: null } }
+  static getDerivedStateFromError(error) { return { hasError: true, error } }
+  render() {
+    if (this.state.hasError) {
+      return (
+        <div className="min-h-screen flex flex-col items-center justify-center gap-4 bg-gray-50 dark:bg-gray-950 text-gray-700 dark:text-gray-300 p-8">
+          <div className="text-[32px]">⚠️</div>
+          <div className="text-[14px] font-semibold">Something went wrong</div>
+          <div className="text-[11px] text-gray-400 max-w-sm text-center">{this.state.error?.message}</div>
+          <button
+            onClick={() => window.location.reload()}
+            className="mt-2 px-4 py-2 rounded-lg bg-blue-600 text-white text-[11px] font-semibold hover:bg-blue-700"
+          >
+            Reload page
+          </button>
+        </div>
+      )
+    }
+    return this.props.children
+  }
+}
 
 // Auth-only pages that should not show the navbar
 const AUTH_ROUTES = ['/login', '/signup']
@@ -42,10 +66,13 @@ function AppContent() {
 
     // Show briefing once per session (clears on tab close, not on refresh)
     const briefingShown = sessionStorage.getItem('briefingShown')
+    // P3-001: store timer ID and clear it on cleanup so it doesn't fire after unmount
+    let timer
     if (!briefingShown) {
-      setTimeout(() => setShowBriefing(true), 1000)
+      timer = setTimeout(() => setShowBriefing(true), 1000)
       sessionStorage.setItem('briefingShown', 'true')
     }
+    return () => clearTimeout(timer)
   }, [user]) // re-run when user changes (login/logout in same session)
 
   return (
@@ -77,9 +104,11 @@ function AppContent() {
 
 function App() {
   return (
-    <BrowserRouter>
-      <AppContent />
-    </BrowserRouter>
+    <ErrorBoundary>
+      <BrowserRouter>
+        <AppContent />
+      </BrowserRouter>
+    </ErrorBoundary>
   )
 }
 

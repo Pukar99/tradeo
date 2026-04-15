@@ -1,4 +1,4 @@
-import { useEffect } from 'react'
+import { useEffect, useRef } from 'react'
 
 // ── Chat action event bus ─────────────────────────────────────────────────────
 // Fired by AIChat after any successful agent action.
@@ -19,14 +19,20 @@ export const REFRESH_MAP = {
 }
 
 // Hook: subscribe to chat actions that affect a given domain
-// usage: useChatRefresh(['trades', 'watchlist'], () => fetchData())
+// usage: useChatRefresh(['trades', 'watchlist'], fetchData)
+// Uses a ref so the latest callback is always called without re-subscribing.
 export function useChatRefresh(domains, callback) {
+  const callbackRef = useRef(callback)
+  callbackRef.current = callback
+
+  // P2-007: re-build relevant set when domains change (stable dep via join)
+  const domainsKey = domains.slice().sort().join(',')
   useEffect(() => {
     const relevant = new Set(domains.flatMap(d => REFRESH_MAP[d] || []))
     const handler = (e) => {
-      if (relevant.has(e.detail?.action)) callback()
+      if (relevant.has(e.detail?.action)) callbackRef.current()
     }
     window.addEventListener(CHAT_EVENT, handler)
     return () => window.removeEventListener(CHAT_EVENT, handler)
-  }, []) // eslint-disable-line react-hooks/exhaustive-deps
+  }, [domainsKey]) // eslint-disable-line react-hooks/exhaustive-deps
 }
