@@ -99,3 +99,12 @@ export const getTradeJournal = () => API.get('/api/tradelog/journal')
 export const addTradeJournal = (data) => API.post('/api/tradelog/journal', data)
 export const updateTradeJournal = (id, data) => API.put(`/api/tradelog/journal/${id}`, data)
 export const deleteTradeJournal = (id) => API.delete(`/api/tradelog/journal/${id}`)
+
+// Complex Tab — Insight
+export const getInsightSignals = (params) => API.get('/api/insight/signals', { params })
+
+// Complex Tab — Breakdown
+export const scanBreakdown = (data) => API.post('/api/breakdown/scan', data)
+
+// Complex Tab — Trade Behavior
+export const getBehaviorStats = (params) => API.get('/api/behavior/stats', { params })
