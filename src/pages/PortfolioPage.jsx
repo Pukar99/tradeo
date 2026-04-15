@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from 'react'
+import { useState, useEffect, useCallback, useMemo } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { useAuth } from '../context/AuthContext'
 import { useLanguage } from '../context/LanguageContext'
@@ -92,25 +92,26 @@ function DonutTooltip({ active, payload }) {
 function AllocationDonut({ openPositions }) {
   const [active, setActive] = useState(null)
 
-  // Aggregate invested per symbol across all open positions
-  const bySymbol = openPositions.reduce((map, t) => {
-    const qty = parseFloat(t.remaining_quantity ?? t.quantity) || 0
-    const inv = (parseFloat(t.entry_price) || 0) * qty
-    map[t.symbol] = (map[t.symbol] || 0) + inv
-    return map
-  }, {})
+  // P3-004: memoize expensive aggregation — re-compute only when openPositions changes
+  const { data, total } = useMemo(() => {
+    const bySymbol = openPositions.reduce((map, t) => {
+      const qty = parseFloat(t.remaining_quantity ?? t.quantity) || 0
+      const inv = (parseFloat(t.entry_price) || 0) * qty
+      map[t.symbol] = (map[t.symbol] || 0) + inv
+      return map
+    }, {})
+    const tot = Object.values(bySymbol).reduce((s, v) => s + v, 0)
+    const entries = Object.entries(bySymbol)
+      .sort((a, b) => b[1] - a[1])
+      .map(([symbol, value]) => ({
+        symbol,
+        value,
+        pct: tot > 0 ? ((value / tot) * 100).toFixed(1) : '0',
+      }))
+    return { data: entries, total: tot }
+  }, [openPositions])
 
-  const total = Object.values(bySymbol).reduce((s, v) => s + v, 0)
   if (total === 0) return null
-
-  const data = Object.entries(bySymbol)
-    .sort((a, b) => b[1] - a[1])
-    .map(([symbol, value]) => ({
-      symbol,
-      value,
-      pct: ((value / total) * 100).toFixed(1),
-    }))
-
   const activeEntry = active != null ? data[active] : null
 
   return (
@@ -250,9 +251,11 @@ function MonthlyPnlChart({ closedTrades }) {
   }
 
   closedTrades.forEach(t => {
-    if (!t.date || t.realized_pnl == null) return
-    const key = t.date.slice(0, 7) // 'YYYY-MM'
-    const m   = months.find(m => m.key === key)
+    if (t.realized_pnl == null) return
+    // Use updated_at (close date) if available, fallback to entry date
+    const closeDate = t.updated_at ? t.updated_at.slice(0, 7) : t.date?.slice(0, 7)
+    if (!closeDate) return
+    const m = months.find(m => m.key === closeDate)
     if (m) m.value += parseFloat(t.realized_pnl) || 0
   })
 
@@ -338,10 +341,12 @@ function EquityCurveTooltip({ active, payload }) {
 function EquityCurve({ closedTrades }) {
   if (closedTrades.length === 0) return null
 
-  // Sort trades by date ascending, build cumulative P&L series
+  // Sort trades by close date ascending, build cumulative P&L series
   const sorted = [...closedTrades]
-    .filter(t => t.realized_pnl != null && t.date)
-    .sort((a, b) => a.date.localeCompare(b.date))
+    .filter(t => t.realized_pnl != null)
+    .map(t => ({ ...t, _closeDate: (t.updated_at || t.date || '').slice(0, 10) }))
+    .filter(t => t._closeDate)
+    .sort((a, b) => a._closeDate.localeCompare(b._closeDate))
 
   if (sorted.length < 2) return null
 
@@ -351,7 +356,7 @@ function EquityCurve({ closedTrades }) {
     cumulative += pnl
     return {
       tradeNum:   i + 1,
-      date:       t.date,
+      date:       t._closeDate,
       symbol:     t.symbol,
       pnl,
       cumulative: Math.round(cumulative),
@@ -450,8 +455,10 @@ function BestWorstTrades({ closedTrades }) {
   const best  = withPnl.reduce((a, b) => (b.realized_pnl > a.realized_pnl ? b : a))
   const worst = withPnl.reduce((a, b) => (b.realized_pnl < a.realized_pnl ? b : a))
 
-  // Streak: count current consecutive wins or losses from most recent trade
-  const byDate  = [...withPnl].sort((a, b) => b.date.localeCompare(a.date))
+  // Streak: count current consecutive wins or losses from most recent closed trade
+  const byDate  = [...withPnl]
+    .map(t => ({ ...t, _closeDate: (t.updated_at || t.date || '') }))
+    .sort((a, b) => b._closeDate.localeCompare(a._closeDate))
   let streak = 0, streakType = null
   for (const t of byDate) {
     const w = t.realized_pnl > 0

@@ -739,19 +739,21 @@ function ImportCSVModal({ onClose, onImport }) {
     setStep('importing')
     setProgress({ done: 0, total: toImport.length, failed: 0 })
 
+    // P2-009: batch requests in groups of 10 (parallel within each batch)
+    // instead of 500 sequential awaits
+    const BATCH = 10
+    let done = 0
     let failed = 0
-    for (let i = 0; i < toImport.length; i++) {
-      const r = toImport[i]
-      try {
-        await onImport({
-          date: r.date, symbol: r.symbol, position: r.position,
-          quantity: r.quantity, entry_price: r.entry_price,
-          sl: r.sl || null, tp: r.tp || null, notes: r.notes || null,
-        })
-      } catch {
-        failed++
-      }
-      setProgress({ done: i + 1, total: toImport.length, failed })
+    for (let i = 0; i < toImport.length; i += BATCH) {
+      const batch = toImport.slice(i, i + BATCH)
+      const results = await Promise.allSettled(batch.map(r => onImport({
+        date: r.date, symbol: r.symbol, position: r.position,
+        quantity: r.quantity, entry_price: r.entry_price,
+        sl: r.sl || null, tp: r.tp || null, notes: r.notes || null,
+      })))
+      failed += results.filter(r => r.status === 'rejected').length
+      done   += batch.length
+      setProgress({ done, total: toImport.length, failed })
     }
     setStep('done')
     setProgress(p => ({ ...p, failed }))
@@ -1010,13 +1012,13 @@ function StatsPanel({ trades }) {
   }
 
   // ── Core metrics ─────────────────────────────────────────────────────────
-  const winners    = closed.filter(t => (t.realized_pnl || 0) > 0)
-  const losers     = closed.filter(t => (t.realized_pnl || 0) < 0)
+  const winners    = closed.filter(t => parseFloat(t.realized_pnl || 0) > 0)
+  const losers     = closed.filter(t => parseFloat(t.realized_pnl || 0) < 0)
   const winRate    = closed.length > 0 ? (winners.length / closed.length) * 100 : null
 
-  const totalPnl   = closed.reduce((s, t) => s + (t.realized_pnl || 0), 0)
-  const avgWin     = winners.length > 0 ? winners.reduce((s, t) => s + (t.realized_pnl || 0), 0) / winners.length : null
-  const avgLoss    = losers.length  > 0 ? losers.reduce((s, t)  => s + (t.realized_pnl || 0), 0)  / losers.length  : null
+  const totalPnl   = closed.reduce((s, t) => s + (parseFloat(t.realized_pnl) || 0), 0)
+  const avgWin     = winners.length > 0 ? winners.reduce((s, t) => s + (parseFloat(t.realized_pnl) || 0), 0) / winners.length : null
+  const avgLoss    = losers.length  > 0 ? losers.reduce((s, t)  => s + (parseFloat(t.realized_pnl) || 0), 0)  / losers.length  : null
 
   // Avg R:R from trades that have both SL and TP set
   const rrTrades   = closed.filter(t => t.sl && t.tp)
@@ -1031,7 +1033,7 @@ function StatsPanel({ trades }) {
     : null
 
   // Best & worst closed trade
-  const sortedByPnl = [...closed].sort((a, b) => (b.realized_pnl || 0) - (a.realized_pnl || 0))
+  const sortedByPnl = [...closed].sort((a, b) => (parseFloat(b.realized_pnl) || 0) - (parseFloat(a.realized_pnl) || 0))
   const bestTrade   = sortedByPnl[0] || null
   const worstTrade  = sortedByPnl[sortedByPnl.length - 1] || null
 
@@ -1049,23 +1051,23 @@ function StatsPanel({ trades }) {
   const chronoClosed = [...closed].sort((a, b) => (a.updated_at || a.date) < (b.updated_at || b.date) ? 1 : -1)
   let streakCount = 0, streakType = null
   for (const t of chronoClosed) {
-    const won = (t.realized_pnl || 0) > 0
+    const won = (parseFloat(t.realized_pnl) || 0) > 0
     if (streakType === null) { streakType = won ? 'W' : 'L'; streakCount = 1 }
     else if ((won && streakType === 'W') || (!won && streakType === 'L')) { streakCount++ }
     else break
   }
 
   // Profit factor
-  const grossWin  = winners.reduce((s, t) => s + (t.realized_pnl || 0), 0)
-  const grossLoss = Math.abs(losers.reduce((s, t) => s + (t.realized_pnl || 0), 0))
+  const grossWin  = winners.reduce((s, t) => s + (parseFloat(t.realized_pnl) || 0), 0)
+  const grossLoss = Math.abs(losers.reduce((s, t) => s + (parseFloat(t.realized_pnl) || 0), 0))
   const profitFactor = grossLoss > 0 ? grossWin / grossLoss : grossWin > 0 ? Infinity : null
 
-  // Monthly P&L breakdown
+  // Monthly P&L breakdown (grouped by close date)
   const monthlyMap = {}
   closed.forEach(t => {
-    const key = (t.date || '').slice(0, 7) // 'YYYY-MM'
+    const key = ((t.updated_at || t.date) || '').slice(0, 7) // 'YYYY-MM' by close date
     if (!key) return
-    monthlyMap[key] = (monthlyMap[key] || 0) + (t.realized_pnl || 0)
+    monthlyMap[key] = (monthlyMap[key] || 0) + (parseFloat(t.realized_pnl) || 0)
   })
   const months = Object.entries(monthlyMap)
     .sort(([a], [b]) => b.localeCompare(a))
@@ -1074,8 +1076,8 @@ function StatsPanel({ trades }) {
   // Long vs Short breakdown
   const longTrades  = closed.filter(t => t.position === 'LONG')
   const shortTrades = closed.filter(t => t.position === 'SHORT')
-  const longWinRate  = longTrades.length  > 0 ? (longTrades.filter(t => (t.realized_pnl || 0) > 0).length  / longTrades.length)  * 100 : null
-  const shortWinRate = shortTrades.length > 0 ? (shortTrades.filter(t => (t.realized_pnl || 0) > 0).length / shortTrades.length) * 100 : null
+  const longWinRate  = longTrades.length  > 0 ? (longTrades.filter(t => (parseFloat(t.realized_pnl) || 0) > 0).length  / longTrades.length)  * 100 : null
+  const shortWinRate = shortTrades.length > 0 ? (shortTrades.filter(t => (parseFloat(t.realized_pnl) || 0) > 0).length / shortTrades.length) * 100 : null
 
   const fmt = (n) => n > 0 ? `+Rs.${Math.abs(Math.round(n)).toLocaleString()}` : `−Rs.${Math.abs(Math.round(n)).toLocaleString()}`
   const fmtColor = (n) => n > 0 ? 'text-emerald-500' : n < 0 ? 'text-red-400' : 'text-gray-400'
@@ -1461,15 +1463,17 @@ function TradeRow({ trade, ltp, onEdit, onClose, onPartialClose, onDelete, onJou
   const [expanded, setExpanded] = useState(false)
   const { onContextMenu, ContextMenuPortal } = useContextMenu()
 
-  const remaining = trade.remaining_quantity ?? trade.quantity
-  const pnl       = trade.realized_pnl || 0
-  const isOpen    = trade.status === 'OPEN' || trade.status === 'PARTIAL'
+  // P2-008: Supabase NUMERIC → string; parseFloat/parseInt before arithmetic
+  const remaining  = parseInt(trade.remaining_quantity ?? trade.quantity) || 0
+  const entryPrice = parseFloat(trade.entry_price) || 0
+  const pnl        = parseFloat(trade.realized_pnl) || 0
+  const isOpen     = trade.status === 'OPEN' || trade.status === 'PARTIAL'
 
   // Unrealized P&L at current LTP (only for open/partial trades)
   const unrealized = ltp?.price && isOpen
     ? (trade.position === 'LONG'
-        ? (ltp.price - trade.entry_price) * remaining
-        : (trade.entry_price - ltp.price) * remaining)
+        ? (ltp.price - entryPrice) * remaining
+        : (entryPrice - ltp.price) * remaining)
     : null
 
   // SL proximity — alert if LTP is within 3% of SL
@@ -1551,7 +1555,7 @@ function TradeRow({ trade, ltp, onEdit, onClose, onPartialClose, onDelete, onJou
           </p>
           {ltp?.price && isOpen && (
             <p className={`text-[9px] tabular-nums font-semibold mt-0.5 ${
-              ltp.price >= trade.entry_price ? 'text-emerald-500' : 'text-red-400'
+              ltp.price >= entryPrice ? 'text-emerald-500' : 'text-red-400'
             }`}>
               {ltp.price.toFixed(2)}
               {ltp.latestDate && (
