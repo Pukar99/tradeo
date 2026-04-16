@@ -15,14 +15,9 @@ import VolatilityMapPage          from '../components/complex/VolatilityMapPage'
 import SmartScreenerPage          from '../components/complex/SmartScreenerPage'
 
 const COMPLEX_TABS = [
-  { id: 'Backtesting',    label: 'Backtesting' },
-  { id: 'Insight',        label: 'Insight'     },
-  { id: 'Breakdown',      label: 'Breakdown'   },
-  { id: 'TradeBehavior',  label: 'My Trades'   },
-  { id: 'MarketRegime',   label: 'Regime'      },
-  { id: 'SwingStructure', label: 'Structure'   },
-  { id: 'Volatility',     label: 'Volatility'  },
-  { id: 'Screener',       label: 'Screener'    },
+  { id: 'Backtesting', label: 'Backtesting' },
+  { id: 'Insight',     label: 'Insight'     },
+  { id: 'Breakdown',   label: 'Breakdown'   },
 ]
 
 function ComplexContent({ activeTab }) {
