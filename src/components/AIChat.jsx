@@ -172,6 +172,23 @@ function BrokerFeeCard({ fee }) {
         <FeeRow label={`Broker (${fee.brokerRate}%)`} value={`Rs.${fee.brokerCommission?.toLocaleString()}`} dim />
         <FeeRow label="SEBON (0.015%)" value={`Rs.${fee.sebon?.toLocaleString()}`} dim />
         {fee.dp > 0 && <FeeRow label="DP Charge" value={`Rs.${fee.dp}`} dim />}
+        {fee.capitalGainTax > 0 && (
+          <FeeRow
+            label={`CGT (${fee.cgtRate}% · ${fee.holdingDays}d ${fee.holdingType === 'long' ? 'long-term' : 'short-term'})`}
+            value={`Rs.${fee.capitalGainTax?.toLocaleString()}`}
+            dim
+          />
+        )}
+        {fee.transaction === 'sell' && fee.capitalGainTax === 0 && fee.holdingDays !== null && (
+          <p className="text-[9px] text-gray-400 dark:text-gray-500 italic mt-0.5" translate="no">
+            No CGT — no profit on this trade ({fee.holdingDays}d held)
+          </p>
+        )}
+        {fee.transaction === 'sell' && fee.holdingDays === null && (
+          <p className="text-[9px] text-gray-400 dark:text-gray-500 italic mt-0.5">
+            CGT not estimated — trade entry not found
+          </p>
+        )}
         <div className="border-t border-sky-200 dark:border-sky-800 my-1" />
         <FeeRow label="Total Charges" value={`Rs.${fee.totalCharges?.toLocaleString()}`} accent="text-red-500" />
         <FeeRow

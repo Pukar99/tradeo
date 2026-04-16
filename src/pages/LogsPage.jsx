@@ -4,7 +4,7 @@ import { useAuth } from '../context/AuthContext'
 import { useLanguage } from '../context/LanguageContext'
 import {
   getTradeLog, addTradeLog, updateTradeLog,
-  closeTradeLog, partialCloseTradeLog, deleteTradeLog,
+  closeTradeLog, partialCloseTradeLog, deleteTradeLog, bulkDeleteTradeLog,
   getTradeJournal, addTradeJournal, updateTradeJournal, deleteTradeJournal,
   getStockPrice
 } from '../api'
@@ -1295,7 +1295,7 @@ function StatsPanel({ trades }) {
 
 // ── Grouped Trade Row (aggregates multiple open entries for same symbol) ───────
 
-function GroupedTradeRow({ symbol, entries, ltp, onEdit, onClose, onPartialClose, onDelete, onJournal, onGoToChart }) {
+function GroupedTradeRow({ symbol, entries, ltp, onEdit, onClose, onPartialClose, onDelete, onJournal, onGoToChart, onToggleSelect, selectedIds }) {
   const [expanded, setExpanded] = useState(false)
   const { onContextMenu, ContextMenuPortal } = useContextMenu()
 
@@ -1345,6 +1345,8 @@ function GroupedTradeRow({ symbol, entries, ltp, onEdit, onClose, onPartialClose
         onClick={() => setExpanded(e => !e)}
         className="border-b border-gray-50 dark:border-gray-800/60 cursor-pointer hover:bg-blue-50/30 dark:hover:bg-blue-900/10 transition-colors bg-gray-50/40 dark:bg-gray-800/10"
       >
+        {/* Empty checkbox cell for alignment */}
+        <td className="pl-4 pr-2 py-3" />
         {/* Date — show earliest entry date */}
         <td className="px-4 py-3" translate="no">
           <p className="text-[10px] text-gray-400 font-medium tabular-nums">
@@ -1450,6 +1452,8 @@ function GroupedTradeRow({ symbol, entries, ltp, onEdit, onClose, onPartialClose
           onDelete={onDelete}
           onJournal={onJournal}
           onGoToChart={onGoToChart}
+          onToggleSelect={onToggleSelect}
+          isSelected={selectedIds?.has(trade.id) || false}
           indented
         />
       ))}
@@ -1459,7 +1463,7 @@ function GroupedTradeRow({ symbol, entries, ltp, onEdit, onClose, onPartialClose
 
 // ── Trade Row ─────────────────────────────────────────────────────────────────
 
-function TradeRow({ trade, ltp, onEdit, onClose, onPartialClose, onDelete, onJournal, onGoToChart, indented = false }) {
+function TradeRow({ trade, ltp, onEdit, onClose, onPartialClose, onDelete, onJournal, onGoToChart, indented = false, isSelected = false, onToggleSelect }) {
   const [expanded, setExpanded] = useState(false)
   const { onContextMenu, ContextMenuPortal } = useContextMenu()
 
@@ -1511,6 +1515,17 @@ function TradeRow({ trade, ltp, onEdit, onClose, onPartialClose, onDelete, onJou
           hasExpandContent ? 'cursor-pointer hover:bg-gray-50/80 dark:hover:bg-gray-800/30' : 'cursor-default hover:bg-gray-50/40 dark:hover:bg-gray-800/10'
         }`}
       >
+        {/* Checkbox */}
+        <td className="pl-4 pr-2 py-3.5" onClick={e => e.stopPropagation()}>
+          {onToggleSelect && (
+            <input
+              type="checkbox"
+              checked={isSelected}
+              onChange={() => onToggleSelect(trade.id)}
+              className="w-3.5 h-3.5 rounded accent-blue-500 cursor-pointer"
+            />
+          )}
+        </td>
         {/* Date + duration */}
         <td className="px-4 py-3.5" translate="no">
           <p className="text-[10px] text-gray-400 font-medium tabular-nums">{trade.date}</p>
@@ -1800,6 +1815,9 @@ function LogsPage() {
   const [jSearch, setJSearch] = useState('')
   // inline error toast for action failures
   const [actionErr, setActionErr] = useState(null)
+  // bulk selection: Set of trade IDs
+  const [selectedIds, setSelectedIds] = useState(new Set())
+  const [bulkDeleting, setBulkDeleting] = useState(false)
 
   // ⚠️ fetchData MUST be declared before useEffect and useChatRefresh
   // useCallback gives useChatRefresh a stable reference so chatbot events always call the current version
@@ -1882,6 +1900,37 @@ function LogsPage() {
     } catch (err) {
       setActionErr(err.response?.data?.error || 'Failed to delete trade')
       setConfirmDelete(null)
+    }
+  }
+
+  const handleBulkDelete = async () => {
+    if (selectedIds.size === 0 || bulkDeleting) return
+    setBulkDeleting(true)
+    try {
+      await bulkDeleteTradeLog([...selectedIds])
+      setTrades(prev => prev.filter(t => !selectedIds.has(t.id)))
+      setSelectedIds(new Set())
+    } catch (err) {
+      setActionErr(err.response?.data?.error || 'Failed to delete selected trades')
+    } finally {
+      setBulkDeleting(false)
+    }
+  }
+
+  const toggleSelectId = (id) => {
+    setSelectedIds(prev => {
+      const next = new Set(prev)
+      if (next.has(id)) next.delete(id)
+      else next.add(id)
+      return next
+    })
+  }
+
+  const toggleSelectAll = () => {
+    if (selectedIds.size === filteredTrades.length) {
+      setSelectedIds(new Set())
+    } else {
+      setSelectedIds(new Set(filteredTrades.map(t => t.id)))
     }
   }
 
@@ -2290,7 +2339,7 @@ function LogsPage() {
               </svg>
               <input
                 type="text" value={searchSymbol}
-                onChange={e => setSearchSymbol(e.target.value)}
+                onChange={e => { setSearchSymbol(e.target.value); setSelectedIds(new Set()) }}
                 placeholder="Search symbol…"
                 className="pl-7 pr-3 py-1.5 bg-gray-50 dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg text-[11px] text-gray-700 dark:text-white placeholder-gray-400 focus:outline-none focus:border-blue-400 w-32 transition-colors"
               />
@@ -2320,7 +2369,7 @@ function LogsPage() {
                 { key: 'PARTIAL', label: 'Partial' },
                 { key: 'CLOSED',  label: 'Closed' },
               ].map(s => (
-                <button key={s.key} onClick={() => setFilterStatus(s.key)}
+                <button key={s.key} onClick={() => { setFilterStatus(s.key); setSelectedIds(new Set()) }}
                   className={`px-2.5 py-1.5 rounded-lg text-[10px] font-semibold transition-all ${
                     filterStatus === s.key
                       ? 'bg-gray-900 dark:bg-white text-white dark:text-gray-900'
@@ -2332,23 +2381,49 @@ function LogsPage() {
             </div>
 
             <div className="ml-auto flex items-center gap-2">
-              <span className="text-[10px] text-gray-400">
-                {filteredTrades.length} trade{filteredTrades.length !== 1 ? 's' : ''}
-                {filteredTrades.some(t => t.notes || t.partial_exits?.length > 0 || t.exit_price) && (
-                  <span className="text-gray-300 dark:text-gray-700"> · click to expand</span>
-                )}
-              </span>
-              {filteredTrades.length > 0 && (
-                <button
-                  onClick={exportCSV}
-                  title="Export to CSV"
-                  className="flex items-center gap-1 px-2.5 py-1.5 rounded-lg text-[10px] font-semibold text-gray-400 hover:text-gray-700 dark:hover:text-gray-200 hover:bg-gray-100 dark:hover:bg-gray-800 border border-gray-200 dark:border-gray-700 hover:border-gray-300 dark:hover:border-gray-600 transition-all"
-                >
-                  <svg className="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" />
-                  </svg>
-                  CSV
-                </button>
+              {selectedIds.size > 0 ? (
+                <>
+                  <span className="text-[10px] text-gray-500 dark:text-gray-400">
+                    {selectedIds.size} selected
+                  </span>
+                  <button
+                    onClick={() => setSelectedIds(new Set())}
+                    className="px-2.5 py-1.5 rounded-lg text-[10px] font-semibold text-gray-400 hover:text-gray-600 hover:bg-gray-100 dark:hover:bg-gray-800 border border-gray-200 dark:border-gray-700 transition-all"
+                  >
+                    Clear
+                  </button>
+                  <button
+                    onClick={handleBulkDelete}
+                    disabled={bulkDeleting}
+                    className="flex items-center gap-1 px-2.5 py-1.5 rounded-lg text-[10px] font-semibold text-red-500 hover:text-white hover:bg-red-600 border border-red-300 dark:border-red-800 hover:border-red-600 disabled:opacity-50 transition-all"
+                  >
+                    <svg className="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+                    </svg>
+                    {bulkDeleting ? 'Deleting…' : `Delete ${selectedIds.size}`}
+                  </button>
+                </>
+              ) : (
+                <>
+                  <span className="text-[10px] text-gray-400">
+                    {filteredTrades.length} trade{filteredTrades.length !== 1 ? 's' : ''}
+                    {filteredTrades.some(t => t.notes || t.partial_exits?.length > 0 || t.exit_price) && (
+                      <span className="text-gray-300 dark:text-gray-700"> · click to expand</span>
+                    )}
+                  </span>
+                  {filteredTrades.length > 0 && (
+                    <button
+                      onClick={exportCSV}
+                      title="Export to CSV"
+                      className="flex items-center gap-1 px-2.5 py-1.5 rounded-lg text-[10px] font-semibold text-gray-400 hover:text-gray-700 dark:hover:text-gray-200 hover:bg-gray-100 dark:hover:bg-gray-800 border border-gray-200 dark:border-gray-700 hover:border-gray-300 dark:hover:border-gray-600 transition-all"
+                    >
+                      <svg className="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" />
+                      </svg>
+                      CSV
+                    </button>
+                  )}
+                </>
               )}
             </div>
           </div>
@@ -2369,6 +2444,15 @@ function LogsPage() {
               <table className="w-full">
                 <thead>
                   <tr className="border-b border-gray-100 dark:border-gray-800">
+                    {/* Checkbox select-all */}
+                    <th className="pl-4 pr-2 py-2.5 w-8">
+                      <input
+                        type="checkbox"
+                        checked={filteredTrades.length > 0 && selectedIds.size === filteredTrades.length}
+                        onChange={toggleSelectAll}
+                        className="w-3.5 h-3.5 rounded accent-blue-500 cursor-pointer"
+                      />
+                    </th>
                     {[
                       { label: 'Date',        col: 'date'   },
                       { label: 'Symbol',      col: 'symbol' },
@@ -2419,17 +2503,18 @@ function LogsPage() {
                       onDelete:       handleDelete,
                       onJournal:      (t) => setJournalTrade(t),
                       onGoToChart:    handleGoToChart,
+                      onToggleSelect: toggleSelectId,
                     }
 
                     return (
                       <>
                         {groups.map(([sym, entries]) =>
                           entries.length === 1
-                            ? <TradeRow key={entries[0].id} trade={entries[0]} ltp={ltpMap[sym] || null} {...rowProps} />
-                            : <GroupedTradeRow key={sym} symbol={sym} entries={entries} ltp={ltpMap[sym] || null} {...rowProps} />
+                            ? <TradeRow key={entries[0].id} trade={entries[0]} ltp={ltpMap[sym] || null} isSelected={selectedIds.has(entries[0].id)} {...rowProps} />
+                            : <GroupedTradeRow key={sym} symbol={sym} entries={entries} ltp={ltpMap[sym] || null} {...rowProps} selectedIds={selectedIds} />
                         )}
                         {closedFiltered.map(trade => (
-                          <TradeRow key={trade.id} trade={trade} ltp={null} {...rowProps} />
+                          <TradeRow key={trade.id} trade={trade} ltp={null} isSelected={selectedIds.has(trade.id)} {...rowProps} />
                         ))}
                       </>
                     )
@@ -2444,6 +2529,8 @@ function LogsPage() {
                       onDelete={handleDelete}
                       onJournal={(t) => setJournalTrade(t)}
                       onGoToChart={handleGoToChart}
+                      onToggleSelect={toggleSelectId}
+                      isSelected={selectedIds.has(trade.id)}
                     />
                   ))}
                 </tbody>
