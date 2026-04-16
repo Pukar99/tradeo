@@ -566,14 +566,10 @@ function PortfolioPage() {
   const { t }      = useLanguage()
   const navigate   = useNavigate()
 
-  const fetchData = useCallback(async () => {
+  const enrichWithLtp = useCallback(async (open) => {
+    if (open.length === 0) return
+    setLtpLoading(true)
     try {
-      const res       = await getTradeLog()
-      const allTrades = res.data ?? []
-      setTrades(allTrades)
-      const open = allTrades.filter(tr => tr.status === 'OPEN' || tr.status === 'PARTIAL')
-      if (open.length === 0) { setOpenPositions([]); setLoading(false); return }
-      setLtpLoading(true)
       const uniqueSymbols = [...new Set(open.map(tr => tr.symbol))]
       const results       = await Promise.allSettled(uniqueSymbols.map(sym => getStockPrice(sym)))
       const priceMap = {}
@@ -581,24 +577,40 @@ function PortfolioPage() {
         const r = results[i]
         if (r.status === 'fulfilled') priceMap[sym] = r.value.data
       })
-      setOpenPositions(open.map(tr => {
-        const p   = priceMap[tr.symbol]
-        const qty = parseFloat(tr.remaining_quantity ?? tr.quantity) || 0
+      setOpenPositions(prev => prev.map(tr => {
+        const p     = priceMap[tr.symbol]
+        const qty   = parseFloat(tr.remaining_quantity ?? tr.quantity) || 0
         const entry = parseFloat(tr.entry_price) || 0
-        if (!p) return { ...tr, currentPrice: null, unrealizedPnl: null, pnlPct: null }
-        const ltp = parseFloat(p.price) || 0
-        const pnl = tr.position === 'LONG' ? (ltp - entry) * qty : (entry - ltp) * qty
+        if (!p) return tr
+        const ltp   = parseFloat(p.price) || 0
+        const pnl   = tr.position === 'LONG' ? (ltp - entry) * qty : (entry - ltp) * qty
         const pnlPct = entry * qty > 0 ? ((pnl / (entry * qty)) * 100).toFixed(2) : '0.00'
         return { ...tr, currentPrice: ltp, change: p.change, latestDate: p.latestDate, unrealizedPnl: Math.round(pnl), pnlPct }
       }))
+    } catch {
+      // LTP enrichment failure is non-fatal; positions still show without prices
+    } finally {
+      setLtpLoading(false)
+    }
+  }, [])
+
+  const fetchData = useCallback(async () => {
+    try {
+      const res       = await getTradeLog()
+      const allTrades = res.data ?? []
+      setTrades(allTrades)
+      const open = allTrades.filter(tr => tr.status === 'OPEN' || tr.status === 'PARTIAL')
+      // Set positions immediately (no LTP yet) so page renders without waiting for price API
+      setOpenPositions(open.map(tr => ({ ...tr, currentPrice: null, unrealizedPnl: null, pnlPct: null })))
+      setLoading(false)
+      // Then enrich with LTPs in the background — no layout reset
+      enrichWithLtp(open)
     } catch (err) {
       console.error('PortfolioPage fetch error:', err)
       setFetchError('Failed to load portfolio data. Please refresh.')
-    } finally {
       setLoading(false)
-      setLtpLoading(false)
     }
-  }, [user?.id])
+  }, [user?.id, enrichWithLtp])
 
   useEffect(() => { if (user) fetchData() }, [user, fetchData])
   useChatRefresh(['trades'], fetchData)
@@ -740,9 +752,9 @@ function PortfolioPage() {
           },
           {
             label: 'Unrealized',
-            value: ltpLoading ? '—' : `${totalUnrealized >= 0 ? '+' : ''}${fmtRs(totalUnrealized)}`,
-            valueClass: ltpLoading ? 'text-gray-400' : signCls(totalUnrealized),
-            sub: ltpLoading ? 'fetching…' : `${openPositions.length} open`,
+            value: `${totalUnrealized >= 0 ? '+' : ''}${fmtRs(totalUnrealized)}`,
+            valueClass: signCls(totalUnrealized),
+            sub: `${openPositions.length} open${ltpLoading ? ' · updating…' : ''}`,
             accent: 'border-t-violet-400',
           },
           {
@@ -783,25 +795,13 @@ function PortfolioPage() {
 
           {/* Allocation donut */}
           <div className="bg-white dark:bg-gray-900 rounded-2xl border border-gray-100 dark:border-gray-800 p-4">
-            {!ltpLoading && openPositions.length > 0
+            {openPositions.length > 0
               ? <AllocationDonut openPositions={openPositions} />
-              : ltpLoading
-                ? (
-                  <div className="animate-pulse space-y-3">
-                    <div className="h-2 w-28 bg-gray-200 dark:bg-gray-700 rounded" />
-                    <div className="flex items-center gap-3">
-                      <div className="w-[120px] h-[120px] rounded-full bg-gray-100 dark:bg-gray-800 flex-shrink-0" />
-                      <div className="flex-1 space-y-2">
-                        {[1,2,3].map(i => <div key={i} className="h-2 bg-gray-100 dark:bg-gray-800 rounded" />)}
-                      </div>
-                    </div>
-                  </div>
-                )
-                : (
-                  <div className="text-center py-6">
-                    <p className="text-[10px] text-gray-400">No open positions</p>
-                  </div>
-                )
+              : (
+                <div className="text-center py-6">
+                  <p className="text-[10px] text-gray-400">No open positions</p>
+                </div>
+              )
             }
           </div>
 
