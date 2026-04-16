@@ -566,51 +566,54 @@ function PortfolioPage() {
   const { t }      = useLanguage()
   const navigate   = useNavigate()
 
-  const enrichWithLtp = useCallback(async (open) => {
-    if (open.length === 0) return
-    setLtpLoading(true)
-    try {
-      const uniqueSymbols = [...new Set(open.map(tr => tr.symbol))]
-      const results       = await Promise.allSettled(uniqueSymbols.map(sym => getStockPrice(sym)))
-      const priceMap = {}
-      uniqueSymbols.forEach((sym, i) => {
-        const r = results[i]
-        if (r.status === 'fulfilled') priceMap[sym] = r.value.data
-      })
-      setOpenPositions(prev => prev.map(tr => {
-        const p     = priceMap[tr.symbol]
-        const qty   = parseFloat(tr.remaining_quantity ?? tr.quantity) || 0
-        const entry = parseFloat(tr.entry_price) || 0
-        if (!p) return tr
-        const ltp   = parseFloat(p.price) || 0
-        const pnl   = tr.position === 'LONG' ? (ltp - entry) * qty : (entry - ltp) * qty
-        const pnlPct = entry * qty > 0 ? ((pnl / (entry * qty)) * 100).toFixed(2) : '0.00'
-        return { ...tr, currentPrice: ltp, change: p.change, latestDate: p.latestDate, unrealizedPnl: Math.round(pnl), pnlPct }
-      }))
-    } catch {
-      // LTP enrichment failure is non-fatal; positions still show without prices
-    } finally {
-      setLtpLoading(false)
-    }
-  }, [])
-
   const fetchData = useCallback(async () => {
     try {
       const res       = await getTradeLog()
       const allTrades = res.data ?? []
       setTrades(allTrades)
       const open = allTrades.filter(tr => tr.status === 'OPEN' || tr.status === 'PARTIAL')
-      // Set positions immediately (no LTP yet) so page renders without waiting for price API
+
+      if (open.length === 0) {
+        setOpenPositions([])
+        setLoading(false)
+        return
+      }
+
+      // Show positions immediately without prices so layout is stable
       setOpenPositions(open.map(tr => ({ ...tr, currentPrice: null, unrealizedPnl: null, pnlPct: null })))
       setLoading(false)
-      // Then enrich with LTPs in the background — no layout reset
-      enrichWithLtp(open)
+
+      // Fetch LTPs and enrich — update positions using the same `open` array as base
+      setLtpLoading(true)
+      try {
+        const uniqueSymbols = [...new Set(open.map(tr => tr.symbol))]
+        const results       = await Promise.allSettled(uniqueSymbols.map(sym => getStockPrice(sym)))
+        const priceMap = {}
+        uniqueSymbols.forEach((sym, i) => {
+          if (results[i].status === 'fulfilled') priceMap[sym] = results[i].value.data
+        })
+        // Build enriched array from the `open` snapshot — avoids stale prev closure
+        setOpenPositions(open.map(tr => {
+          const p     = priceMap[tr.symbol]
+          const qty   = parseFloat(tr.remaining_quantity ?? tr.quantity) || 0
+          const entry = parseFloat(tr.entry_price) || 0
+          if (!p) return { ...tr, currentPrice: null, unrealizedPnl: null, pnlPct: null }
+          const ltp    = parseFloat(p.price) || 0
+          const pnl    = tr.position === 'LONG' ? (ltp - entry) * qty : (entry - ltp) * qty
+          const pnlPct = entry * qty > 0 ? ((pnl / (entry * qty)) * 100).toFixed(2) : '0.00'
+          return { ...tr, currentPrice: ltp, change: p.change, latestDate: p.latestDate, unrealizedPnl: Math.round(pnl), pnlPct }
+        }))
+      } catch {
+        // non-fatal — positions still visible without prices
+      } finally {
+        setLtpLoading(false)
+      }
     } catch (err) {
       console.error('PortfolioPage fetch error:', err)
       setFetchError('Failed to load portfolio data. Please refresh.')
       setLoading(false)
     }
-  }, [user?.id, enrichWithLtp])
+  }, [user?.id])
 
   useEffect(() => { if (user) fetchData() }, [user, fetchData])
   useChatRefresh(['trades'], fetchData)
