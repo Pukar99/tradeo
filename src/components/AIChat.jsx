@@ -43,6 +43,9 @@ const ACTION_META = {
   DELETE_GOAL:        { icon: '🗑️', label: 'Goal Removed',              color: 'border-gray-400 bg-gray-50 dark:bg-gray-700/50' },
   UNDO:               { icon: '↩️', label: 'Action Undone',             color: 'border-indigo-400 bg-indigo-50 dark:bg-indigo-900/30' },
   TOGGLE_THEME:       { icon: '🌙', label: 'Theme Changed',             color: 'border-gray-400 bg-gray-50 dark:bg-gray-700/50' },
+  SHOW_TRADES:        { icon: '📋', label: 'Your Trades',               color: 'border-green-400 bg-green-50 dark:bg-green-900/20' },
+  SHOW_GOALS:         { icon: '🏆', label: 'Your Goals',                color: 'border-teal-400 bg-teal-50 dark:bg-teal-900/20' },
+  SHOW_JOURNAL:       { icon: '📝', label: 'Your Journal',              color: 'border-amber-400 bg-amber-50 dark:bg-amber-900/20' },
 }
 
 // ── Standard action card (trade, watchlist, goal, journal, etc.) ─────────────
@@ -237,6 +240,124 @@ function JournalDraftCard({ draft, onSave, onDiscard }) {
           Discard
         </button>
       </div>
+    </div>
+  )
+}
+
+// ── Show trades card ──────────────────────────────────────────────────────────
+function ShowTradesCard({ result }) {
+  if (!result?.trades) return null
+  const { trades, filter } = result
+  const labelMap = { open: 'Open / Partial', closed: 'Closed', all: 'All' }
+  return (
+    <div className="border-l-2 border-green-400 bg-green-50 dark:bg-green-900/20 rounded-xl px-3 py-2 mb-1.5 w-full">
+      <div className="flex items-center gap-1.5 mb-2">
+        <span className="text-sm">📋</span>
+        <span className="text-[11px] font-semibold text-gray-700 dark:text-gray-200">
+          {labelMap[filter] || 'Your'} Trades ({trades.length})
+        </span>
+      </div>
+      {trades.length === 0 ? (
+        <p className="text-[10px] text-gray-400">No trades found.</p>
+      ) : (
+        <div className="space-y-1">
+          {trades.map((t, i) => {
+            const qty = parseInt(t.remaining_quantity ?? t.quantity, 10) || 0
+            const entry = parseFloat(t.entry_price)
+            const ltp = t.ltp ? parseFloat(t.ltp) : null
+            const unrealized = ltp && t.status !== 'CLOSED'
+              ? (t.position === 'LONG' ? ltp - entry : entry - ltp) * qty
+              : null
+            const realized = t.status === 'CLOSED' ? parseFloat(t.realized_pnl || 0) : null
+            const pnl = realized ?? unrealized
+            const statusColor = t.status === 'OPEN'
+              ? 'text-green-500' : t.status === 'PARTIAL' ? 'text-yellow-500' : 'text-gray-400'
+            return (
+              <div key={t.id} className="flex items-center justify-between bg-white dark:bg-gray-900 rounded-lg px-2 py-1.5 border border-gray-100 dark:border-gray-800">
+                <div className="flex items-center gap-1.5">
+                  <span className={`text-[9px] font-bold uppercase ${statusColor}`}>{t.status}</span>
+                  <span className="text-[11px] font-semibold text-gray-800 dark:text-white" translate="no">{t.symbol}</span>
+                  <span className="text-[9px] text-gray-400">{t.position} · {qty}@{entry}</span>
+                </div>
+                {pnl !== null && (
+                  <span className={`text-[10px] font-semibold ${pnl >= 0 ? 'text-green-500' : 'text-red-400'}`} translate="no">
+                    {pnl >= 0 ? '+' : ''}Rs.{Math.round(pnl).toLocaleString()}
+                  </span>
+                )}
+              </div>
+            )
+          })}
+        </div>
+      )}
+    </div>
+  )
+}
+
+// ── Show goals card ───────────────────────────────────────────────────────────
+function ShowGoalsCard({ result }) {
+  if (!result?.goals) return null
+  const { goals, filter } = result
+  const pending = goals.filter(g => !g.completed)
+  const done = goals.filter(g => g.completed)
+  return (
+    <div className="border-l-2 border-teal-400 bg-teal-50 dark:bg-teal-900/20 rounded-xl px-3 py-2 mb-1.5 w-full">
+      <div className="flex items-center gap-1.5 mb-2">
+        <span className="text-sm">🏆</span>
+        <span className="text-[11px] font-semibold text-gray-700 dark:text-gray-200">
+          Goals ({done.length}/{goals.length} completed)
+        </span>
+      </div>
+      {goals.length === 0 ? (
+        <p className="text-[10px] text-gray-400">No goals found.</p>
+      ) : (
+        <div className="space-y-1">
+          {goals.map((g, i) => (
+            <div key={g.id} className="flex items-center gap-2 bg-white dark:bg-gray-900 rounded-lg px-2 py-1.5 border border-gray-100 dark:border-gray-800">
+              <span className="text-sm">{g.completed ? '✅' : '⬜'}</span>
+              <span className={`text-[10px] ${g.completed ? 'text-gray-400 line-through' : 'text-gray-700 dark:text-gray-200'}`}>
+                {g.title}
+              </span>
+            </div>
+          ))}
+        </div>
+      )}
+    </div>
+  )
+}
+
+// ── Show journal card ──────────────────────────────────────────────────────────
+function ShowJournalCard({ result }) {
+  if (!result?.entries) return null
+  const { entries, symbol } = result
+  return (
+    <div className="border-l-2 border-amber-400 bg-amber-50 dark:bg-amber-900/20 rounded-xl px-3 py-2 mb-1.5 w-full">
+      <div className="flex items-center gap-1.5 mb-2">
+        <span className="text-sm">📝</span>
+        <span className="text-[11px] font-semibold text-gray-700 dark:text-gray-200">
+          Journal{symbol ? ` — ${symbol}` : ''} ({entries.length})
+        </span>
+      </div>
+      {entries.length === 0 ? (
+        <p className="text-[10px] text-gray-400">No journal entries found.</p>
+      ) : (
+        <div className="space-y-1.5">
+          {entries.map((e, i) => (
+            <div key={e.id} className="bg-white dark:bg-gray-900 rounded-lg px-2 py-1.5 border border-gray-100 dark:border-gray-800">
+              <div className="flex items-center justify-between mb-0.5">
+                <span className="text-[10px] font-semibold text-gray-700 dark:text-gray-200" translate="no">{e.symbol}</span>
+                <span className="text-[9px] text-gray-400">{e.created_at?.slice(0, 10)}</span>
+              </div>
+              {e.notes && <p className="text-[10px] text-gray-500 dark:text-gray-400 leading-relaxed line-clamp-2">{e.notes}</p>}
+              {e.pre_trade_reasoning && (
+                <p className="text-[9px] text-blue-400 mt-0.5 leading-snug line-clamp-1">Pre: {e.pre_trade_reasoning}</p>
+              )}
+              {e.post_trade_evaluation && (
+                <p className="text-[9px] text-purple-400 mt-0.5 leading-snug line-clamp-1">Post: {e.post_trade_evaluation}</p>
+              )}
+            </div>
+          ))}
+        </div>
+      )}
     </div>
   )
 }
@@ -877,11 +998,15 @@ function AIChat({ isFullPage = false, onClose }) {
     const showBrokerFee      = msg.actionType === 'CALC_BROKER_FEE' && msg.actionResult?.fee
     const showMorningBrief   = msg.actionType === 'MORNING_BRIEF' && msg.actionResult?.brief
     const showDisambiguation = msg.actionType === 'NEEDS_DISAMBIGUATION' && msg.actionResult?.entries?.length
+    const showShowTrades     = msg.actionType === 'SHOW_TRADES' && msg.actionResult?.trades
+    const showShowGoals      = msg.actionType === 'SHOW_GOALS' && msg.actionResult?.goals
+    const showShowJournal    = msg.actionType === 'SHOW_JOURNAL' && msg.actionResult?.entries
     // TOGGLE_THEME: handled inline, no card needed
     // DELETE_TRADE: pending confirmation — no action card yet, text reply is the prompt
     // DRAFT_JOURNAL: shown as interactive JournalDraftCard (not inline here, added to messages area separately)
     const showStandardCard   = msg.actionType && msg.actionResult && !showBrokerFee && !showMorningBrief
-      && !showDisambiguation && !['DRAFT_JOURNAL', 'TOGGLE_THEME', 'DELETE_TRADE'].includes(msg.actionType)
+      && !showDisambiguation && !showShowTrades && !showShowGoals && !showShowJournal
+      && !['DRAFT_JOURNAL', 'TOGGLE_THEME', 'DELETE_TRADE'].includes(msg.actionType)
 
     return (
       <div
@@ -901,6 +1026,10 @@ function AIChat({ isFullPage = false, onClose }) {
           {showBrokerFee && <BrokerFeeCard fee={msg.actionResult.fee} />}
           {/* Morning brief card */}
           {showMorningBrief && <MorningBriefCard brief={msg.actionResult.brief} />}
+          {/* Read-side query cards */}
+          {showShowTrades && <ShowTradesCard result={msg.actionResult} />}
+          {showShowGoals && <ShowGoalsCard result={msg.actionResult} />}
+          {showShowJournal && <ShowJournalCard result={msg.actionResult} />}
           {/* Text bubble */}
           <div className={`px-3 py-2 rounded-2xl text-xs leading-relaxed ${
             msg.role === 'user'
