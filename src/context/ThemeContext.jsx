@@ -15,6 +15,9 @@ export function ThemeProvider({ children }) {
       document.documentElement.classList.remove('dark')
       localStorage.setItem('theme', 'light')
     }
+    // Swap favicon to match app theme
+    const link = document.querySelector("link[rel='icon']")
+    if (link) link.href = isDark ? '/favicon-dark.svg' : '/favicon-light.svg'
   }, [isDark])
 
   const toggleTheme = () => setIsDark(prev => !prev)
