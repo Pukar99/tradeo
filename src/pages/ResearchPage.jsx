@@ -139,7 +139,7 @@ function EligibilityBanner({ eligibility }) {
           <p className="text-[10px] text-gray-400 mt-0.5">{eligibility.reason}</p>
         </div>
       </div>
-      <div className="grid grid-cols-4 gap-3">
+      <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
         {bars.map(({ label, val, max, suffix, prefix, target }) => {
           const pct = Math.min((val / max) * 100, 100)
           const met = val >= (target ?? max)

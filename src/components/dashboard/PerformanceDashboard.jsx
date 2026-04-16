@@ -178,7 +178,7 @@ function PerformanceDashboard() {
           Add trades in the Trader screen to see your performance
         </p>
         <div className="mt-4 opacity-30 pointer-events-none select-none">
-          <div className="grid grid-cols-4 gap-3">
+          <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
             {['P&L', 'Return', 'Win Rate', 'Trades'].map(label => (
               <div key={label} className="bg-gray-100 dark:bg-gray-700 rounded-lg p-3 text-center">
                 <div className="h-5 bg-gray-200 dark:bg-gray-600 rounded mb-1" />
@@ -206,7 +206,7 @@ function PerformanceDashboard() {
       </div>
 
       {stats && (
-        <div className="grid grid-cols-4 gap-3 mb-4">
+        <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 mb-4">
           <div className="bg-gray-50 dark:bg-gray-700 rounded-lg p-3 text-center">
             <p className={`text-lg font-bold ${stats.totalPnl >= 0 ? 'text-green-500' : 'text-red-500'}`}>
               {stats.totalPnl >= 0 ? '+' : '-'}Rs.{Math.abs(Math.round(stats.totalPnl)).toLocaleString()}

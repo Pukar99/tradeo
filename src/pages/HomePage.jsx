@@ -7,7 +7,6 @@ import DisciplineScore from '../components/dashboard/DisciplineScore'
 import MonthlyGoals from '../components/dashboard/MonthlyGoals'
 import { Link, useNavigate } from 'react-router-dom'
 import { useState, useEffect } from 'react'
-import axios from 'axios'
 import {
   getTradeLog, getStockPrice,
   getWatchlist, addToWatchlist,
@@ -286,7 +285,6 @@ function CenterDashboard({ navigate }) {
   const [watchlist, setWatchlist] = useState([])
   const [watchlistTab, setWatchlistTab] = useState('active')
   const { onContextMenu: watchCtx, ContextMenuPortal: WatchMenuPortal } = useContextMenu()
-  const [perfCollapsed, setPerfCollapsed] = useState(false)
   const [positionsCollapsed, setPositionsCollapsed] = useState(true)
   const [loading, setLoading] = useState(true)
   const [showAddWatch, setShowAddWatch] = useState(false)
@@ -439,7 +437,7 @@ function CenterDashboard({ navigate }) {
     <div className="flex flex-col gap-4">
       <div className="bg-white dark:bg-gray-800 rounded-2xl p-6 shadow-sm border border-gray-100 dark:border-gray-700 animate-pulse">
         <div className="h-6 bg-gray-100 dark:bg-gray-700 rounded w-1/2 mb-4" />
-        <div className="grid grid-cols-4 gap-3">
+        <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
           {[1,2,3,4].map(i => <div key={i} className="h-16 bg-gray-100 dark:bg-gray-700 rounded-xl" />)}
         </div>
       </div>
@@ -451,7 +449,7 @@ function CenterDashboard({ navigate }) {
 
       {/* Stats Bar — inside center */}
       {perfStats && (
-        <div className="grid grid-cols-4 gap-2.5">
+        <div className="grid grid-cols-2 sm:grid-cols-4 gap-2.5">
           {[
             {
               label: tr('stats.totalPL'),
@@ -489,7 +487,7 @@ function CenterDashboard({ navigate }) {
             <h3 className="text-[12px] font-semibold text-gray-700 dark:text-gray-300 uppercase tracking-wide">Performance</h3>
           </div>
           <div className="p-4">
-            <div className="grid grid-cols-4 gap-2.5 mb-3">
+            <div className="grid grid-cols-2 sm:grid-cols-4 gap-2.5 mb-3">
               {[
                 { label: 'Total P/L', value: `${perfStats.totalPnl >= 0 ? '+' : ''}Rs. ${Math.abs(Math.round(perfStats.totalPnl)).toLocaleString()}`, color: perfStats.totalPnl >= 0 ? 'text-green-500' : 'text-red-500' },
                 { label: 'Unrealized', value: `${perfStats.totalInvested > 0 ? ((perfStats.unrealizedPnl / perfStats.totalInvested) * 100).toFixed(2) : '0.00'}%`, color: perfStats.unrealizedPnl >= 0 ? 'text-green-500' : 'text-red-500' },
@@ -538,16 +536,22 @@ function CenterDashboard({ navigate }) {
             {openPositions.length === 0 ? (
               <div className="p-8 text-center">
                 <p className="text-gray-400 text-sm">{tr('positions.noPositions')}</p>
-                <button onClick={() => navigate('/trader')} className="mt-2 text-blue-500 text-xs hover:underline">+ Add a trade</button>
+                <button onClick={() => navigate('/logs')} className="mt-2 text-blue-500 text-xs hover:underline">+ Add a trade</button>
               </div>
             ) : (
               <div className="divide-y divide-gray-50 dark:divide-gray-700">
                 {openPositions.map(t => {
+                  // For LONG: SL is below entry (negative = price dropped toward SL)
+                  // For SHORT: SL is above entry (positive = price rose toward SL)
                   const slDistPct = t.sl && t.currentPrice
-                    ? (((t.currentPrice - t.sl) / t.currentPrice) * 100).toFixed(2)
+                    ? t.position === 'SHORT'
+                      ? (((t.sl - t.currentPrice) / t.currentPrice) * 100).toFixed(2)
+                      : (((t.currentPrice - t.sl) / t.currentPrice) * 100).toFixed(2)
                     : null
                   const tpDistPct = t.tp && t.currentPrice
-                    ? (((t.tp - t.currentPrice) / t.currentPrice) * 100).toFixed(2)
+                    ? t.position === 'SHORT'
+                      ? (((t.currentPrice - t.tp) / t.currentPrice) * 100).toFixed(2)
+                      : (((t.tp - t.currentPrice) / t.currentPrice) * 100).toFixed(2)
                     : null
 
                   return (
@@ -766,7 +770,7 @@ function CenterDashboard({ navigate }) {
                   {watchForm.alert_date && (
                     <div className="mt-1 px-2.5 py-1 rounded-lg text-xs font-medium bg-blue-50 dark:bg-blue-900 text-blue-600 dark:text-blue-300 flex items-center justify-between">
                       <span>📅 {new Date(watchForm.alert_date).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}</span>
-                      <span>{Math.ceil((new Date(watchForm.alert_date) - new Date()) / (1000 * 60 * 60 * 24))} days remaining</span>
+                      <span>{Math.ceil((new Date(watchForm.alert_date) - new Date(new Date().toISOString().split('T')[0])) / (1000 * 60 * 60 * 24))} days remaining</span>
                     </div>
                   )}
                 </div>
@@ -846,7 +850,7 @@ function CenterDashboard({ navigate }) {
                   onContextMenu={!item.isPosition ? watchCtx([
                     { label: 'Delete', icon: '🗑️', danger: true, action: () => handleRemoveWatch(item.id) },
                   ]) : undefined}
-                  className="flex flex-col bg-gray-50 dark:bg-gray-700 rounded-lg px-2.5 py-2">
+                  className="flex flex-col bg-gray-50 dark:bg-gray-700 rounded-lg px-2.5 py-2 group">
                   <div className="flex items-center justify-between">
                     <div className="flex items-center gap-1.5">
                       <StockAvatar symbol={item.symbol} size="w-7 h-7" />
@@ -902,7 +906,7 @@ function CenterDashboard({ navigate }) {
                     }
 
                     if (item.alert_date) {
-                      const days = Math.ceil((new Date(item.alert_date) - new Date()) / (1000 * 60 * 60 * 24))
+                      const days = Math.ceil((new Date(item.alert_date) - new Date(new Date().toISOString().split('T')[0])) / (1000 * 60 * 60 * 24))
                       const isBuy = item.notes?.startsWith('[BUY]')
                       const isSell = item.notes?.startsWith('[SELL]')
                       const dateTag = isBuy ? '🟢 BUY' : isSell ? '🔴 SELL' : '📅'
@@ -969,7 +973,7 @@ function LoggedInHome() {
         <p className="text-xs text-gray-400">{today}</p>
         <div className="hidden lg:flex items-center gap-2">
           <div className="w-1.5 h-1.5 bg-green-500 rounded-full animate-pulse" />
-          <span className="text-xs text-gray-400">Market data as of 2026-02-26</span>
+          <span className="text-xs text-gray-400">Market data as of {new Date().toISOString().split('T')[0]}</span>
         </div>
       </div>
 
@@ -993,10 +997,10 @@ function LoggedInHome() {
           <div className="bg-white dark:bg-gray-900 rounded-2xl border border-gray-100 dark:border-gray-800 flex flex-col">
             <div className="flex items-center justify-between px-4 py-3 border-b border-gray-100 dark:border-gray-800">
               <h3 className="text-[11px] font-semibold uppercase tracking-widest text-gray-400 dark:text-gray-500">Journal</h3>
-              <button onClick={() => navigate('/trader')} className="text-[10px] text-gray-400 hover:text-green-500 transition-colors">view all →</button>
+              <button onClick={() => navigate('/logs')} className="text-[10px] text-gray-400 hover:text-green-500 transition-colors">view all →</button>
             </div>
             <div className="p-3 space-y-1.5 no-scrollbar">
-              <Link to="/trader" className="flex items-center justify-between px-3 py-2.5 rounded-xl hover:bg-gray-50 dark:hover:bg-gray-800 transition-colors group">
+              <Link to="/logs" className="flex items-center justify-between px-3 py-2.5 rounded-xl hover:bg-gray-50 dark:hover:bg-gray-800 transition-colors group">
                 <div className="flex items-center gap-2.5">
                   <span className="w-1.5 h-1.5 rounded-full bg-blue-400 flex-shrink-0" />
                   <div>
@@ -1008,7 +1012,7 @@ function LoggedInHome() {
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
                 </svg>
               </Link>
-              <Link to="/trader" className="flex items-center justify-between px-3 py-2.5 rounded-xl hover:bg-gray-50 dark:hover:bg-gray-800 transition-colors group">
+              <Link to="/logs" className="flex items-center justify-between px-3 py-2.5 rounded-xl hover:bg-gray-50 dark:hover:bg-gray-800 transition-colors group">
                 <div className="flex items-center gap-2.5">
                   <span className="w-1.5 h-1.5 rounded-full bg-purple-400 flex-shrink-0" />
                   <div>

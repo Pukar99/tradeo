@@ -84,7 +84,7 @@ function TradeLog() {
     <div>
       <ContextMenuPortal />
       {summary && (
-        <div className="grid grid-cols-4 gap-4 mb-6">
+        <div className="grid grid-cols-2 sm:grid-cols-4 gap-4 mb-6">
           <div className="bg-white dark:bg-gray-800 rounded-xl p-4 shadow-sm text-center">
             <p className="text-2xl font-bold text-gray-900 dark:text-white">
               {summary.totalTrades}
