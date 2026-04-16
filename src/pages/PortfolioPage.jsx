@@ -924,20 +924,7 @@ function PortfolioPage() {
             )}
           </div>
 
-          {ltpLoading ? (
-            <div className="p-4 space-y-2">
-              {[1, 2, 3].map(i => (
-                <div key={i} className="flex items-center gap-3 animate-pulse">
-                  <div className="w-7 h-7 rounded-lg bg-gray-200 dark:bg-gray-700 flex-shrink-0" />
-                  <div className="flex-1 space-y-1.5">
-                    <div className="h-2.5 w-20 bg-gray-200 dark:bg-gray-700 rounded" />
-                    <div className="h-2 w-28 bg-gray-100 dark:bg-gray-800 rounded" />
-                  </div>
-                  <div className="h-3 w-16 bg-gray-200 dark:bg-gray-700 rounded" />
-                </div>
-              ))}
-            </div>
-          ) : openPositions.length === 0 ? (
+          {openPositions.length === 0 ? (
             <EmptySlate
               icon={<svg className="w-5 h-5 text-gray-300" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z" /></svg>}
               title="No open positions"
@@ -968,7 +955,7 @@ function PortfolioPage() {
           )}
 
           {/* Summary footer */}
-          {openPositions.length > 0 && !ltpLoading && (
+          {openPositions.length > 0 && (
             <div className="px-5 py-3 border-t border-gray-100 dark:border-gray-800 flex items-center justify-between">
               <span className="text-[10px] text-gray-400">
                 Total invested: <span className="font-semibold text-gray-700 dark:text-gray-300">{fmtRs(totalInvested)}</span>
