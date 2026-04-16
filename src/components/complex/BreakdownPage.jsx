@@ -1,204 +1,465 @@
 import { useState, useCallback, useRef, useEffect } from 'react'
 import { createChart, CrosshairMode } from 'lightweight-charts'
-import axios from 'axios'
+import { useTheme } from '../../context/ThemeContext'
+import {
+  getSectorYear, getSectorHistory,
+  getStockReturns, getStockMonthDetail,
+  getMarketSymbols,
+} from '../../api/index'
 
-const API = axios.create({ baseURL: 'http://localhost:5000' })
-API.interceptors.request.use(cfg => {
-  const t = localStorage.getItem('token')
-  if (t) cfg.headers.Authorization = `Bearer ${t}`
-  return cfg
-})
+// ── Color helpers (shared with InsightPage) ────────────────────────────────────
 
-// ── Condition definitions ─────────────────────────────────────────────────────
+function cellBg(val, isDark) {
+  if (val == null) return isDark ? '#1f2937' : '#f3f4f6'
+  if (val >= 10)  return isDark ? '#14532d' : '#bbf7d0'
+  if (val >= 3)   return isDark ? '#166534' : '#d1fae5'
+  if (val >= 0)   return isDark ? '#1a3a2a' : '#f0fdf4'
+  if (val >= -3)  return isDark ? '#3b1a1a' : '#fff0f0'
+  if (val >= -10) return isDark ? '#7f1d1d' : '#fecaca'
+  return isDark ? '#450a0a' : '#fca5a5'
+}
 
-const CONDITION_TYPES = [
-  { value: 'PRICE_ABOVE_N_HIGH',  label: 'Price > N-day High',   params: [{ key: 'n', label: 'Days', default: 20, min: 5, max: 252 }] },
-  { value: 'PRICE_BELOW_N_LOW',   label: 'Price < N-day Low',    params: [{ key: 'n', label: 'Days', default: 20, min: 5, max: 252 }] },
-  { value: 'PRICE_ABOVE_SMA',     label: 'Price > SMA',          params: [{ key: 'period', label: 'Period', default: 20, min: 5, max: 200 }] },
-  { value: 'PRICE_BELOW_SMA',     label: 'Price < SMA',          params: [{ key: 'period', label: 'Period', default: 20, min: 5, max: 200 }] },
-  { value: 'VOLUME_ABOVE_AVG',    label: 'Volume > Avg × mult',  params: [{ key: 'lookback', label: 'Lookback', default: 20, min: 5, max: 60 }, { key: 'multiplier', label: 'Mult', default: 1.5, min: 0.5, max: 5, step: 0.1 }] },
-  { value: 'VOLUME_BELOW_AVG',    label: 'Volume < Avg × mult',  params: [{ key: 'lookback', label: 'Lookback', default: 20, min: 5, max: 60 }, { key: 'multiplier', label: 'Mult', default: 0.7, min: 0.1, max: 1, step: 0.05 }] },
-  { value: 'BULLISH_CANDLE',      label: 'Bullish Candle',        params: [] },
-  { value: 'BEARISH_CANDLE',      label: 'Bearish Candle',        params: [] },
-  { value: 'NEAR_52W_HIGH',       label: 'Within X% of 52W High', params: [{ key: 'pct', label: '% from high', default: 5, min: 1, max: 20 }] },
-  { value: 'CONSECUTIVE_UP',      label: 'N Consecutive Up',      params: [{ key: 'n', label: 'Days', default: 3, min: 2, max: 10 }] },
-  { value: 'CONSECUTIVE_DOWN',    label: 'N Consecutive Down',    params: [{ key: 'n', label: 'Days', default: 3, min: 2, max: 10 }] },
+function cellText(val, isDark) {
+  if (val == null) return isDark ? '#6b7280' : '#9ca3af'
+  if (val >= 3)   return isDark ? '#86efac' : '#166534'
+  if (val >= 0)   return isDark ? '#4ade80' : '#15803d'
+  if (val >= -3)  return isDark ? '#fca5a5' : '#dc2626'
+  return isDark ? '#f87171' : '#991b1b'
+}
+
+function fmt(v, decimals = 2) {
+  if (v == null) return '—'
+  return (v > 0 ? '+' : '') + v.toFixed(decimals) + '%'
+}
+
+const MONTHS_EN = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec']
+
+// ── Small candlestick chart ────────────────────────────────────────────────────
+
+function MiniChart({ candles, isDark, height = 140 }) {
+  const containerRef = useRef(null)
+  const chartRef = useRef(null)
+
+  useEffect(() => {
+    if (!containerRef.current || !candles?.length) return
+
+    const chart = createChart(containerRef.current, {
+      width:  containerRef.current.clientWidth,
+      height,
+      layout: {
+        background: { color: 'transparent' },
+        textColor:  isDark ? '#9ca3af' : '#6b7280',
+      },
+      grid: {
+        vertLines: { color: isDark ? 'rgba(255,255,255,0.04)' : 'rgba(0,0,0,0.04)' },
+        horzLines: { color: isDark ? 'rgba(255,255,255,0.04)' : 'rgba(0,0,0,0.04)' },
+      },
+      crosshair: { mode: CrosshairMode.Normal },
+      rightPriceScale: { borderColor: isDark ? '#374151' : '#e5e7eb' },
+      timeScale:       { borderColor: isDark ? '#374151' : '#e5e7eb', timeVisible: true },
+      handleScroll: false,
+      handleScale:  false,
+    })
+
+    const cs = chart.addCandlestickSeries({
+      upColor: '#22c55e', downColor: '#ef4444', borderVisible: false,
+      wickUpColor: '#22c55e', wickDownColor: '#ef4444',
+    })
+    cs.setData(candles)
+    chart.timeScale().fitContent()
+    chartRef.current = chart
+
+    const ro = new ResizeObserver(() => {
+      if (containerRef.current && chartRef.current)
+        chartRef.current.applyOptions({ width: containerRef.current.clientWidth })
+    })
+    ro.observe(containerRef.current)
+
+    return () => { ro.disconnect(); chart.remove(); chartRef.current = null }
+  }, [candles, isDark, height])
+
+  return <div ref={containerRef} className="w-full" style={{ height }} />
+}
+
+// ── StatRow ────────────────────────────────────────────────────────────────────
+
+function StatRow({ label, value, accent }) {
+  const cls = accent === 'green' ? 'text-green-500' : accent === 'red' ? 'text-red-400' : 'text-gray-900 dark:text-white'
+  return (
+    <div className="flex justify-between items-center py-0.5">
+      <span className="text-[10px] text-gray-500 dark:text-gray-400">{label}</span>
+      <span className={`text-[10px] font-semibold ${cls}`}>{value}</span>
+    </div>
+  )
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// TAB A — SECTORS heatmap
+// ─────────────────────────────────────────────────────────────────────────────
+
+// Sector index ID map (matches backend INDEX_LIST)
+const SECTOR_OPTIONS = [
+  { id: 12, name: 'NEPSE'              },
+  { id: 1,  name: 'Banking'            },
+  { id: 2,  name: 'Development Bank'   },
+  { id: 3,  name: 'Finance'            },
+  { id: 9,  name: 'Microfinance'       },
+  { id: 11, name: 'Non-Life Insurance' },
+  { id: 6,  name: 'Life Insurance'     },
+  { id: 15, name: 'Investment'         },
+  { id: 4,  name: 'Hotels & Tourism'   },
+  { id: 8,  name: 'Manufacturing'      },
+  { id: 13, name: 'Others'             },
+  { id: 5,  name: 'Hydropower'         },
+  { id: 10, name: 'Mutual Fund'        },
+  { id: 14, name: 'Trading'            },
+  { id: 16, name: 'Sensitive Index'    },
 ]
 
-function defaultParams(type) {
-  const def = CONDITION_TYPES.find(c => c.value === type)
-  if (!def) return {}
-  return def.params.reduce((acc, p) => ({ ...acc, [p.key]: p.default }), {})
+function SectorsTab({ isDark }) {
+  const currentYear = new Date().getFullYear()
+  const [year,       setYear]      = useState(currentYear)
+  const [mode,       setMode]      = useState('year')   // 'year' | 'history'
+  const [indexId,    setIndexId]   = useState(null)     // for history mode (numeric id)
+  const [loading,    setLoading]   = useState(false)
+  const [error,      setError]     = useState('')
+  const [data,       setData]      = useState(null)
+  const [selected,   setSelected]  = useState(null)     // { sector, month, year, value }
+
+  const fetchYear = useCallback(async () => {
+    setLoading(true)
+    setError('')
+    setData(null)
+    setSelected(null)
+    try {
+      const r = await getSectorYear({ year })
+      setData(r.data)
+    } catch {
+      setError('Failed to load sector data')
+    } finally {
+      setLoading(false)
+    }
+  }, [year])
+
+  const fetchHistory = useCallback(async () => {
+    if (!indexId) return
+    setLoading(true)
+    setError('')
+    setData(null)
+    setSelected(null)
+    try {
+      const r = await getSectorHistory({ index_id: indexId })
+      setData(r.data)
+    } catch {
+      setError('Failed to load sector history')
+    } finally {
+      setLoading(false)
+    }
+  }, [indexId])
+
+  useEffect(() => {
+    if (mode === 'year') fetchYear()
+  }, [mode, fetchYear])
+
+  useEffect(() => {
+    if (mode === 'history' && indexId) fetchHistory()
+  }, [mode, indexId, fetchHistory])
+
+  // Sidebar: detail for selected cell
+  const [cellDetail, setCellDetail] = useState(null)
+  const [detailLoading, setDetailLoading] = useState(false)
+
+  useEffect(() => {
+    if (!selected) { setCellDetail(null); return }
+    // show basic info immediately
+    setCellDetail({ value: selected.value, sector: selected.sector, year: selected.year, month: selected.month })
+  }, [selected])
+
+  // ── Year mode: rows = sectors, cols = months ──
+  const renderYearTable = () => {
+    if (!data?.sectors) return null
+    const rows = data.sectors
+
+    return (
+      <table className="w-full border-collapse text-[10px]" style={{ minWidth: 560 }}>
+        <thead>
+          <tr>
+            <th className="text-left px-2 py-1.5 text-[9px] font-bold text-gray-400 uppercase w-28">Sector</th>
+            {MONTHS_EN.map((m, i) => (
+              <th key={i} className="px-0.5 py-1.5 text-center text-[9px] font-bold text-gray-400 uppercase w-10">{m}</th>
+            ))}
+            <th className="px-2 py-1.5 text-center text-[9px] font-bold text-gray-400 uppercase w-14">Annual</th>
+          </tr>
+        </thead>
+        <tbody>
+          {rows.map(row => (
+            <tr key={row.index_id || row.name} className="border-t border-gray-100 dark:border-gray-800">
+              <td className="px-2 py-0.5 text-[9px] font-semibold text-gray-600 dark:text-gray-300 truncate max-w-[112px]"
+                title={row.name}>{row.name}</td>
+              {row.months.map((val, mi) => {
+                const isSel = selected?.sector === row.name && selected?.month === mi + 1
+                return (
+                  <td key={mi} className="px-0.5 py-0.5">
+                    <div
+                      onClick={() => val != null && setSelected(prev =>
+                        prev?.sector === row.name && prev?.month === mi + 1
+                          ? null : { sector: row.name, month: mi + 1, year, value: val }
+                      )}
+                      className={`rounded px-0.5 py-0.5 text-center cursor-pointer select-none transition-transform hover:scale-110 text-[9px] ${isSel ? 'ring-2 ring-white scale-110 shadow' : ''}`}
+                      style={{ background: cellBg(val, isDark), color: cellText(val, isDark), minWidth: 32 }}
+                    >
+                      {val != null ? (val > 0 ? '+' : '') + val.toFixed(1) : '—'}
+                    </div>
+                  </td>
+                )
+              })}
+              <td className="px-1 py-0.5">
+                <div className="rounded px-0.5 py-0.5 text-center font-bold text-[9px]"
+                  style={{ background: cellBg(row.annual, isDark), color: cellText(row.annual, isDark) }}>
+                  {row.annual != null ? (row.annual > 0 ? '+' : '') + row.annual.toFixed(1) : '—'}
+                </div>
+              </td>
+            </tr>
+          ))}
+        </tbody>
+      </table>
+    )
+  }
+
+  // ── History mode: rows = years, cols = months, for one sector ──
+  const renderHistoryTable = () => {
+    if (!data?.years) return null
+
+    return (
+      <table className="w-full border-collapse text-[10px]" style={{ minWidth: 560 }}>
+        <thead>
+          <tr>
+            <th className="text-left px-2 py-1.5 text-[9px] font-bold text-gray-400 uppercase w-12">Year</th>
+            {MONTHS_EN.map((m, i) => (
+              <th key={i} className="px-0.5 py-1.5 text-center text-[9px] font-bold text-gray-400 uppercase w-10">{m}</th>
+            ))}
+            <th className="px-2 py-1.5 text-center text-[9px] font-bold text-gray-400 uppercase w-14">Annual</th>
+          </tr>
+        </thead>
+        <tbody>
+          {data.years.map(row => (
+            <tr key={row.year} className="border-t border-gray-100 dark:border-gray-800">
+              <td className="px-2 py-0.5 font-bold text-gray-700 dark:text-gray-200 text-[10px]">{row.year}</td>
+              {row.months.map((val, mi) => {
+                const isSel = selected?.year === row.year && selected?.month === mi + 1
+                return (
+                  <td key={mi} className="px-0.5 py-0.5">
+                    <div
+                      onClick={() => val != null && setSelected(prev =>
+                        prev?.year === row.year && prev?.month === mi + 1
+                          ? null : { sector, month: mi + 1, year: row.year, value: val }
+                      )}
+                      className={`rounded px-0.5 py-0.5 text-center cursor-pointer select-none transition-transform hover:scale-110 text-[9px] ${isSel ? 'ring-2 ring-white scale-110 shadow' : ''}`}
+                      style={{ background: cellBg(val, isDark), color: cellText(val, isDark), minWidth: 32 }}
+                    >
+                      {val != null ? (val > 0 ? '+' : '') + val.toFixed(1) : '—'}
+                    </div>
+                  </td>
+                )
+              })}
+              <td className="px-1 py-0.5">
+                <div className="rounded px-0.5 py-0.5 text-center font-bold text-[9px]"
+                  style={{ background: cellBg(row.annual, isDark), color: cellText(row.annual, isDark) }}>
+                  {row.annual != null ? (row.annual > 0 ? '+' : '') + row.annual.toFixed(1) : '—'}
+                </div>
+              </td>
+            </tr>
+          ))}
+        </tbody>
+      </table>
+    )
+  }
+
+  return (
+    <div className="flex flex-1 min-h-0 overflow-hidden">
+
+      {/* Main area */}
+      <div className="flex-1 flex flex-col min-h-0 overflow-hidden">
+        {/* Toolbar */}
+        <div className="flex flex-wrap items-center gap-2 px-4 py-2 border-b border-gray-100 dark:border-gray-800 shrink-0">
+          {/* Mode toggle */}
+          <div className="flex items-center rounded-md overflow-hidden border border-gray-200 dark:border-gray-700 text-[9px] font-bold">
+            <button onClick={() => setMode('year')}
+              className={`px-2.5 py-1 transition-colors ${mode === 'year' ? 'bg-indigo-500 text-white' : 'text-gray-500 dark:text-gray-400 hover:bg-gray-50 dark:hover:bg-gray-800'}`}>
+              By Year
+            </button>
+            <button onClick={() => setMode('history')}
+              className={`px-2.5 py-1 transition-colors ${mode === 'history' ? 'bg-indigo-500 text-white' : 'text-gray-500 dark:text-gray-400 hover:bg-gray-50 dark:hover:bg-gray-800'}`}>
+              By Sector
+            </button>
+          </div>
+
+          {mode === 'year' && (
+            <div className="flex items-center gap-1.5">
+              <span className="text-[9px] text-gray-400">Year</span>
+              <input type="number" min={2021} max={currentYear} value={year}
+                onChange={e => setYear(parseInt(e.target.value))}
+                className="w-16 px-1.5 py-0.5 text-[10px] border border-gray-200 dark:border-gray-700 rounded bg-white dark:bg-gray-800 dark:text-white outline-none" />
+              <button onClick={fetchYear}
+                className="px-2 py-0.5 text-[9px] font-semibold rounded bg-indigo-500 hover:bg-indigo-600 text-white transition-colors">
+                Load
+              </button>
+            </div>
+          )}
+
+          {mode === 'history' && (
+            <div className="flex items-center gap-1.5">
+              <span className="text-[9px] text-gray-400">Sector</span>
+              <select value={indexId || ''} onChange={e => setIndexId(parseInt(e.target.value))}
+                className="px-1.5 py-0.5 text-[10px] border border-gray-200 dark:border-gray-700 rounded bg-white dark:bg-gray-800 dark:text-white outline-none">
+                <option value="" disabled>Select…</option>
+                {SECTOR_OPTIONS.map(s => <option key={s.id} value={s.id}>{s.name}</option>)}
+              </select>
+            </div>
+          )}
+
+          <span className="ml-auto text-[9px] text-gray-400">
+            {data?.note || ''}
+          </span>
+        </div>
+
+        {/* Table */}
+        <div className="flex-1 overflow-auto px-4 py-2">
+          {loading && <div className="flex items-center justify-center h-32 text-[12px] text-gray-400">Loading…</div>}
+          {error   && <div className="flex items-center justify-center h-32 text-[12px] text-red-400">{error}</div>}
+          {!loading && !error && mode === 'year'    && renderYearTable()}
+          {!loading && !error && mode === 'history' && !indexId && (
+            <div className="flex items-center justify-center h-32 text-[12px] text-gray-400">Select a sector to see its history</div>
+          )}
+          {!loading && !error && mode === 'history' && indexId && renderHistoryTable()}
+        </div>
+      </div>
+
+      {/* Side panel */}
+      {selected && (
+        <div className="w-[220px] min-w-[200px] border-l border-gray-200 dark:border-gray-700 flex flex-col bg-white dark:bg-gray-900 overflow-hidden shrink-0">
+          <div className="flex items-center justify-between px-3 py-2 border-b border-gray-100 dark:border-gray-800 shrink-0">
+            <div>
+              <div className="text-[10px] font-bold text-gray-800 dark:text-white">{selected.sector}</div>
+              <div className="text-[9px] text-gray-400">{MONTHS_EN[selected.month - 1]} {selected.year}</div>
+            </div>
+            <div className="text-[12px] font-bold" style={{ color: cellText(selected.value, isDark) }}>
+              {fmt(selected.value)}
+            </div>
+            <button onClick={() => setSelected(null)}
+              className="w-5 h-5 flex items-center justify-center text-gray-400 hover:text-gray-700 dark:hover:text-gray-200 text-xs">
+              ✕
+            </button>
+          </div>
+          <div className="flex-1 overflow-y-auto p-3">
+            <div className="rounded-md border border-gray-100 dark:border-gray-800 p-2">
+              <div className="text-[9px] font-bold text-gray-400 uppercase mb-1">Cell Info</div>
+              <StatRow label="Sector" value={selected.sector} />
+              <StatRow label="Period" value={`${MONTHS_EN[selected.month - 1]} ${selected.year}`} />
+              <StatRow label="Return" value={fmt(selected.value)} accent={selected.value >= 0 ? 'green' : 'red'} />
+            </div>
+            <div className="mt-3 text-[9px] text-gray-400 text-center">
+              Sector index data from NEPSE
+            </div>
+          </div>
+        </div>
+      )}
+    </div>
+  )
 }
 
-let _condId = 0
-function newCond() {
-  return { _id: ++_condId, type: 'PRICE_ABOVE_N_HIGH', ...defaultParams('PRICE_ABOVE_N_HIGH') }
-}
+// ─────────────────────────────────────────────────────────────────────────────
+// TAB B — STOCKS heatmap
+// ─────────────────────────────────────────────────────────────────────────────
 
-// ── Chart helpers ─────────────────────────────────────────────────────────────
-
-function initChart(container) {
-  const chart = createChart(container, {
-    width:  container.clientWidth,
-    height: container.clientHeight,
-    layout: { background: { color: 'transparent' }, textColor: '#64748b' },
-    grid:   { vertLines: { color: 'rgba(100,116,139,0.1)' }, horzLines: { color: 'rgba(100,116,139,0.1)' } },
-    crosshair: { mode: CrosshairMode.Normal },
-    rightPriceScale: { borderColor: 'rgba(100,116,139,0.2)' },
-    timeScale:       { borderColor: 'rgba(100,116,139,0.2)', timeVisible: true },
-  })
-  return chart
-}
-
-// ── Component ─────────────────────────────────────────────────────────────────
-
-export default function BreakdownPage() {
+function StocksTab({ isDark }) {
   const [symbols,      setSymbols]      = useState([])
   const [symbolSearch, setSymbolSearch] = useState('')
   const [showList,     setShowList]     = useState(false)
   const [symbol,       setSymbol]       = useState('')
-  const [from,         setFrom]         = useState('')
-  const [to,           setTo]           = useState('')
-  const [lookahead,    setLookahead]    = useState(10)
-  const [conditions,   setConditions]   = useState([newCond()])
   const [loading,      setLoading]      = useState(false)
   const [error,        setError]        = useState('')
-  const [result,       setResult]       = useState(null)
-  const [selected,     setSelected]     = useState(null)
+  const [data,         setData]         = useState(null)
+  const [selected,     setSelected]     = useState(null)    // { year, month, value }
+  const [panel,        setPanel]        = useState(null)    // detail data
+  const [panelLoading, setPanelLoading] = useState(false)
 
-  const chartContainerRef = useRef(null)
-  const chartRef          = useRef(null)
-  const candleRef         = useRef(null)
-
+  // Load symbols
   useEffect(() => {
-    API.get('/api/backtest/symbols')
-      .then(r => setSymbols(r.data.symbols || []))
+    getMarketSymbols()
+      .then(r => setSymbols((r.data.stocks || []).map(s => s.symbol)))
       .catch(() => {})
   }, [])
 
   const filteredSymbols = symbols
-    .filter(s => s.symbol.toLowerCase().includes(symbolSearch.toLowerCase()))
-    .slice(0, 50)
+    .filter(s => s.toLowerCase().includes(symbolSearch.toLowerCase()))
+    .slice(0, 60)
 
-  // Chart init
-  useEffect(() => {
-    if (!chartContainerRef.current) return
-    const chart = initChart(chartContainerRef.current)
-    candleRef.current = chart.addCandlestickSeries({
-      upColor: '#22c55e', downColor: '#ef4444', borderVisible: false,
-      wickUpColor: '#22c55e', wickDownColor: '#ef4444',
-    })
-    chartRef.current = chart
-
-    const ro = new ResizeObserver(() => {
-      if (chartContainerRef.current && chartRef.current) {
-        chartRef.current.applyOptions({
-          width:  chartContainerRef.current.clientWidth,
-          height: chartContainerRef.current.clientHeight,
-        })
-      }
-    })
-    ro.observe(chartContainerRef.current)
-    return () => { ro.disconnect(); chart.remove(); chartRef.current = null }
-  }, [])
-
-  // Paint chart when result arrives — fetch OHLCV separately for proper candles
-  useEffect(() => {
-    if (!result || !candleRef.current) return
-
-    API.get('/api/backtest/ohlcv', {
-      params: { symbol: result.symbol, from: result.matches[0]?.date || from, to: to || undefined }
-    }).then(r => {
-      if (!candleRef.current) return
-      candleRef.current.setData(r.data.candles.map(c => ({
-        time: c.date, open: c.open, high: c.high, low: c.low, close: c.close,
-      })))
-
-      const markers = result.matches
-        .filter(m => m.complete)
-        .map(m => ({
-          time:     m.date,
-          position: 'aboveBar',
-          color:    m.outcome_pct > 0 ? '#22c55e' : '#ef4444',
-          shape:    'circle',
-          text:     m.outcome_pct > 0 ? `+${m.outcome_pct}%` : `${m.outcome_pct}%`,
-          size:     1,
-        }))
-        .sort((a, b) => a.time.localeCompare(b.time))
-
-      candleRef.current.setMarkers(markers)
-    }).catch(() => {})
-  }, [result])
-
-  // Condition editor handlers
-  const addCondition = () => setConditions(prev => [...prev, newCond()])
-  const removeCondition = (id) => setConditions(prev => prev.filter(c => c._id !== id))
-  const updateCondition = (id, key, value) => setConditions(prev =>
-    prev.map(c => c._id === id ? { ...c, [key]: value } : c)
-  )
-  const changeConditionType = (id, type) => setConditions(prev =>
-    prev.map(c => c._id === id ? { _id: id, type, ...defaultParams(type) } : c)
-  )
-
-  const handleScan = useCallback(async () => {
-    if (!symbol)           return setError('Select a symbol')
-    if (!conditions.length) return setError('Add at least one condition')
-    setError('')
+  const fetchStock = useCallback(async () => {
+    if (!symbol) return
     setLoading(true)
-    setResult(null)
+    setError('')
+    setData(null)
     setSelected(null)
+    setPanel(null)
     try {
-      // Strip internal _id before sending
-      const cleanConditions = conditions.map(({ _id, ...rest }) => rest)
-      const r = await API.post('/api/breakdown/scan', {
-        symbol, from: from || undefined, to: to || undefined,
-        conditions: cleanConditions, lookahead,
-      })
-      setResult(r.data)
-    } catch (err) {
-      setError(err.response?.data?.error || 'Failed to scan')
+      const r = await getStockReturns({ symbol })
+      setData(r.data)
+    } catch {
+      setError('Failed to load stock data')
     } finally {
       setLoading(false)
     }
-  }, [symbol, from, to, conditions, lookahead])
+  }, [symbol])
 
-  const selectedMatch = selected != null && result?.matches[selected]
+  // Load panel on cell click
+  useEffect(() => {
+    if (!selected) { setPanel(null); return }
+    setPanelLoading(true)
+    getStockMonthDetail({ symbol, year: selected.year, month: selected.month })
+      .then(r => setPanel(r.data))
+      .catch(() => setPanel(null))
+      .finally(() => setPanelLoading(false))
+  }, [selected?.year, selected?.month, symbol])
+
+  // Escape to close panel
+  useEffect(() => {
+    const h = (e) => { if (e.key === 'Escape') setSelected(null) }
+    window.addEventListener('keydown', h)
+    return () => window.removeEventListener('keydown', h)
+  }, [])
+
+  const years = data?.years || []
 
   return (
-    <div className="flex flex-1 overflow-hidden min-h-0">
+    <div className="flex flex-1 min-h-0 overflow-hidden">
 
-      {/* ── LEFT PANEL ──────────────────────────────────────────────── */}
-      <div className="w-[240px] min-w-[220px] border-r border-gray-100 dark:border-gray-800 flex flex-col shrink-0 overflow-hidden">
-        <div className="flex flex-col gap-3 p-3 overflow-y-auto h-full">
-          <div className="text-[10px] font-bold text-gray-500 dark:text-gray-400 uppercase tracking-widest">
-            Breakdown — Pattern Scanner
-          </div>
-
-          {/* Symbol */}
+      {/* Main */}
+      <div className="flex-1 flex flex-col min-h-0 overflow-hidden">
+        {/* Toolbar */}
+        <div className="flex items-center gap-2 px-4 py-2 border-b border-gray-100 dark:border-gray-800 shrink-0">
+          {/* Symbol picker */}
           <div className="relative">
-            <label className="text-[9px] font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wider">Symbol</label>
             <div onClick={() => setShowList(v => !v)}
-              className="mt-0.5 flex items-center gap-1 px-2 py-1.5 rounded-md border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 cursor-pointer text-[11px]">
+              className="flex items-center gap-1.5 px-2.5 py-1 rounded-md border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 cursor-pointer text-[11px] min-w-[120px]">
               <span className={symbol ? 'text-gray-900 dark:text-white font-semibold' : 'text-gray-400'}>
-                {symbol || 'Select symbol'}
+                {symbol || 'Select stock'}
               </span>
-              <svg className="ml-auto w-3 h-3 text-gray-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <svg className="ml-auto w-3 h-3 text-gray-400 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
               </svg>
             </div>
             {showList && (
-              <div className="absolute z-50 top-full left-0 right-0 mt-0.5 bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-md shadow-lg">
+              <div className="absolute z-50 top-full left-0 mt-0.5 w-48 bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-md shadow-lg">
                 <input autoFocus value={symbolSearch} onChange={e => setSymbolSearch(e.target.value)}
-                  placeholder="Search…"
+                  placeholder="Search symbol…"
                   className="w-full px-2 py-1.5 text-[11px] border-b border-gray-100 dark:border-gray-700 bg-transparent outline-none dark:text-white" />
-                <div className="max-h-40 overflow-y-auto">
+                <div className="max-h-48 overflow-y-auto">
                   {filteredSymbols.map(s => (
-                    <div key={s.symbol}
-                      onClick={() => { setSymbol(s.symbol); setShowList(false); setSymbolSearch('') }}
-                      className="px-2 py-1 text-[11px] hover:bg-blue-50 dark:hover:bg-blue-900/20 cursor-pointer text-gray-800 dark:text-gray-200">
-                      <span className="font-semibold">{s.symbol}</span>
-                      <span className="text-gray-400 ml-2 text-[9px]">{s.total_days}d</span>
+                    <div key={s}
+                      onClick={() => { setSymbol(s); setShowList(false); setSymbolSearch('') }}
+                      className="px-2 py-1 text-[11px] hover:bg-blue-50 dark:hover:bg-blue-900/20 cursor-pointer text-gray-800 dark:text-gray-200 font-semibold">
+                      {s}
                     </div>
                   ))}
                   {filteredSymbols.length === 0 && <div className="px-2 py-2 text-[11px] text-gray-400">No results</div>}
@@ -207,240 +468,188 @@ export default function BreakdownPage() {
             )}
           </div>
 
-          {/* Date Range */}
-          <div>
-            <label className="text-[9px] font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wider">From (optional)</label>
-            <input type="date" value={from} onChange={e => setFrom(e.target.value)}
-              className="mt-0.5 w-full px-2 py-1.5 text-[11px] rounded-md border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 dark:text-white outline-none focus:ring-1 focus:ring-blue-500" />
-          </div>
-          <div>
-            <label className="text-[9px] font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wider">To (optional)</label>
-            <input type="date" value={to} onChange={e => setTo(e.target.value)}
-              className="mt-0.5 w-full px-2 py-1.5 text-[11px] rounded-md border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 dark:text-white outline-none focus:ring-1 focus:ring-blue-500" />
-          </div>
-
-          {/* Lookahead */}
-          <div>
-            <div className="flex items-center justify-between">
-              <label className="text-[9px] font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wider">Lookahead</label>
-              <span className="text-[10px] font-bold text-indigo-600">{lookahead}d</span>
-            </div>
-            <input type="range" min="3" max="60" step="1" value={lookahead}
-              onChange={e => setLookahead(parseInt(e.target.value))}
-              className="w-full mt-1 accent-indigo-500" />
-          </div>
-
-          {/* Conditions */}
-          <div>
-            <div className="flex items-center justify-between mb-1">
-              <label className="text-[9px] font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wider">
-                Conditions (AND)
-              </label>
-              {conditions.length < 4 && (
-                <button onClick={addCondition}
-                  className="text-[9px] text-blue-600 hover:text-blue-800 font-semibold">+ Add</button>
-              )}
-            </div>
-            <div className="flex flex-col gap-2">
-              {conditions.map((cond) => {
-                const def = CONDITION_TYPES.find(c => c.value === cond.type)
-                return (
-                  <div key={cond._id} className="border border-gray-200 dark:border-gray-700 rounded-md p-2 bg-gray-50 dark:bg-gray-900">
-                    <div className="flex items-center gap-1 mb-1.5">
-                      <select
-                        value={cond.type}
-                        onChange={e => changeConditionType(cond._id, e.target.value)}
-                        className="flex-1 text-[10px] rounded border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 dark:text-white px-1 py-0.5 outline-none"
-                      >
-                        {CONDITION_TYPES.map(ct => (
-                          <option key={ct.value} value={ct.value}>{ct.label}</option>
-                        ))}
-                      </select>
-                      {conditions.length > 1 && (
-                        <button onClick={() => removeCondition(cond._id)}
-                          className="text-gray-400 hover:text-red-500 text-[11px] leading-none px-0.5">✕</button>
-                      )}
-                    </div>
-                    {def?.params.map(p => (
-                      <div key={p.key} className="flex items-center gap-1.5">
-                        <span className="text-[9px] text-gray-400 w-14 shrink-0">{p.label}</span>
-                        <input
-                          type="number"
-                          min={p.min}
-                          max={p.max}
-                          step={p.step || 1}
-                          value={cond[p.key] ?? p.default}
-                          onChange={e => updateCondition(cond._id, p.key, parseFloat(e.target.value))}
-                          className="flex-1 text-[10px] px-1.5 py-0.5 rounded border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 dark:text-white outline-none focus:ring-1 focus:ring-indigo-500"
-                        />
-                      </div>
-                    ))}
-                  </div>
-                )
-              })}
-            </div>
-          </div>
-
-          {error && (
-            <div className="text-[10px] text-red-500 bg-red-50 dark:bg-red-900/20 rounded-md px-2 py-1.5">{error}</div>
-          )}
-
-          <button onClick={handleScan} disabled={loading}
-            className="mt-auto w-full py-2 text-[11px] font-bold rounded-md bg-indigo-600 hover:bg-indigo-700 disabled:opacity-50 text-white transition-colors">
-            {loading ? 'Scanning…' : 'Find Instances'}
+          <button onClick={fetchStock} disabled={!symbol || loading}
+            className="px-3 py-1 text-[10px] font-bold rounded-md bg-indigo-500 hover:bg-indigo-600 disabled:opacity-40 text-white transition-colors">
+            {loading ? 'Loading…' : 'Load'}
           </button>
 
-          <div className="text-[9px] text-gray-400 text-center leading-tight">
-            Full history scan · outcome measured at {lookahead}d
-          </div>
+          {data && (
+            <span className="ml-auto text-[9px] text-gray-400">
+              {data.years?.length || 0} years of data · Updated {data.latest_date || ''}
+            </span>
+          )}
+        </div>
+
+        {/* Table */}
+        <div className="flex-1 overflow-auto px-4 py-2">
+          {loading && <div className="flex items-center justify-center h-32 text-[12px] text-gray-400">Loading…</div>}
+          {error   && <div className="flex items-center justify-center h-32 text-[12px] text-red-400">{error}</div>}
+          {!loading && !error && !symbol && (
+            <div className="flex items-center justify-center h-32 text-[12px] text-gray-400">Select a stock to view its monthly return heatmap</div>
+          )}
+          {!loading && !error && symbol && !data && !error && (
+            <div className="flex items-center justify-center h-32 text-[12px] text-gray-400">Click Load to fetch data</div>
+          )}
+          {!loading && data && (
+            <table className="w-full border-collapse text-[10px]" style={{ minWidth: 620 }}>
+              <thead>
+                <tr>
+                  <th className="text-left px-2 py-1.5 text-[9px] font-bold text-gray-400 uppercase w-12">Year</th>
+                  {MONTHS_EN.map((m, i) => (
+                    <th key={i} className="px-0.5 py-1.5 text-center text-[9px] font-bold text-gray-400 uppercase w-10">{m}</th>
+                  ))}
+                  <th className="px-2 py-1.5 text-center text-[9px] font-bold text-gray-400 uppercase w-14">Annual</th>
+                </tr>
+              </thead>
+              <tbody>
+                {years.map(row => (
+                  <tr key={row.year} className="border-t border-gray-100 dark:border-gray-800">
+                    <td className="px-2 py-0.5 font-bold text-gray-700 dark:text-gray-200 text-[10px]">{row.year}</td>
+                    {row.months.map((val, mi) => {
+                      const isSel = selected?.year === row.year && selected?.month === mi + 1
+                      const isNow = row.year === new Date().getFullYear() && (mi + 1) === new Date().getMonth() + 1
+                      return (
+                        <td key={mi} className="px-0.5 py-0.5">
+                          <div
+                            onClick={() => val != null && setSelected(prev =>
+                              prev?.year === row.year && prev?.month === mi + 1
+                                ? null : { year: row.year, month: mi + 1, value: val }
+                            )}
+                            className={`rounded px-0.5 py-0.5 text-center cursor-pointer select-none transition-transform hover:scale-110 text-[9px]
+                              ${isNow  ? 'ring-1 ring-blue-400 animate-pulse' : ''}
+                              ${isSel ? 'ring-2 ring-white scale-110 shadow-lg' : ''}`}
+                            style={{ background: cellBg(val, isDark), color: cellText(val, isDark), minWidth: 32 }}
+                          >
+                            {val != null ? (val > 0 ? '+' : '') + val.toFixed(1) : '—'}
+                          </div>
+                        </td>
+                      )
+                    })}
+                    <td className="px-1 py-0.5">
+                      <div className="rounded px-0.5 py-0.5 text-center font-bold text-[9px]"
+                        style={{ background: cellBg(row.annual, isDark), color: cellText(row.annual, isDark) }}>
+                        {row.annual != null ? (row.annual > 0 ? '+' : '') + row.annual.toFixed(1) : '—'}
+                      </div>
+                    </td>
+                  </tr>
+                ))}
+
+                {/* Avg row */}
+                {data.month_averages?.some(v => v != null) && (
+                  <tr className="border-t-2 border-gray-300 dark:border-gray-600">
+                    <td className="px-2 py-1 text-[9px] font-bold text-gray-400 uppercase">Avg</td>
+                    {data.month_averages.map((v, mi) => (
+                      <td key={mi} className="px-0.5 py-0.5">
+                        <div className="rounded px-0.5 py-0.5 text-center text-[9px] font-semibold opacity-80"
+                          style={{ background: cellBg(v, isDark), color: cellText(v, isDark), minWidth: 32 }}>
+                          {v != null ? (v > 0 ? '+' : '') + v.toFixed(1) : '—'}
+                        </div>
+                      </td>
+                    ))}
+                    <td colSpan={1} />
+                  </tr>
+                )}
+              </tbody>
+            </table>
+          )}
         </div>
       </div>
 
-      {/* ── CENTER: Chart ────────────────────────────────────────────── */}
-      <div className="flex-1 flex flex-col min-h-0 min-w-0 relative">
-        <div ref={chartContainerRef} className="flex-1 min-h-0" />
-        {!result && !loading && (
-          <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
-            <span className="text-[12px] text-gray-400">Build conditions and scan to find historical instances</span>
+      {/* Side panel */}
+      {selected && (
+        <div className="w-[260px] min-w-[240px] border-l border-gray-200 dark:border-gray-700 flex flex-col bg-white dark:bg-gray-900 overflow-hidden shrink-0">
+          {/* Header */}
+          <div className="flex items-center justify-between px-3 py-2 border-b border-gray-100 dark:border-gray-800 shrink-0">
+            <div>
+              <span className="text-[11px] font-bold text-gray-800 dark:text-white">{symbol}</span>
+              <span className="text-[9px] text-gray-400 ml-2">{MONTHS_EN[selected.month - 1]} {selected.year}</span>
+            </div>
+            <div className="flex items-center gap-2">
+              <span className="text-[12px] font-bold" style={{ color: cellText(selected.value, isDark) }}>
+                {fmt(selected.value)}
+              </span>
+              <button onClick={() => setSelected(null)}
+                className="w-5 h-5 flex items-center justify-center text-gray-400 hover:text-gray-700 dark:hover:text-gray-200 text-xs">
+                ✕
+              </button>
+            </div>
           </div>
-        )}
-      </div>
 
-      {/* ── RIGHT PANEL ─────────────────────────────────────────────── */}
-      <div className="w-[280px] min-w-[240px] border-l border-gray-100 dark:border-gray-800 flex flex-col shrink-0 overflow-hidden">
-        <div className="flex flex-col h-full overflow-y-auto">
+          {/* Chart */}
+          <div className="h-[140px] border-b border-gray-100 dark:border-gray-800 shrink-0 bg-gray-50 dark:bg-gray-950">
+            {panelLoading ? (
+              <div className="h-full flex items-center justify-center text-[10px] text-gray-400">Loading…</div>
+            ) : panel?.candles?.length ? (
+              <MiniChart candles={panel.candles} isDark={isDark} height={140} />
+            ) : (
+              <div className="h-full flex items-center justify-center text-[10px] text-gray-400">No chart data</div>
+            )}
+          </div>
 
-          {result && (
-            <>
-              {/* Stats */}
-              <div className="p-3 border-b border-gray-100 dark:border-gray-800 shrink-0">
-                <div className="text-[9px] font-bold text-gray-400 uppercase tracking-widest mb-2">
-                  {result.symbol} · {result.total_matches} instances · {result.lookahead}d lookahead
-                </div>
-
-                {result.stats.sample_warning && (
-                  <div className="text-[9px] text-amber-600 bg-amber-50 dark:bg-amber-900/20 rounded px-2 py-1 mb-2">
-                    ⚠ Small sample ({result.complete_count} complete) — not statistically significant
-                  </div>
-                )}
-
-                <div className="grid grid-cols-2 gap-2">
-                  <StatBox
-                    label="Win Rate"
-                    value={result.stats.win_rate != null ? `${result.stats.win_rate}%` : '—'}
-                    color={result.stats.win_rate >= 60 ? 'green' : result.stats.win_rate >= 40 ? 'amber' : 'red'}
-                  />
-                  <StatBox
-                    label="Exp. Value"
-                    value={result.stats.expected_value != null ? `${result.stats.expected_value > 0 ? '+' : ''}${result.stats.expected_value}%` : '—'}
-                    color={result.stats.expected_value > 0 ? 'green' : 'red'}
-                  />
-                  <StatBox
-                    label="Avg Win"
-                    value={result.stats.avg_win_pct != null ? `+${result.stats.avg_win_pct}%` : '—'}
-                    color="green"
-                  />
-                  <StatBox
-                    label="Avg Loss"
-                    value={result.stats.avg_loss_pct != null ? `${result.stats.avg_loss_pct}%` : '—'}
-                    color="red"
-                  />
-                  <StatBox
-                    label="Best Case"
-                    value={result.stats.best_case_pct != null ? `+${result.stats.best_case_pct}%` : '—'}
-                    color="green"
-                  />
-                  <StatBox
-                    label="Worst Case"
-                    value={result.stats.worst_case_pct != null ? `${result.stats.worst_case_pct}%` : '—'}
-                    color="red"
-                  />
-                </div>
-              </div>
-
-              {/* Histogram */}
-              {result.histogram.length > 0 && (
-                <div className="p-3 border-b border-gray-100 dark:border-gray-800 shrink-0">
-                  <div className="text-[9px] font-bold text-gray-400 uppercase tracking-widest mb-2">Outcome Distribution</div>
-                  <div className="flex flex-col gap-0.5">
-                    {result.histogram.map((bin, i) => {
-                      const maxCount = Math.max(...result.histogram.map(b => b.count))
-                      const pct = maxCount > 0 ? (bin.count / maxCount) * 100 : 0
-                      const isWin = bin.lo >= 0
-                      return (
-                        <div key={i} className="flex items-center gap-1.5">
-                          <div className="w-20 text-[8px] text-gray-400 text-right shrink-0">{bin.lo > 0 ? '+' : ''}{bin.lo}%</div>
-                          <div className="flex-1 h-3 bg-gray-100 dark:bg-gray-800 rounded overflow-hidden">
-                            <div
-                              className={`h-full rounded ${isWin ? 'bg-green-400' : 'bg-red-400'}`}
-                              style={{ width: `${pct}%` }}
-                            />
-                          </div>
-                          <div className="w-4 text-[9px] text-gray-400">{bin.count}</div>
-                        </div>
-                      )
-                    })}
-                  </div>
+          {/* Stats */}
+          {panel?.stats && (
+            <div className="flex-1 overflow-y-auto p-3 flex flex-col gap-2">
+              {panel.stats.month_open != null && (
+                <div className="rounded-md border border-gray-100 dark:border-gray-800 p-2">
+                  <div className="text-[9px] font-bold text-gray-400 uppercase mb-1">{symbol} Price</div>
+                  <StatRow label="Open"         value={panel.stats.month_open?.toFixed(2)} />
+                  <StatRow label="Close"        value={panel.stats.month_close?.toFixed(2)} />
+                  <StatRow label="High"         value={panel.stats.month_high?.toFixed(2)} />
+                  <StatRow label="Low"          value={panel.stats.month_low?.toFixed(2)} />
+                  <StatRow label="Return"       value={fmt(selected.value)} accent={selected.value >= 0 ? 'green' : 'red'} />
+                  <StatRow label="Trading Days" value={panel.stats.trading_days} />
                 </div>
               )}
 
-              {/* Matches list */}
-              <div className="px-3 py-1.5 text-[9px] font-bold text-gray-400 uppercase tracking-widest bg-gray-50 dark:bg-gray-900 shrink-0">
-                Instances ({result.matches.length})
-              </div>
-              <div className="flex flex-col divide-y divide-gray-50 dark:divide-gray-800 overflow-y-auto">
-                {result.matches.map((m, i) => (
-                  <div
-                    key={i}
-                    onClick={() => setSelected(i === selected ? null : i)}
-                    className={`flex items-center gap-2 px-3 py-1.5 cursor-pointer hover:bg-gray-50 dark:hover:bg-gray-800/50 transition-colors ${
-                      selected === i ? 'bg-indigo-50 dark:bg-indigo-900/20' : ''
-                    }`}
-                  >
-                    <div className="flex-1 min-w-0">
-                      <div className="text-[10px] font-semibold text-gray-700 dark:text-gray-300">{m.date}</div>
-                      {m.exit_date && (
-                        <div className="text-[9px] text-gray-400">→ {m.exit_date}</div>
-                      )}
-                    </div>
-                    <div className="text-right shrink-0">
-                      {m.complete && m.outcome_pct != null ? (
-                        <span className={`text-[11px] font-bold ${m.outcome_pct > 0 ? 'text-green-600' : 'text-red-500'}`}>
-                          {m.outcome_pct > 0 ? '+' : ''}{m.outcome_pct}%
-                        </span>
-                      ) : (
-                        <span className="text-[9px] text-gray-400">incomplete</span>
-                      )}
-                    </div>
-                  </div>
-                ))}
-              </div>
-            </>
-          )}
-
-          {!result && (
-            <div className="flex-1 flex items-center justify-center text-[12px] text-gray-400 text-center px-6">
-              {loading ? 'Scanning history…' : 'Scan to see all historical instances of your pattern'}
+              {panel.stats.nepse_return != null && (
+                <div className="rounded-md border border-gray-100 dark:border-gray-800 p-2">
+                  <div className="text-[9px] font-bold text-gray-400 uppercase mb-1">vs NEPSE</div>
+                  <StatRow label="NEPSE return"      value={fmt(panel.stats.nepse_return)} accent={panel.stats.nepse_return >= 0 ? 'green' : 'red'} />
+                  <StatRow label="Relative Strength" value={fmt(panel.stats.relative_strength)} accent={(panel.stats.relative_strength || 0) >= 0 ? 'green' : 'red'} />
+                </div>
+              )}
             </div>
           )}
         </div>
-      </div>
-
+      )}
     </div>
   )
 }
 
-// ── Helpers ───────────────────────────────────────────────────────────────────
+// ─────────────────────────────────────────────────────────────────────────────
+// Main BreakdownPage
+// ─────────────────────────────────────────────────────────────────────────────
 
-function StatBox({ label, value, color }) {
-  const textColor = color === 'green' ? 'text-green-600 dark:text-green-400'
-                  : color === 'red'   ? 'text-red-500 dark:text-red-400'
-                  : color === 'amber' ? 'text-amber-600 dark:text-amber-400'
-                  : 'text-gray-900 dark:text-white'
+export default function BreakdownPage() {
+  const { isDark } = useTheme()
+  const [tab, setTab] = useState('sectors')  // 'sectors' | 'stocks'
+
   return (
-    <div className="bg-gray-50 dark:bg-gray-900 rounded-md p-2">
-      <div className="text-[8px] text-gray-400 uppercase tracking-wide">{label}</div>
-      <div className={`text-[14px] font-bold ${textColor}`}>{value}</div>
+    <div className="flex flex-col flex-1 min-h-0 overflow-hidden bg-white dark:bg-gray-900">
+
+      {/* Sub-tab bar */}
+      <div className="flex items-center gap-0 px-4 border-b border-gray-100 dark:border-gray-800 shrink-0">
+        {[
+          { id: 'sectors', label: 'Sectors' },
+          { id: 'stocks',  label: 'Stocks' },
+        ].map(t => (
+          <button key={t.id}
+            onClick={() => setTab(t.id)}
+            className={`px-4 py-2 text-[11px] font-semibold border-b-2 transition-colors ${
+              tab === t.id
+                ? 'border-indigo-500 text-indigo-600 dark:text-indigo-400'
+                : 'border-transparent text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-200'
+            }`}>
+            {t.label}
+          </button>
+        ))}
+      </div>
+
+      {/* Tab content */}
+      <div className="flex flex-1 min-h-0 overflow-hidden">
+        {tab === 'sectors' && <SectorsTab isDark={isDark} />}
+        {tab === 'stocks'  && <StocksTab  isDark={isDark} />}
+      </div>
     </div>
   )
 }

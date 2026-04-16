@@ -102,10 +102,16 @@ export const updateTradeJournal = (id, data) => API.put(`/api/tradelog/journal/$
 export const deleteTradeJournal = (id) => API.delete(`/api/tradelog/journal/${id}`)
 
 // Complex Tab — Insight
-export const getInsightSignals = (params) => API.get('/api/insight/signals', { params })
+export const getInsightSignals      = (params) => API.get('/api/insight/signals',        { params })
+export const getMonthlyReturns      = (params) => API.get('/api/insight/monthly-returns', { params })
+export const getMonthDetail         = (params) => API.get('/api/insight/month-detail',    { params })
 
 // Complex Tab — Breakdown
-export const scanBreakdown = (data) => API.post('/api/breakdown/scan', data)
+export const scanBreakdown          = (data)   => API.post('/api/breakdown/scan',         data)
+export const getSectorYear          = (params) => API.get('/api/breakdown/sector-year',   { params })
+export const getSectorHistory       = (params) => API.get('/api/breakdown/sector-history',{ params })
+export const getStockReturns        = (params) => API.get('/api/breakdown/stock-returns', { params })
+export const getStockMonthDetail    = (params) => API.get('/api/breakdown/stock-month-detail', { params })
 
 // Complex Tab — Trade Behavior
 export const getBehaviorStats = (params) => API.get('/api/behavior/stats', { params })
