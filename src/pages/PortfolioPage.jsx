@@ -579,11 +579,9 @@ function PortfolioPage() {
         return
       }
 
-      // Show positions immediately without prices so layout is stable
       setOpenPositions(open.map(tr => ({ ...tr, currentPrice: null, unrealizedPnl: null, pnlPct: null })))
       setLoading(false)
 
-      // Fetch LTPs and enrich — update positions using the same `open` array as base
       setLtpLoading(true)
       try {
         const uniqueSymbols = [...new Set(open.map(tr => tr.symbol))]
@@ -592,7 +590,6 @@ function PortfolioPage() {
         uniqueSymbols.forEach((sym, i) => {
           if (results[i].status === 'fulfilled') priceMap[sym] = results[i].value.data
         })
-        // Build enriched array from the `open` snapshot — avoids stale prev closure
         setOpenPositions(open.map(tr => {
           const p     = priceMap[tr.symbol]
           const qty   = parseFloat(tr.remaining_quantity ?? tr.quantity) || 0
@@ -604,7 +601,6 @@ function PortfolioPage() {
           return { ...tr, currentPrice: ltp, change: p.change, latestDate: p.latestDate, unrealizedPnl: Math.round(pnl), pnlPct }
         }))
       } catch {
-        // non-fatal — positions still visible without prices
       } finally {
         setLtpLoading(false)
       }
@@ -615,7 +611,7 @@ function PortfolioPage() {
     }
   }, [user?.id])
 
-  useEffect(() => { if (user) fetchData() }, [user, fetchData])
+  useEffect(() => { if (user?.id) fetchData() }, [user?.id]) // eslint-disable-line react-hooks/exhaustive-deps
   useChatRefresh(['trades'], fetchData)
 
   const handleGoToChart = ({ symbol, entries, id, entry_price, sl, tp, position, remaining_quantity, quantity, date }) => {
