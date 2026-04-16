@@ -345,7 +345,7 @@ export default function TradeBehaviorPage() {
                   <div className="text-[10px] font-bold text-gray-500 dark:text-gray-400 uppercase tracking-widest mb-2">
                     Summary — {data.total} Closed Trades
                   </div>
-                  <div className="grid grid-cols-4 gap-2">
+                  <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
                     <SummaryCard
                       label="Win Rate"
                       value={data.summary.win_rate != null ? `${data.summary.win_rate}%` : '—'}

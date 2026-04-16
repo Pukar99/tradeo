@@ -265,7 +265,7 @@ function MorningBriefing({ onClose }) {
               </div>
 
               {/* Quick Stats */}
-              <div className="grid grid-cols-4 gap-2">
+              <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
                 {[
                   { label: 'Open', value: data.openPositions.length, color: 'text-blue-400' },
                   { label: 'Win Rate', value: `${data.winRate}%`, color: data.winRate >= 50 ? 'text-green-400' : 'text-red-400' },

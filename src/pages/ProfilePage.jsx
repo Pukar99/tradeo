@@ -336,7 +336,7 @@ function ProfilePage() {
           </div>
 
           {/* Quick stats strip */}
-          <div className="grid grid-cols-4 gap-4 mt-6">
+          <div className="grid grid-cols-2 sm:grid-cols-4 gap-4 mt-6">
             <div className="bg-white bg-opacity-5 rounded-xl p-3 text-center border border-white border-opacity-10">
               <p className="text-2xl font-bold text-white">{profile.stats.totalTrades}</p>
               <p className="text-xs text-gray-400 mt-1">Total Trades</p>
@@ -539,7 +539,7 @@ function ProfilePage() {
 
       {/* ── Overview Tab ── */}
       {activeTab === 'overview' && (
-        <div className="grid grid-cols-3 gap-4">
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
           <div className="bg-white dark:bg-gray-800 rounded-2xl p-5 shadow-sm border border-gray-100 dark:border-gray-700">
             <h3 className="text-sm font-semibold text-gray-900 dark:text-white mb-4 flex items-center gap-2">
               <span>📈</span> Trading Summary
@@ -659,7 +659,7 @@ function ProfilePage() {
 
       {/* ── Trading Tab ── */}
       {activeTab === 'trading' && (
-        <div className="grid grid-cols-4 gap-4">
+        <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
           <StatCard label="Total Trades" value={profile.stats.totalTrades} />
           <StatCard label="Closed Trades" value={profile.stats.closedTrades} color="text-blue-400" />
           <StatCard label="Open Positions" value={profile.stats.openPositions} color="text-green-400" />
@@ -693,12 +693,12 @@ function ProfilePage() {
 
       {/* ── Discipline Tab ── */}
       {activeTab === 'discipline' && (
-        <div className="grid grid-cols-3 gap-4">
+        <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
           <StatCard label="Today's Score" value={`${profile.discipline.todayScore}%`} color={profile.discipline.todayScore >= 80 ? 'text-green-500' : profile.discipline.todayScore >= 50 ? 'text-blue-500' : 'text-red-400'} />
           <StatCard label="Monthly Average" value={`${profile.discipline.monthlyScore}%`} color="text-blue-500" />
           <StatCard label="Current Streak" value={`🔥 ${profile.discipline.streak}`} color="text-orange-400" sub="consecutive days ≥70%" />
           <StatCard label="Total Days Tracked" value={profile.discipline.totalDaysTracked} />
-          <div className="col-span-2 bg-white dark:bg-gray-800 rounded-xl p-5 shadow-sm border border-gray-100 dark:border-gray-700">
+          <div className="col-span-1 sm:col-span-2 bg-white dark:bg-gray-800 rounded-xl p-5 shadow-sm border border-gray-100 dark:border-gray-700">
             <h3 className="text-sm font-semibold text-gray-900 dark:text-white mb-3">Discipline Impact</h3>
             <p className={`text-sm font-medium p-3 rounded-lg ${
               profile.discipline.todayScore >= 80
@@ -723,12 +723,12 @@ function ProfilePage() {
 
       {/* ── Research Tab ── */}
       {activeTab === 'research' && (
-        <div className="grid grid-cols-3 gap-4">
+        <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
           <StatCard label="Posts Published" value={profile.research.totalPosts} color="text-blue-500" />
           <StatCard label="Verified Posts" value={profile.research.verifiedPosts} color="text-green-500" />
           <StatCard label="Research Status" value={profile.isEligible ? '✓ Eligible' : '✗ Not Yet'} color={profile.isEligible ? 'text-green-500' : 'text-red-400'} />
           {profile.research.recentPosts.length > 0 ? (
-            <div className="col-span-3 bg-white dark:bg-gray-800 rounded-xl p-5 shadow-sm border border-gray-100 dark:border-gray-700">
+            <div className="col-span-1 sm:col-span-3 bg-white dark:bg-gray-800 rounded-xl p-5 shadow-sm border border-gray-100 dark:border-gray-700">
               <h3 className="text-sm font-semibold text-gray-900 dark:text-white mb-3">Recent Research Posts</h3>
               <div className="space-y-2">
                 {profile.research.recentPosts.map(post => (
@@ -749,7 +749,7 @@ function ProfilePage() {
               </div>
             </div>
           ) : (
-            <div className="col-span-3 bg-white dark:bg-gray-800 rounded-xl p-8 shadow-sm border border-gray-100 dark:border-gray-700 text-center">
+            <div className="col-span-1 sm:col-span-3 bg-white dark:bg-gray-800 rounded-xl p-8 shadow-sm border border-gray-100 dark:border-gray-700 text-center">
               <p className="text-gray-400 text-sm">No published research posts yet.</p>
               {profile.isEligible && (
                 <button
