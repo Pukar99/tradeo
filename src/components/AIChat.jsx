@@ -1053,6 +1053,8 @@ function AIChat({ isFullPage = false, onClose }) {
               ? 'bg-green-500 text-white rounded-tr-sm'
               : msg.isError
               ? 'bg-red-50 dark:bg-red-900/20 text-red-500 border border-red-200 dark:border-red-800 rounded-tl-sm'
+              : isFloat
+              ? 'bg-white/55 dark:bg-white/8 border border-white/50 dark:border-white/12 text-gray-800 dark:text-gray-100 rounded-tl-sm shadow-sm backdrop-blur-sm'
               : 'bg-white dark:bg-gray-900 border border-gray-100 dark:border-gray-800 text-gray-800 dark:text-gray-200 rounded-tl-sm shadow-sm'
           }`}>
             <p className="whitespace-pre-wrap">
@@ -1089,11 +1091,17 @@ function AIChat({ isFullPage = false, onClose }) {
     )
   }
 
+  const isFloat = !isFullPage
+
   return (
-    <div className="flex flex-col h-full bg-white dark:bg-gray-950">
+    <div className={`flex flex-col h-full ${isFloat ? 'bg-transparent' : 'bg-white dark:bg-gray-950'}`}>
 
       {/* ── Header ── */}
-      <div className="flex items-center justify-between px-3 py-2 border-b border-gray-100 dark:border-gray-800">
+      <div className={`flex items-center justify-between px-3 py-2.5 shrink-0 border-b ${
+        isFloat
+          ? 'bg-white/20 dark:bg-black/20 border-white/20 dark:border-white/8'
+          : 'bg-white dark:bg-gray-950 border-gray-100 dark:border-gray-800'
+      }`}>
         <div className="flex items-center gap-2">
           <TradeoLogo size={22} />
           <div>
@@ -1108,7 +1116,7 @@ function AIChat({ isFullPage = false, onClose }) {
           {messages.length > 0 && (
             <button
               onClick={() => { setMessages([]); setActiveForm(null); setJournalDraft(null); setDisciplineNudge(null); setLastAction(null) }}
-              className="text-gray-400 hover:text-gray-600 dark:hover:text-gray-300 text-[10px] px-2 py-1 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors"
+              className="text-gray-400 hover:text-gray-600 dark:hover:text-gray-300 text-[10px] px-2 py-1 rounded-lg hover:bg-black/5 dark:hover:bg-white/5 transition-colors"
             >
               {t('chat.clear')}
             </button>
@@ -1116,21 +1124,11 @@ function AIChat({ isFullPage = false, onClose }) {
           {!isFullPage && (
             <button
               onClick={() => navigate('/chat')}
-              className="text-gray-400 hover:text-gray-600 dark:hover:text-gray-300 w-6 h-6 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-800 flex items-center justify-center transition-colors"
+              className="text-gray-400 hover:text-gray-600 dark:hover:text-gray-300 w-6 h-6 rounded-lg hover:bg-black/5 dark:hover:bg-white/5 flex items-center justify-center transition-colors"
               title="Open full page"
             >
               <svg className="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 8V4m0 0h4M4 4l5 5m11-1V4m0 0h-4m4 0l-5 5M4 16v4m0 0h4m-4 0l5-5m11 5l-5-5m5 5v-4m0 4h-4" />
-              </svg>
-            </button>
-          )}
-          {onClose && (
-            <button
-              onClick={onClose}
-              className="text-gray-400 hover:text-gray-600 dark:hover:text-gray-300 w-6 h-6 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-800 flex items-center justify-center transition-colors"
-            >
-              <svg className="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
               </svg>
             </button>
           )}
@@ -1139,14 +1137,21 @@ function AIChat({ isFullPage = false, onClose }) {
 
       {/* ── Quick action chips ── */}
       {user && (
-        <div className="flex gap-1.5 px-3 py-2 border-b border-gray-100 dark:border-gray-800 overflow-x-auto no-scrollbar">
+        <div className={`flex gap-1.5 px-3 py-2 shrink-0 border-b overflow-x-auto no-scrollbar ${
+          isFloat
+            ? 'bg-white/10 dark:bg-black/10 border-white/15 dark:border-white/6'
+            : 'bg-white dark:bg-gray-950 border-gray-100 dark:border-gray-800'
+        }`}>
           {QUICK_CHIPS.map(chip => (
             chip.id === 'brief' ? (
-              // Brief chip sends immediately — no form
               <button
                 key={chip.id}
                 onClick={handleBriefChip}
-                className={`flex items-center gap-1 px-2.5 py-1 rounded-full border text-[10px] font-semibold whitespace-nowrap transition-all flex-shrink-0 bg-white dark:bg-gray-900 ${chip.color}`}
+                className={`flex items-center gap-1 px-2.5 py-1 rounded-full border text-[10px] font-semibold whitespace-nowrap transition-all flex-shrink-0 ${
+                  isFloat
+                    ? 'bg-white/30 dark:bg-white/8 border-white/40 dark:border-white/12'
+                    : 'bg-white dark:bg-gray-900'
+                } ${chip.color}`}
               >
                 <span>{chip.icon}</span>
                 <span>{chip.label}</span>
@@ -1158,7 +1163,7 @@ function AIChat({ isFullPage = false, onClose }) {
                 className={`flex items-center gap-1 px-2.5 py-1 rounded-full border text-[10px] font-semibold whitespace-nowrap transition-all flex-shrink-0 ${
                   activeForm === chip.id
                     ? 'bg-gray-900 dark:bg-white text-white dark:text-gray-900 border-gray-900 dark:border-white'
-                    : `bg-white dark:bg-gray-900 ${chip.color}`
+                    : `${isFloat ? 'bg-white/30 dark:bg-white/8 border-white/40 dark:border-white/12' : 'bg-white dark:bg-gray-900'} ${chip.color}`
                 }`}
               >
                 <span>{chip.icon}</span>
@@ -1171,83 +1176,93 @@ function AIChat({ isFullPage = false, onClose }) {
 
       {/* ── Messages area ── */}
       <div className="flex-1 relative overflow-hidden">
-        {/* Top fade edge */}
-        <div className="absolute top-0 left-0 right-0 h-5 bg-gradient-to-b from-gray-50 dark:from-gray-950 to-transparent z-10 pointer-events-none" />
-        {/* Bottom fade edge */}
-        <div className="absolute bottom-0 left-0 right-0 h-5 bg-gradient-to-t from-gray-50 dark:from-gray-950 to-transparent z-10 pointer-events-none" />
-      <div className="h-full overflow-y-auto no-scrollbar px-3 py-3 space-y-3 bg-gray-50 dark:bg-gray-950">
+        <div className={`absolute top-0 left-0 right-0 h-6 bg-gradient-to-b ${isFloat ? 'from-white/0' : 'from-white/80 dark:from-gray-950/80'} to-transparent z-10 pointer-events-none`} />
+        <div className={`absolute bottom-0 left-0 right-0 h-6 bg-gradient-to-t ${isFloat ? 'from-white/0' : 'from-white/80 dark:from-gray-950/80'} to-transparent z-10 pointer-events-none`} />
+        <div className="h-full overflow-y-auto no-scrollbar px-3 py-3 space-y-3">
 
-        {/* Empty state */}
-        {messages.length === 0 && !activeForm && (
-          <div className="flex flex-col items-center pt-4 pb-2">
-            <TradeoLogo size={42} />
-            <p className="text-gray-900 dark:text-white text-sm font-semibold mt-3 mb-1">{t('chat.greeting')}</p>
-            <p className="text-gray-400 text-[11px] text-center max-w-[200px] leading-relaxed mb-4">{t('chat.greetingSub')}</p>
-            <div className="w-full grid grid-cols-2 gap-1.5">
-              {(suggestions.length > 0
-                ? suggestions.slice(0, 8).map((s, i) => ({ icon: PRESET_PROMPTS[i]?.icon || '💬', text: s }))
-                : PRESET_PROMPTS
-              ).map((p, i) => (
-                <button
-                  key={i}
-                  onClick={() => handleSend(p.text)}
-                  className="flex items-start gap-1.5 bg-white dark:bg-gray-900 hover:bg-blue-50 dark:hover:bg-gray-800 border border-gray-100 dark:border-gray-800 hover:border-blue-200 dark:hover:border-gray-700 rounded-xl px-2.5 py-2 text-left transition-all group"
-                >
-                  <span className="text-sm leading-none mt-0.5">{p.icon}</span>
-                  <span className="text-[10px] text-gray-500 dark:text-gray-400 group-hover:text-blue-600 dark:group-hover:text-gray-200 leading-snug">{p.text}</span>
-                </button>
-              ))}
-            </div>
-          </div>
-        )}
-
-        {/* Quick form in empty state */}
-        {activeForm && messages.length === 0 && (
-          <QuickForm type={activeForm} onSubmit={handleSend} onCancel={() => setActiveForm(null)} />
-        )}
-
-        {/* Messages */}
-        {messages.map((msg, i) => renderMessage(msg, i))}
-
-        {/* Quick form after messages */}
-        {activeForm && messages.length > 0 && (
-          <QuickForm type={activeForm} onSubmit={handleSend} onCancel={() => setActiveForm(null)} />
-        )}
-
-        {/* Journal draft card */}
-        {journalDraft && (
-          <JournalDraftCard
-            draft={journalDraft}
-            onSave={handleJournalSave}
-            onDiscard={() => { setJournalDraft(null); setLastAction(null) }}
-          />
-        )}
-
-        {/* Discipline nudge card */}
-        {disciplineNudge !== null && (
-          <DisciplineNudgeCard score={disciplineNudge} onDismiss={() => setDisciplineNudge(null)} />
-        )}
-
-        {/* Loading indicator */}
-        {loading && (
-          <div className="flex justify-start gap-1.5 animate-fade-up">
-            <div className="flex-shrink-0 mt-0.5"><TradeoLogo size={20} /></div>
-            <div className="bg-white dark:bg-gray-900 border border-gray-100 dark:border-gray-800 px-3 py-2.5 rounded-2xl rounded-tl-sm shadow-sm">
-              <div className="flex gap-1 items-center">
-                <div className="w-1.5 h-1.5 bg-green-400 rounded-full animate-soft-bounce" style={{ animationDelay: '0ms' }} />
-                <div className="w-1.5 h-1.5 bg-green-400 rounded-full animate-soft-bounce" style={{ animationDelay: '200ms' }} />
-                <div className="w-1.5 h-1.5 bg-green-400 rounded-full animate-soft-bounce" style={{ animationDelay: '400ms' }} />
+          {/* Empty state */}
+          {messages.length === 0 && !activeForm && (
+            <div className="flex flex-col items-center pt-4 pb-2">
+              <TradeoLogo size={42} />
+              <p className="text-gray-900 dark:text-white text-sm font-semibold mt-3 mb-1 drop-shadow-sm">{t('chat.greeting')}</p>
+              <p className="text-gray-500 dark:text-gray-300 text-[11px] text-center max-w-[200px] leading-relaxed mb-4">{t('chat.greetingSub')}</p>
+              <div className="w-full grid grid-cols-2 gap-1.5">
+                {(suggestions.length > 0
+                  ? suggestions.slice(0, 8).map((s, i) => ({ icon: PRESET_PROMPTS[i]?.icon || '💬', text: s }))
+                  : PRESET_PROMPTS
+                ).map((p, i) => (
+                  <button
+                    key={i}
+                    onClick={() => handleSend(p.text)}
+                    className={`flex items-start gap-1.5 rounded-xl px-2.5 py-2 text-left transition-all group border ${
+                      isFloat
+                        ? 'bg-white/25 dark:bg-white/6 border-white/40 dark:border-white/10 hover:bg-white/45 dark:hover:bg-white/12 backdrop-blur-sm'
+                        : 'bg-white dark:bg-gray-900 border-gray-100 dark:border-gray-800 hover:bg-blue-50 dark:hover:bg-gray-800 hover:border-blue-200 dark:hover:border-gray-700'
+                    }`}
+                  >
+                    <span className="text-sm leading-none mt-0.5">{p.icon}</span>
+                    <span className="text-[10px] text-gray-500 dark:text-gray-400 group-hover:text-blue-600 dark:group-hover:text-gray-200 leading-snug">{p.text}</span>
+                  </button>
+                ))}
               </div>
             </div>
-          </div>
-        )}
+          )}
 
-        <div ref={messagesEndRef} />
+          {/* Quick form in empty state */}
+          {activeForm && messages.length === 0 && (
+            <QuickForm type={activeForm} onSubmit={handleSend} onCancel={() => setActiveForm(null)} />
+          )}
+
+          {/* Messages */}
+          {messages.map((msg, i) => renderMessage(msg, i))}
+
+          {/* Quick form after messages */}
+          {activeForm && messages.length > 0 && (
+            <QuickForm type={activeForm} onSubmit={handleSend} onCancel={() => setActiveForm(null)} />
+          )}
+
+          {/* Journal draft card */}
+          {journalDraft && (
+            <JournalDraftCard
+              draft={journalDraft}
+              onSave={handleJournalSave}
+              onDiscard={() => { setJournalDraft(null); setLastAction(null) }}
+            />
+          )}
+
+          {/* Discipline nudge card */}
+          {disciplineNudge !== null && (
+            <DisciplineNudgeCard score={disciplineNudge} onDismiss={() => setDisciplineNudge(null)} />
+          )}
+
+          {/* Loading indicator */}
+          {loading && (
+            <div className="flex justify-start gap-1.5 animate-fade-up">
+              <div className="flex-shrink-0 mt-0.5"><TradeoLogo size={20} /></div>
+              <div className={`px-3 py-2.5 rounded-2xl rounded-tl-sm shadow-sm ${
+                isFloat
+                  ? 'bg-white/40 dark:bg-white/8 border border-white/40 dark:border-white/12 backdrop-blur-sm'
+                  : 'bg-white dark:bg-gray-900 border border-gray-100 dark:border-gray-800'
+              }`}>
+                <div className="flex gap-1 items-center">
+                  <div className="w-1.5 h-1.5 bg-green-400 rounded-full animate-soft-bounce" style={{ animationDelay: '0ms' }} />
+                  <div className="w-1.5 h-1.5 bg-green-400 rounded-full animate-soft-bounce" style={{ animationDelay: '200ms' }} />
+                  <div className="w-1.5 h-1.5 bg-green-400 rounded-full animate-soft-bounce" style={{ animationDelay: '400ms' }} />
+                </div>
+              </div>
+            </div>
+          )}
+
+          <div ref={messagesEndRef} />
+        </div>
       </div>
-      </div>{/* end outer relative wrapper */}
 
       {/* ── Input bar ── */}
-      <div className="px-3 py-2.5 border-t border-gray-100 dark:border-gray-800 bg-white dark:bg-gray-950">
+      <div className={`px-3 py-2.5 shrink-0 border-t ${
+        isFloat
+          ? 'bg-white/15 dark:bg-black/15 border-white/20 dark:border-white/8'
+          : 'bg-white dark:bg-gray-950 border-gray-100 dark:border-gray-800'
+      }`}>
         {!user ? (
           <button
             onClick={() => navigate('/login')}
@@ -1264,12 +1279,16 @@ function AIChat({ isFullPage = false, onClose }) {
               onKeyDown={handleKeyDown}
               placeholder={t('chat.placeholder')}
               rows={1}
-              className="flex-1 bg-gray-50 dark:bg-gray-900 border border-gray-200 dark:border-gray-800 focus:border-green-400 dark:focus:border-green-600 text-gray-800 dark:text-gray-200 placeholder-gray-400 dark:placeholder-gray-600 rounded-xl px-3 py-2 text-xs focus:outline-none resize-none transition-colors"
+              className={`flex-1 border focus:border-green-400 dark:focus:border-green-500 text-gray-800 dark:text-gray-100 placeholder-gray-400 dark:placeholder-gray-500 rounded-xl px-3 py-2 text-xs focus:outline-none resize-none transition-colors ${
+                isFloat
+                  ? 'bg-white/40 dark:bg-white/10 border-white/50 dark:border-white/15 backdrop-blur-sm'
+                  : 'bg-gray-50 dark:bg-gray-900 border-gray-200 dark:border-gray-800'
+              }`}
             />
             <button
               onClick={() => handleSend()}
               disabled={loading || !input.trim()}
-              className="bg-green-500 hover:bg-green-400 disabled:opacity-30 text-white w-8 h-8 rounded-xl flex items-center justify-center flex-shrink-0 transition-colors"
+              className="bg-green-500 hover:bg-green-400 disabled:opacity-30 text-white w-8 h-8 rounded-xl flex items-center justify-center flex-shrink-0 transition-colors shadow-sm"
             >
               <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M12 19l9 2-9-18-9 18 9-2zm0 0v-8" />

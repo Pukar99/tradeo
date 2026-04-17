@@ -136,7 +136,7 @@ function Navbar() {
   const firstName = displayName.split(/\s+/)[0]
 
   return (
-    <nav className="bg-white dark:bg-gray-950 border-b border-gray-200 dark:border-gray-800 px-4 lg:px-6 py-0 flex justify-between items-center sticky top-0 z-40 shadow-sm">
+    <nav className="glass-bar px-4 lg:px-6 py-0 flex justify-between items-center sticky top-0 z-40">
 
       {/* ── Left: Logo + Desktop nav links ─────────────────────────────────── */}
       <div className="flex items-center gap-6">
