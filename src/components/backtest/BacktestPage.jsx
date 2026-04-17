@@ -33,27 +33,6 @@ export default function BacktestPage() {
   // Load session on mount (restore if active)
   useEffect(() => { loadSession() }, [loadSession])
 
-  // Keyboard shortcuts: Space = play/pause, → = step forward, ← = step back
-  useEffect(() => {
-    if (!session) return
-    const h = e => {
-      // Don't fire if user is typing in an input/textarea
-      if (['INPUT', 'TEXTAREA', 'SELECT'].includes(e.target.tagName)) return
-      if (e.key === ' ') {
-        e.preventDefault()
-        isPlaying ? handlePause() : handlePlay()
-      } else if (e.key === 'ArrowRight') {
-        e.preventDefault()
-        handleStep()
-      } else if (e.key === 'ArrowLeft') {
-        e.preventDefault()
-        handleStepBack()
-      }
-    }
-    window.addEventListener('keydown', h)
-    return () => window.removeEventListener('keydown', h)
-  }, [session, isPlaying, handlePlay, handlePause, handleStep, handleStepBack])
-
   const currentCandle = candles[cursorIndex] || null
 
   // ── SL/TP Breach handlers ─────────────────────────────────────────────────────
@@ -148,6 +127,26 @@ export default function BacktestPage() {
     handlePause()
     setShowReport(true)
   }, [handlePause])
+
+  // ── Keyboard shortcuts (must be after all handlers) ───────────────────────────
+  useEffect(() => {
+    if (!session) return
+    const h = e => {
+      if (['INPUT', 'TEXTAREA', 'SELECT'].includes(e.target.tagName)) return
+      if (e.key === ' ') {
+        e.preventDefault()
+        isPlaying ? handlePause() : handlePlay()
+      } else if (e.key === 'ArrowRight') {
+        e.preventDefault()
+        handleStep()
+      } else if (e.key === 'ArrowLeft') {
+        e.preventDefault()
+        handleStepBack()
+      }
+    }
+    window.addEventListener('keydown', h)
+    return () => window.removeEventListener('keydown', h)
+  }, [session, isPlaying, handlePlay, handlePause, handleStep, handleStepBack])
 
   // ── Render states ─────────────────────────────────────────────────────────────
 
