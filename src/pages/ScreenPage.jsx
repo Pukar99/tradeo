@@ -37,8 +37,17 @@ function ComplexContent({ activeTab }) {
 }
 
 function ScreenInner() {
-  const [mode,       setMode]       = useState('simple')
-  const [complexTab, setComplexTab] = useState('Backtesting')
+  const [mode,       setMode]       = useState(() => sessionStorage.getItem('screen_mode')       || 'simple')
+  const [complexTab, setComplexTab] = useState(() => sessionStorage.getItem('screen_complexTab') || 'Backtesting')
+
+  const handleMode = (m) => {
+    setMode(m)
+    sessionStorage.setItem('screen_mode', m)
+  }
+  const handleComplexTab = (t) => {
+    setComplexTab(t)
+    sessionStorage.setItem('screen_complexTab', t)
+  }
 
   return (
     <div className="flex flex-col h-[calc(100vh-56px)] overflow-hidden bg-white dark:bg-gray-950">
@@ -50,7 +59,7 @@ function ScreenInner() {
           {/* Simple / Complex toggle */}
           <div className="flex items-center bg-gray-100 dark:bg-gray-800 rounded-lg p-0.5">
             {['simple', 'complex'].map(m => (
-              <button key={m} onClick={() => setMode(m)}
+              <button key={m} onClick={() => handleMode(m)}
                 className={`px-2.5 py-0.5 rounded-md text-[9px] font-semibold capitalize transition-colors ${
                   mode === m
                     ? 'bg-white dark:bg-gray-700 text-gray-900 dark:text-white shadow-sm'
@@ -65,7 +74,7 @@ function ScreenInner() {
           {mode === 'complex' && (
             <div className="flex items-center bg-gray-100 dark:bg-gray-800 rounded-lg p-0.5">
               {COMPLEX_TABS.map(t => (
-                <button key={t.id} onClick={() => setComplexTab(t.id)}
+                <button key={t.id} onClick={() => handleComplexTab(t.id)}
                   className={`px-2.5 py-0.5 rounded-md text-[9px] font-semibold transition-colors ${
                     complexTab === t.id
                       ? 'bg-white dark:bg-gray-700 text-gray-900 dark:text-white shadow-sm'

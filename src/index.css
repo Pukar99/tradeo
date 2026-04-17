@@ -54,6 +54,126 @@ html {
   display: none;
 }
 
+/* ─────────────────────────────────────────────────────────────────────────
+   LIQUID GLASS — Apple-style frosted glass utility system
+   Uses backdrop-filter: blur + translucent fill + inner-border highlight
+   Safe: only applies visual texture, never touches layout or text colour
+   ───────────────────────────────────────────────────────────────────────── */
+
+/* Core glass surface */
+.glass {
+  background:    rgba(255, 255, 255, 0.72);
+  backdrop-filter: blur(20px) saturate(180%);
+  -webkit-backdrop-filter: blur(20px) saturate(180%);
+  border: 1px solid rgba(255, 255, 255, 0.55);
+  box-shadow:
+    0 8px 32px rgba(0, 0, 0, 0.08),
+    inset 0 1px 0 rgba(255, 255, 255, 0.9),
+    inset 0 -1px 0 rgba(0, 0, 0, 0.04);
+}
+.dark .glass {
+  background:    rgba(15, 23, 42, 0.70);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  box-shadow:
+    0 8px 32px rgba(0, 0, 0, 0.40),
+    inset 0 1px 0 rgba(255, 255, 255, 0.07),
+    inset 0 -1px 0 rgba(0, 0, 0, 0.20);
+}
+
+/* Stronger glass for floating panels (chatbot, modals) */
+.glass-panel {
+  background:    rgba(255, 255, 255, 0.82);
+  backdrop-filter: blur(28px) saturate(200%);
+  -webkit-backdrop-filter: blur(28px) saturate(200%);
+  border: 1px solid rgba(255, 255, 255, 0.65);
+  box-shadow:
+    0 20px 60px rgba(0, 0, 0, 0.12),
+    0 4px 16px  rgba(0, 0, 0, 0.06),
+    inset 0 1.5px 0 rgba(255, 255, 255, 0.95),
+    inset 0 -1px 0 rgba(0, 0, 0, 0.05);
+}
+.dark .glass-panel {
+  background:    rgba(10, 15, 30, 0.78);
+  border: 1px solid rgba(255, 255, 255, 0.10);
+  box-shadow:
+    0 20px 60px rgba(0, 0, 0, 0.55),
+    0 4px 16px  rgba(0, 0, 0, 0.30),
+    inset 0 1.5px 0 rgba(255, 255, 255, 0.09),
+    inset 0 -1px 0 rgba(0, 0, 0, 0.30);
+}
+
+/* Light glass for navbar / sticky bars */
+.glass-bar {
+  background:    rgba(255, 255, 255, 0.80);
+  backdrop-filter: blur(16px) saturate(160%);
+  -webkit-backdrop-filter: blur(16px) saturate(160%);
+  border-bottom: 1px solid rgba(0, 0, 0, 0.07);
+  box-shadow:
+    0 1px 12px rgba(0, 0, 0, 0.06),
+    inset 0 1px 0 rgba(255, 255, 255, 0.80);
+}
+.dark .glass-bar {
+  background:    rgba(10, 15, 30, 0.82);
+  border-bottom: 1px solid rgba(255, 255, 255, 0.07);
+  box-shadow:
+    0 1px 12px rgba(0, 0, 0, 0.40),
+    inset 0 1px 0 rgba(255, 255, 255, 0.05);
+}
+
+/* Subtle glass for cards / inner surfaces */
+.glass-card {
+  background:    rgba(255, 255, 255, 0.60);
+  backdrop-filter: blur(12px) saturate(150%);
+  -webkit-backdrop-filter: blur(12px) saturate(150%);
+  border: 1px solid rgba(255, 255, 255, 0.50);
+  box-shadow:
+    0 4px 16px rgba(0, 0, 0, 0.06),
+    inset 0 1px 0 rgba(255, 255, 255, 0.80);
+}
+.dark .glass-card {
+  background:    rgba(30, 41, 59, 0.55);
+  border: 1px solid rgba(255, 255, 255, 0.06);
+  box-shadow:
+    0 4px 16px rgba(0, 0, 0, 0.30),
+    inset 0 1px 0 rgba(255, 255, 255, 0.05);
+}
+
+/* FAB / pill buttons */
+.glass-fab {
+  background:    rgba(255, 255, 255, 0.85);
+  backdrop-filter: blur(20px) saturate(180%);
+  -webkit-backdrop-filter: blur(20px) saturate(180%);
+  border: 1px solid rgba(255, 255, 255, 0.70);
+  box-shadow:
+    0 8px 24px rgba(0, 0, 0, 0.12),
+    0 2px 6px  rgba(0, 0, 0, 0.06),
+    inset 0 1.5px 0 rgba(255, 255, 255, 1),
+    inset 0 -1px 0 rgba(0, 0, 0, 0.06);
+}
+.dark .glass-fab {
+  background:    rgba(15, 23, 42, 0.80);
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  box-shadow:
+    0 8px 24px rgba(0, 0, 0, 0.50),
+    0 2px 6px  rgba(0, 0, 0, 0.25),
+    inset 0 1.5px 0 rgba(255, 255, 255, 0.10),
+    inset 0 -1px 0 rgba(0, 0, 0, 0.30);
+}
+
+/* Liquid shimmer highlight on hover */
+.glass-fab:hover, .glass:hover {
+  box-shadow:
+    0 12px 40px rgba(0, 0, 0, 0.14),
+    inset 0 1.5px 0 rgba(255, 255, 255, 1),
+    inset 0 -1px 0 rgba(0, 0, 0, 0.05);
+}
+.dark .glass-fab:hover, .dark .glass:hover {
+  box-shadow:
+    0 12px 40px rgba(0, 0, 0, 0.60),
+    inset 0 1.5px 0 rgba(255, 255, 255, 0.13),
+    inset 0 -1px 0 rgba(0, 0, 0, 0.35);
+}
+
 /* keep .no-scrollbar for explicit use */
 .no-scrollbar {
   -ms-overflow-style: none;
@@ -61,6 +181,58 @@ html {
 }
 .no-scrollbar::-webkit-scrollbar {
   display: none;
+}
+
+/* ── Auto-apply glass to modal surfaces ────────────────────────────────────
+   Targets the common pattern: bg-white dark:bg-gray-900 rounded-2xl shadow-2xl
+   inside a fixed overlay. We scope to .fixed > .relative or direct modal divs.
+   This avoids editing every modal individually while keeping the effect precise.
+   ─────────────────────────────────────────────────────────────────────────── */
+
+/* Modal backdrops — light tinted blur */
+.fixed.inset-0[style*="rgba(0,0,0"] > div:not([class*="absolute"]):first-child,
+.fixed.inset-0 > .absolute.inset-0 {
+  backdrop-filter: blur(4px);
+  -webkit-backdrop-filter: blur(4px);
+}
+
+/* Modal card surfaces — glass-panel treatment */
+.fixed.inset-0 > .relative.bg-white,
+.fixed.inset-0 > .relative.dark\:bg-gray-900,
+.fixed.inset-0 > div > .relative.bg-white,
+.fixed.inset-0 > div > .relative.dark\:bg-gray-900 {
+  background:    rgba(255, 255, 255, 0.88) !important;
+  backdrop-filter: blur(24px) saturate(180%) !important;
+  -webkit-backdrop-filter: blur(24px) saturate(180%) !important;
+  border: 1px solid rgba(255, 255, 255, 0.60) !important;
+  box-shadow:
+    0 24px 64px rgba(0, 0, 0, 0.14),
+    0 4px 16px  rgba(0, 0, 0, 0.07),
+    inset 0 1.5px 0 rgba(255, 255, 255, 0.95) !important;
+}
+.dark .fixed.inset-0 > .relative,
+.dark .fixed.inset-0 > div > .relative {
+  background:    rgba(10, 15, 30, 0.82) !important;
+  border: 1px solid rgba(255, 255, 255, 0.09) !important;
+  box-shadow:
+    0 24px 64px rgba(0, 0, 0, 0.55),
+    0 4px 16px  rgba(0, 0, 0, 0.28),
+    inset 0 1.5px 0 rgba(255, 255, 255, 0.08) !important;
+}
+
+/* bg-white rounded-xl shadow-2xl pattern (backtest modals, simpler) */
+.fixed.inset-0 > div > .bg-white.rounded-xl,
+.fixed.inset-0 > .bg-white.rounded-xl {
+  background:    rgba(255, 255, 255, 0.88) !important;
+  backdrop-filter: blur(24px) saturate(180%) !important;
+  -webkit-backdrop-filter: blur(24px) saturate(180%) !important;
+  border: 1px solid rgba(255, 255, 255, 0.60) !important;
+  box-shadow: 0 20px 60px rgba(0, 0, 0, 0.14), inset 0 1px 0 rgba(255,255,255,0.9) !important;
+}
+.dark .fixed.inset-0 > div > .bg-white.rounded-xl,
+.dark .fixed.inset-0 > .bg-white.rounded-xl {
+  background: rgba(10, 15, 30, 0.82) !important;
+  border: 1px solid rgba(255, 255, 255, 0.09) !important;
 }
 
 /* ── Smooth fade-in for cards / messages ─────────────────────────────────── */

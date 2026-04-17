@@ -8,7 +8,7 @@ export const translations = {
   en: {
     // Nav
     nav: {
-      home: 'Home', analysis: 'Analysis', trader: 'Trader',
+      home: 'Home', analysis: 'Screen', trader: 'Logs',
       portfolio: 'Portfolio', research: 'Research', risklab: 'Risk Lab',
       login: 'Login', getStarted: 'Get Started',
       dashboard: 'Dashboard', profile: 'Profile', aiChat: 'AI Chat',
@@ -105,7 +105,7 @@ export const translations = {
   ne: {
     // Nav
     nav: {
-      home: 'होमपेज', analysis: 'विश्लेषण', trader: 'ट्रेडर',
+      home: 'होमपेज', analysis: 'स्क्रिन', trader: 'लग्स',
       portfolio: 'पोर्टफोलियो', research: 'रिसर्च', risklab: 'Risk Lab',
       login: 'लगइन', getStarted: 'सुरु गर्नुस्',
       dashboard: 'ड्यासबोर्ड', profile: 'प्रोफाइल', aiChat: 'AI च्याट',
