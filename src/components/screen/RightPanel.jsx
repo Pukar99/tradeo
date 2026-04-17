@@ -369,12 +369,14 @@ export default function RightPanel() {
           </div>
         )}
 
-        <button
-          onClick={() => setShowExplore(true)}
-          className="w-full mt-2 py-1.5 rounded-xl border border-gray-200 dark:border-gray-700 text-[9px] font-semibold text-gray-500 dark:text-gray-400 hover:border-blue-300 hover:text-blue-500 transition-colors flex items-center justify-center gap-1"
-        >
-          <span>🔗</span> Explore All
-        </button>
+        {!feedErr && feedItems.length > 0 && (
+          <button
+            onClick={() => setShowExplore(true)}
+            className="w-full mt-2 py-1.5 rounded-xl border border-gray-200 dark:border-gray-700 text-[9px] font-semibold text-gray-500 dark:text-gray-400 hover:border-blue-300 hover:text-blue-500 transition-colors flex items-center justify-center gap-1"
+          >
+            <span>🔗</span> Explore All ({feedItems.length})
+          </button>
+        )}
       </div>
 
       {/* ── Explore Modal ─────────────────────────────────────────────────── */}
