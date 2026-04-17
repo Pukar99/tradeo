@@ -20,13 +20,15 @@ function fmtVol(n) {
 export default function BacktestChart({ candles, cursorIndex, positions }) {
   const { isDark } = useTheme()
 
-  const containerRef  = useRef(null)
-  const chartRef      = useRef(null)
-  const candleSerRef  = useRef(null)
-  const volSerRef     = useRef(null)
-  const overlayRefs   = useRef({})   // { [orderId]: { entry, sl, tp } }
-  const markerSerRef  = useRef(null) // for entry/exit arrow markers
-  const roRef         = useRef(null)
+  const containerRef    = useRef(null)
+  const chartRef        = useRef(null)
+  const candleSerRef    = useRef(null)
+  const volSerRef       = useRef(null)
+  const overlayRefs     = useRef({})   // { [orderId]: { entry, sl, tp } }
+  const markerSerRef    = useRef(null) // for entry/exit arrow markers
+  const roRef           = useRef(null)
+  // Track whether the user has manually panned away from the live edge
+  const userPannedRef   = useRef(false)
 
   // Always-fresh refs so async callbacks never close over stale values
   const candlesRef   = useRef(candles)
@@ -52,7 +54,10 @@ export default function BacktestChart({ candles, cursorIndex, positions }) {
     }))
     candleSerRef.current.setData(candleData)
     if (volSerRef.current) volSerRef.current.setData(volData)
-    if (chartRef.current) chartRef.current.timeScale().scrollToPosition(3, false)
+    // Only auto-scroll to the live edge when the user hasn't manually panned
+    if (chartRef.current && !userPannedRef.current) {
+      chartRef.current.timeScale().scrollToPosition(3, false)
+    }
     // Update HUD to show the current candle
     const cur = slice[slice.length - 1]
     if (cur) setHud(cur)
@@ -180,6 +185,16 @@ export default function BacktestChart({ candles, cursorIndex, positions }) {
         const cdls = candlesRef.current
         const c    = cdls.find(x => x.date === param.time)
         if (c) setHud(c)
+      })
+
+      // Detect user pan: if the visible range's right edge is not near the
+      // last bar, the user has scrolled away — stop auto-following
+      chart.timeScale().subscribeVisibleLogicalRangeChange(range => {
+        if (!range) return
+        const totalBars = candlesRef.current.length
+        // "near edge" means right side is within 8 bars of the last painted bar
+        const nearEdge = range.to >= totalBars - 8
+        userPannedRef.current = !nearEdge
       })
 
       // Paint whatever is already loaded
