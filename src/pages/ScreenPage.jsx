@@ -8,11 +8,6 @@ import RightPanel                 from '../components/screen/RightPanel'
 import BacktestPage               from '../components/backtest/BacktestPage'
 import InsightPage                from '../components/complex/InsightPage'
 import BreakdownPage              from '../components/complex/BreakdownPage'
-import TradeBehaviorPage          from '../components/complex/TradeBehaviorPage'
-import MarketRegimePage           from '../components/complex/MarketRegimePage'
-import SwingStructurePage         from '../components/complex/SwingStructurePage'
-import VolatilityMapPage          from '../components/complex/VolatilityMapPage'
-import SmartScreenerPage          from '../components/complex/SmartScreenerPage'
 
 const COMPLEX_TABS = [
   { id: 'Backtesting', label: 'Backtesting' },
@@ -21,14 +16,9 @@ const COMPLEX_TABS = [
 ]
 
 function ComplexContent({ activeTab }) {
-  if (activeTab === 'Backtesting')    return <BacktestPage />
-  if (activeTab === 'Insight')        return <InsightPage />
-  if (activeTab === 'Breakdown')      return <BreakdownPage />
-  if (activeTab === 'TradeBehavior')  return <TradeBehaviorPage />
-  if (activeTab === 'MarketRegime')   return <MarketRegimePage />
-  if (activeTab === 'SwingStructure') return <SwingStructurePage />
-  if (activeTab === 'Volatility')     return <VolatilityMapPage />
-  if (activeTab === 'Screener')       return <SmartScreenerPage />
+  if (activeTab === 'Backtesting') return <BacktestPage />
+  if (activeTab === 'Insight')     return <InsightPage />
+  if (activeTab === 'Breakdown')   return <BreakdownPage />
   return (
     <div className="flex-1 flex items-center justify-center text-[12px] text-gray-400">
       {activeTab} — coming soon

@@ -809,7 +809,7 @@ export default function StockChart() {
         <ChartSkeleton />
       ) : (
         <>
-          <div ref={mainRef} style={{ height: `${mainPct}%`, paddingTop: '2px', boxSizing: 'border-box' }} className="w-full" />
+          <div ref={mainRef} style={{ height: `${mainPct}%`, paddingTop: '34px', boxSizing: 'border-box' }} className="w-full" />
 
           {showRSI && (
             <div className="w-full border-t border-gray-100 dark:border-gray-800 shrink-0">

@@ -230,12 +230,13 @@ export default function LeftPanel() {
   const [positions, setPositions] = useState([])
   const [watchlist, setWatchlist] = useState([])
   const [tab,       setTab]       = useState('portfolio')
+  const [watchErr,  setWatchErr]  = useState(null)
 
   // Modal state
-  const [tradeModal,    setTradeModal]    = useState(null)
-  const [closeTarget,   setCloseTarget]   = useState(null)
+  const [tradeModal,     setTradeModal]     = useState(null)
+  const [closeTarget,    setCloseTarget]    = useState(null)
   const [alertPositions, setAlertPositions] = useState([])
-  const [editWatchItem, setEditWatchItem] = useState(null)
+  const [editWatchItem,  setEditWatchItem]  = useState(null)
 
   const loadData = useCallback(() => {
     getTradeLog()
@@ -352,8 +353,8 @@ export default function LeftPanel() {
                 <div className="text-[8px] text-gray-500 space-y-0.5" translate="no">
                   <div>Qty: <span className="text-gray-700 dark:text-gray-300 font-medium">{p.remaining_quantity ?? p.quantity}</span></div>
                   <div>Entry: <span className="text-blue-400 font-medium">{parseFloat(p.entry_price)?.toLocaleString()}</span></div>
-                  {p.sl && <div>SL: <span className="text-red-400 font-medium">{p.sl}</span></div>}
-                  {p.tp && <div>TP: <span className="text-emerald-500 font-medium">{p.tp}</span></div>}
+                  {p.sl && <div>SL: <span className="text-red-400 font-medium">{parseFloat(p.sl).toLocaleString()}</span></div>}
+                  {p.tp && <div>TP: <span className="text-emerald-500 font-medium">{parseFloat(p.tp).toLocaleString()}</span></div>}
                 </div>
                 {p.sl && p.tp && (
                   <div className="mt-1.5 h-1 rounded-full bg-gray-100 dark:bg-gray-800 overflow-hidden">
@@ -376,9 +377,15 @@ export default function LeftPanel() {
                 onContextMenu={onContextMenu([
                   { label: 'Edit', icon: '✏️', action: () => setEditWatchItem(w) },
                   { separator: true },
-                  { label: 'Delete', icon: '🗑️', danger: true, action: () =>
-                      removeFromWatchlist(w.id).then(() => setWatchlist(prev => prev.filter(x => x.id !== w.id)))
-                  },
+                  { label: 'Delete', icon: '🗑️', danger: true, action: async () => {
+                    try {
+                      await removeFromWatchlist(w.id)
+                      setWatchlist(prev => prev.filter(x => x.id !== w.id))
+                      setWatchErr(null)
+                    } catch {
+                      setWatchErr('Failed to remove from watchlist')
+                    }
+                  }},
                 ])}
                 className={`cursor-pointer rounded-xl px-2 py-2 transition-all border ${
                   selectedSymbol === w.symbol
@@ -407,7 +414,7 @@ export default function LeftPanel() {
       </div>
 
       {/* ── Bottom half: BUY/SELL + Alerts ──────────────────────────── */}
-      <div className="h-1/2 flex flex-col justify-center gap-2 px-2 py-3">
+      <div className="h-1/2 flex flex-col gap-2 px-2 py-3 min-h-0">
 
         {/* BUY / SELL */}
         <div className="grid grid-cols-2 gap-1 shrink-0">
@@ -435,9 +442,17 @@ export default function LeftPanel() {
           </button>
         </div>
 
+        {/* Watchlist error */}
+        {watchErr && (
+          <div className="flex items-center justify-between bg-red-50 dark:bg-red-950/40 border border-red-200 dark:border-red-900 rounded-lg px-2 py-1 shrink-0">
+            <p className="text-[8px] text-red-500">{watchErr}</p>
+            <button onClick={() => setWatchErr(null)} className="text-red-400 text-[10px] leading-none">×</button>
+          </div>
+        )}
+
         {/* SL/TP Alerts */}
-        {alertPositions.length > 0 && (
-          <div className="overflow-y-auto space-y-1.5">
+        {alertPositions.length > 0 ? (
+          <div className="flex-1 overflow-y-auto min-h-0 space-y-1.5">
             {alertPositions.map((p, i) => (
               <div key={i} className="rounded-xl border border-orange-200 dark:border-orange-900 bg-orange-50 dark:bg-orange-950/30 px-2 py-1.5">
                 <div className="flex items-center justify-between mb-0.5">
@@ -458,10 +473,8 @@ export default function LeftPanel() {
               </div>
             ))}
           </div>
-        )}
-
-        {alertPositions.length === 0 && (
-          <p className="text-center text-[8px] text-gray-300 dark:text-gray-700">No SL/TP alerts</p>
+        ) : (
+          <p className="text-center text-[8px] text-gray-300 dark:text-gray-700 mt-auto">No SL/TP alerts</p>
         )}
       </div>
 
