@@ -1,4 +1,4 @@
-import { useState, useCallback, useEffect } from 'react'
+import { useState, useCallback, useEffect, useRef } from 'react'
 import { useBacktestSession } from '../../hooks/useBacktestSession'
 import { useBacktestEngine }  from '../../hooks/useBacktestEngine'
 import BacktestSetupPanel     from './BacktestSetupPanel'
@@ -32,6 +32,27 @@ export default function BacktestPage() {
 
   // Load session on mount (restore if active)
   useEffect(() => { loadSession() }, [loadSession])
+
+  // Keyboard shortcuts: Space = play/pause, → = step forward, ← = step back
+  useEffect(() => {
+    if (!session) return
+    const h = e => {
+      // Don't fire if user is typing in an input/textarea
+      if (['INPUT', 'TEXTAREA', 'SELECT'].includes(e.target.tagName)) return
+      if (e.key === ' ') {
+        e.preventDefault()
+        isPlaying ? handlePause() : handlePlay()
+      } else if (e.key === 'ArrowRight') {
+        e.preventDefault()
+        handleStep()
+      } else if (e.key === 'ArrowLeft') {
+        e.preventDefault()
+        handleStepBack()
+      }
+    }
+    window.addEventListener('keydown', h)
+    return () => window.removeEventListener('keydown', h)
+  }, [session, isPlaying, handlePlay, handlePause, handleStep, handleStepBack])
 
   const currentCandle = candles[cursorIndex] || null
 
@@ -81,6 +102,11 @@ export default function BacktestPage() {
     engine.stepForward()
   }, [engine])
 
+  const handleStepBack = useCallback(() => {
+    setIsPlaying(false)
+    engine.stepBack()
+  }, [engine])
+
   const handleSpeedChange = useCallback((s) => {
     setSpeedState(s)
     engine.setSpeed(s)
@@ -93,8 +119,11 @@ export default function BacktestPage() {
   }, [])
 
   // ── Full exit (from panel button) ─────────────────────────────────────────────
+  const [exitError, setExitError] = useState('')
+
   const handleFullExit = useCallback(async (order) => {
     if (!session || !currentCandle) return
+    setExitError('')
     try {
       const res = await btExitOrder(session.id, order.id, {
         exit_date:  currentCandle.date,
@@ -103,7 +132,9 @@ export default function BacktestPage() {
       })
       closePositionLocal(order.id, res.data)
       updateCapitalLocal(res.data.available_capital_after)
-    } catch {}
+    } catch (err) {
+      setExitError(err.response?.data?.message || 'Failed to exit position')
+    }
   }, [session, currentCandle, closePositionLocal, updateCapitalLocal])
 
   // ── Script switch ─────────────────────────────────────────────────────────────
@@ -142,7 +173,7 @@ export default function BacktestPage() {
     <div className="flex flex-1 overflow-hidden min-h-0">
 
       {/* LEFT PANEL */}
-      <div className="w-[220px] min-w-[200px] border-r border-gray-100 dark:border-gray-800 bg-white dark:bg-gray-900 flex flex-col shrink-0 overflow-hidden">
+      <div className="w-[260px] min-w-[240px] border-r border-gray-100 dark:border-gray-800 bg-white dark:bg-gray-900 flex flex-col shrink-0 overflow-hidden">
         {!session ? (
           <BacktestSetupPanel onSessionStarted={(sess, opts) => {
             onSessionStarted(sess)
@@ -193,10 +224,19 @@ export default function BacktestPage() {
             onPlay={handlePlay}
             onPause={handlePause}
             onStep={handleStep}
+            onStepBack={handleStepBack}
             onSpeedChange={handleSpeedChange}
           />
         )}
       </div>
+
+      {/* Exit error toast */}
+      {exitError && (
+        <div className="fixed bottom-4 right-4 z-50 bg-red-600 text-white text-[11px] font-semibold px-3 py-2 rounded-lg shadow-lg flex items-center gap-2">
+          <span>{exitError}</span>
+          <button onClick={() => setExitError('')} className="text-white/70 hover:text-white font-bold">×</button>
+        </div>
+      )}
 
       {/* MODALS */}
       {showBuy && session && currentScript && currentCandle && (

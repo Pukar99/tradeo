@@ -1,12 +1,20 @@
-import { useEffect, useRef } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { useTheme } from '../../context/ThemeContext'
 
 async function loadLC() { return import('lightweight-charts') }
 
-const COLORS = {
+const LINE_COLORS = {
   entry: '#3b82f6',
   sl:    '#ef4444',
   tp:    '#22c55e',
+}
+
+function fmt(n) { return n == null ? '—' : Number(n).toLocaleString('en-IN', { maximumFractionDigits: 2 }) }
+function fmtVol(n) {
+  if (n == null) return '—'
+  if (n >= 1_000_000) return (n / 1_000_000).toFixed(2) + 'M'
+  if (n >= 1_000)     return (n / 1_000).toFixed(1) + 'K'
+  return String(n)
 }
 
 export default function BacktestChart({ candles, cursorIndex, positions }) {
@@ -17,15 +25,21 @@ export default function BacktestChart({ candles, cursorIndex, positions }) {
   const candleSerRef  = useRef(null)
   const volSerRef     = useRef(null)
   const overlayRefs   = useRef({})   // { [orderId]: { entry, sl, tp } }
+  const markerSerRef  = useRef(null) // for entry/exit arrow markers
   const roRef         = useRef(null)
 
   // Always-fresh refs so async callbacks never close over stale values
   const candlesRef   = useRef(candles)
   const cursorRef    = useRef(cursorIndex)
   const isDarkRef    = useRef(isDark)
-  candlesRef.current = candles
-  cursorRef.current  = cursorIndex
-  isDarkRef.current  = isDark
+  const positionsRef = useRef(positions)
+  candlesRef.current   = candles
+  cursorRef.current    = cursorIndex
+  isDarkRef.current    = isDark
+  positionsRef.current = positions
+
+  // OHLCV HUD state (shown top-left)
+  const [hud, setHud] = useState(null)
 
   // ── Helpers ───────────────────────────────────────────────────────────────────
   function paintCandles(cdls, idx) {
@@ -39,6 +53,9 @@ export default function BacktestChart({ candles, cursorIndex, positions }) {
     candleSerRef.current.setData(candleData)
     if (volSerRef.current) volSerRef.current.setData(volData)
     if (chartRef.current) chartRef.current.timeScale().scrollToPosition(3, false)
+    // Update HUD to show the current candle
+    const cur = slice[slice.length - 1]
+    if (cur) setHud(cur)
   }
 
   function removeOverlays() {
@@ -48,6 +65,54 @@ export default function BacktestChart({ candles, cursorIndex, positions }) {
       })
     })
     overlayRefs.current = {}
+  }
+
+  // Build marker data for all positions (entry + exit arrows)
+  function buildMarkers(cdls, idx, pos) {
+    const markers = []
+    const visibleUntil = cdls[idx]?.date || ''
+
+    for (const p of pos) {
+      const entryDate = p.entry_date?.slice(0, 10)
+      if (!entryDate || entryDate > visibleUntil) continue
+
+      markers.push({
+        time:     entryDate,
+        position: 'belowBar',
+        color:    '#3b82f6',
+        shape:    'arrowUp',
+        text:     `BUY ${p.symbol} @${fmt(parseFloat(p.entry_price))}`,
+        size:     1,
+      })
+
+      if (p.status === 'CLOSED' && p.exit_date) {
+        const exitDate = p.exit_date.slice(0, 10)
+        if (exitDate <= visibleUntil) {
+          const pnl      = parseFloat(p.net_pnl) || 0
+          const isProfit = pnl >= 0
+          markers.push({
+            time:     exitDate,
+            position: 'aboveBar',
+            color:    isProfit ? '#22c55e' : '#ef4444',
+            shape:    'arrowDown',
+            text:     `EXIT ${p.symbol} ${isProfit ? '+' : ''}Rs.${fmt(pnl)}`,
+            size:     1,
+          })
+        }
+      }
+    }
+
+    // Sort by date (required by lightweight-charts)
+    markers.sort((a, b) => a.time.localeCompare(b.time))
+    return markers
+  }
+
+  function paintMarkers(cdls, idx, pos) {
+    if (!candleSerRef.current) return
+    const markers = buildMarkers(cdls, idx, pos)
+    try {
+      candleSerRef.current.setMarkers(markers)
+    } catch {}
   }
 
   // ── Init / re-init on theme change ───────────────────────────────────────────
@@ -62,13 +127,14 @@ export default function BacktestChart({ candles, cursorIndex, positions }) {
       if (chartRef.current) {
         roRef.current?.disconnect()
         chartRef.current.remove()
-        chartRef.current   = null
+        chartRef.current     = null
         candleSerRef.current = null
         volSerRef.current    = null
+        markerSerRef.current = null
         overlayRefs.current  = {}
       }
 
-      const el  = containerRef.current
+      const el   = containerRef.current
       const dark = isDarkRef.current
 
       const chart = LC.createChart(el, {
@@ -108,8 +174,17 @@ export default function BacktestChart({ candles, cursorIndex, positions }) {
       candleSerRef.current = candleSer
       volSerRef.current    = volSer
 
+      // Update HUD on crosshair move
+      chart.subscribeCrosshairMove(param => {
+        if (!param || !param.time) return
+        const cdls = candlesRef.current
+        const c    = cdls.find(x => x.date === param.time)
+        if (c) setHud(c)
+      })
+
       // Paint whatever is already loaded
       paintCandles(candlesRef.current, cursorRef.current)
+      paintMarkers(candlesRef.current, cursorRef.current, positionsRef.current || [])
 
       // Resize observer
       const ro = new ResizeObserver(() => {
@@ -132,6 +207,7 @@ export default function BacktestChart({ candles, cursorIndex, positions }) {
         chartRef.current     = null
         candleSerRef.current = null
         volSerRef.current    = null
+        markerSerRef.current = null
         overlayRefs.current  = {}
       }
     }
@@ -142,7 +218,7 @@ export default function BacktestChart({ candles, cursorIndex, positions }) {
     paintCandles(candles, cursorIndex)
   }, [candles, cursorIndex]) // eslint-disable-line react-hooks/exhaustive-deps
 
-  // ── Redraw overlays whenever positions / cursor change ────────────────────────
+  // ── Redraw overlays + markers whenever positions / cursor change ──────────────
   useEffect(() => {
     if (!chartRef.current || !candleSerRef.current) return
 
@@ -173,19 +249,47 @@ export default function BacktestChart({ candles, cursorIndex, positions }) {
       }
 
       const g = {}
-      g.entry = makeLine(ep, COLORS.entry + hex, 0)
-      if (sl !== null) g.sl = makeLine(sl, COLORS.sl + hex, 1)
-      if (tp !== null) g.tp = makeLine(tp, COLORS.tp + hex, 1)
+      g.entry = makeLine(ep, LINE_COLORS.entry + hex, 0)
+      if (sl !== null) g.sl = makeLine(sl, LINE_COLORS.sl + hex, 1)
+      if (tp !== null) g.tp = makeLine(tp, LINE_COLORS.tp + hex, 1)
 
       overlayRefs.current[pos.id] = g
     })
 
+    // Paint markers for ALL positions (open + closed visible so far)
+    paintMarkers(candles, cursorIndex, positions || [])
+
   }, [positions, candles, cursorIndex]) // eslint-disable-line react-hooks/exhaustive-deps
 
+  // ── OHLCV HUD ─────────────────────────────────────────────────────────────────
+  const curCandle = hud || candles[cursorIndex - 1] || candles[0]
+  const isUp = curCandle ? parseFloat(curCandle.close) >= parseFloat(curCandle.open) : true
+
   return (
-    <div
-      ref={containerRef}
-      style={{ position: 'absolute', inset: 0 }}
-    />
+    <div style={{ position: 'absolute', inset: 0 }}>
+      {/* Chart container */}
+      <div ref={containerRef} style={{ position: 'absolute', inset: 0 }} />
+
+      {/* OHLCV HUD — top left overlay */}
+      {curCandle && (
+        <div className="absolute top-1.5 left-2 z-10 pointer-events-none select-none">
+          <div className="flex items-center gap-2 text-[10px] font-mono bg-white/80 dark:bg-gray-950/80 backdrop-blur-sm rounded px-1.5 py-0.5">
+            <span className="text-gray-400 dark:text-gray-500">{curCandle.date}</span>
+            <span className="text-gray-500 dark:text-gray-400">O <span className={isUp ? 'text-green-600' : 'text-red-500'}>{fmt(curCandle.open)}</span></span>
+            <span className="text-gray-500 dark:text-gray-400">H <span className="text-green-600">{fmt(curCandle.high)}</span></span>
+            <span className="text-gray-500 dark:text-gray-400">L <span className="text-red-500">{fmt(curCandle.low)}</span></span>
+            <span className="text-gray-500 dark:text-gray-400">C <span className={`font-bold ${isUp ? 'text-green-600' : 'text-red-500'}`}>{fmt(curCandle.close)}</span></span>
+            <span className="text-gray-400 dark:text-gray-500">Vol {fmtVol(curCandle.volume || curCandle.turnover)}</span>
+          </div>
+        </div>
+      )}
+
+      {/* Legend for SL/TP/Entry lines */}
+      <div className="absolute top-1.5 right-2 z-10 pointer-events-none select-none flex gap-2 text-[9px]">
+        <span className="flex items-center gap-1"><span className="inline-block w-3 h-0.5 bg-blue-500" /> Entry</span>
+        <span className="flex items-center gap-1"><span className="inline-block w-3 h-0.5 bg-red-500" style={{ borderTop: '1px dashed #ef4444', background: 'none' }} /> SL</span>
+        <span className="flex items-center gap-1"><span className="inline-block w-3 h-0.5 bg-green-500" style={{ borderTop: '1px dashed #22c55e', background: 'none' }} /> TP</span>
+      </div>
+    </div>
   )
 }

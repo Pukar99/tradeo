@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from 'react'
+import { useState, useEffect, useCallback, useRef } from 'react'
 import { btGetSymbols, btCreateSession } from '../../api/backtest'
 
 const SPEEDS = ['0.5', '1', '2', '5', '10']
@@ -17,12 +17,28 @@ export default function BacktestSetupPanel({ onSessionStarted }) {
   const [loading, setLoading]             = useState(false)
   const [error, setError]                 = useState('')
   const [symbolsLoading, setSymbolsLoading] = useState(true)
+  const [symbolsError, setSymbolsError]   = useState('')
+  const dropdownRef                       = useRef(null)
 
   useEffect(() => {
     btGetSymbols()
       .then(r => setSymbols(r.data.symbols || []))
-      .catch(() => {})
+      .catch(() => setSymbolsError('Failed to load symbols — check server'))
       .finally(() => setSymbolsLoading(false))
+  }, [])
+
+  // Close dropdown on Escape
+  useEffect(() => {
+    const h = e => { if (e.key === 'Escape') setShowSymbolList(false) }
+    window.addEventListener('keydown', h)
+    return () => window.removeEventListener('keydown', h)
+  }, [])
+
+  // Close dropdown on outside click
+  useEffect(() => {
+    const h = e => { if (dropdownRef.current && !dropdownRef.current.contains(e.target)) setShowSymbolList(false) }
+    document.addEventListener('mousedown', h)
+    return () => document.removeEventListener('mousedown', h)
   }, [])
 
   const filteredSymbols = symbols.filter(s =>
@@ -61,8 +77,15 @@ export default function BacktestSetupPanel({ onSessionStarted }) {
         Backtest Setup
       </div>
 
+      {/* Symbol load error */}
+      {symbolsError && (
+        <div className="text-[10px] text-red-500 bg-red-50 dark:bg-red-900/20 rounded-md px-2 py-1.5">
+          {symbolsError}
+        </div>
+      )}
+
       {/* Script */}
-      <div className="relative">
+      <div className="relative" ref={dropdownRef}>
         <label className="text-[9px] font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wider">Script</label>
         <div
           className="mt-0.5 flex items-center gap-1 px-2 py-1.5 rounded-md border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 cursor-pointer text-[11px]"
@@ -129,6 +152,7 @@ export default function BacktestSetupPanel({ onSessionStarted }) {
           value={capital}
           min={10000}
           step={1000}
+          autoComplete="off"
           onChange={e => setCapital(e.target.value)}
           className="mt-0.5 w-full px-2 py-1.5 text-[11px] rounded-md border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 dark:text-white outline-none focus:ring-1 focus:ring-blue-500"
         />
@@ -142,6 +166,7 @@ export default function BacktestSetupPanel({ onSessionStarted }) {
           value={strategyName}
           onChange={e => setStrategyName(e.target.value)}
           placeholder="e.g. Breakout Test"
+          autoComplete="off"
           className="mt-0.5 w-full px-2 py-1.5 text-[11px] rounded-md border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 dark:text-white outline-none focus:ring-1 focus:ring-blue-500"
         />
       </div>

@@ -19,14 +19,15 @@ export function useBacktestEngine({
   onTPHit,
   onDataEnd,
 }) {
-  const playingRef    = useRef(false)
-  const speedRef      = useRef(1)
-  const timerRef      = useRef(null)
-  const speedTimerRef = useRef(null)   // pending setSpeed restart
-  const cursorRef     = useRef(cursorIndex)
-  const candlesRef    = useRef(candles)
-  const sessionRef    = useRef(session)
-  const scriptRef     = useRef(currentScript)
+  const playingRef      = useRef(false)
+  const processingRef   = useRef(false)   // guard against concurrent processCandle calls
+  const speedRef        = useRef(1)
+  const timerRef        = useRef(null)
+  const speedTimerRef   = useRef(null)   // pending setSpeed restart
+  const cursorRef       = useRef(cursorIndex)
+  const candlesRef      = useRef(candles)
+  const sessionRef      = useRef(session)
+  const scriptRef       = useRef(currentScript)
 
   // Keep all refs in sync on every render
   cursorRef.current  = cursorIndex
@@ -42,9 +43,13 @@ export function useBacktestEngine({
 
   // ── Process a single candle ───────────────────────────────────────────────────
   const processCandle = useCallback(async (candle, index) => {
+    // Guard: skip if already processing a candle (prevents interval stacking)
+    if (processingRef.current) return
+    processingRef.current = true
+
     const sess   = sessionRef.current
     const script = scriptRef.current
-    if (!sess || !candle) return
+    if (!sess || !candle) { processingRef.current = false; return }
 
     // 1. Settle positions whose settlement_date <= candle.date
     await settlePositions(candle.date)
@@ -105,6 +110,7 @@ export function useBacktestEngine({
               { label: 'Keep Position', action: () => {} },
             ],
           })
+          processingRef.current = false
           return // pause — wait for user
         }
 
@@ -169,6 +175,7 @@ export function useBacktestEngine({
               },
             ],
           })
+          processingRef.current = false
           return // pause for user
         }
       }
@@ -205,6 +212,7 @@ export function useBacktestEngine({
               { label: 'Keep Position', action: () => {} },
             ],
           })
+          processingRef.current = false
           return
         }
 
@@ -231,6 +239,8 @@ export function useBacktestEngine({
       if (timerRef.current) { clearInterval(timerRef.current); timerRef.current = null }
       onDataEnd()
     }
+
+    processingRef.current = false
   }, [settlePositions, advanceCursor, closePositionLocal, onSLBreach, onTPHit, onDataEnd, pauseInternal])
 
   // ── Public: Play ──────────────────────────────────────────────────────────────
@@ -265,6 +275,17 @@ export function useBacktestEngine({
     await processCandle(candle, idx)
   }, [processCandle, onDataEnd])
 
+  // ── Public: Step back (visual review — no DB change) ─────────────────────────
+  const stepBack = useCallback(() => {
+    if (playingRef.current) return
+    const idx = cursorRef.current
+    if (idx <= 0) return
+    const newIndex = idx - 1
+    const candle   = candlesRef.current[newIndex]
+    if (!candle) return
+    advanceCursor(newIndex, candle.date)
+  }, [advanceCursor])
+
   // ── Public: Set speed ─────────────────────────────────────────────────────────
   const setSpeed = useCallback((s) => {
     speedRef.current = parseFloat(s)
@@ -291,6 +312,7 @@ export function useBacktestEngine({
     play,
     pause,
     stepForward,
+    stepBack,
     setSpeed,
   }
 }
