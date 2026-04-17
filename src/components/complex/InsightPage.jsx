@@ -9,6 +9,21 @@ const MONTHS_FULL = ['January','February','March','April','May','June','July','A
 const MONTHS_NP   = ['Pou','Mag','Fal','Cha','Bai','Jes','Ash','Shr','Bha','Asw','Kar','Man']
 const RECENT_N    = 5
 
+// Available indices for the selector
+const INDEX_OPTIONS = [
+  { id: 12, label: 'NEPSE',    short: 'NEPSE'  },
+  { id: 1,  label: 'Banking',  short: 'BANK'   },
+  { id: 2,  label: 'Dev Bank', short: 'DBANK'  },
+  { id: 3,  label: 'Finance',  short: 'FIN'    },
+  { id: 4,  label: 'Hydro',    short: 'HYDRO'  },
+  { id: 5,  label: 'Mfg & Proc', short: 'MFG'  },
+  { id: 6,  label: 'Hotels',   short: 'HOTEL'  },
+  { id: 8,  label: 'Others',   short: 'OTH'    },
+  { id: 9,  label: 'Trading',  short: 'TRAD'   },
+  { id: 10, label: 'Insurance',short: 'INS'    },
+  { id: 11, label: 'Micro Fin',short: 'MICRO'  },
+]
+
 // ─── Colour helpers ───────────────────────────────────────────────────────────
 function cellBg(val, dark) {
   if (val == null) return dark ? '#0f172a' : '#f8fafc'
@@ -116,34 +131,55 @@ function Tile({ label, value, color }) {
   )
 }
 
-// ─── Left Panel (static insight sidebar) ─────────────────────────────────────
-function LeftInsightPanel({ data, years, wAvg, wWinRate, dark, curYear, curRow, prevRow, recentSet, useNP, setUseNP, LABELS }) {
-  const validAvg = wAvg.filter(v => v != null)
-  const bestMi   = validAvg.length ? wAvg.indexOf(Math.max(...validAvg))  : -1
-  const worstMi  = validAvg.length ? wAvg.indexOf(Math.min(...validAvg)) : -1
+// ─── Left Panel ───────────────────────────────────────────────────────────────
+function LeftInsightPanel({ data, years, wAvg, wWinRate, dark, curYear, curRow, prevRow,
+  recentSet, useNP, setUseNP, LABELS, selectedIndexId, setSelectedIndexId }) {
+
+  const validAvg  = wAvg.filter(v => v != null)
+  const bestMi    = validAvg.length ? wAvg.indexOf(Math.max(...validAvg)) : -1
+  const worstMi   = validAvg.length ? wAvg.indexOf(Math.min(...validAvg)) : -1
   const annualRows = years.filter(y => y.annual != null)
-  const posYears = annualRows.filter(y => y.annual > 0).length
-  const negYears = annualRows.filter(y => y.annual <= 0).length
+  const posYears  = annualRows.filter(y => y.annual > 0).length
+  const negYears  = annualRows.filter(y => y.annual <= 0).length
   const avgAnnual = annualRows.length
     ? +(annualRows.reduce((s, y) => s + y.annual, 0) / annualRows.length).toFixed(1)
     : null
   const maxAnnual = annualRows.length ? Math.max(...annualRows.map(y => y.annual)) : null
   const minAnnual = annualRows.length ? Math.min(...annualRows.map(y => y.annual)) : null
 
+  // Streak dates
+  const streakCount = data?.current_streak?.count || 0
+  const streakDir   = data?.current_streak?.direction
+
   return (
     <div className="flex flex-col h-full overflow-y-auto overflow-x-hidden bg-white dark:bg-gray-900">
 
-      {/* ── Header ── */}
+      {/* Header */}
       <div className="shrink-0 px-3 pt-3 pb-2 border-b border-gray-100 dark:border-gray-800">
-        <div className="text-[11px] font-black text-gray-900 dark:text-white uppercase tracking-widest">
-          Insight
-        </div>
-        <div className="text-[9px] text-gray-400 mt-0.5">NEPSE Index Analysis</div>
+        <div className="text-[11px] font-black text-gray-900 dark:text-white uppercase tracking-widest">Insight</div>
+        <div className="text-[9px] text-gray-400 mt-0.5">NEPSE Seasonality & Analytics</div>
       </div>
 
-      {/* ── Lang toggle ── */}
+      {/* Index selector */}
+      <div className="shrink-0 px-3 py-2 border-b border-gray-100 dark:border-gray-800">
+        <div className="text-[9px] font-bold uppercase tracking-wider text-gray-400 mb-1.5">Index</div>
+        <div className="flex flex-wrap gap-1">
+          {INDEX_OPTIONS.map(opt => (
+            <button key={opt.id} onClick={() => setSelectedIndexId(opt.id)}
+              className={`px-1.5 py-0.5 rounded text-[8px] font-bold transition-colors ${
+                selectedIndexId === opt.id
+                  ? 'bg-blue-600 text-white'
+                  : 'bg-gray-100 dark:bg-gray-800 text-gray-500 dark:text-gray-400 hover:bg-gray-200 dark:hover:bg-gray-700'
+              }`}>
+              {opt.short}
+            </button>
+          ))}
+        </div>
+      </div>
+
+      {/* Month labels toggle */}
       <div className="shrink-0 px-3 py-2 border-b border-gray-100 dark:border-gray-800 flex items-center justify-between">
-        <span className="text-[9px] text-gray-400 font-bold uppercase tracking-wider">Month Labels</span>
+        <span className="text-[9px] text-gray-400 font-bold uppercase tracking-wider">Labels</span>
         <div className="flex rounded overflow-hidden border border-gray-200 dark:border-gray-700 text-[9px] font-black">
           {['EN','NP'].map((t, i) => (
             <button key={t} onClick={() => setUseNP(i === 1)}
@@ -157,47 +193,46 @@ function LeftInsightPanel({ data, years, wAvg, wWinRate, dark, curYear, curRow, 
         </div>
       </div>
 
-      {/* ── Market summary tiles ── */}
+      {/* All-time summary tiles */}
       {data && (
         <div className="shrink-0 px-3 py-2.5 border-b border-gray-100 dark:border-gray-800 space-y-2">
-          <div className="text-[9px] font-black uppercase tracking-widest text-gray-400 dark:text-gray-600 mb-1.5">
+          <div className="text-[9px] font-black uppercase tracking-widest text-gray-400 dark:text-gray-600 mb-1">
             All-Time Summary
           </div>
           <div className="grid grid-cols-2 gap-1.5">
             <Tile label="Avg Annual" value={fmtPct(avgAnnual)} color={avgAnnual >= 0 ? '#22c55e' : '#ef4444'} />
             <Tile label="Bull Years" value={posYears} color="#22c55e" />
             <Tile label="Bear Years" value={negYears} color="#ef4444" />
-            <Tile label="Data Since" value="2003" />
+            <Tile label="Years Data"  value={annualRows.length} />
           </div>
           {maxAnnual != null && (
             <div className="grid grid-cols-2 gap-1.5">
-              <Tile label="Best Year" value={fmtPct(maxAnnual)} color="#4ade80" />
+              <Tile label="Best Year"  value={fmtPct(maxAnnual)} color="#4ade80" />
               <Tile label="Worst Year" value={fmtPct(minAnnual)} color="#f87171" />
             </div>
           )}
         </div>
       )}
 
-      {/* ── Current streak ── */}
-      {data?.current_streak?.count > 0 && (
+      {/* Live streak */}
+      {streakCount > 0 && (
         <div className="shrink-0 px-3 py-2.5 border-b border-gray-100 dark:border-gray-800">
           <div className="text-[9px] font-black uppercase tracking-widest text-gray-400 dark:text-gray-600 mb-2">
             Live Streak
           </div>
           <div className="flex items-center gap-2">
-            <span className={`text-2xl font-black leading-none ${
-              data.current_streak.direction === 'positive' ? 'text-green-500' : 'text-red-400'}`}>
-              {data.current_streak.direction === 'positive' ? '▲' : '▼'}{data.current_streak.count}
+            <span className={`text-2xl font-black leading-none ${streakDir === 'positive' ? 'text-green-500' : 'text-red-400'}`}>
+              {streakDir === 'positive' ? '▲' : '▼'}{streakCount}
             </span>
             <div className="text-[9px] text-gray-400 leading-relaxed">
-              consecutive {data.current_streak.direction}<br />
-              month{data.current_streak.count !== 1 ? 's' : ''}
+              consecutive {streakDir}<br />
+              month{streakCount !== 1 ? 's' : ''}
             </div>
           </div>
         </div>
       )}
 
-      {/* ── Year spotlight ── */}
+      {/* Year spotlight */}
       {(curRow || prevRow) && (
         <div className="shrink-0 px-3 py-2.5 border-b border-gray-100 dark:border-gray-800 space-y-2.5">
           <div className="text-[9px] font-black uppercase tracking-widest text-gray-400 dark:text-gray-600">
@@ -228,37 +263,30 @@ function LeftInsightPanel({ data, years, wAvg, wWinRate, dark, curYear, curRow, 
         </div>
       )}
 
-      {/* ── Seasonality best/worst ── */}
+      {/* Best / Worst month */}
       {bestMi >= 0 && (
         <div className="shrink-0 px-3 py-2.5 border-b border-gray-100 dark:border-gray-800">
           <div className="text-[9px] font-black uppercase tracking-widest text-gray-400 dark:text-gray-600 mb-2">
-            Best Month
+            Seasonal Edge
           </div>
-          <div className="flex items-center justify-between mb-1.5">
-            <span className="text-[12px] font-black text-green-500">{MONTHS_EN[bestMi]}</span>
-            <span className="text-[11px] font-black text-green-500">{fmtPct(wAvg[bestMi])}</span>
-          </div>
-          <div className="flex items-center justify-between">
-            <span className="text-[9px] text-gray-400">Win rate</span>
-            <span className="text-[9px] font-bold text-green-400">{wWinRate[bestMi]}%</span>
-          </div>
-          <div className="mt-2.5">
-            <div className="text-[9px] font-black uppercase tracking-widest text-gray-400 dark:text-gray-600 mb-1.5">
-              Worst Month
+          <div className="flex gap-2">
+            <div className="flex-1 rounded-lg bg-green-50 dark:bg-green-900/10 border border-green-100 dark:border-green-900 p-2">
+              <div className="text-[8px] text-green-500 font-bold uppercase mb-0.5">Best</div>
+              <div className="text-[12px] font-black text-green-600">{MONTHS_EN[bestMi]}</div>
+              <div className="text-[10px] font-bold text-green-500">{fmtPct(wAvg[bestMi])}</div>
+              <div className="text-[8px] text-gray-400 mt-0.5">{wWinRate[bestMi]}% win rate</div>
             </div>
-            <div className="flex items-center justify-between mb-1">
-              <span className="text-[12px] font-black text-red-400">{MONTHS_EN[worstMi]}</span>
-              <span className="text-[11px] font-black text-red-400">{fmtPct(wAvg[worstMi])}</span>
-            </div>
-            <div className="flex items-center justify-between">
-              <span className="text-[9px] text-gray-400">Win rate</span>
-              <span className="text-[9px] font-bold text-red-400">{wWinRate[worstMi]}%</span>
+            <div className="flex-1 rounded-lg bg-red-50 dark:bg-red-900/10 border border-red-100 dark:border-red-900 p-2">
+              <div className="text-[8px] text-red-400 font-bold uppercase mb-0.5">Worst</div>
+              <div className="text-[12px] font-black text-red-500">{MONTHS_EN[worstMi]}</div>
+              <div className="text-[10px] font-bold text-red-400">{fmtPct(wAvg[worstMi])}</div>
+              <div className="text-[8px] text-gray-400 mt-0.5">{wWinRate[worstMi]}% win rate</div>
             </div>
           </div>
         </div>
       )}
 
-      {/* ── Win rate by month ── */}
+      {/* Win rate by month */}
       <div className="shrink-0 px-3 py-2.5 border-b border-gray-100 dark:border-gray-800">
         <div className="text-[9px] font-black uppercase tracking-widest text-gray-400 dark:text-gray-600 mb-2.5">
           Win Rate / Month
@@ -270,7 +298,7 @@ function LeftInsightPanel({ data, years, wAvg, wWinRate, dark, curYear, curRow, 
         </div>
       </div>
 
-      {/* ── Top/bottom years ── */}
+      {/* Top / Bottom years */}
       {data?.best_years?.length > 0 && (
         <div className="shrink-0 px-3 py-2.5">
           <div className="grid grid-cols-2 gap-3">
@@ -278,7 +306,8 @@ function LeftInsightPanel({ data, years, wAvg, wWinRate, dark, curYear, curRow, 
               <div className="text-[8px] font-black uppercase tracking-wider text-gray-400 mb-1.5">Top Years</div>
               {(data.best_years || []).slice(0, 5).map((y, i) => (
                 <div key={y.year} className="flex items-center justify-between mb-0.5">
-                  <span className="text-[9px] text-gray-500 dark:text-gray-500">{i+1}. {y.year}
+                  <span className="text-[9px] text-gray-500 dark:text-gray-500">
+                    {i+1}. {y.year}
                     {recentSet.has(y.year) && <span className="ml-1 w-1 h-1 rounded-full bg-blue-400 inline-block align-middle" />}
                   </span>
                   <span className="text-[9px] font-bold text-green-500">{fmtPct(y.annual)}</span>
@@ -301,7 +330,7 @@ function LeftInsightPanel({ data, years, wAvg, wWinRate, dark, curYear, curRow, 
   )
 }
 
-// ─── Month OHLC chart (lightweight-charts) ────────────────────────────────────
+// ─── Month OHLC chart (interactive) ───────────────────────────────────────────
 function MonthChart({ candles, dark }) {
   const ref  = useRef(null)
   const cRef = useRef(null)
@@ -311,8 +340,8 @@ function MonthChart({ candles, dark }) {
     if (!el || !candles?.length) return
 
     const chart = createChart(el, {
-      width:  el.clientWidth,
-      height: el.clientHeight,
+      width:  el.clientWidth  || 400,
+      height: el.clientHeight || 200,
       layout: {
         background:  { color: 'transparent' },
         textColor:   dark ? '#94a3b8' : '#64748b',
@@ -327,13 +356,14 @@ function MonthChart({ candles, dark }) {
       crosshair:       { mode: CrosshairMode.Normal },
       rightPriceScale: { borderColor: dark ? '#334155' : '#e2e8f0', minimumWidth: 50 },
       leftPriceScale:  { visible: false },
-      timeScale:       {
-        borderColor:       dark ? '#334155' : '#e2e8f0',
-        timeVisible:       false,
+      timeScale: {
+        borderColor: dark ? '#334155' : '#e2e8f0',
+        timeVisible: false,
         tickMarkFormatter: () => '',
       },
-      handleScroll: false,
-      handleScale:  false,
+      // Interactive — allow scroll and scale for analysis
+      handleScroll: true,
+      handleScale:  true,
     })
 
     const cs = chart.addCandlestickSeries({
@@ -361,11 +391,14 @@ function MonthChart({ candles, dark }) {
       })))
     }
 
-    const hi = candles.reduce((a, b) => b.high > a.high ? b : a)
-    const lo = candles.reduce((a, b) => b.low  < a.low  ? b : a)
-    const mkrs = [{ time: hi.date, position: 'aboveBar', color: '#22c55e', shape: 'arrowDown', text: hi.high.toFixed(0) }]
-    if (lo.date !== hi.date) mkrs.push({ time: lo.date, position: 'belowBar', color: '#ef4444', shape: 'arrowUp', text: lo.low.toFixed(0) })
-    cs.setMarkers(mkrs.sort((a, b) => a.time.localeCompare(b.time)))
+    if (candles.length >= 2) {
+      const hi  = candles.reduce((a, b) => b.high > a.high ? b : a)
+      const lo  = candles.reduce((a, b) => b.low  < a.low  ? b : a)
+      const mkrs = [{ time: hi.date, position: 'aboveBar', color: '#22c55e', shape: 'arrowDown', text: hi.high.toFixed(0) }]
+      if (lo.date !== hi.date) mkrs.push({ time: lo.date, position: 'belowBar', color: '#ef4444', shape: 'arrowUp', text: lo.low.toFixed(0) })
+      cs.setMarkers(mkrs.sort((a, b) => a.time.localeCompare(b.time)))
+    }
+
     chart.timeScale().fitContent()
     cRef.current = chart
 
@@ -406,7 +439,7 @@ function SectorBar({ name, ret, maxAbs }) {
 }
 
 // ─── Company list for a sector×month ─────────────────────────────────────────
-function CompanyList({ sectorIndex, year, month, dark, onClose }) {
+function CompanyList({ sectorIndex, year, month, onClose }) {
   const [stocks,  setStocks]  = useState(null)
   const [loading, setLoading] = useState(true)
   const [error,   setError]   = useState(null)
@@ -425,62 +458,40 @@ function CompanyList({ sectorIndex, year, month, dark, onClose }) {
 
   return (
     <div className="border-t border-gray-100 dark:border-gray-800">
-      {/* header */}
       <div className="flex items-center justify-between px-3 py-2 bg-gray-50 dark:bg-gray-900/60">
-        <span className="text-[10px] font-black text-gray-700 dark:text-gray-200 uppercase tracking-wide">
-          {shortName}
-        </span>
+        <span className="text-[10px] font-black text-gray-700 dark:text-gray-200 uppercase tracking-wide">{shortName}</span>
         <button onClick={onClose}
-          className="w-4 h-4 flex items-center justify-center rounded text-gray-400
-            hover:text-gray-600 dark:hover:text-gray-300 text-xs leading-none">×</button>
+          className="w-5 h-5 flex items-center justify-center rounded text-gray-400 hover:text-gray-600 dark:hover:text-gray-300 text-sm">×</button>
       </div>
-
       {loading && (
         <div className="flex items-center justify-center py-4">
           <div className="w-4 h-4 border-2 border-blue-400 border-t-transparent rounded-full animate-spin" />
         </div>
       )}
-
-      {error && (
-        <div className="px-3 py-3 text-[10px] text-red-400">{error}</div>
-      )}
-
+      {error && <div className="px-3 py-3 text-[10px] text-red-400">{error}</div>}
       {!loading && !error && stocks?.length === 0 && (
         <div className="px-3 py-3 text-[10px] text-gray-400">No stock data for this period.</div>
       )}
-
       {!loading && !error && stocks?.length > 0 && (
         <div className="max-h-52 overflow-y-auto">
           <table className="w-full border-collapse">
             <thead className="sticky top-0 bg-gray-50 dark:bg-gray-900/80">
               <tr>
-                <th className="px-3 py-1 text-left text-[8px] font-bold uppercase tracking-wide text-gray-400">#</th>
-                <th className="px-2 py-1 text-left text-[8px] font-bold uppercase tracking-wide text-gray-400">Symbol</th>
-                <th className="px-2 py-1 text-left text-[8px] font-bold uppercase tracking-wide text-gray-400">Company</th>
-                <th className="px-2 py-1 text-right text-[8px] font-bold uppercase tracking-wide text-gray-400">Return</th>
-                <th className="px-2 py-1 text-[8px] font-bold uppercase tracking-wide text-gray-400 w-16">Bar</th>
+                {['#','Symbol','Company','Return','Bar'].map(h => (
+                  <th key={h} className="px-2 py-1 text-left text-[8px] font-bold uppercase tracking-wide text-gray-400">{h}</th>
+                ))}
               </tr>
             </thead>
             <tbody>
               {stocks.map((s, i) => {
-                const color  = sectorCol(s.return_pct)
-                const barW   = maxAbs > 0 ? Math.abs(s.return_pct ?? 0) / maxAbs * 100 : 0
-                const isPos  = (s.return_pct ?? 0) >= 0
+                const color = sectorCol(s.return_pct)
+                const barW  = maxAbs > 0 ? Math.abs(s.return_pct ?? 0) / maxAbs * 100 : 0
                 return (
-                  <tr key={s.symbol}
-                    className="border-b border-gray-50 dark:border-gray-800/60 hover:bg-gray-50 dark:hover:bg-gray-800/30">
-                    <td className="px-3 py-1 text-[9px] text-gray-400 tabular-nums w-6">{i + 1}</td>
-                    <td className="px-2 py-1">
-                      <span className="text-[10px] font-bold text-gray-800 dark:text-gray-100">{s.symbol}</span>
-                    </td>
-                    <td className="px-2 py-1 max-w-[100px]">
-                      <span className="text-[9px] text-gray-500 truncate block">{s.company_name}</span>
-                    </td>
-                    <td className="px-2 py-1 text-right">
-                      <span className="text-[10px] font-bold tabular-nums" style={{ color }}>
-                        {fmtPct(s.return_pct)}
-                      </span>
-                    </td>
+                  <tr key={s.symbol} className="border-b border-gray-50 dark:border-gray-800/60 hover:bg-gray-50 dark:hover:bg-gray-800/30">
+                    <td className="px-2 py-1 text-[9px] text-gray-400 w-6">{i + 1}</td>
+                    <td className="px-2 py-1"><span className="text-[10px] font-bold dark:text-gray-100">{s.symbol}</span></td>
+                    <td className="px-2 py-1 max-w-[90px]"><span className="text-[9px] text-gray-500 truncate block">{s.company_name}</span></td>
+                    <td className="px-2 py-1 text-right"><span className="text-[10px] font-bold tabular-nums" style={{ color }}>{fmtPct(s.return_pct)}</span></td>
                     <td className="px-2 py-1">
                       <div className="h-1.5 w-full rounded-full bg-gray-100 dark:bg-gray-700 overflow-hidden">
                         <div className="h-full rounded-full" style={{ width: `${barW}%`, background: color }} />
@@ -497,21 +508,62 @@ function CompanyList({ sectorIndex, year, month, dark, onClose }) {
   )
 }
 
+// ─── Historical rank bar ───────────────────────────────────────────────────────
+// Shows how this month's return ranks among all historical occurrences of the same calendar month
+function HistoricalRank({ value, allYears, month }) {
+  if (value == null || !allYears?.length) return null
+  const hist = allYears
+    .map(y => y.months[month - 1])
+    .filter(v => v != null)
+    .sort((a, b) => a - b)
+  if (!hist.length) return null
+  const rank     = hist.filter(v => v <= value).length
+  const pct      = Math.round((rank / hist.length) * 100)
+  const isGood   = pct >= 60
+  const color    = pct >= 70 ? '#22c55e' : pct >= 45 ? '#f59e0b' : '#ef4444'
+  const min      = hist[0]
+  const max      = hist[hist.length - 1]
+  const pos      = max !== min ? ((value - min) / (max - min)) * 100 : 50
+
+  return (
+    <div className="px-3 py-2.5 border-t border-gray-100 dark:border-gray-800">
+      <div className="text-[8px] font-bold uppercase tracking-wider text-gray-400 mb-1.5">
+        Historical Rank ({MONTHS_FULL[month - 1]})
+      </div>
+      <div className="text-[9px] text-gray-500 dark:text-gray-400 mb-1">
+        Ranks <span className="font-bold" style={{ color }}>{rank}/{hist.length}</span>
+        {' '}({pct}th percentile) · better than {rank - 1} of {hist.length} past years
+      </div>
+      {/* Range bar with marker */}
+      <div className="relative h-3 bg-gray-100 dark:bg-gray-800 rounded-full overflow-visible mb-1">
+        <div className="absolute inset-y-0 left-0 rounded-full" style={{ width: `${pos}%`, background: color, opacity: 0.3 }} />
+        <div className="absolute top-1/2 -translate-y-1/2 w-1.5 h-3 rounded-sm" style={{ left: `${pos}%`, background: color }} />
+      </div>
+      <div className="flex justify-between text-[8px] text-gray-400">
+        <span>{fmtPct(min)}</span>
+        <span className="font-bold" style={{ color }}>{fmtPct(value)}</span>
+        <span>{fmtPct(max)}</span>
+      </div>
+    </div>
+  )
+}
+
 // ─── Right Detail Panel ───────────────────────────────────────────────────────
-function DetailPanel({ cell, onClose, dark }) {
-  const [tab,       setTab]       = useState('chart')
-  const [loading,   setLoading]   = useState(false)
-  const [candles,   setCandles]   = useState(null)
-  const [stats,     setStats]     = useState(null)
-  const [sectors,   setSectors]   = useState(null)
-  const [available, setAvailable] = useState(true)
+function DetailPanel({ cell, onClose, onNavigate, dark, allYears }) {
+  const [tab,              setTab]              = useState('chart')
+  const [loading,          setLoading]          = useState(false)
+  const [candles,          setCandles]          = useState(null)
+  const [stats,            setStats]            = useState(null)
+  const [sectors,          setSectors]          = useState(null)
+  const [available,        setAvailable]        = useState(true)
+  const [dataError,        setDataError]        = useState(null)
   const [activeSectorIndex, setActiveSectorIndex] = useState(null)
 
   useEffect(() => {
     if (!cell) return
-    setLoading(true); setCandles(null); setStats(null); setSectors(null); setAvailable(true)
-    setActiveSectorIndex(null)
-    if (cell.year < 2020) { setAvailable(false); setLoading(false); return }
+    setLoading(true); setCandles(null); setStats(null); setSectors(null)
+    setAvailable(true); setDataError(null); setActiveSectorIndex(null)
+
     Promise.all([
       getMonthDetail({ year: cell.year, month: cell.month }),
       getSectorMonth({ year: cell.year, month: cell.month }),
@@ -519,10 +571,13 @@ function DetailPanel({ cell, onClose, dark }) {
       .then(([det, sec]) => {
         if (!det.data.available) { setAvailable(false); return }
         setCandles(det.data.candles || [])
-        setStats(det.data.stats   || null)
+        setStats(det.data.stats || null)
         setSectors(sec.data.sectors || [])
       })
-      .catch(() => setAvailable(false))
+      .catch(err => {
+        const msg = err.response?.data?.message || err.response?.data?.error || 'Failed to load data'
+        setDataError(msg)
+      })
       .finally(() => setLoading(false))
   }, [cell?.year, cell?.month])
 
@@ -536,51 +591,60 @@ function DetailPanel({ cell, onClose, dark }) {
   const fg     = cell ? cellFg(cell.value, dark) : (dark ? '#94a3b8' : '#64748b')
   const maxAbs = sectors?.length ? Math.max(...sectors.map(s => Math.abs(s.return_pct ?? 0)), 0.1) : 1
 
-  return (
-    <div className="w-[320px] shrink-0 flex flex-col
-      bg-white dark:bg-gray-900
-      border-l border-gray-200 dark:border-gray-700/60
-      overflow-hidden">
+  // If no cell selected, show collapsed placeholder
+  if (!cell) {
+    return (
+      <div className="w-10 shrink-0 border-l border-gray-100 dark:border-gray-800 bg-white dark:bg-gray-900 flex items-center justify-center">
+        <span className="text-[8px] text-gray-300 dark:text-gray-700 writing-mode-vertical rotate-90 whitespace-nowrap select-none">
+          Click a cell
+        </span>
+      </div>
+    )
+  }
 
-      {/* header */}
+  return (
+    <div className="w-[300px] shrink-0 flex flex-col bg-white dark:bg-gray-900 border-l border-gray-200 dark:border-gray-700/60 overflow-hidden">
+
+      {/* Header */}
       <div className="shrink-0 px-3 pt-2.5 pb-2 border-b border-gray-100 dark:border-gray-800">
-        {!cell ? (
-          <div className="flex items-center gap-2">
-            <div className="w-2 h-2 rounded-sm bg-gray-200 dark:bg-gray-700 shrink-0" />
-            <span className="text-[10px] font-black text-gray-400 dark:text-gray-600">
-              {loading ? 'Loading…' : 'Select a cell'}
-            </span>
-          </div>
-        ) : (
-          <div className="flex items-start justify-between gap-1">
-            <div>
-              <div className="flex items-center gap-1.5 mb-0.5">
-                <div className="w-2 h-2 rounded-sm shrink-0" style={{ background: bg }} />
-                <span className="text-[10px] font-black text-gray-900 dark:text-white leading-none">
-                  {MONTHS_FULL[cell.month - 1]} {cell.year}
-                </span>
-              </div>
-              <div className="text-lg font-black leading-none" style={{ color: fg }}>
-                {fmtPct(cell.value, 2)}
-              </div>
+        <div className="flex items-start justify-between gap-1">
+          <div>
+            <div className="flex items-center gap-1.5 mb-0.5">
+              <div className="w-2 h-2 rounded-sm shrink-0" style={{ background: bg }} />
+              <span className="text-[10px] font-black text-gray-900 dark:text-white leading-none">
+                {MONTHS_FULL[cell.month - 1]} {cell.year}
+              </span>
             </div>
-            <button onClick={onClose}
-              className="mt-0.5 w-5 h-5 flex items-center justify-center rounded
-                text-gray-400 hover:text-gray-600 dark:hover:text-gray-200
-                hover:bg-gray-100 dark:hover:bg-gray-800 text-sm leading-none transition-colors shrink-0">
-              ×
-            </button>
+            <div className="text-lg font-black leading-none" style={{ color: fg }}>
+              {fmtPct(cell.value, 2)}
+            </div>
           </div>
-        )}
+          <button onClick={onClose}
+            className="mt-0.5 w-5 h-5 flex items-center justify-center rounded text-gray-400
+              hover:text-gray-600 dark:hover:text-gray-200 hover:bg-gray-100 dark:hover:bg-gray-800 text-sm leading-none transition-colors shrink-0">
+            ×
+          </button>
+        </div>
+        {/* Month navigation */}
+        <div className="flex items-center gap-1 mt-2">
+          <button onClick={() => onNavigate(-1)}
+            className="flex-1 py-0.5 text-[9px] font-bold rounded border border-gray-200 dark:border-gray-700 text-gray-500 hover:bg-gray-50 dark:hover:bg-gray-800 transition-colors">
+            ← Prev
+          </button>
+          <button onClick={() => onNavigate(1)}
+            className="flex-1 py-0.5 text-[9px] font-bold rounded border border-gray-200 dark:border-gray-700 text-gray-500 hover:bg-gray-50 dark:hover:bg-gray-800 transition-colors">
+            Next →
+          </button>
+        </div>
       </div>
 
-      {/* tabs */}
-      {cell && available && !loading && (
+      {/* Tabs */}
+      {!loading && !dataError && available && (
         <div className="shrink-0 flex border-b border-gray-100 dark:border-gray-800">
           {[['chart','Price'],['sectors','Sectors']].map(([id, lbl]) => (
             <button key={id} onClick={() => setTab(id)}
-              className={`flex-1 py-1.5 text-[9px] font-black uppercase tracking-widest transition-colors
-                ${tab === id
+              className={`flex-1 py-1.5 text-[9px] font-black uppercase tracking-widest transition-colors ${
+                tab === id
                   ? 'text-blue-500 border-b-2 border-blue-500'
                   : 'text-gray-400 hover:text-gray-600 dark:hover:text-gray-300'}`}>
               {lbl}
@@ -589,43 +653,43 @@ function DetailPanel({ cell, onClose, dark }) {
         </div>
       )}
 
-      {/* body */}
+      {/* Body */}
       <div className="flex-1 min-h-0 overflow-y-auto">
 
         {loading && (
           <div className="flex h-full items-center justify-center">
-            <div className="w-4 h-4 border-2 border-blue-400 border-t-transparent rounded-full animate-spin" />
+            <div className="w-5 h-5 border-2 border-blue-400 border-t-transparent rounded-full animate-spin" />
           </div>
         )}
 
-        {!cell && !loading && (
-          <div className="flex h-full items-center justify-center p-6">
-            <div className="text-center">
-              <div className="text-2xl mb-2 opacity-30">📊</div>
-              <div className="text-[10px] text-gray-400">Click any cell in the heatmap to explore that month</div>
-            </div>
+        {/* Network error */}
+        {!loading && dataError && (
+          <div className="p-4 text-center">
+            <div className="text-[10px] text-red-400 mb-1">{dataError}</div>
+            <div className="text-[9px] text-gray-400">Try clicking the cell again</div>
           </div>
         )}
 
-        {cell && !loading && !available && (
+        {/* No data (pre-2021 or missing) */}
+        {!loading && !dataError && !available && (
           <div className="p-4 text-center">
             <div className="text-xl mb-1">📂</div>
             <div className="text-[10px] text-gray-400 leading-relaxed">
-              {cell.year < 2020
-                ? 'Daily charts from 2020 only.\nHistorical return shown in heatmap.'
-                : 'No data for this period.'}
+              Daily chart data is only available from 2021.<br />
+              The heatmap return is from historical records.
             </div>
           </div>
         )}
 
         {/* Chart tab */}
-        {cell && !loading && available && tab === 'chart' && (
+        {!loading && !dataError && available && tab === 'chart' && (
           <div>
-            <div style={{ height: 240 }} className="bg-gray-50 dark:bg-gray-950 border-b border-gray-100 dark:border-gray-800">
+            <div style={{ height: 200 }} className="bg-gray-50 dark:bg-gray-950 border-b border-gray-100 dark:border-gray-800">
               {candles?.length
                 ? <MonthChart candles={candles} dark={dark} />
-                : <div className="h-full flex items-center justify-center text-xs text-gray-400">No candles</div>}
+                : <div className="h-full flex items-center justify-center text-xs text-gray-400">No candle data</div>}
             </div>
+
             {stats && (
               <div className="p-2.5 space-y-2">
                 <div className="grid grid-cols-2 gap-1">
@@ -644,11 +708,11 @@ function DetailPanel({ cell, onClose, dark }) {
                     </div>
                   ))}
                 </div>
+
                 <div className="grid grid-cols-3 gap-1">
                   <div className="rounded bg-gray-50 dark:bg-gray-800/80 px-2 py-1.5">
                     <div className="text-[8px] text-gray-400 uppercase tracking-wide">Ret</div>
-                    <div className="text-[10px] font-black mt-0.5"
-                      style={{ color: (stats.month_return ?? 0) >= 0 ? '#22c55e' : '#ef4444' }}>
+                    <div className="text-[10px] font-black mt-0.5" style={{ color: (stats.month_return ?? 0) >= 0 ? '#22c55e' : '#ef4444' }}>
                       {fmtPct(stats.month_return, 2)}
                     </div>
                   </div>
@@ -665,6 +729,7 @@ function DetailPanel({ cell, onClose, dark }) {
                     </div>
                   </div>
                 </div>
+
                 {(stats.best_day || stats.worst_day) && (
                   <div className="space-y-1 pt-1.5 border-t border-gray-100 dark:border-gray-800">
                     {stats.best_day && (
@@ -687,11 +752,14 @@ function DetailPanel({ cell, onClose, dark }) {
                 )}
               </div>
             )}
+
+            {/* Historical rank — always shown if we have value */}
+            <HistoricalRank value={cell.value} allYears={allYears} month={cell.month} />
           </div>
         )}
 
         {/* Sectors tab */}
-        {cell && !loading && available && tab === 'sectors' && (
+        {!loading && !dataError && available && tab === 'sectors' && (
           <div>
             <div className="p-2.5">
               <div className="text-[8px] text-gray-400 uppercase tracking-widest mb-1.5 font-bold">
@@ -704,8 +772,8 @@ function DetailPanel({ cell, onClose, dark }) {
                     <div key={s.index_id}>
                       <button
                         onClick={() => setActiveSectorIndex(isActive ? null : s.name)}
-                        className={`w-full text-left rounded px-1.5 py-1 transition-colors
-                          ${isActive
+                        className={`w-full text-left rounded px-1.5 py-1 transition-colors ${
+                          isActive
                             ? 'bg-blue-50 dark:bg-blue-950/30 ring-1 ring-blue-200 dark:ring-blue-800'
                             : 'hover:bg-gray-50 dark:hover:bg-gray-800/40'}`}
                       >
@@ -716,7 +784,6 @@ function DetailPanel({ cell, onClose, dark }) {
                           sectorIndex={s.name}
                           year={cell.year}
                           month={cell.month}
-                          dark={dark}
                           onClose={() => setActiveSectorIndex(null)}
                         />
                       )}
@@ -746,13 +813,13 @@ function DetailPanel({ cell, onClose, dark }) {
       </div>
 
       <div className="shrink-0 px-2.5 py-1 border-t border-gray-100 dark:border-gray-800">
-        <span className="text-[8px] text-gray-300 dark:text-gray-700">Esc · click cell</span>
+        <span className="text-[8px] text-gray-300 dark:text-gray-700">Esc to close · ← → to navigate</span>
       </div>
     </div>
   )
 }
 
-// ─── Annual bar (compact horizontal) ──────────────────────────────────────────
+// ─── Annual bar ────────────────────────────────────────────────────────────────
 function AnnualBar({ year, annual, isRecent, isLatest }) {
   const maxVal  = 80
   const clamped = Math.min(Math.max(annual ?? 0, -maxVal), maxVal)
@@ -761,19 +828,18 @@ function AnnualBar({ year, annual, isRecent, isLatest }) {
   const color   = isPos
     ? (isLatest ? '#22c55e' : isRecent ? '#4ade80' : '#86efac')
     : (isLatest ? '#ef4444' : isRecent ? '#f87171' : '#fca5a5')
+  const opacity = isLatest ? 1 : isRecent ? 0.9 : 0.65
   return (
-    <div className="flex items-center gap-1.5">
-      <span className={`text-[9px] font-bold w-8 shrink-0 text-right
-        ${isLatest ? 'text-blue-500' : isRecent ? 'text-gray-700 dark:text-gray-300' : 'text-gray-400 dark:text-gray-600'}`}>
+    <div className="flex items-center gap-1.5" style={{ opacity }}>
+      <span className={`text-[9px] font-bold w-8 shrink-0 text-right ${
+        isLatest ? 'text-blue-500' : isRecent ? 'text-gray-700 dark:text-gray-300' : 'text-gray-400 dark:text-gray-600'}`}>
         {year}
       </span>
       <div className="flex-1 flex items-center h-3.5 relative">
         <div className="absolute left-1/2 top-0 bottom-0 w-px bg-gray-200 dark:bg-gray-700" />
         {isPos
-          ? <div className="absolute left-1/2 h-2 rounded-r-sm"
-              style={{ width: `${w / 2}%`, background: color, opacity: isRecent ? 1 : 0.55 }} />
-          : <div className="absolute right-1/2 h-2 rounded-l-sm"
-              style={{ width: `${w / 2}%`, background: color, opacity: isRecent ? 1 : 0.55 }} />
+          ? <div className="absolute left-1/2 h-2 rounded-r-sm" style={{ width: `${w / 2}%`, background: color }} />
+          : <div className="absolute right-1/2 h-2 rounded-l-sm" style={{ width: `${w / 2}%`, background: color }} />
         }
       </div>
       <span className="text-[9px] font-bold w-11 text-right shrink-0" style={{ color }}>
@@ -783,87 +849,97 @@ function AnnualBar({ year, annual, isRecent, isLatest }) {
   )
 }
 
-// ─── Seasonality mini heatmap grid ───────────────────────────────────────────
-function SeasonGrid({ wAvg, dark, selectedMonth }) {
-  return (
-    <div className="grid grid-cols-4 gap-1">
-      {wAvg.map((v, i) => (
-        <div key={i}
-          className={`rounded px-1 py-1.5 text-center transition-all
-            ${selectedMonth === i + 1 ? 'ring-2 ring-blue-400 scale-105' : ''}`}
-          style={{ background: cellBg(v, dark) }}>
-          <div className="text-[8px] text-gray-500 dark:text-gray-400">{MONTHS_EN[i]}</div>
-          <div className="text-[9px] font-black" style={{ color: cellFg(v, dark) }}>
-            {v != null ? fmtPct(v) : '—'}
-          </div>
-        </div>
-      ))}
-    </div>
-  )
-}
-
 // ─── Main ─────────────────────────────────────────────────────────────────────
 export default function InsightPage() {
   const { isDark: dark } = useTheme()
-  const [data,     setData]     = useState(null)
-  const [loading,  setLoading]  = useState(false)
-  const [error,    setError]    = useState('')
-  const [useNP,    setUseNP]    = useState(false)
-  const [selected, setSelected] = useState(null)
+  const [data,            setData]            = useState(null)
+  const [loading,         setLoading]         = useState(false)
+  const [error,           setError]           = useState('')
+  const [useNP,           setUseNP]           = useState(false)
+  const [selected,        setSelected]        = useState(null)
+  const [selectedIndexId, setSelectedIndexId] = useState(12)
+  const [yearFilter,      setYearFilter]      = useState('all') // 'all' | '10' | '5'
 
-  const doFetch = useCallback(async () => {
-    setLoading(true); setError('')
+  const doFetch = useCallback(async (indexId) => {
+    setLoading(true); setError(''); setData(null); setSelected(null)
     try {
-      const r = await getMonthlyReturns()
+      const r = await getMonthlyReturns({ index_id: indexId || selectedIndexId })
       setData(r.data)
-      // Auto-select latest available month on first load
+      // Auto-select latest available month
       if (r.data?.latest_data_date && r.data?.years?.length) {
         const dt  = new Date(r.data.latest_data_date)
         const yr  = dt.getFullYear()
         const mo  = dt.getMonth() + 1
         const row = r.data.years.find(y => y.year === yr)
         const val = row?.months?.[mo - 1] ?? null
-        setSelected(p => p ? p : { year: yr, month: mo, value: val })
+        setSelected({ year: yr, month: mo, value: val })
       }
-    } catch {
-      setError('Failed to load NEPSE data.')
+    } catch (err) {
+      setError(err.response?.data?.message || err.response?.data?.error || 'Failed to load NEPSE data.')
     } finally {
       setLoading(false)
     }
-  }, [])
-  useEffect(() => { doFetch() }, [doFetch])
+  }, [selectedIndexId])
 
-  const years      = data?.years || []
+  useEffect(() => { doFetch(selectedIndexId) }, [selectedIndexId]) // eslint-disable-line react-hooks/exhaustive-deps
+
+  const allYears   = data?.years || []
   const latestDate = data?.latest_data_date || null
   const latestDt   = latestDate ? new Date(latestDate) : new Date()
   const curYear    = latestDt.getFullYear()
   const curMon     = latestDt.getMonth() + 1
 
-  const recentSet = new Set(years.slice(0, RECENT_N).map(y => y.year))
+  // Year range filter
+  const years = allYears.filter(y => {
+    if (yearFilter === '5')  return y.year >= curYear - 4
+    if (yearFilter === '10') return y.year >= curYear - 9
+    return true
+  })
+
+  const recentSet = new Set(allYears.slice(0, RECENT_N).map(y => y.year))
   const wAvg      = years.length ? weightedAvg(years)     : (data?.month_averages  || [])
   const wWinRate  = years.length ? weightedWinRate(years) : (data?.month_win_rates || [])
 
-  const validAvg = wAvg.filter(v => v != null)
-  const bestMi   = validAvg.length ? wAvg.indexOf(Math.max(...validAvg)) : -1
-  const worstMi  = validAvg.length ? wAvg.indexOf(Math.min(...validAvg)) : -1
-
-  const LABELS   = useNP ? MONTHS_NP : MONTHS_EN
-  const curRow   = years.find(y => y.year === curYear)
-  const prevRow  = years.find(y => y.year === curYear - 1)
+  const LABELS = useNP ? MONTHS_NP : MONTHS_EN
+  const curRow = allYears.find(y => y.year === curYear)
+  const prevRow = allYears.find(y => y.year === curYear - 1)
 
   const handleCell = useCallback((year, month, value) => {
     setSelected(p => p?.year === year && p?.month === month ? null : { year, month, value })
   }, [])
+
+  // Navigate to prev/next month from the detail panel
+  const handleNavigate = useCallback((dir) => {
+    if (!selected || !allYears.length) return
+    let { year, month } = selected
+    month += dir
+    if (month < 1)  { month = 12; year-- }
+    if (month > 12) { month = 1;  year++ }
+    const row = allYears.find(y => y.year === year)
+    if (!row) return
+    const value = row.months[month - 1] ?? null
+    setSelected({ year, month, value })
+  }, [selected, allYears])
+
+  // Keyboard: arrow keys navigate heatmap, Escape closes detail
+  useEffect(() => {
+    const h = e => {
+      if (['INPUT','TEXTAREA','SELECT'].includes(e.target.tagName)) return
+      if (e.key === 'ArrowLeft')  { e.preventDefault(); handleNavigate(-1) }
+      if (e.key === 'ArrowRight') { e.preventDefault(); handleNavigate(1) }
+      if (e.key === 'Escape')     setSelected(null)
+    }
+    window.addEventListener('keydown', h)
+    return () => window.removeEventListener('keydown', h)
+  }, [handleNavigate])
 
   const annualRows = years.filter(y => y.annual != null)
 
   return (
     <div className="flex flex-1 overflow-hidden min-h-0 bg-white dark:bg-gray-950">
 
-      {/* ══════════════════════════════════════════════════════════════════
-          LEFT PANEL — 220px insight sidebar
-      ══════════════════════════════════════════════════════════════════ */}
-      <div className="w-[220px] min-w-[200px] border-r border-gray-100 dark:border-gray-800
+      {/* ── Left Panel ───────────────────────────────────────────────────── */}
+      <div className="w-[240px] min-w-[220px] border-r border-gray-100 dark:border-gray-800
         bg-white dark:bg-gray-900 flex flex-col shrink-0 overflow-hidden">
         {loading && !data ? (
           <div className="flex-1 flex items-center justify-center">
@@ -873,7 +949,8 @@ export default function InsightPage() {
           <div className="flex-1 flex items-center justify-center p-4 text-center">
             <div>
               <div className="text-red-400 text-xs mb-2">{error}</div>
-              <button onClick={doFetch} className="text-[10px] text-blue-500 underline">Retry</button>
+              <button onClick={() => doFetch(selectedIndexId)}
+                className="text-[10px] text-blue-500 underline">Retry</button>
             </div>
           </div>
         ) : (
@@ -890,30 +967,42 @@ export default function InsightPage() {
             useNP={useNP}
             setUseNP={setUseNP}
             LABELS={LABELS}
+            selectedIndexId={selectedIndexId}
+            setSelectedIndexId={(id) => { setSelectedIndexId(id) }}
           />
         )}
       </div>
 
-      {/* ══════════════════════════════════════════════════════════════════
-          CENTER — heatmap table + analytics
-      ══════════════════════════════════════════════════════════════════ */}
+      {/* ── Center ───────────────────────────────────────────────────────── */}
       <div className="flex-1 flex flex-col min-h-0 min-w-0">
 
-        {/* ── Toolbar strip ── */}
+        {/* Toolbar */}
         <div className="shrink-0 flex items-center justify-between px-3 py-1.5
-          border-b border-gray-100 dark:border-gray-800
-          bg-white dark:bg-gray-950">
+          border-b border-gray-100 dark:border-gray-800 bg-white dark:bg-gray-950">
           <div className="flex items-center gap-2">
             <span className="text-[10px] font-black text-gray-700 dark:text-gray-300 uppercase tracking-widest">
-              Monthly Returns Heatmap
+              Monthly Returns
+            </span>
+            <span className="text-[9px] text-gray-400 dark:text-gray-600 font-medium">
+              {INDEX_OPTIONS.find(o => o.id === selectedIndexId)?.label}
             </span>
             {latestDate && (
-              <span className="text-[9px] text-gray-400 dark:text-gray-600">
-                · {latestDate}
-              </span>
+              <span className="text-[9px] text-gray-300 dark:text-gray-700">· {latestDate}</span>
             )}
           </div>
           <div className="flex items-center gap-1.5">
+            {/* Year filter */}
+            <div className="flex rounded overflow-hidden border border-gray-200 dark:border-gray-700 text-[8px] font-bold">
+              {[['all','All'],['10','10yr'],['5','5yr']].map(([v, lbl]) => (
+                <button key={v} onClick={() => setYearFilter(v)}
+                  className={`px-1.5 py-0.5 transition-colors ${
+                    yearFilter === v
+                      ? 'bg-gray-800 dark:bg-gray-200 text-white dark:text-gray-900'
+                      : 'text-gray-500 dark:text-gray-400 hover:bg-gray-50 dark:hover:bg-gray-800'}`}>
+                  {lbl}
+                </button>
+              ))}
+            </div>
             {selected && (
               <button onClick={() => setSelected(null)}
                 className="text-[9px] text-gray-400 hover:text-gray-600 dark:hover:text-gray-300 px-2 py-0.5
@@ -921,20 +1010,18 @@ export default function InsightPage() {
                 × Clear
               </button>
             )}
-            <button onClick={doFetch} disabled={loading}
-              className="w-5 h-5 flex items-center justify-center rounded
-                border border-gray-200 dark:border-gray-700 text-gray-400
-                hover:bg-gray-50 dark:hover:bg-gray-800 disabled:opacity-30 transition-colors text-xs">
+            <button onClick={() => doFetch(selectedIndexId)} disabled={loading}
+              className="w-6 h-6 flex items-center justify-center rounded border border-gray-200 dark:border-gray-700
+                text-gray-400 hover:bg-gray-50 dark:hover:bg-gray-800 disabled:opacity-30 transition-colors text-xs">
               {loading ? '·' : '↻'}
             </button>
           </div>
         </div>
 
-        {/* ── Scrollable content ── */}
+        {/* Scrollable content */}
         <div className="flex-1 min-h-0 overflow-y-auto overflow-x-auto">
-          <div style={{ minWidth: 560 }}>
+          <div style={{ minWidth: 520 }}>
 
-            {/* Loading */}
             {loading && !data && (
               <div className="flex flex-col items-center justify-center py-20 gap-3">
                 <div className="w-6 h-6 border-2 border-blue-500 border-t-transparent rounded-full animate-spin" />
@@ -942,7 +1029,7 @@ export default function InsightPage() {
               </div>
             )}
 
-            {/* ── Heatmap Table ── */}
+            {/* Heatmap */}
             {data && (
               <div className="px-3 pt-2.5">
                 <table className="w-full border-collapse">
@@ -954,24 +1041,24 @@ export default function InsightPage() {
                       </th>
                       {LABELS.map((m, i) => (
                         <th key={i} className="pb-1.5 text-center text-[9px] font-bold
-                          text-gray-400 dark:text-gray-600 uppercase tracking-wide px-px
-                          min-w-[34px]">
+                          text-gray-400 dark:text-gray-600 uppercase tracking-wide px-px min-w-[34px]">
                           {m}
                         </th>
                       ))}
+                      <th className="pb-1.5 text-right text-[9px] font-bold text-gray-400 dark:text-gray-600 uppercase tracking-wide pl-2 pr-1 min-w-[44px]">
+                        YTD
+                      </th>
                     </tr>
                   </thead>
                   <tbody>
                     {years.map((row) => {
                       const isRecent = recentSet.has(row.year)
                       const isLatest = row.year === curYear
-                      const opacity  = isRecent ? 1.0 : 0.5
+                      const opacity  = isRecent ? 1.0 : 0.6
                       return (
                         <tr key={row.year}
                           style={{ opacity }}
                           className="hover:opacity-100 transition-opacity duration-150">
-
-                          {/* Year label */}
                           <td className="py-0.5 pr-2 sticky left-0 z-10 bg-white dark:bg-gray-950">
                             <div className="flex items-center gap-1">
                               {isLatest ? (
@@ -984,8 +1071,6 @@ export default function InsightPage() {
                               {isLatest && <span className="w-1 h-1 rounded-full bg-blue-400 shrink-0" />}
                             </div>
                           </td>
-
-                          {/* Month cells */}
                           {row.months.map((val, mi) => {
                             const isCur = row.year === curYear && mi + 1 === curMon
                             const isSel = selected?.year === row.year && selected?.month === mi + 1
@@ -996,9 +1081,7 @@ export default function InsightPage() {
                                   disabled={val == null}
                                   className={[
                                     'w-full rounded text-[10px] font-bold select-none transition-all duration-100 leading-none',
-                                    val != null
-                                      ? 'cursor-pointer hover:scale-110 hover:shadow-sm relative'
-                                      : 'cursor-default opacity-20',
+                                    val != null ? 'cursor-pointer hover:scale-110 hover:shadow-sm' : 'cursor-default opacity-20',
                                     isSel ? 'scale-110 shadow-md ring-2 ring-blue-400 ring-offset-1 dark:ring-offset-gray-950 z-10' : '',
                                   ].join(' ')}
                                   style={{
@@ -1014,11 +1097,18 @@ export default function InsightPage() {
                               </td>
                             )
                           })}
+                          {/* Annual return */}
+                          <td className="py-0.5 pl-2 pr-1">
+                            <div className="text-right text-[9px] font-black"
+                              style={{ color: (row.annual ?? 0) >= 0 ? '#22c55e' : '#ef4444' }}>
+                              {row.annual != null ? fmtPct(row.annual) : '—'}
+                            </div>
+                          </td>
                         </tr>
                       )
                     })}
 
-                    {/* ── Weighted Avg row ── */}
+                    {/* Weighted Avg row */}
                     {wAvg.some(v => v != null) && (
                       <tr className="border-t-2 border-gray-200 dark:border-gray-700">
                         <td className="py-1 pr-2 sticky left-0 z-10 bg-white dark:bg-gray-950">
@@ -1027,20 +1117,16 @@ export default function InsightPage() {
                         {wAvg.map((v, i) => (
                           <td key={i} className="py-0.5 px-px">
                             <div className="w-full rounded text-center text-[9px] font-black"
-                              style={{
-                                background: cellBg(v, dark),
-                                color: cellFg(v, dark),
-                                padding: '2px 1px',
-                                opacity: 0.85,
-                              }}>
+                              style={{ background: cellBg(v, dark), color: cellFg(v, dark), padding: '2px 1px', opacity: 0.9 }}>
                               {v != null ? fmtPct(v) : '—'}
                             </div>
                           </td>
                         ))}
+                        <td />
                       </tr>
                     )}
 
-                    {/* ── Win rate row ── */}
+                    {/* Win rate row */}
                     {wWinRate.some(v => v != null) && (
                       <tr>
                         <td className="py-0.5 pr-2 sticky left-0 z-10 bg-white dark:bg-gray-950">
@@ -1062,78 +1148,48 @@ export default function InsightPage() {
                             </td>
                           )
                         })}
+                        <td />
                       </tr>
                     )}
                   </tbody>
                 </table>
 
-                {/* Table legend */}
-                <div className="flex items-center gap-3 mt-1.5 mb-3 text-[8px] text-gray-400 dark:text-gray-600 px-0.5">
+                {/* Legend */}
+                <div className="flex items-center gap-3 mt-1.5 mb-3 text-[8px] text-gray-400 dark:text-gray-600 px-0.5 flex-wrap">
                   <span className="flex items-center gap-1">
                     <span className="w-1 h-1 rounded-full bg-blue-400 inline-block" />
-                    <span className="text-blue-400 font-bold">{curYear}</span>
-                    <span>= live</span>
+                    <span className="text-blue-400 font-bold">{curYear}</span> = live
                   </span>
-                  <span>Recent {RECENT_N} yrs full opacity</span>
+                  <span>Recent {RECENT_N}yr full opacity</span>
                   <span>Avg = weighted ({RECENT_N}yr = 2×)</span>
-                  <span className="ml-auto">Click any cell →</span>
+                  <span>YTD = annual so far</span>
+                  <span className="ml-auto text-gray-300 dark:text-gray-700">← → arrow keys navigate · click cell for detail</span>
                 </div>
               </div>
             )}
 
-            {/* ── Analytics strip ── */}
+            {/* Analytics strip — Annual performance only (removed duplicate SeasonGrid) */}
             {data && !loading && (
               <div className="px-3 pb-6 space-y-3">
-
                 <div className="flex items-center gap-2 pt-1">
                   <div className="h-px flex-1 bg-gray-100 dark:bg-gray-800" />
-                  <span className="text-[8px] font-black text-gray-300 dark:text-gray-700 uppercase tracking-widest px-2">
-                    Analytics
-                  </span>
+                  <span className="text-[8px] font-black text-gray-300 dark:text-gray-700 uppercase tracking-widest px-2">Annual Performance</span>
                   <div className="h-px flex-1 bg-gray-100 dark:bg-gray-800" />
                 </div>
-
-                <div className="grid grid-cols-1 lg:grid-cols-2 gap-3">
-
-                  {/* Seasonality mini heatmap */}
-                  <div className="bg-gray-50 dark:bg-gray-900/50 rounded-xl p-3
-                    border border-gray-100 dark:border-gray-800/50">
-                    <div className="text-[9px] font-black uppercase tracking-widest text-gray-400 mb-0.5">
-                      Monthly Seasonality
-                    </div>
-                    <div className="text-[9px] text-gray-400 dark:text-gray-600 mb-2">
-                      Weighted avg · recent {RECENT_N}yr = 2×
-                      {bestMi >= 0 && (
-                        <span className="ml-2">
-                          <span className="text-green-500 font-bold">↑{MONTHS_EN[bestMi]} {fmtPct(wAvg[bestMi])}</span>
-                          {' · '}
-                          <span className="text-red-400 font-bold">↓{MONTHS_EN[worstMi]} {fmtPct(wAvg[worstMi])}</span>
-                        </span>
-                      )}
-                    </div>
-                    <SeasonGrid wAvg={wAvg} dark={dark} selectedMonth={selected?.month} />
+                <div className="bg-gray-50 dark:bg-gray-900/50 rounded-xl p-3 border border-gray-100 dark:border-gray-800/50">
+                  <div className="text-[9px] text-gray-400 dark:text-gray-600 mb-2">
+                    Brighter = more recent · dimmed = historical
                   </div>
-
-                  {/* Annual performance bar */}
-                  <div className="bg-gray-50 dark:bg-gray-900/50 rounded-xl p-3
-                    border border-gray-100 dark:border-gray-800/50">
-                    <div className="text-[9px] font-black uppercase tracking-widest text-gray-400 mb-0.5">
-                      Annual Performance
-                    </div>
-                    <div className="text-[9px] text-gray-400 dark:text-gray-600 mb-2">
-                      Brighter = more recent · dimmed = historical
-                    </div>
-                    <div className="space-y-px max-h-56 overflow-y-auto pr-1">
-                      {annualRows.map(row => (
-                        <AnnualBar
-                          key={row.year}
-                          year={row.year}
-                          annual={row.annual}
-                          isRecent={recentSet.has(row.year)}
-                          isLatest={row.year === curYear}
-                        />
-                      ))}
-                    </div>
+                  <div className="space-y-px">
+                    {annualRows.map(row => (
+                      <AnnualBar
+                        key={row.year}
+                        year={row.year}
+                        annual={row.annual}
+                        isRecent={recentSet.has(row.year)}
+                        isLatest={row.year === curYear}
+                      />
+                    ))}
                   </div>
                 </div>
               </div>
@@ -1142,13 +1198,13 @@ export default function InsightPage() {
         </div>
       </div>
 
-      {/* ══════════════════════════════════════════════════════════════════
-          RIGHT PANEL — always open, shows latest month by default
-      ══════════════════════════════════════════════════════════════════ */}
+      {/* ── Right Detail Panel ───────────────────────────────────────────── */}
       <DetailPanel
         cell={selected}
         onClose={() => setSelected(null)}
+        onNavigate={handleNavigate}
         dark={dark}
+        allYears={allYears}
       />
     </div>
   )
