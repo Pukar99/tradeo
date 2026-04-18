@@ -1,4 +1,5 @@
 import AIChat from '../components/AIChat'
+import TraderProfile from '../components/TraderProfile'
 import { useAuth } from '../context/AuthContext'
 import { Link } from 'react-router-dom'
 
@@ -28,19 +29,30 @@ function ChatPage() {
   }
 
   return (
-    <div className="w-full h-screen flex flex-col bg-gray-100 dark:bg-gray-900">
-      <div className="flex-1 max-w-3xl mx-auto w-full px-4 py-6 flex flex-col">
-        <div className="mb-4">
-          <h1 className="text-2xl font-bold text-gray-900 dark:text-white">
-            AI Trading Assistant
-          </h1>
-          <p className="text-sm text-gray-400 mt-0.5">
-            Powered by Groq · Knows your portfolio, NEPSE data & verified research
-          </p>
+    <div className="min-h-screen bg-gray-100 dark:bg-gray-900">
+      <div className="max-w-6xl mx-auto px-4 py-6 flex gap-4 h-[calc(100vh-80px)]">
+
+        {/* Left — Trader Profile sidebar */}
+        <div className="hidden lg:flex flex-col w-72 flex-shrink-0 gap-4 overflow-y-auto pb-2">
+          <div>
+            <h2 className="text-[13px] font-bold text-gray-900 dark:text-white mb-0.5">AI Trading Assistant</h2>
+            <p className="text-[10px] text-gray-400">Powered by Groq · NEPSE-aware</p>
+          </div>
+          <TraderProfile />
         </div>
-        <div className="flex-1 bg-white dark:bg-gray-800 rounded-2xl shadow-sm overflow-hidden flex flex-col">
-          <AIChat isFullPage={true} />
+
+        {/* Right — Chat */}
+        <div className="flex-1 flex flex-col min-w-0">
+          {/* Mobile header (hidden on lg) */}
+          <div className="lg:hidden mb-4">
+            <h1 className="text-[16px] font-bold text-gray-900 dark:text-white">AI Trading Assistant</h1>
+            <p className="text-[10px] text-gray-400 mt-0.5">Powered by Groq · Knows your portfolio, NEPSE data & verified research</p>
+          </div>
+          <div className="flex-1 bg-white dark:bg-gray-800 rounded-2xl shadow-sm overflow-hidden flex flex-col">
+            <AIChat isFullPage={true} />
+          </div>
         </div>
+
       </div>
     </div>
   )

@@ -76,6 +76,7 @@ export const changePassword = (data) => API.put('/api/profile/password', data)
 export const sendChatMessage = (data) => API.post('/api/chat/message', data)
 export const sendAgentMessage = (data) => API.post('/api/chat/agent', data)
 export const getChatSuggestions = () => API.get('/api/chat/suggestions')
+export const getTraderProfile = () => API.get('/api/chat/trader-profile')
 
 // Market — new DB-backed endpoints
 export const getMarketSymbols  = ()             => API.get('/api/market/symbols')
