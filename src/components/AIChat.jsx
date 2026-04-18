@@ -817,10 +817,27 @@ function AIChat({ isFullPage = false, onClose }) {
   // P3-002: always-fresh ref so handleSend never closes over stale lastAction
   const lastActionRef = useRef(lastAction)
 
-  // Cancel any in-flight SSE stream on unmount
+  // ── Voice input state ──────────────────────────────────────────────────────
+  // 'idle' | 'listening' | 'processing' | 'error'
+  const [voiceState, setVoiceState]   = useState('idle')
+  const [voiceError, setVoiceError]   = useState('')
+  const [voiceSeconds, setVoiceSeconds] = useState(0)   // recording duration counter
+  const mediaRecorderRef  = useRef(null)
+  const audioChunksRef    = useRef([])
+  const silenceTimerRef   = useRef(null)   // 4s auto-stop timer
+  const recordTickRef     = useRef(null)   // seconds counter interval
+  const audioCtxRef       = useRef(null)
+  const analyserRef       = useRef(null)
+  const silenceFrameRef   = useRef(null)   // rAF for silence detection
+  const streamRef         = useRef(null)
+
+  // Cancel any in-flight SSE stream + voice recording on unmount
   useEffect(() => {
-    return () => { abortCtrlRef.current?.abort() }
-  }, [])
+    return () => {
+      abortCtrlRef.current?.abort()
+      stopVoiceRecording()
+    }
+  }, []) // eslint-disable-line react-hooks/exhaustive-deps
 
   // P4-004: sync lastAction to sessionStorage so undo survives in-tab refresh
   // P3-002: keep ref in sync so handleSend always reads the latest lastAction
@@ -841,6 +858,137 @@ function AIChat({ isFullPage = false, onClose }) {
   useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' })
   }, [messages, journalDraft])
+
+  // ── Voice helpers ──────────────────────────────────────────────────────────
+  function stopVoiceRecording() {
+    clearTimeout(silenceTimerRef.current)
+    clearInterval(recordTickRef.current)
+    cancelAnimationFrame(silenceFrameRef.current)
+    if (mediaRecorderRef.current?.state !== 'inactive') {
+      mediaRecorderRef.current?.stop()
+    }
+    streamRef.current?.getTracks().forEach(t => t.stop())
+    audioCtxRef.current?.close().catch(() => {})
+    audioCtxRef.current   = null
+    analyserRef.current   = null
+    streamRef.current     = null
+  }
+
+  async function transcribeAndSend(chunks, autoSend) {
+    if (!chunks.length) { setVoiceState('idle'); return }
+    setVoiceState('processing')
+    try {
+      const blob     = new Blob(chunks, { type: 'audio/webm' })
+      const formData = new FormData()
+      formData.append('audio', blob, 'audio.webm')
+      const token = localStorage.getItem('token')
+      const res   = await fetch('http://localhost:5000/api/chat/transcribe', {
+        method: 'POST',
+        headers: { Authorization: `Bearer ${token}` },
+        body:    formData,
+      })
+      const data = await res.json()
+      if (!res.ok) throw new Error(data.error || 'Transcription failed')
+      const text = data.text?.trim()
+      if (!text) { setVoiceState('idle'); return }
+      setInput(prev => (prev ? prev + ' ' : '') + text)
+      setVoiceState('idle')
+      if (autoSend) {
+        // small delay so state settles, then fire send with the full new text
+        setTimeout(() => handleSend((input ? input + ' ' : '') + text), 80)
+      } else {
+        inputRef.current?.focus()
+      }
+    } catch (err) {
+      setVoiceError(err.message || 'Transcription failed')
+      setVoiceState('error')
+      setTimeout(() => { setVoiceState('idle'); setVoiceError('') }, 3500)
+    }
+  }
+
+  // ── Voice input toggle ─────────────────────────────────────────────────────
+  const SILENCE_MS    = 4000   // auto-stop after 4 s of silence
+  const SILENCE_THRESHOLD = 8  // RMS below this = silent (0–255 scale)
+
+  const handleVoice = async () => {
+    // Stop if already recording
+    if (voiceState === 'listening') {
+      stopVoiceRecording()
+      const chunks = [...audioChunksRef.current]
+      audioChunksRef.current = []
+      setVoiceState('idle')
+      setVoiceSeconds(0)
+      await transcribeAndSend(chunks, false)
+      return
+    }
+    if (voiceState === 'processing') return
+
+    setVoiceError('')
+    audioChunksRef.current = []
+
+    let stream
+    try {
+      stream = await navigator.mediaDevices.getUserMedia({ audio: true, video: false })
+    } catch {
+      setVoiceError('Microphone access denied')
+      setVoiceState('error')
+      setTimeout(() => { setVoiceState('idle'); setVoiceError('') }, 3500)
+      return
+    }
+    streamRef.current = stream
+
+    // ── Silence detection via AnalyserNode ─────────────────────────────────
+    const ctx      = new (window.AudioContext || window.webkitAudioContext)()
+    audioCtxRef.current = ctx
+    const source   = ctx.createMediaStreamSource(stream)
+    const analyser = ctx.createAnalyser()
+    analyser.fftSize = 256
+    source.connect(analyser)
+    analyserRef.current = analyser
+    const dataArr  = new Uint8Array(analyser.frequencyBinCount)
+
+    let silentSince = Date.now()
+    let hasSpeech   = false
+
+    function checkSilence() {
+      analyser.getByteTimeDomainData(dataArr)
+      // RMS of signal around 128 (silence baseline)
+      let sum = 0
+      for (let i = 0; i < dataArr.length; i++) sum += Math.abs(dataArr[i] - 128)
+      const rms = sum / dataArr.length
+
+      if (rms > SILENCE_THRESHOLD) {
+        silentSince = Date.now()
+        hasSpeech   = true
+        clearTimeout(silenceTimerRef.current)
+        silenceTimerRef.current = setTimeout(async () => {
+          // 4 s of silence after speech → auto-stop + auto-send
+          stopVoiceRecording()
+          const chunks = [...audioChunksRef.current]
+          audioChunksRef.current = []
+          setVoiceState('idle')
+          setVoiceSeconds(0)
+          await transcribeAndSend(chunks, true)
+        }, SILENCE_MS)
+      }
+      silenceFrameRef.current = requestAnimationFrame(checkSilence)
+    }
+    silenceFrameRef.current = requestAnimationFrame(checkSilence)
+
+    // ── MediaRecorder ───────────────────────────────────────────────────────
+    const mimeType = MediaRecorder.isTypeSupported('audio/webm;codecs=opus')
+      ? 'audio/webm;codecs=opus'
+      : 'audio/webm'
+    const recorder = new MediaRecorder(stream, { mimeType })
+    mediaRecorderRef.current = recorder
+
+    recorder.ondataavailable = e => { if (e.data?.size > 0) audioChunksRef.current.push(e.data) }
+    recorder.start(250)  // chunk every 250 ms so we always get data
+
+    setVoiceState('listening')
+    setVoiceSeconds(0)
+    recordTickRef.current = setInterval(() => setVoiceSeconds(s => s + 1), 1000)
+  }
 
   // Handles sending any message (from input or quick actions)
   const handleSend = async (messageText) => {
@@ -1275,29 +1423,104 @@ function AIChat({ isFullPage = false, onClose }) {
             {t('chat.loginToChat')}
           </button>
         ) : (
-          <div className="flex gap-2 items-end">
-            <textarea
-              ref={inputRef}
-              value={input}
-              onChange={e => setInput(e.target.value)}
-              onKeyDown={handleKeyDown}
-              placeholder={t('chat.placeholder')}
-              rows={1}
-              className={`flex-1 border focus:border-green-400 dark:focus:border-green-500 text-gray-800 dark:text-gray-100 placeholder-gray-400 dark:placeholder-gray-500 rounded-xl px-3 py-2 text-xs focus:outline-none resize-none transition-colors ${
-                isFloat
-                  ? 'bg-white/40 dark:bg-white/10 border-white/50 dark:border-white/15 backdrop-blur-sm'
-                  : 'bg-gray-50 dark:bg-gray-900 border-gray-200 dark:border-gray-800'
-              }`}
-            />
-            <button
-              onClick={() => handleSend()}
-              disabled={loading || !input.trim()}
-              className="bg-green-500 hover:bg-green-400 disabled:opacity-30 text-white w-8 h-8 rounded-xl flex items-center justify-center flex-shrink-0 transition-colors shadow-sm"
-            >
-              <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M12 19l9 2-9-18-9 18 9-2zm0 0v-8" />
-              </svg>
-            </button>
+          <div className="flex flex-col gap-1">
+            {/* Voice status bar */}
+            {voiceState === 'listening' && (
+              <div className="flex items-center gap-2 px-3 py-1.5 rounded-lg bg-red-50 dark:bg-red-950/30 border border-red-200 dark:border-red-800">
+                <span className="w-2 h-2 rounded-full bg-red-500 animate-pulse shrink-0" />
+                <span className="text-[10px] text-red-600 dark:text-red-400 font-medium flex-1">
+                  Recording… {voiceSeconds}s
+                </span>
+                <span className="text-[9px] text-red-400 dark:text-red-500">
+                  auto-sends after 4s silence
+                </span>
+              </div>
+            )}
+            {voiceState === 'processing' && (
+              <div className="flex items-center gap-2 px-3 py-1.5 rounded-lg bg-blue-50 dark:bg-blue-950/30 border border-blue-200 dark:border-blue-800">
+                <span className="w-2 h-2 rounded-full bg-blue-500 animate-pulse shrink-0" />
+                <span className="text-[10px] text-blue-600 dark:text-blue-400 font-medium">
+                  Transcribing with Whisper…
+                </span>
+              </div>
+            )}
+            {voiceState === 'error' && voiceError && (
+              <div className="flex items-center gap-2 px-3 py-1.5 rounded-lg bg-red-50 dark:bg-red-950/30 border border-red-200 dark:border-red-800">
+                <span className="text-[10px] text-red-500">{voiceError}</span>
+              </div>
+            )}
+            <div className="flex gap-2 items-end">
+              <textarea
+                ref={inputRef}
+                value={input}
+                onChange={e => setInput(e.target.value)}
+                onKeyDown={handleKeyDown}
+                placeholder={
+                  voiceState === 'listening'   ? 'Listening… speak in Nepali or English'
+                  : voiceState === 'processing' ? 'Transcribing…'
+                  : t('chat.placeholder')
+                }
+                rows={1}
+                className={`flex-1 border focus:border-green-400 dark:focus:border-green-500 text-gray-800 dark:text-gray-100 placeholder-gray-400 dark:placeholder-gray-500 rounded-xl px-3 py-2 text-xs focus:outline-none resize-none transition-colors ${
+                  isFloat
+                    ? 'bg-white/40 dark:bg-white/10 border-white/50 dark:border-white/15 backdrop-blur-sm'
+                    : 'bg-gray-50 dark:bg-gray-900 border-gray-200 dark:border-gray-800'
+                }`}
+              />
+
+              {/* Mic button */}
+              <button
+                onClick={handleVoice}
+                disabled={loading || voiceState === 'processing'}
+                title={
+                  voiceState === 'listening'   ? 'Stop recording (or wait 4s of silence)'
+                  : voiceState === 'processing' ? 'Transcribing…'
+                  : 'Voice input — Nepali / English (Whisper AI)'
+                }
+                className={`w-8 h-8 rounded-xl flex items-center justify-center flex-shrink-0 transition-all border disabled:opacity-40 ${
+                  voiceState === 'listening'
+                    ? 'bg-red-500 border-red-500 text-white shadow-lg shadow-red-500/40'
+                    : voiceState === 'processing'
+                    ? 'bg-blue-100 dark:bg-blue-900/30 border-blue-300 dark:border-blue-700 text-blue-500'
+                    : voiceState === 'error'
+                    ? 'bg-red-100 dark:bg-red-900/30 border-red-300 dark:border-red-700 text-red-500'
+                    : 'border-gray-200 dark:border-gray-700 text-gray-500 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-gray-800 hover:text-gray-700 dark:hover:text-gray-200'
+                }`}
+              >
+                {voiceState === 'listening' ? (
+                  // Animated waveform bars while recording
+                  <svg className="w-4 h-4" viewBox="0 0 16 16" fill="currentColor">
+                    <rect x="1" y="5" width="2" height="6" rx="1" className="animate-[bounce_0.6s_infinite]" />
+                    <rect x="4.5" y="3" width="2" height="10" rx="1" className="animate-[bounce_0.6s_0.1s_infinite]" />
+                    <rect x="8" y="1" width="2" height="14" rx="1" className="animate-[bounce_0.6s_0.2s_infinite]" />
+                    <rect x="11.5" y="3" width="2" height="10" rx="1" className="animate-[bounce_0.6s_0.1s_infinite]" />
+                  </svg>
+                ) : voiceState === 'processing' ? (
+                  // Spinner
+                  <svg className="w-3.5 h-3.5 animate-spin" fill="none" viewBox="0 0 24 24">
+                    <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="3"/>
+                    <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"/>
+                  </svg>
+                ) : (
+                  // Microphone icon
+                  <svg className="w-3.5 h-3.5" viewBox="0 0 16 16" fill="currentColor">
+                    <path d="M8 1a2.5 2.5 0 0 0-2.5 2.5v4a2.5 2.5 0 0 0 5 0v-4A2.5 2.5 0 0 0 8 1z"/>
+                    <path d="M4.5 7.5a.5.5 0 0 0-1 0A4.5 4.5 0 0 0 7.5 12v1.5H6a.5.5 0 0 0 0 1h4a.5.5 0 0 0 0-1H8.5V12a4.5 4.5 0 0 0 4-4.5.5.5 0 0 0-1 0 3.5 3.5 0 0 1-7 0z"/>
+                  </svg>
+                )}
+              </button>
+
+              {/* Send button */}
+              <button
+                onClick={() => handleSend()}
+                disabled={loading || !input.trim()}
+                className="bg-green-500 hover:bg-green-400 disabled:opacity-30 text-white w-8 h-8 rounded-xl flex items-center justify-center flex-shrink-0 transition-colors shadow-sm"
+              >
+                <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M12 19l9 2-9-18-9 18 9-2zm0 0v-8" />
+                </svg>
+              </button>
+            </div>
           </div>
         )}
       </div>
