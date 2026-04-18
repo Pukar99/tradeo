@@ -7,7 +7,7 @@ import { useChatRefresh } from '../utils/chatEvents'
 import {
   PieChart, Pie, Cell, Tooltip, ResponsiveContainer,
   BarChart, Bar, XAxis, YAxis, ReferenceLine,
-  AreaChart, Area,
+  AreaChart, Area, LineChart, Line, CartesianGrid,
 } from 'recharts'
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
@@ -693,6 +693,131 @@ function GroupedPositionRows({ symbol, entries, onChart }) {
   )
 }
 
+// ── Drawdown + Equity Widget ──────────────────────────────────────────────────
+
+function DrawdownWidget({ equityCurve, currentDrawdown, maxDrawdown, peakEquity, currentEquity, dailyStreak }) {
+  const [tab, setTab] = useState('equity') // 'equity' | 'drawdown'
+
+  if (equityCurve.length === 0) return null
+
+  const ddColor = currentDrawdown === 0 ? 'text-emerald-500'
+    : currentDrawdown < 10 ? 'text-amber-500'
+    : 'text-red-500'
+
+  const ddBg = currentDrawdown === 0 ? 'bg-emerald-50 dark:bg-emerald-900/20 border-emerald-200 dark:border-emerald-800/50'
+    : currentDrawdown < 10 ? 'bg-amber-50 dark:bg-amber-900/20 border-amber-200 dark:border-amber-800/50'
+    : 'bg-red-50 dark:bg-red-900/20 border-red-200 dark:border-red-800/50'
+
+  return (
+    <div className="bg-white dark:bg-gray-900 rounded-2xl border border-gray-100 dark:border-gray-800 overflow-hidden">
+      {/* Header */}
+      <div className="flex items-center justify-between px-4 py-3 border-b border-gray-100 dark:border-gray-800">
+        <div className="flex items-center gap-1.5">
+          {[
+            { key: 'equity',   label: 'Equity Curve' },
+            { key: 'drawdown', label: 'Drawdown' },
+          ].map(t => (
+            <button key={t.key} onClick={() => setTab(t.key)}
+              className={`px-3 py-1 rounded-lg text-[10px] font-semibold transition-all ${
+                tab === t.key
+                  ? 'bg-gray-900 dark:bg-white text-white dark:text-gray-900'
+                  : 'text-gray-400 hover:text-gray-600 dark:hover:text-gray-300'
+              }`}>
+              {t.label}
+            </button>
+          ))}
+        </div>
+
+        {/* Summary pills */}
+        <div className="flex items-center gap-2">
+          <div className={`text-[10px] font-semibold px-2.5 py-1 rounded-lg border ${ddBg} ${ddColor}`}>
+            DD: {currentDrawdown.toFixed(1)}%
+          </div>
+          <div className="text-[10px] text-gray-400">
+            Max DD: <span className="font-semibold text-red-400">{maxDrawdown.toFixed(1)}%</span>
+          </div>
+        </div>
+      </div>
+
+      <div className="px-2 pt-3 pb-1">
+        {tab === 'equity' ? (
+          <ResponsiveContainer width="100%" height={180}>
+            <AreaChart data={equityCurve} margin={{ top: 4, right: 8, left: 4, bottom: 0 }}>
+              <defs>
+                <linearGradient id="eqGrad" x1="0" y1="0" x2="0" y2="1">
+                  <stop offset="5%"  stopColor={currentEquity >= 0 ? '#10b981' : '#ef4444'} stopOpacity={0.15} />
+                  <stop offset="95%" stopColor={currentEquity >= 0 ? '#10b981' : '#ef4444'} stopOpacity={0} />
+                </linearGradient>
+              </defs>
+              <CartesianGrid strokeDasharray="3 3" stroke="#f0f0f0" vertical={false} />
+              <XAxis dataKey="date" tick={{ fontSize: 8 }} tickLine={false} axisLine={false}
+                tickFormatter={d => d.slice(5)} interval="preserveStartEnd" />
+              <YAxis tick={{ fontSize: 8 }} tickLine={false} axisLine={false} width={48}
+                tickFormatter={v => `${v >= 0 ? '+' : ''}${(v / 1000).toFixed(0)}k`} />
+              <Tooltip
+                contentStyle={{ fontSize: 10, borderRadius: 8, border: '1px solid #e5e7eb' }}
+                formatter={(v, n, p) => [`Rs.${Number(v).toLocaleString()}`, 'Equity']}
+                labelFormatter={l => l}
+              />
+              <ReferenceLine y={0} stroke="#9ca3af" strokeDasharray="3 3" />
+              <Area type="monotone" dataKey="equity" stroke={currentEquity >= 0 ? '#10b981' : '#ef4444'}
+                strokeWidth={2} fill="url(#eqGrad)" dot={false} />
+            </AreaChart>
+          </ResponsiveContainer>
+        ) : (
+          <ResponsiveContainer width="100%" height={180}>
+            <AreaChart data={equityCurve} margin={{ top: 4, right: 8, left: 4, bottom: 0 }}>
+              <defs>
+                <linearGradient id="ddGrad" x1="0" y1="0" x2="0" y2="1">
+                  <stop offset="5%"  stopColor="#ef4444" stopOpacity={0.2} />
+                  <stop offset="95%" stopColor="#ef4444" stopOpacity={0} />
+                </linearGradient>
+              </defs>
+              <CartesianGrid strokeDasharray="3 3" stroke="#f0f0f0" vertical={false} />
+              <XAxis dataKey="date" tick={{ fontSize: 8 }} tickLine={false} axisLine={false}
+                tickFormatter={d => d.slice(5)} interval="preserveStartEnd" />
+              <YAxis tick={{ fontSize: 8 }} tickLine={false} axisLine={false} width={36}
+                tickFormatter={v => `${v.toFixed(0)}%`} reversed />
+              <Tooltip
+                contentStyle={{ fontSize: 10, borderRadius: 8, border: '1px solid #e5e7eb' }}
+                formatter={(v) => [`${v.toFixed(2)}%`, 'Drawdown']}
+                labelFormatter={l => l}
+              />
+              <Area type="monotone" dataKey="drawdown" stroke="#ef4444"
+                strokeWidth={2} fill="url(#ddGrad)" dot={false} />
+            </AreaChart>
+          </ResponsiveContainer>
+        )}
+      </div>
+
+      {/* Daily streak dots */}
+      {dailyStreak.length > 0 && (
+        <div className="px-4 pb-3 pt-1">
+          <p className="text-[9px] font-semibold uppercase tracking-widest text-gray-400 mb-2">Last {dailyStreak.length} trading days</p>
+          <div className="flex items-center gap-1.5 flex-wrap">
+            {dailyStreak.map((d, i) => (
+              <div key={i} title={`${d.date}: ${d.pnl >= 0 ? '+' : ''}Rs.${d.pnl.toLocaleString()}`}
+                className={`relative group w-5 h-5 rounded-md flex-shrink-0 ${d.win ? 'bg-emerald-400' : 'bg-red-400'}`}>
+                {/* tooltip on hover */}
+                <div className="absolute bottom-full left-1/2 -translate-x-1/2 mb-1.5 hidden group-hover:flex flex-col items-center z-10 pointer-events-none">
+                  <div className="bg-gray-900 text-white text-[9px] px-2 py-1 rounded-lg whitespace-nowrap">
+                    {d.date.slice(5)}: {d.pnl >= 0 ? '+' : ''}Rs.{Math.abs(d.pnl).toLocaleString()}
+                  </div>
+                  <div className="w-1.5 h-1.5 bg-gray-900 rotate-45 -mt-1" />
+                </div>
+              </div>
+            ))}
+            <div className="ml-1 flex items-center gap-2 text-[9px] text-gray-400">
+              <span className="flex items-center gap-1"><span className="w-2 h-2 rounded-sm bg-emerald-400 inline-block" />Win</span>
+              <span className="flex items-center gap-1"><span className="w-2 h-2 rounded-sm bg-red-400 inline-block" />Loss</span>
+            </div>
+          </div>
+        </div>
+      )}
+    </div>
+  )
+}
+
 // ── Main Page ─────────────────────────────────────────────────────────────────
 
 function PortfolioPage() {
@@ -832,6 +957,49 @@ function PortfolioPage() {
     else break
   }
 
+  // ── Equity curve + drawdown ───────────────────────────────────────────────
+  // Sort closed trades chronologically by close date (updated_at)
+  const equityCurve = useMemo(() => {
+    const sorted = [...closedTrades]
+      .filter(t => t.updated_at || t.date)
+      .sort((a, b) => (a.updated_at || a.date) > (b.updated_at || b.date) ? 1 : -1)
+    if (sorted.length === 0) return []
+    let equity = 0
+    let peak = 0
+    return sorted.map(t => {
+      equity += t.realized_pnl
+      if (equity > peak) peak = equity
+      const dd = peak > 0 ? ((peak - equity) / peak) * 100 : 0
+      return {
+        date: (t.updated_at || t.date || '').slice(0, 10),
+        equity: Math.round(equity),
+        drawdown: parseFloat(dd.toFixed(2)),
+        pnl: Math.round(t.realized_pnl),
+        symbol: t.symbol,
+      }
+    })
+  }, [closedTrades])
+
+  const currentDrawdown = equityCurve.length > 0 ? equityCurve[equityCurve.length - 1].drawdown : 0
+  const maxDrawdown     = equityCurve.length > 0 ? Math.max(...equityCurve.map(p => p.drawdown)) : 0
+  const peakEquity      = equityCurve.length > 0 ? Math.max(...equityCurve.map(p => p.equity)) : 0
+  const currentEquity   = equityCurve.length > 0 ? equityCurve[equityCurve.length - 1].equity : 0
+
+  // Daily P&L streak dots — last 14 closed-trade days
+  const dailyStreak = useMemo(() => {
+    const byCloseDate = {}
+    for (const t of closedTrades) {
+      const d = (t.updated_at || t.date || '').slice(0, 10)
+      if (!d) continue
+      if (!byCloseDate[d]) byCloseDate[d] = 0
+      byCloseDate[d] += t.realized_pnl
+    }
+    return Object.entries(byCloseDate)
+      .sort((a, b) => a[0] > b[0] ? 1 : -1)
+      .slice(-14)
+      .map(([date, pnl]) => ({ date, pnl: Math.round(pnl), win: pnl > 0 }))
+  }, [closedTrades])
+
   // Grouped open positions
   const grouped = openPositions.reduce((map, t) => { if (!map[t.symbol]) map[t.symbol] = []; map[t.symbol].push(t); return map }, {})
   const groupedEntries = Object.entries(grouped)
@@ -879,7 +1047,7 @@ function PortfolioPage() {
       </div>
 
       {/* ── Top stats strip ──────────────────────────────────────────────────── */}
-      <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-2">
+      <div className="grid grid-cols-2 sm:grid-cols-4 lg:grid-cols-8 gap-2">
         {[
           {
             label: 'Total P&L',
@@ -923,6 +1091,20 @@ function PortfolioPage() {
             sub: 'per trade avg',
             accent: 'border-t-pink-400',
           },
+          {
+            label: 'Curr. Drawdown',
+            value: equityCurve.length > 0 ? `${currentDrawdown.toFixed(1)}%` : '—',
+            valueClass: currentDrawdown === 0 ? 'text-emerald-500' : currentDrawdown < 10 ? 'text-amber-500' : 'text-red-500',
+            sub: `max: ${maxDrawdown.toFixed(1)}%`,
+            accent: currentDrawdown === 0 ? 'border-t-emerald-400' : currentDrawdown < 10 ? 'border-t-amber-400' : 'border-t-red-500',
+          },
+          {
+            label: 'Peak Equity',
+            value: peakEquity > 0 ? `+${fmtRs(peakEquity)}` : '—',
+            valueClass: 'text-blue-500',
+            sub: `current: ${currentEquity >= 0 ? '+' : ''}${fmtRs(currentEquity)}`,
+            accent: 'border-t-blue-400',
+          },
         ].map((s, i) => (
           <div key={i} className={`bg-white dark:bg-gray-900 rounded-2xl border border-gray-100 dark:border-gray-800 border-t-2 ${s.accent} px-3.5 py-3`}>
             <p className="text-[9px] font-semibold uppercase tracking-widest text-gray-400 mb-1.5">{s.label}</p>
@@ -931,6 +1113,18 @@ function PortfolioPage() {
           </div>
         ))}
       </div>
+
+      {/* ── Equity Curve + Drawdown ─────────────────────────────────────────── */}
+      {equityCurve.length > 1 && (
+        <DrawdownWidget
+          equityCurve={equityCurve}
+          currentDrawdown={currentDrawdown}
+          maxDrawdown={maxDrawdown}
+          peakEquity={peakEquity}
+          currentEquity={currentEquity}
+          dailyStreak={dailyStreak}
+        />
+      )}
 
       {/* ── Risk Heat Dashboard ─────────────────────────────────────────────── */}
       {openPositions.length > 0 && <RiskHeatDashboard positions={openPositions} />}
