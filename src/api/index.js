@@ -156,3 +156,14 @@ export const getRuleViolations   = ()         => API.get('/api/rules/violations'
 export const getBenchmarkCompare = ()         => API.get('/api/benchmark/compare')
 export const benchmarkContribute = ()         => API.post('/api/benchmark/contribute')
 export const benchmarkOptOut     = ()         => API.post('/api/benchmark/opt-out')
+
+// Meroshare
+export const getMeroshareDpList      = ()              => API.get('/api/meroshare/dp-list')
+export const getMeroshareAccounts    = ()              => API.get('/api/meroshare/accounts')
+export const addMeroshareAccount     = (data)          => API.post('/api/meroshare/accounts', data)
+export const deleteMeroshareAccount  = (id)            => API.delete(`/api/meroshare/accounts/${id}`)
+export const getMeroshareIPOs        = (accountId)     => API.get('/api/meroshare/ipos', { params: accountId ? { account_id: accountId } : {} })
+export const getMeroshareResults     = (accountId)     => API.get('/api/meroshare/results', { params: accountId ? { account_id: accountId } : {} })
+export const applyMeroshareIPO       = (data)          => API.post('/api/meroshare/apply', data)
+export const applyMeroshareIPOBulk   = (data)          => API.post('/api/meroshare/apply-bulk', data)
+export const getMerosharePortfolio   = (accountId)     => API.get('/api/meroshare/portfolio', { params: accountId ? { account_id: accountId } : {} })
