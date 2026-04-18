@@ -137,3 +137,6 @@ export const getTradeDebrief = (tradeData) => API.post('/api/chat/debrief', trad
 
 // What If I Had Held? Simulator
 export const getWhatIf = (params) => API.get('/api/market/what-if', { params })
+
+// Corporate Actions Calendar
+export const getCorporateActions = () => API.get('/api/market/corporate-actions')
