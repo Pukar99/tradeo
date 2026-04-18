@@ -1085,6 +1085,32 @@ function LoggedInHome() {
               ))}
             </div>
           </div>
+
+          {/* Quick Tools */}
+          <div className="bg-white dark:bg-gray-900 rounded-2xl border border-gray-100 dark:border-gray-800 flex flex-col">
+            <div className="px-4 py-3 border-b border-gray-100 dark:border-gray-800">
+              <h3 className="text-[11px] font-semibold uppercase tracking-widest text-gray-400 dark:text-gray-500">Quick Tools</h3>
+            </div>
+            <div className="p-3 space-y-1">
+              {[
+                { icon: '📅', label: 'Corporate Actions', desc: 'Dividends, rights, bonuses', to: '/calendar', dot: 'bg-amber-400' },
+                { icon: '⚖️', label: 'Risk Lab', desc: 'Position sizing & risk calculator', to: '/risklab', dot: 'bg-rose-400' },
+              ].map(({ icon, label, desc, to, dot }) => (
+                <Link key={label} to={to} className="flex items-center justify-between px-3 py-2.5 rounded-xl hover:bg-gray-50 dark:hover:bg-gray-800 transition-colors group">
+                  <div className="flex items-center gap-2.5">
+                    <span className={`w-1.5 h-1.5 rounded-full ${dot} flex-shrink-0`} />
+                    <div>
+                      <p className="text-[11px] font-medium text-gray-700 dark:text-gray-200">{label}</p>
+                      <p className="text-[10px] text-gray-400">{desc}</p>
+                    </div>
+                  </div>
+                  <svg className="w-3 h-3 text-gray-300 group-hover:text-green-400 transition-colors flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
+                  </svg>
+                </Link>
+              ))}
+            </div>
+          </div>
         </div>
 
       </div>
