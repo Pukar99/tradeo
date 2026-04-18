@@ -814,6 +814,8 @@ function AIChat({ isFullPage = false, onClose }) {
   const messagesEndRef = useRef(null)
   const inputRef = useRef(null)
   const abortCtrlRef = useRef(null)
+  // P3-002: always-fresh ref so handleSend never closes over stale lastAction
+  const lastActionRef = useRef(lastAction)
 
   // Cancel any in-flight SSE stream on unmount
   useEffect(() => {
@@ -821,7 +823,9 @@ function AIChat({ isFullPage = false, onClose }) {
   }, [])
 
   // P4-004: sync lastAction to sessionStorage so undo survives in-tab refresh
+  // P3-002: keep ref in sync so handleSend always reads the latest lastAction
   useEffect(() => {
+    lastActionRef.current = lastAction
     if (lastAction) sessionStorage.setItem('chat_lastAction', JSON.stringify(lastAction))
     else sessionStorage.removeItem('chat_lastAction')
   }, [lastAction])
@@ -865,7 +869,7 @@ function AIChat({ isFullPage = false, onClose }) {
           message: text,
           // Exclude streaming/incomplete messages from history — they have empty content
           history: messages.filter(m => !m.streaming && m.content).slice(-6).map(m => ({ role: m.role, content: m.content })),
-          lastAction,
+          lastAction: lastActionRef.current,
           lang,
         }),
       })

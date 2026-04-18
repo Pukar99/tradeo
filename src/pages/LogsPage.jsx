@@ -414,7 +414,8 @@ function CloseTradeModal({ trade, onClose, onSave, isPartial }) {
   const [reason, setReason]       = useState('target')
   const [saving, setSaving]       = useState(false)
 
-  const remaining = trade.remaining_quantity ?? trade.quantity
+  // P2-008: remaining_quantity is a Supabase string — parseInt to avoid silent coercion in arithmetic
+  const remaining = parseInt(trade.remaining_quantity ?? trade.quantity) || 0
 
   const entryPrice = parseFloat(trade.entry_price)
   const pnlPreview = exitPrice
