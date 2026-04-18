@@ -16,6 +16,8 @@ import ChatPage from './pages/ChatPage'
 import RiskLabPage from './pages/RiskLabPage'
 import FloatingChat from './components/FloatingChat'
 import MorningBriefing from './components/MorningBriefing'
+import { PriceAlertContainer, useAlertToasts } from './components/PriceAlertToast'
+import { usePriceAlerts } from './hooks/usePriceAlerts'
 import { useAuth } from './context/AuthContext'
 import { getProfile } from './api'
 
@@ -50,6 +52,8 @@ function AppContent() {
   const { user, updateUser } = useAuth()
   const location = useLocation()
   const [showBriefing, setShowBriefing] = useState(false)
+  const { toasts, addToast, dismissToast } = useAlertToasts()
+  usePriceAlerts({ user, onAlert: addToast })
 
   const isAuthPage = AUTH_ROUTES.includes(location.pathname)
 
@@ -98,6 +102,7 @@ function AppContent() {
       {showBriefing && user && (
         <MorningBriefing onClose={() => setShowBriefing(false)} />
       )}
+      <PriceAlertContainer alerts={toasts} onDismiss={dismissToast} />
     </div>
   )
 }
