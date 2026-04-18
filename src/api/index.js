@@ -141,6 +141,9 @@ export const getWhatIf = (params) => API.get('/api/market/what-if', { params })
 // Corporate Actions Calendar
 export const getCorporateActions = () => API.get('/api/market/corporate-actions')
 
+// Tax Report
+export const getTaxReport        = (fy)       => API.get('/api/tax/report', { params: fy ? { fy } : {} })
+
 // Rules Library
 export const getRules            = ()         => API.get('/api/rules')
 export const addRule             = (data)     => API.post('/api/rules', data)
