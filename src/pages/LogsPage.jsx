@@ -10,7 +10,7 @@ import {
 } from '../api'
 import { useContextMenu } from '../components/ContextMenu'
 import { useChatRefresh, dispatchDebrief } from '../utils/chatEvents'
-import { getTradeDebrief, getWhatIf } from '../api'
+import { getTradeDebrief, getWhatIf, getRules, addRule, updateRule, deleteRule, getRuleViolations } from '../api'
 
 // ── Constants ─────────────────────────────────────────────────────────────────
 
@@ -1242,6 +1242,356 @@ function tradeDuration(dateStr) {
   const days  = Math.round((now - start) / 86400000)
   if (days === 1) return '1d'
   return `${days}d`
+}
+
+// ── Rules Panel ───────────────────────────────────────────────────────────────
+
+const RULE_CATEGORIES = ['General', 'Entry', 'Exit', 'Risk Management', 'Psychology']
+
+const VIOLATION_COLORS = {
+  NO_SL:              { bg: 'bg-red-50 dark:bg-red-900/20',    border: 'border-red-200 dark:border-red-800/50',    dot: 'bg-red-500',    text: 'text-red-600 dark:text-red-400' },
+  RR_BELOW_1:         { bg: 'bg-amber-50 dark:bg-amber-900/20', border: 'border-amber-200 dark:border-amber-800/50', dot: 'bg-amber-500',  text: 'text-amber-600 dark:text-amber-400' },
+  FOMO_TAG:           { bg: 'bg-orange-50 dark:bg-orange-900/20',border: 'border-orange-200 dark:border-orange-800/50',dot: 'bg-orange-500',text: 'text-orange-600 dark:text-orange-400' },
+  NO_ENTRY_REASON:    { bg: 'bg-purple-50 dark:bg-purple-900/20',border: 'border-purple-200 dark:border-purple-800/50',dot: 'bg-purple-500',text: 'text-purple-600 dark:text-purple-400' },
+  NO_EXIT_REFLECTION: { bg: 'bg-blue-50 dark:bg-blue-900/20',  border: 'border-blue-200 dark:border-blue-800/50',  dot: 'bg-blue-500',   text: 'text-blue-600 dark:text-blue-400' },
+}
+
+function RulesPanel() {
+  const [rules, setRules]               = useState([])
+  const [violations, setViolations]     = useState(null)
+  const [summary, setSummary]           = useState(null)
+  const [loading, setLoading]           = useState(true)
+  const [vLoading, setVLoading]         = useState(false)
+  const [view, setView]                 = useState('rules') // 'rules' | 'violations'
+  const [addText, setAddText]           = useState('')
+  const [addCat, setAddCat]             = useState('General')
+  const [adding, setAdding]             = useState(false)
+  const [editId, setEditId]             = useState(null)
+  const [editText, setEditText]         = useState('')
+  const [editCat, setEditCat]           = useState('General')
+  const [saving, setSaving]             = useState(false)
+  const [error, setError]               = useState(null)
+
+  const fetchRules = useCallback(async () => {
+    try {
+      setLoading(true)
+      const res = await getRules()
+      setRules(res.data)
+    } catch (e) {
+      setError('Failed to load rules')
+    } finally {
+      setLoading(false)
+    }
+  }, [])
+
+  const fetchViolations = useCallback(async () => {
+    try {
+      setVLoading(true)
+      const res = await getRuleViolations()
+      setViolations(res.data.violations)
+      setSummary(res.data.summary)
+    } catch (e) {
+      setError('Failed to load violations')
+    } finally {
+      setVLoading(false)
+    }
+  }, [])
+
+  useEffect(() => { fetchRules() }, [fetchRules])
+
+  const handleAdd = async () => {
+    if (!addText.trim()) return
+    setAdding(true)
+    try {
+      const res = await addRule({ rule_text: addText, category: addCat })
+      setRules(prev => [...prev, res.data])
+      setAddText('')
+    } catch {
+      setError('Failed to add rule')
+    } finally {
+      setAdding(false)
+    }
+  }
+
+  const handleToggle = async (rule) => {
+    try {
+      const res = await updateRule(rule.id, { is_active: !rule.is_active })
+      setRules(prev => prev.map(r => r.id === rule.id ? res.data : r))
+    } catch { /* silent */ }
+  }
+
+  const handleDelete = async (id) => {
+    try {
+      await deleteRule(id)
+      setRules(prev => prev.filter(r => r.id !== id))
+    } catch {
+      setError('Failed to delete rule')
+    }
+  }
+
+  const startEdit = (rule) => {
+    setEditId(rule.id)
+    setEditText(rule.rule_text)
+    setEditCat(rule.category)
+  }
+
+  const handleSaveEdit = async () => {
+    setSaving(true)
+    try {
+      const res = await updateRule(editId, { rule_text: editText, category: editCat })
+      setRules(prev => prev.map(r => r.id === editId ? res.data : r))
+      setEditId(null)
+    } catch {
+      setError('Failed to save')
+    } finally {
+      setSaving(false)
+    }
+  }
+
+  const switchToViolations = () => {
+    setView('violations')
+    if (!violations) fetchViolations()
+  }
+
+  // Group rules by category
+  const grouped = {}
+  for (const rule of rules) {
+    if (!grouped[rule.category]) grouped[rule.category] = []
+    grouped[rule.category].push(rule)
+  }
+
+  return (
+    <div className="space-y-4">
+      {/* Header row */}
+      <div className="flex items-center justify-between">
+        <div className="flex items-center gap-1.5">
+          {[
+            { key: 'rules',      label: `Rules (${rules.length})` },
+            { key: 'violations', label: 'Violations' },
+          ].map(v => (
+            <button key={v.key}
+              onClick={() => v.key === 'violations' ? switchToViolations() : setView('rules')}
+              className={`px-3 py-1.5 rounded-lg text-[11px] font-semibold transition-all ${
+                view === v.key
+                  ? 'bg-gray-900 dark:bg-white text-white dark:text-gray-900'
+                  : 'bg-white dark:bg-gray-900 text-gray-500 dark:text-gray-400 border border-gray-200 dark:border-gray-800 hover:bg-gray-50 dark:hover:bg-gray-800'
+              }`}>
+              {v.label}
+            </button>
+          ))}
+        </div>
+        {view === 'violations' && summary && (
+          <div className="flex items-center gap-3">
+            <span className="text-[10px] text-gray-400">{summary.trades_with_violations} trades with violations</span>
+            <span className="text-[10px] font-semibold text-red-500">Rs.{summary.total_cost.toLocaleString()} cost</span>
+          </div>
+        )}
+      </div>
+
+      {error && (
+        <div className="text-[11px] text-red-500 bg-red-50 dark:bg-red-900/20 rounded-xl px-4 py-2">{error}</div>
+      )}
+
+      {/* ── Rules view ── */}
+      {view === 'rules' && (
+        <div className="space-y-4">
+          {/* Add rule */}
+          <div className="bg-white dark:bg-gray-900 rounded-2xl border border-gray-100 dark:border-gray-800 p-4">
+            <p className="text-[11px] font-semibold text-gray-700 dark:text-gray-200 mb-3">Add a Rule</p>
+            <textarea
+              value={addText}
+              onChange={e => setAddText(e.target.value)}
+              placeholder="e.g. Never enter without a stop-loss set at swing low"
+              className="w-full text-[11px] bg-gray-50 dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-xl px-3 py-2.5 text-gray-700 dark:text-gray-200 resize-none h-16 focus:outline-none focus:ring-1 focus:ring-blue-500 placeholder-gray-400"
+            />
+            <div className="flex items-center gap-2 mt-2">
+              <select
+                value={addCat}
+                onChange={e => setAddCat(e.target.value)}
+                className="text-[10px] bg-gray-50 dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg px-2 py-1.5 text-gray-600 dark:text-gray-300 focus:outline-none"
+              >
+                {RULE_CATEGORIES.map(c => <option key={c} value={c}>{c}</option>)}
+              </select>
+              <button
+                onClick={handleAdd}
+                disabled={adding || !addText.trim()}
+                className="ml-auto px-4 py-1.5 bg-blue-600 text-white text-[11px] font-semibold rounded-lg hover:bg-blue-700 disabled:opacity-50 transition-colors"
+              >
+                {adding ? 'Adding…' : 'Add Rule'}
+              </button>
+            </div>
+          </div>
+
+          {/* Rules list grouped by category */}
+          {loading ? (
+            <div className="text-[11px] text-gray-400 text-center py-8">Loading rules…</div>
+          ) : rules.length === 0 ? (
+            <div className="bg-white dark:bg-gray-900 rounded-2xl border border-gray-100 dark:border-gray-800 p-8 text-center">
+              <p className="text-[13px] text-gray-400">No rules yet</p>
+              <p className="text-[11px] text-gray-300 dark:text-gray-600 mt-1">Document your trading rules above to start tracking violations</p>
+            </div>
+          ) : (
+            Object.entries(grouped).map(([cat, catRules]) => (
+              <div key={cat} className="bg-white dark:bg-gray-900 rounded-2xl border border-gray-100 dark:border-gray-800 overflow-hidden">
+                <div className="px-4 py-2.5 border-b border-gray-100 dark:border-gray-800">
+                  <span className="text-[10px] font-semibold uppercase tracking-widest text-gray-400">{cat}</span>
+                  <span className="ml-2 text-[10px] text-gray-300 dark:text-gray-600">{catRules.length} rule{catRules.length !== 1 ? 's' : ''}</span>
+                </div>
+                <div className="divide-y divide-gray-50 dark:divide-gray-800">
+                  {catRules.map(rule => (
+                    <div key={rule.id} className="px-4 py-3">
+                      {editId === rule.id ? (
+                        /* Edit mode */
+                        <div className="space-y-2">
+                          <textarea
+                            value={editText}
+                            onChange={e => setEditText(e.target.value)}
+                            className="w-full text-[11px] bg-gray-50 dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-xl px-3 py-2 text-gray-700 dark:text-gray-200 resize-none h-14 focus:outline-none focus:ring-1 focus:ring-blue-500"
+                          />
+                          <div className="flex items-center gap-2">
+                            <select
+                              value={editCat}
+                              onChange={e => setEditCat(e.target.value)}
+                              className="text-[10px] bg-gray-50 dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg px-2 py-1 text-gray-600 dark:text-gray-300 focus:outline-none"
+                            >
+                              {RULE_CATEGORIES.map(c => <option key={c} value={c}>{c}</option>)}
+                            </select>
+                            <button onClick={handleSaveEdit} disabled={saving}
+                              className="ml-auto px-3 py-1 bg-blue-600 text-white text-[10px] font-semibold rounded-lg hover:bg-blue-700 disabled:opacity-50">
+                              {saving ? 'Saving…' : 'Save'}
+                            </button>
+                            <button onClick={() => setEditId(null)}
+                              className="px-3 py-1 bg-gray-100 dark:bg-gray-800 text-gray-500 text-[10px] font-semibold rounded-lg hover:bg-gray-200 dark:hover:bg-gray-700">
+                              Cancel
+                            </button>
+                          </div>
+                        </div>
+                      ) : (
+                        /* View mode */
+                        <div className="flex items-start gap-3">
+                          {/* Active toggle */}
+                          <button
+                            onClick={() => handleToggle(rule)}
+                            className={`mt-0.5 w-4 h-4 rounded flex items-center justify-center flex-shrink-0 border transition-colors ${
+                              rule.is_active
+                                ? 'bg-emerald-500 border-emerald-500'
+                                : 'bg-white dark:bg-gray-900 border-gray-300 dark:border-gray-600'
+                            }`}
+                          >
+                            {rule.is_active && (
+                              <svg className="w-2.5 h-2.5 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={3}>
+                                <path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" />
+                              </svg>
+                            )}
+                          </button>
+                          <p className={`flex-1 text-[11px] leading-relaxed ${rule.is_active ? 'text-gray-700 dark:text-gray-200' : 'text-gray-400 line-through'}`}>
+                            {rule.rule_text}
+                          </p>
+                          <div className="flex items-center gap-1 flex-shrink-0">
+                            <button onClick={() => startEdit(rule)}
+                              className="p-1 text-gray-400 hover:text-blue-500 transition-colors">
+                              <svg className="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                                <path strokeLinecap="round" strokeLinejoin="round" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
+                              </svg>
+                            </button>
+                            <button onClick={() => handleDelete(rule.id)}
+                              className="p-1 text-gray-400 hover:text-red-500 transition-colors">
+                              <svg className="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                                <path strokeLinecap="round" strokeLinejoin="round" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+                              </svg>
+                            </button>
+                          </div>
+                        </div>
+                      )}
+                    </div>
+                  ))}
+                </div>
+              </div>
+            ))
+          )}
+        </div>
+      )}
+
+      {/* ── Violations view ── */}
+      {view === 'violations' && (
+        <div className="space-y-4">
+          {vLoading ? (
+            <div className="text-[11px] text-gray-400 text-center py-8">Scanning trades…</div>
+          ) : violations?.length === 0 ? (
+            <div className="bg-white dark:bg-gray-900 rounded-2xl border border-gray-100 dark:border-gray-800 p-8 text-center">
+              <p className="text-[13px] text-emerald-500 font-semibold">No violations found</p>
+              <p className="text-[11px] text-gray-400 mt-1">Your trades are following the detectable rules</p>
+            </div>
+          ) : violations ? (
+            <>
+              {/* Summary strip */}
+              {summary && summary.most_common.length > 0 && (
+                <div className="bg-white dark:bg-gray-900 rounded-2xl border border-gray-100 dark:border-gray-800 p-4">
+                  <p className="text-[11px] font-semibold text-gray-700 dark:text-gray-200 mb-3">Most Common Violations</p>
+                  <div className="flex flex-wrap gap-2">
+                    {summary.most_common.map(v => {
+                      const colors = VIOLATION_COLORS[v.code] || {}
+                      return (
+                        <div key={v.code} className={`flex items-center gap-1.5 px-2.5 py-1.5 rounded-xl border text-[10px] font-medium ${colors.bg} ${colors.border} ${colors.text}`}>
+                          <span className={`w-1.5 h-1.5 rounded-full ${colors.dot}`} />
+                          {v.label} · {v.count}×
+                        </div>
+                      )
+                    })}
+                  </div>
+                </div>
+              )}
+
+              {/* Per-trade violations */}
+              <div className="bg-white dark:bg-gray-900 rounded-2xl border border-gray-100 dark:border-gray-800 overflow-hidden">
+                <div className="px-4 py-2.5 border-b border-gray-100 dark:border-gray-800">
+                  <span className="text-[10px] font-semibold uppercase tracking-widest text-gray-400">Trade Violations</span>
+                </div>
+                <div className="divide-y divide-gray-50 dark:divide-gray-800">
+                  {violations.map(v => (
+                    <div key={v.trade_id} className="px-4 py-3">
+                      <div className="flex items-center justify-between mb-2">
+                        <div className="flex items-center gap-2">
+                          <span className="text-[11px] font-bold text-gray-900 dark:text-white">{v.symbol}</span>
+                          <span className={`text-[9px] font-semibold px-1.5 py-0.5 rounded-full ${
+                            v.position === 'LONG'
+                              ? 'bg-emerald-100 dark:bg-emerald-900/30 text-emerald-600 dark:text-emerald-400'
+                              : 'bg-red-100 dark:bg-red-900/30 text-red-600 dark:text-red-400'
+                          }`}>{v.position}</span>
+                          <span className="text-[10px] text-gray-400">{v.date}</span>
+                        </div>
+                        <div className="flex items-center gap-2">
+                          {v.realized_pnl !== 0 && (
+                            <span className={`text-[10px] font-semibold ${v.realized_pnl >= 0 ? 'text-emerald-500' : 'text-red-500'}`}>
+                              {v.realized_pnl >= 0 ? '+' : ''}Rs.{Math.abs(v.realized_pnl).toLocaleString()}
+                            </span>
+                          )}
+                          <span className="text-[9px] text-red-400 font-semibold">{v.violation_count} violation{v.violation_count !== 1 ? 's' : ''}</span>
+                        </div>
+                      </div>
+                      <div className="flex flex-wrap gap-1.5">
+                        {v.violations.map(viol => {
+                          const colors = VIOLATION_COLORS[viol.code] || {}
+                          return (
+                            <div key={viol.code}
+                              title={viol.description}
+                              className={`flex items-center gap-1 px-2 py-1 rounded-lg border text-[9px] font-semibold ${colors.bg} ${colors.border} ${colors.text}`}>
+                              <span className={`w-1 h-1 rounded-full ${colors.dot}`} />
+                              {viol.label}
+                            </div>
+                          )
+                        })}
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            </>
+          ) : null}
+        </div>
+      )}
+    </div>
+  )
 }
 
 // ── Stats Panel ───────────────────────────────────────────────────────────────
@@ -2982,6 +3332,7 @@ function LogsPage() {
           { key: 'trades',  label: tr('trader.tabLog') },
           { key: 'journal', label: tr('trader.tabJournal') },
           { key: 'stats',   label: 'Stats' },
+          { key: 'rules',   label: 'Rules' },
         ].map(tab => (
           <button key={tab.key} onClick={() => setActiveTab(tab.key)}
             className={`px-3.5 py-1.5 rounded-lg text-[11px] font-semibold transition-all ${
@@ -3346,6 +3697,11 @@ function LogsPage() {
       {/* ── Stats tab ── */}
       {activeTab === 'stats' && (
         <StatsPanel trades={trades} />
+      )}
+
+      {/* ── Rules tab ── */}
+      {activeTab === 'rules' && (
+        <RulesPanel />
       )}
 
     </div>

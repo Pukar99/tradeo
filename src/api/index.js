@@ -140,3 +140,10 @@ export const getWhatIf = (params) => API.get('/api/market/what-if', { params })
 
 // Corporate Actions Calendar
 export const getCorporateActions = () => API.get('/api/market/corporate-actions')
+
+// Rules Library
+export const getRules            = ()         => API.get('/api/rules')
+export const addRule             = (data)     => API.post('/api/rules', data)
+export const updateRule          = (id, data) => API.put(`/api/rules/${id}`, data)
+export const deleteRule          = (id)       => API.delete(`/api/rules/${id}`)
+export const getRuleViolations   = ()         => API.get('/api/rules/violations')
