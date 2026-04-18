@@ -3,7 +3,7 @@ import { useAuth } from '../context/AuthContext'
 import { useTheme } from '../context/ThemeContext'
 import { useLanguage } from '../context/LanguageContext'
 import { sendAgentMessage, getChatSuggestions } from '../api'
-import { dispatchChatAction } from '../utils/chatEvents'
+import { dispatchChatAction, DEBRIEF_EVENT } from '../utils/chatEvents'
 import { useNavigate } from 'react-router-dom'
 
 // ── Tradeo logo SVG (reused everywhere in chat) ──────────────────────────────
@@ -855,6 +855,25 @@ function AIChat({ isFullPage = false, onClose }) {
     }
   }, [user])
 
+  // ── Inject AI Trade Coach debrief when fired by LogsPage after close ─────────
+  useEffect(() => {
+    const handler = (e) => {
+      const { symbol, debrief } = e.detail || {}
+      if (!debrief) return
+      setMessages(prev => [
+        ...prev,
+        {
+          role: 'assistant',
+          content: `Coach · ${symbol || 'Trade'} closed\n\n${debrief}`,
+          time: new Date(),
+          isCoach: true,
+        },
+      ])
+    }
+    window.addEventListener(DEBRIEF_EVENT, handler)
+    return () => window.removeEventListener(DEBRIEF_EVENT, handler)
+  }, [])
+
   useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' })
   }, [messages, journalDraft])
@@ -1205,6 +1224,8 @@ function AIChat({ isFullPage = false, onClose }) {
               ? 'bg-green-500 text-white rounded-tr-sm'
               : msg.isError
               ? 'bg-red-50 dark:bg-red-900/20 text-red-500 border border-red-200 dark:border-red-800 rounded-tl-sm'
+              : msg.isCoach
+              ? 'bg-violet-50 dark:bg-violet-900/20 border border-violet-200 dark:border-violet-800/50 text-gray-800 dark:text-gray-200 rounded-tl-sm shadow-sm'
               : isFloat
               ? 'bg-white/55 dark:bg-white/8 border border-white/50 dark:border-white/12 text-gray-800 dark:text-gray-100 rounded-tl-sm shadow-sm backdrop-blur-sm'
               : 'bg-white dark:bg-gray-900 border border-gray-100 dark:border-gray-800 text-gray-800 dark:text-gray-200 rounded-tl-sm shadow-sm'

@@ -87,6 +87,7 @@ export const getTopMovers      = (date)         => API.get('/api/market/top-move
 export const getAIReport       = ()             => API.get('/api/market/ai-report')
 export const getIPOs           = ()             => API.get('/api/market/ipos')
 export const getMarketNews     = ()             => API.get('/api/market/news')
+export const getSectorStrength = ()             => API.get('/api/market/sector-strength')
 
 // Trade Log (new system)
 export const getTradeLog = () => API.get('/api/tradelog')
@@ -129,3 +130,6 @@ export const getVolatilityClusters = (params) => API.get('/api/volatility/cluste
 
 // Complex Tab — Smart Screener
 export const runScreener = (params) => API.get('/api/screener/scan', { params })
+
+// AI Trade Coach — auto-debrief after trade close
+export const getTradeDebrief = (tradeData) => API.post('/api/chat/debrief', tradeData)
