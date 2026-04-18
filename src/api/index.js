@@ -44,6 +44,7 @@ export const addToWatchlist = (data) => API.post('/api/dashboard/watchlist', dat
 export const updateWatchlist = (id, data) => API.put(`/api/dashboard/watchlist/${id}`, data)
 export const removeFromWatchlist = (id) => API.delete(`/api/dashboard/watchlist/${id}`)
 export const getMindset = () => API.get('/api/dashboard/mindset')
+export const checkPriceAlerts = () => API.get('/api/dashboard/alerts/check')
 export const saveMindset = (content) => API.post('/api/dashboard/mindset', { content })
 
 // Research
