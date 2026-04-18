@@ -133,3 +133,6 @@ export const runScreener = (params) => API.get('/api/screener/scan', { params })
 
 // AI Trade Coach — auto-debrief after trade close
 export const getTradeDebrief = (tradeData) => API.post('/api/chat/debrief', tradeData)
+
+// What If I Had Held? Simulator
+export const getWhatIf = (params) => API.get('/api/market/what-if', { params })

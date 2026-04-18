@@ -10,7 +10,7 @@ import {
 } from '../api'
 import { useContextMenu } from '../components/ContextMenu'
 import { useChatRefresh, dispatchDebrief } from '../utils/chatEvents'
-import { getTradeDebrief } from '../api'
+import { getTradeDebrief, getWhatIf } from '../api'
 
 // ── Constants ─────────────────────────────────────────────────────────────────
 
@@ -1681,6 +1681,115 @@ function GroupedTradeRow({ symbol, entries, ltp, onEdit, onClose, onPartialClose
   )
 }
 
+// ── What If Panel ─────────────────────────────────────────────────────────────
+
+function WhatIfPanel({ trade }) {
+  const [data,    setData]    = useState(null)
+  const [loading, setLoading] = useState(false)
+  const [error,   setError]   = useState(null)
+  const [fetched, setFetched] = useState(false)
+
+  // Resolve exit date from updated_at or a fallback
+  const exitDate = (trade.updated_at || trade.date || '').slice(0, 10)
+
+  const load = () => {
+    if (fetched || loading) return
+    setLoading(true)
+    getWhatIf({
+      symbol:      trade.symbol,
+      exit_date:   exitDate,
+      exit_price:  parseFloat(trade.exit_price),
+      entry_price: parseFloat(trade.entry_price),
+      position:    trade.position,
+    })
+      .then(res => { setData(res.data); setFetched(true) })
+      .catch(err => { setError(err.response?.data?.error || 'No data'); setFetched(true) })
+      .finally(() => setLoading(false))
+  }
+
+  if (!trade.exit_price || !exitDate) return null
+
+  const fmtDelta = (d) => {
+    if (d == null) return '—'
+    return `${d > 0 ? '+' : ''}${d.toFixed(2)}%`
+  }
+  const deltaColor = (d) => d == null ? 'text-gray-400' : d > 0 ? 'text-emerald-500' : d < 0 ? 'text-red-400' : 'text-gray-400'
+
+  return (
+    <div className="flex gap-3">
+      <div className="w-0.5 rounded-full bg-amber-200 dark:bg-amber-800/50 flex-shrink-0" />
+      <div className="flex-1">
+        <div className="flex items-center gap-2 mb-1.5">
+          <p className="text-[9px] uppercase tracking-widest font-semibold text-gray-400">What If I Had Held?</p>
+          {!fetched && (
+            <button
+              onClick={load}
+              className="text-[9px] text-amber-500 hover:text-amber-400 font-semibold border border-amber-200 dark:border-amber-800/50 rounded px-1.5 py-0.5 transition-colors"
+            >
+              Load →
+            </button>
+          )}
+        </div>
+
+        {loading && (
+          <div className="flex items-center gap-1.5">
+            <div className="w-3 h-3 border border-amber-400 border-t-transparent rounded-full animate-spin" />
+            <span className="text-[9px] text-gray-400">Fetching post-exit prices…</span>
+          </div>
+        )}
+
+        {error && <p className="text-[9px] text-gray-400 italic">{error}</p>}
+
+        {data && !loading && (
+          <div className="space-y-1.5">
+            {/* Snapshot pills */}
+            <div className="flex items-center gap-2 flex-wrap">
+              {[
+                { label: '+7d',  snap: data.snapshots?.at7  },
+                { label: '+14d', snap: data.snapshots?.at14 },
+                { label: '+30d', snap: data.snapshots?.at30 },
+              ].map(({ label, snap }) => snap && (
+                <div key={label} className="inline-flex items-center gap-1.5 bg-white dark:bg-gray-900 border border-gray-100 dark:border-gray-800 rounded-lg px-2 py-1">
+                  <span className="text-[8px] text-gray-400 font-medium">{label}</span>
+                  <span className="text-[9px] font-semibold text-gray-700 dark:text-gray-300 tabular-nums">Rs.{snap.close.toLocaleString()}</span>
+                  <span className={`text-[9px] font-bold tabular-nums ${deltaColor(snap.delta)}`}>{fmtDelta(snap.delta)}</span>
+                </div>
+              ))}
+            </div>
+
+            {/* Peak & Valley */}
+            <div className="flex items-center gap-3 flex-wrap">
+              {data.peak && (
+                <div className="flex items-center gap-1.5">
+                  <span className="text-[8px] text-gray-400">Peak</span>
+                  <span className="text-[9px] font-semibold text-gray-700 dark:text-gray-300 tabular-nums">Rs.{data.peak.price.toLocaleString()}</span>
+                  <span className={`text-[9px] font-bold ${deltaColor(data.peak.delta)}`}>{fmtDelta(data.peak.delta)}</span>
+                  <span className="text-[8px] text-gray-300 dark:text-gray-700">{data.peak.date}</span>
+                </div>
+              )}
+              {data.valley && (
+                <div className="flex items-center gap-1.5">
+                  <span className="text-[8px] text-gray-400">Valley</span>
+                  <span className="text-[9px] font-semibold text-gray-700 dark:text-gray-300 tabular-nums">Rs.{data.valley.price.toLocaleString()}</span>
+                  <span className={`text-[9px] font-bold ${deltaColor(data.valley.delta)}`}>{fmtDelta(data.valley.delta)}</span>
+                  <span className="text-[8px] text-gray-300 dark:text-gray-700">{data.valley.date}</span>
+                </div>
+              )}
+            </div>
+
+            {/* Context note */}
+            {data.dataPoints != null && (
+              <p className="text-[8px] text-gray-300 dark:text-gray-700 italic">
+                {data.dataPoints} trading days of post-exit data · % vs your exit Rs.{parseFloat(trade.exit_price).toFixed(2)}
+              </p>
+            )}
+          </div>
+        )}
+      </div>
+    </div>
+  )
+}
+
 // ── Trade Row ─────────────────────────────────────────────────────────────────
 
 function TradeRow({ trade, ltp, onEdit, onClose, onPartialClose, onDelete, onJournal, onGoToChart, indented = false, isSelected = false, onToggleSelect }) {
@@ -1948,6 +2057,11 @@ function TradeRow({ trade, ltp, onEdit, onClose, onPartialClose, onDelete, onJou
                     </div>
                   </div>
                 </div>
+              )}
+
+              {/* What If I Had Held — closed trades only */}
+              {trade.status === 'CLOSED' && trade.exit_price && (
+                <WhatIfPanel trade={trade} />
               )}
 
             </div>
