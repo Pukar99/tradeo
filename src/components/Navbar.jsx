@@ -84,6 +84,7 @@ function Navbar() {
     { path: '/portfolio', label: t('nav.portfolio') },
     { path: '/research', label: t('nav.research') },
     { path: '/risklab', label: t('nav.risklab') },
+    { path: '/ipo',     label: 'IPO' },
   ]
 
   // ── Close dropdown on outside click ────────────────────────────────────────

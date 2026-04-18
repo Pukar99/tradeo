@@ -15,6 +15,7 @@ import ProfilePage from './pages/ProfilePage'
 import ChatPage from './pages/ChatPage'
 import RiskLabPage from './pages/RiskLabPage'
 import CalendarPage from './pages/CalendarPage'
+import IPOPage from './pages/IPOPage'
 import FloatingChat from './components/FloatingChat'
 import MorningBriefing from './components/MorningBriefing'
 import { PriceAlertContainer, useAlertToasts } from './components/PriceAlertToast'
@@ -96,6 +97,7 @@ function AppContent() {
         <Route path="/chat" element={<ChatPage />} />
         <Route path="/risklab" element={<RiskLabPage />} />
         <Route path="/calendar" element={<CalendarPage />} />
+        <Route path="/ipo" element={<IPOPage />} />
         <Route path="/login" element={<LoginPage />} />
         <Route path="/signup" element={<SignupPage />} />
         <Route path="*" element={<NotFoundPage />} />
