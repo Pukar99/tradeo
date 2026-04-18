@@ -279,7 +279,7 @@ function IPOPage() {
     setError(null)
     try {
       const res = await getMeroshareIPOs(accountId)
-      setIpos(res.data.ipos || [])
+      setIpos(Array.isArray(res.data.ipos) ? res.data.ipos : [])
     } catch (err) {
       setError(err.response?.data?.error || 'Failed to load IPOs')
     } finally {
@@ -292,7 +292,7 @@ function IPOPage() {
     setError(null)
     try {
       const res = await getMeroshareResults(accountId)
-      setResults(res.data.results || [])
+      setResults(Array.isArray(res.data.results) ? res.data.results : [])
     } catch (err) {
       setError(err.response?.data?.error || 'Failed to load results')
     } finally {
@@ -305,7 +305,7 @@ function IPOPage() {
     setError(null)
     try {
       const res = await getMerosharePortfolio(accountId)
-      setPortfolio(res.data.holdings || [])
+      setPortfolio(Array.isArray(res.data.holdings) ? res.data.holdings : [])
     } catch (err) {
       setError(err.response?.data?.error || 'Failed to load portfolio')
     } finally {
