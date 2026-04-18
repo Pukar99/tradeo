@@ -798,7 +798,14 @@ function AIChat({ isFullPage = false, onClose }) {
   const { t, lang } = useLanguage()
   const navigate = useNavigate()
 
-  const [messages, setMessages] = useState([])
+  const [messages, setMessages] = useState(() => {
+    try {
+      const saved = sessionStorage.getItem('chat_messages')
+      if (!saved) return []
+      // Revive time strings back to Date objects
+      return JSON.parse(saved).map(m => ({ ...m, time: m.time ? new Date(m.time) : undefined }))
+    } catch { return [] }
+  })
   const [input, setInput] = useState('')
   const [loading, setLoading] = useState(false)
   const [suggestions, setSuggestions] = useState([])
@@ -846,6 +853,15 @@ function AIChat({ isFullPage = false, onClose }) {
     if (lastAction) sessionStorage.setItem('chat_lastAction', JSON.stringify(lastAction))
     else sessionStorage.removeItem('chat_lastAction')
   }, [lastAction])
+
+  // Persist messages to sessionStorage — keep last 30 to stay within storage limits
+  // Streaming messages (incomplete) are excluded to avoid storing partial content
+  useEffect(() => {
+    try {
+      const toSave = messages.filter(m => !m.streaming).slice(-30)
+      sessionStorage.setItem('chat_messages', JSON.stringify(toSave))
+    } catch { /* storage full or private mode — fail silently */ }
+  }, [messages])
 
   useEffect(() => {
     if (user) {
@@ -1035,7 +1051,7 @@ function AIChat({ isFullPage = false, onClose }) {
         body: JSON.stringify({
           message: text,
           // Exclude streaming/incomplete messages from history — they have empty content
-          history: messages.filter(m => !m.streaming && m.content).slice(-6).map(m => ({ role: m.role, content: m.content })),
+          history: messages.filter(m => !m.streaming && m.content).slice(-10).map(m => ({ role: m.role, content: m.content })),
           lastAction: lastActionRef.current,
           lang,
         }),
@@ -1288,7 +1304,7 @@ function AIChat({ isFullPage = false, onClose }) {
         <div className="flex items-center gap-1">
           {messages.length > 0 && (
             <button
-              onClick={() => { setMessages([]); setActiveForm(null); setJournalDraft(null); setDisciplineNudge(null); setLastAction(null) }}
+              onClick={() => { setMessages([]); setActiveForm(null); setJournalDraft(null); setDisciplineNudge(null); setLastAction(null); sessionStorage.removeItem('chat_messages') }}
               className="text-gray-400 hover:text-gray-600 dark:hover:text-gray-300 text-[10px] px-2 py-1 rounded-lg hover:bg-black/5 dark:hover:bg-white/5 transition-colors"
             >
               {t('chat.clear')}
