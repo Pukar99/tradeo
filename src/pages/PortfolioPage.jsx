@@ -894,6 +894,74 @@ function PortfolioPage() {
 
   const toggleSort = (col) => setSort(prev => prev.col === col ? { col, dir: prev.dir === 'desc' ? 'asc' : 'desc' } : { col, dir: 'desc' })
 
+  // ── Derived stats (must be above early returns — Rules of Hooks) ──────────
+
+  const closedTrades    = trades.filter(t => t.status === 'CLOSED').map(t => ({ ...t, realized_pnl: parseFloat(t.realized_pnl) || 0 }))
+  const totalInvested   = openPositions.reduce((s, t) => s + (parseFloat(t.entry_price) || 0) * (parseFloat(t.remaining_quantity ?? t.quantity) || 0), 0)
+  const totalUnrealized = openPositions.reduce((s, t) => s + (t.unrealizedPnl ?? 0), 0)
+  const totalRealized   = closedTrades.reduce((s, t) => s + t.realized_pnl, 0)
+  const totalPnl        = totalRealized + totalUnrealized
+  const wins            = closedTrades.filter(t => t.realized_pnl > 0)
+  const losses          = closedTrades.filter(t => t.realized_pnl < 0)
+  const winRate         = closedTrades.length > 0 ? Math.round((wins.length / closedTrades.length) * 100) : null
+  const avgWin          = wins.length   > 0 ? wins.reduce((s, t)   => s + t.realized_pnl, 0) / wins.length : 0
+  const avgLoss         = losses.length > 0 ? Math.abs(losses.reduce((s, t) => s + t.realized_pnl, 0) / losses.length) : 0
+  const expectancy      = winRate != null && avgWin && avgLoss ? (winRate / 100) * avgWin - (1 - winRate / 100) * avgLoss : null
+  const grossWin        = wins.reduce((s, t) => s + t.realized_pnl, 0)
+  const grossLoss       = Math.abs(losses.reduce((s, t) => s + t.realized_pnl, 0))
+  const profitFactor    = grossLoss > 0 ? (grossWin / grossLoss).toFixed(2) : wins.length > 0 ? '∞' : null
+
+  const withPnl    = closedTrades.filter(t => t.realized_pnl != null)
+  const bestTrade  = withPnl.length > 0 ? withPnl.reduce((a, b) => b.realized_pnl > a.realized_pnl ? b : a) : null
+  const worstTrade = withPnl.length > 0 ? withPnl.reduce((a, b) => b.realized_pnl < a.realized_pnl ? b : a) : null
+  const byDate     = [...withPnl].sort((a, b) => ((b.updated_at || b.date || '') > (a.updated_at || a.date || '') ? 1 : -1))
+  let streak = 0, streakType = null
+  for (const t of byDate) {
+    const w = t.realized_pnl > 0
+    if (streakType === null) { streakType = w; streak = 1 }
+    else if (w === streakType) streak++
+    else break
+  }
+
+  const equityCurve = useMemo(() => {
+    const sorted = [...closedTrades]
+      .filter(t => t.updated_at || t.date)
+      .sort((a, b) => (a.updated_at || a.date) > (b.updated_at || b.date) ? 1 : -1)
+    if (sorted.length === 0) return []
+    let equity = 0, peak = 0
+    return sorted.map(t => {
+      equity += t.realized_pnl
+      if (equity > peak) peak = equity
+      const dd = peak > 0 ? ((peak - equity) / peak) * 100 : 0
+      return {
+        date: (t.updated_at || t.date || '').slice(0, 10),
+        equity: Math.round(equity),
+        drawdown: parseFloat(dd.toFixed(2)),
+        pnl: Math.round(t.realized_pnl),
+        symbol: t.symbol,
+      }
+    })
+  }, [closedTrades])
+
+  const currentDrawdown = equityCurve.length > 0 ? equityCurve[equityCurve.length - 1].drawdown : 0
+  const maxDrawdown     = equityCurve.length > 0 ? Math.max(...equityCurve.map(p => p.drawdown)) : 0
+  const peakEquity      = equityCurve.length > 0 ? Math.max(...equityCurve.map(p => p.equity)) : 0
+  const currentEquity   = equityCurve.length > 0 ? equityCurve[equityCurve.length - 1].equity : 0
+
+  const dailyStreak = useMemo(() => {
+    const byCloseDate = {}
+    for (const t of closedTrades) {
+      const d = (t.updated_at || t.date || '').slice(0, 10)
+      if (!d) continue
+      if (!byCloseDate[d]) byCloseDate[d] = 0
+      byCloseDate[d] += t.realized_pnl
+    }
+    return Object.entries(byCloseDate)
+      .sort((a, b) => a[0] > b[0] ? 1 : -1)
+      .slice(-14)
+      .map(([date, pnl]) => ({ date, pnl: Math.round(pnl), win: pnl > 0 }))
+  }, [closedTrades])
+
   // ── Guards ────────────────────────────────────────────────────────────────
 
   if (!user) return (
@@ -926,79 +994,6 @@ function PortfolioPage() {
       </div>
     </div>
   )
-
-  // ── Derived stats ─────────────────────────────────────────────────────────
-
-  const closedTrades    = trades.filter(t => t.status === 'CLOSED').map(t => ({ ...t, realized_pnl: parseFloat(t.realized_pnl) || 0 }))
-  const totalInvested   = openPositions.reduce((s, t) => s + (parseFloat(t.entry_price) || 0) * (parseFloat(t.remaining_quantity ?? t.quantity) || 0), 0)
-  const totalUnrealized = openPositions.reduce((s, t) => s + (t.unrealizedPnl ?? 0), 0)
-  const totalRealized   = closedTrades.reduce((s, t) => s + t.realized_pnl, 0)
-  const totalPnl        = totalRealized + totalUnrealized
-  const wins            = closedTrades.filter(t => t.realized_pnl > 0)
-  const losses          = closedTrades.filter(t => t.realized_pnl < 0)
-  const winRate         = closedTrades.length > 0 ? Math.round((wins.length / closedTrades.length) * 100) : null
-  const avgWin          = wins.length   > 0 ? wins.reduce((s, t)   => s + t.realized_pnl, 0) / wins.length : 0
-  const avgLoss         = losses.length > 0 ? Math.abs(losses.reduce((s, t) => s + t.realized_pnl, 0) / losses.length) : 0
-  const expectancy      = winRate != null && avgWin && avgLoss ? (winRate / 100) * avgWin - (1 - winRate / 100) * avgLoss : null
-  const grossWin        = wins.reduce((s, t) => s + t.realized_pnl, 0)
-  const grossLoss       = Math.abs(losses.reduce((s, t) => s + t.realized_pnl, 0))
-  const profitFactor    = grossLoss > 0 ? (grossWin / grossLoss).toFixed(2) : wins.length > 0 ? '∞' : null
-
-  // Best/worst trades
-  const withPnl  = closedTrades.filter(t => t.realized_pnl != null)
-  const bestTrade  = withPnl.length > 0 ? withPnl.reduce((a, b) => b.realized_pnl > a.realized_pnl ? b : a) : null
-  const worstTrade = withPnl.length > 0 ? withPnl.reduce((a, b) => b.realized_pnl < a.realized_pnl ? b : a) : null
-  const byDate     = [...withPnl].sort((a, b) => ((b.updated_at || b.date || '') > (a.updated_at || a.date || '') ? 1 : -1))
-  let streak = 0, streakType = null
-  for (const t of byDate) {
-    const w = t.realized_pnl > 0
-    if (streakType === null) { streakType = w; streak = 1 }
-    else if (w === streakType) streak++
-    else break
-  }
-
-  // ── Equity curve + drawdown ───────────────────────────────────────────────
-  // Sort closed trades chronologically by close date (updated_at)
-  const equityCurve = useMemo(() => {
-    const sorted = [...closedTrades]
-      .filter(t => t.updated_at || t.date)
-      .sort((a, b) => (a.updated_at || a.date) > (b.updated_at || b.date) ? 1 : -1)
-    if (sorted.length === 0) return []
-    let equity = 0
-    let peak = 0
-    return sorted.map(t => {
-      equity += t.realized_pnl
-      if (equity > peak) peak = equity
-      const dd = peak > 0 ? ((peak - equity) / peak) * 100 : 0
-      return {
-        date: (t.updated_at || t.date || '').slice(0, 10),
-        equity: Math.round(equity),
-        drawdown: parseFloat(dd.toFixed(2)),
-        pnl: Math.round(t.realized_pnl),
-        symbol: t.symbol,
-      }
-    })
-  }, [closedTrades])
-
-  const currentDrawdown = equityCurve.length > 0 ? equityCurve[equityCurve.length - 1].drawdown : 0
-  const maxDrawdown     = equityCurve.length > 0 ? Math.max(...equityCurve.map(p => p.drawdown)) : 0
-  const peakEquity      = equityCurve.length > 0 ? Math.max(...equityCurve.map(p => p.equity)) : 0
-  const currentEquity   = equityCurve.length > 0 ? equityCurve[equityCurve.length - 1].equity : 0
-
-  // Daily P&L streak dots — last 14 closed-trade days
-  const dailyStreak = useMemo(() => {
-    const byCloseDate = {}
-    for (const t of closedTrades) {
-      const d = (t.updated_at || t.date || '').slice(0, 10)
-      if (!d) continue
-      if (!byCloseDate[d]) byCloseDate[d] = 0
-      byCloseDate[d] += t.realized_pnl
-    }
-    return Object.entries(byCloseDate)
-      .sort((a, b) => a[0] > b[0] ? 1 : -1)
-      .slice(-14)
-      .map(([date, pnl]) => ({ date, pnl: Math.round(pnl), win: pnl > 0 }))
-  }, [closedTrades])
 
   // Grouped open positions
   const grouped = openPositions.reduce((map, t) => { if (!map[t.symbol]) map[t.symbol] = []; map[t.symbol].push(t); return map }, {})
