@@ -61,6 +61,152 @@ function EmptySlate({ icon, title, action, onAction }) {
   )
 }
 
+// ── Risk Heat Dashboard ───────────────────────────────────────────────────────
+
+function riskLevel(position, ltp, entry, sl) {
+  if (ltp == null || sl == null || entry == null) return 'unknown'
+  const e = parseFloat(entry), s = parseFloat(sl), l = parseFloat(ltp)
+  if (isNaN(e) || isNaN(s) || isNaN(l)) return 'unknown'
+  const distPct = position === 'LONG'
+    ? ((l - s) / Math.abs(e - s || 1)) * 100
+    : ((s - l) / Math.abs(s - e || 1)) * 100
+  if (distPct < 0)   return 'breached'
+  if (distPct < 15)  return 'critical'
+  if (distPct < 35)  return 'warning'
+  return 'safe'
+}
+
+const RISK_META = {
+  breached: { label: 'SL Breached', dot: 'bg-red-600',    bar: 'bg-red-600',    card: 'border-red-500    bg-red-50    dark:bg-red-900/20',   text: 'text-red-600   dark:text-red-400',   order: 0 },
+  critical: { label: 'Critical',    dot: 'bg-red-500',    bar: 'bg-red-500',    card: 'border-red-400    bg-red-50/60 dark:bg-red-900/10',   text: 'text-red-500   dark:text-red-400',   order: 1 },
+  warning:  { label: 'Warning',     dot: 'bg-amber-400',  bar: 'bg-amber-400',  card: 'border-amber-300  bg-amber-50  dark:bg-amber-900/15', text: 'text-amber-500 dark:text-amber-400', order: 2 },
+  safe:     { label: 'Safe',        dot: 'bg-emerald-400',bar: 'bg-emerald-400',card: 'border-emerald-200 bg-white     dark:bg-gray-900',     text: 'text-emerald-500',                  order: 3 },
+  unknown:  { label: 'No SL',       dot: 'bg-gray-300',   bar: 'bg-gray-300',   card: 'border-gray-200   bg-white     dark:bg-gray-900',     text: 'text-gray-400',                     order: 4 },
+}
+
+function daysHeld(dateStr) {
+  if (!dateStr) return null
+  const diff = Math.floor((Date.now() - new Date(dateStr).getTime()) / 86400000)
+  return Math.max(0, diff)
+}
+
+function breakEven(entry, qty, fees = 0) {
+  const e = parseFloat(entry), q = parseFloat(qty)
+  if (!e || !q) return null
+  return (e + fees / q).toFixed(2)
+}
+
+function RiskHeatDashboard({ positions }) {
+  if (positions.length === 0) return null
+
+  const enriched = positions.map(t => {
+    const ltp   = t.currentPrice
+    const entry = parseFloat(t.entry_price) || 0
+    const qty   = parseFloat(t.remaining_quantity ?? t.quantity) || 0
+    const risk  = riskLevel(t.position, ltp, entry, t.sl)
+    const meta  = RISK_META[risk]
+    const days  = daysHeld(t.date)
+    const be    = breakEven(entry, qty)
+
+    // Distance to SL as % for progress bar (capped 0–100)
+    let slDistPct = null
+    if (ltp != null && t.sl != null) {
+      const s = parseFloat(t.sl)
+      const e = entry
+      const raw = t.position === 'LONG'
+        ? ((parseFloat(ltp) - s) / Math.abs(e - s || 1)) * 100
+        : ((s - parseFloat(ltp)) / Math.abs(s - e || 1)) * 100
+      slDistPct = Math.max(0, Math.min(100, raw))
+    }
+
+    return { ...t, risk, meta, days, be, slDistPct, entry, qty }
+  }).sort((a, b) => a.meta.order - b.meta.order)
+
+  const counts = enriched.reduce((acc, t) => { acc[t.risk] = (acc[t.risk] || 0) + 1; return acc }, {})
+
+  return (
+    <div className="bg-white dark:bg-gray-900 rounded-2xl border border-gray-100 dark:border-gray-800 p-4">
+      {/* Header */}
+      <div className="flex items-center justify-between mb-3">
+        <div className="flex items-center gap-2">
+          <p className="text-[11px] font-semibold uppercase tracking-widest text-gray-400">Risk Heat</p>
+          {['breached','critical','warning','safe'].map(r => counts[r] ? (
+            <span key={r} className={`text-[9px] font-bold px-1.5 py-0.5 rounded-full border ${RISK_META[r].card} ${RISK_META[r].text}`}>
+              {counts[r]} {RISK_META[r].label}
+            </span>
+          ) : null)}
+        </div>
+        <p className="text-[9px] text-gray-300 dark:text-gray-700">sorted by risk · click row to chart</p>
+      </div>
+
+      {/* Cards */}
+      <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 gap-2">
+        {enriched.map(t => (
+          <div key={t.id} className={`rounded-xl border p-3 ${t.meta.card}`}>
+            {/* Top row */}
+            <div className="flex items-center justify-between mb-2">
+              <div className="flex items-center gap-1.5">
+                <div className={`w-2 h-2 rounded-full flex-shrink-0 ${t.meta.dot}`} />
+                <span className="text-[12px] font-bold text-gray-900 dark:text-white tracking-tight">{t.symbol}</span>
+                <span className={`text-[8px] font-semibold px-1.5 py-0.5 rounded-full border ${t.meta.card} ${t.meta.text}`}>
+                  {t.position === 'LONG' ? '↑L' : '↓S'}
+                </span>
+              </div>
+              <div className="flex items-center gap-1.5">
+                {t.days != null && (
+                  <span className="text-[8px] text-gray-400 tabular-nums">{t.days}d</span>
+                )}
+                <span className={`text-[9px] font-bold ${t.meta.text}`}>{t.meta.label}</span>
+              </div>
+            </div>
+
+            {/* Price row */}
+            <div className="flex items-center gap-3 mb-2">
+              <div>
+                <p className="text-[8px] text-gray-400">Entry</p>
+                <p className="text-[10px] font-semibold text-gray-700 dark:text-gray-200 tabular-nums">Rs.{t.entry.toFixed(2)}</p>
+              </div>
+              {t.currentPrice != null && (
+                <div>
+                  <p className="text-[8px] text-gray-400">LTP</p>
+                  <p className="text-[10px] font-semibold text-gray-700 dark:text-gray-200 tabular-nums">Rs.{Number(t.currentPrice).toLocaleString()}</p>
+                </div>
+              )}
+              {t.sl && (
+                <div>
+                  <p className="text-[8px] text-gray-400">SL</p>
+                  <p className="text-[10px] font-semibold text-red-400 tabular-nums">{t.sl}</p>
+                </div>
+              )}
+              {t.be && (
+                <div className="ml-auto">
+                  <p className="text-[8px] text-gray-400">Break-even</p>
+                  <p className="text-[10px] font-semibold text-gray-500 dark:text-gray-400 tabular-nums">Rs.{t.be}</p>
+                </div>
+              )}
+            </div>
+
+            {/* SL proximity bar */}
+            {t.slDistPct != null ? (
+              <div>
+                <div className="flex justify-between mb-0.5">
+                  <span className="text-[8px] text-gray-400">SL proximity</span>
+                  <span className={`text-[8px] font-semibold tabular-nums ${t.meta.text}`}>{t.slDistPct.toFixed(0)}% away</span>
+                </div>
+                <div className="h-[3px] bg-gray-200 dark:bg-gray-700 rounded-full overflow-hidden">
+                  <div className={`h-full rounded-full transition-all duration-700 ${t.meta.bar}`} style={{ width: `${t.slDistPct}%` }} />
+                </div>
+              </div>
+            ) : (
+              <p className="text-[8px] text-gray-300 dark:text-gray-700 italic">No stop-loss set</p>
+            )}
+          </div>
+        ))}
+      </div>
+    </div>
+  )
+}
+
 // ── Risk gauge ────────────────────────────────────────────────────────────────
 
 function RiskGauge({ entry, sl, tp, ltp, position, pnlPct }) {
@@ -785,6 +931,9 @@ function PortfolioPage() {
           </div>
         ))}
       </div>
+
+      {/* ── Risk Heat Dashboard ─────────────────────────────────────────────── */}
+      {openPositions.length > 0 && <RiskHeatDashboard positions={openPositions} />}
 
       {/* ── Middle row: sidebar + open positions ────────────────────────────── */}
       <div className="grid grid-cols-1 xl:grid-cols-4 gap-4">
