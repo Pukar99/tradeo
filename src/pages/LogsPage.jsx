@@ -122,6 +122,160 @@ function parseBrokerMessage(msg) {
   return Object.keys(result).length > 0 ? result : null
 }
 
+// ── Pre-Trade Checklist ───────────────────────────────────────────────────────
+
+const DEFAULT_CHECKLIST = [
+  'Is there a clear setup? (breakout, pullback, reversal)',
+  'Is the stop-loss level defined before entry?',
+  'Is the R:R at least 1:2?',
+  'Is position size within risk limits (≤2% of capital)?',
+  'Am I trading from logic, not FOMO or revenge?',
+]
+
+const CHECKLIST_KEY = 'tradeo_checklist_items'
+
+function loadChecklistItems() {
+  try {
+    const saved = localStorage.getItem(CHECKLIST_KEY)
+    if (saved) return JSON.parse(saved)
+  } catch {}
+  return DEFAULT_CHECKLIST
+}
+
+function saveChecklistItems(items) {
+  try { localStorage.setItem(CHECKLIST_KEY, JSON.stringify(items)) } catch {}
+}
+
+function ChecklistModal({ onPass, onClose }) {
+  const [items,   setItems]   = useState(loadChecklistItems)
+  const [checked, setChecked] = useState([])
+  const [editing, setEditing] = useState(false)
+  const [draft,   setDraft]   = useState('')
+
+  const allChecked = items.length > 0 && checked.length === items.length
+
+  const toggle = (i) => setChecked(prev =>
+    prev.includes(i) ? prev.filter(x => x !== i) : [...prev, i]
+  )
+
+  const handlePass = () => {
+    if (!allChecked) return
+    onPass(checked.map(i => items[i]))
+  }
+
+  const handleSaveEdit = () => {
+    const updated = draft.split('\n').map(s => s.trim()).filter(Boolean)
+    if (updated.length === 0) return
+    setItems(updated)
+    saveChecklistItems(updated)
+    setChecked([])
+    setEditing(false)
+  }
+
+  const handleSkip = () => onPass([])  // pass with empty — no checklist enforcement
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-4"
+      style={{ background: 'rgba(0,0,0,0.6)', backdropFilter: 'blur(2px)' }}
+      onClick={onClose}
+    >
+      <div className="bg-white dark:bg-gray-900 rounded-2xl border border-gray-200 dark:border-gray-700 shadow-2xl w-full max-w-md"
+        onClick={e => e.stopPropagation()}
+      >
+        {/* Header */}
+        <div className="px-5 pt-4 pb-3 border-b border-gray-100 dark:border-gray-800 flex items-center justify-between">
+          <div>
+            <p className="text-[13px] font-bold text-gray-900 dark:text-white">Pre-Trade Checklist</p>
+            <p className="text-[10px] text-gray-400 mt-0.5">Check all before entering a trade</p>
+          </div>
+          <div className="flex items-center gap-1.5">
+            <button onClick={() => { setEditing(e => !e); setDraft(items.join('\n')) }}
+              className="text-[9px] text-gray-400 hover:text-gray-600 dark:hover:text-gray-300 px-2 py-1 rounded-lg border border-gray-200 dark:border-gray-700 transition-colors">
+              {editing ? 'Cancel' : 'Edit'}
+            </button>
+            <button onClick={onClose}
+              className="w-6 h-6 flex items-center justify-center rounded-lg text-gray-400 hover:text-gray-600 dark:hover:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors">
+              ✕
+            </button>
+          </div>
+        </div>
+
+        {/* Body */}
+        <div className="px-5 py-4 space-y-2.5 max-h-80 overflow-y-auto">
+          {editing ? (
+            <div>
+              <p className="text-[9px] text-gray-400 mb-1.5">One item per line</p>
+              <textarea
+                value={draft}
+                onChange={e => setDraft(e.target.value)}
+                rows={8}
+                className="w-full text-[11px] bg-gray-50 dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-xl px-3 py-2 text-gray-700 dark:text-gray-200 focus:outline-none focus:border-blue-400 resize-none"
+              />
+              <button onClick={handleSaveEdit}
+                className="mt-2 w-full bg-blue-600 hover:bg-blue-700 text-white text-[11px] font-semibold rounded-xl py-2 transition-colors">
+                Save Items
+              </button>
+            </div>
+          ) : (
+            items.map((item, i) => (
+              <button key={i} onClick={() => toggle(i)}
+                className={`w-full flex items-start gap-3 text-left px-3 py-2.5 rounded-xl border transition-all ${
+                  checked.includes(i)
+                    ? 'bg-emerald-50 dark:bg-emerald-900/20 border-emerald-200 dark:border-emerald-800/50'
+                    : 'bg-gray-50 dark:bg-gray-800/60 border-gray-200 dark:border-gray-700 hover:border-gray-300'
+                }`}>
+                <div className={`w-4 h-4 rounded-full border-2 flex-shrink-0 mt-0.5 flex items-center justify-center transition-all ${
+                  checked.includes(i)
+                    ? 'bg-emerald-500 border-emerald-500'
+                    : 'border-gray-300 dark:border-gray-600'
+                }`}>
+                  {checked.includes(i) && (
+                    <svg className="w-2.5 h-2.5 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M5 13l4 4L19 7" />
+                    </svg>
+                  )}
+                </div>
+                <span className={`text-[11px] leading-snug ${checked.includes(i) ? 'text-emerald-700 dark:text-emerald-400 line-through opacity-70' : 'text-gray-700 dark:text-gray-300'}`}>
+                  {item}
+                </span>
+              </button>
+            ))
+          )}
+        </div>
+
+        {/* Footer */}
+        {!editing && (
+          <div className="px-5 pb-4 pt-3 border-t border-gray-100 dark:border-gray-800 flex items-center gap-2">
+            {/* Progress */}
+            <div className="flex-1">
+              <div className="flex justify-between mb-1">
+                <span className="text-[9px] text-gray-400">{checked.length}/{items.length} checked</span>
+                {allChecked && <span className="text-[9px] text-emerald-500 font-semibold">Ready to trade</span>}
+              </div>
+              <div className="h-1.5 bg-gray-200 dark:bg-gray-700 rounded-full overflow-hidden">
+                <div className={`h-full rounded-full transition-all duration-300 ${allChecked ? 'bg-emerald-500' : 'bg-amber-400'}`}
+                  style={{ width: `${items.length > 0 ? (checked.length / items.length) * 100 : 0}%` }} />
+              </div>
+            </div>
+            <button onClick={handleSkip}
+              className="text-[10px] text-gray-400 hover:text-gray-600 dark:hover:text-gray-300 px-3 py-1.5 rounded-lg transition-colors">
+              Skip
+            </button>
+            <button onClick={handlePass} disabled={!allChecked}
+              className={`px-4 py-1.5 rounded-xl text-[11px] font-semibold transition-colors ${
+                allChecked
+                  ? 'bg-emerald-500 hover:bg-emerald-400 text-white'
+                  : 'bg-gray-100 dark:bg-gray-800 text-gray-400 cursor-not-allowed'
+              }`}>
+              Proceed →
+            </button>
+          </div>
+        )}
+      </div>
+    </div>
+  )
+}
+
 // ── Add / Edit Trade Modal ────────────────────────────────────────────────────
 
 function AddTradeModal({ onClose, onSave, editTrade, openTrades = [] }) {
@@ -2165,6 +2319,7 @@ function LogsPage() {
   const [loading, setLoading]           = useState(true)
   const [activeTab, setActiveTab]       = useState('trades')
   const [showAddModal, setShowAddModal] = useState(false)
+  const [showChecklist, setShowChecklist] = useState(false)
   const [editTrade, setEditTrade]       = useState(null)
   const [closeTrade, setCloseTrade]     = useState(null)
   const [partialTrade, setPartialTrade] = useState(null)
@@ -2548,6 +2703,12 @@ function LogsPage() {
     <div className="w-full px-6 pt-6 pb-12 max-w-7xl mx-auto">
 
       {/* ── Modals ── */}
+      {showChecklist && (
+        <ChecklistModal
+          onClose={() => setShowChecklist(false)}
+          onPass={() => { setShowChecklist(false); setShowAddModal(true) }}
+        />
+      )}
       {showAddModal && (
         <AddTradeModal
           onClose={() => { setShowAddModal(false); setEditTrade(null) }}
@@ -2657,7 +2818,7 @@ function LogsPage() {
             Import CSV
           </button>
           <button
-            onClick={() => { setEditTrade(null); setShowAddModal(true) }}
+            onClick={() => { setEditTrade(null); setShowChecklist(true) }}
             className="flex items-center gap-1.5 bg-blue-600 hover:bg-blue-700 active:bg-blue-800 text-white px-4 py-2 rounded-xl text-[11px] font-semibold transition-colors shadow-sm shadow-blue-200 dark:shadow-none"
           >
             <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
