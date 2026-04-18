@@ -10,7 +10,7 @@ import {
 } from '../api'
 import { useContextMenu } from '../components/ContextMenu'
 import { useChatRefresh, dispatchDebrief } from '../utils/chatEvents'
-import { getTradeDebrief, getWhatIf, getRules, addRule, updateRule, deleteRule, getRuleViolations, getTaxReport } from '../api'
+import { getTradeDebrief, getWhatIf, getRules, addRule, updateRule, deleteRule, getRuleViolations, getTaxReport, getBenchmarkCompare, benchmarkContribute, benchmarkOptOut } from '../api'
 
 // ── Constants ─────────────────────────────────────────────────────────────────
 
@@ -1518,6 +1518,210 @@ const VIOLATION_COLORS = {
   FOMO_TAG:           { bg: 'bg-orange-50 dark:bg-orange-900/20',border: 'border-orange-200 dark:border-orange-800/50',dot: 'bg-orange-500',text: 'text-orange-600 dark:text-orange-400' },
   NO_ENTRY_REASON:    { bg: 'bg-purple-50 dark:bg-purple-900/20',border: 'border-purple-200 dark:border-purple-800/50',dot: 'bg-purple-500',text: 'text-purple-600 dark:text-purple-400' },
   NO_EXIT_REFLECTION: { bg: 'bg-blue-50 dark:bg-blue-900/20',  border: 'border-blue-200 dark:border-blue-800/50',  dot: 'bg-blue-500',   text: 'text-blue-600 dark:text-blue-400' },
+}
+
+// ── Community Benchmarks Panel ────────────────────────────────────────────────
+function BenchmarkPanel() {
+  const [data,    setData]    = useState(null)
+  const [loading, setLoading] = useState(true)
+  const [working, setWorking] = useState(false)
+  const [error,   setError]   = useState(null)
+
+  const load = useCallback(async () => {
+    try {
+      setError(null)
+      const res = await getBenchmarkCompare()
+      setData(res.data)
+    } catch (err) {
+      setError(err.response?.data?.error || 'Failed to load benchmark data')
+    } finally {
+      setLoading(false)
+    }
+  }, [])
+
+  useEffect(() => { load() }, [load])
+
+  const handleOptIn = async () => {
+    setWorking(true)
+    try {
+      await benchmarkContribute()
+      await load()
+    } catch (err) {
+      setError(err.response?.data?.error || 'Failed to contribute stats')
+    } finally {
+      setWorking(false)
+    }
+  }
+
+  const handleOptOut = async () => {
+    setWorking(true)
+    try {
+      await benchmarkOptOut()
+      await load()
+    } catch (err) {
+      setError(err.response?.data?.error || 'Failed to opt out')
+    } finally {
+      setWorking(false)
+    }
+  }
+
+  if (loading) return (
+    <div className="space-y-3 animate-pulse">
+      {[1,2,3].map(i => <div key={i} className="h-16 bg-gray-100 dark:bg-gray-800 rounded-xl" />)}
+    </div>
+  )
+
+  if (error) return (
+    <div className="bg-red-50 dark:bg-red-900/20 border border-red-100 dark:border-red-800/50 rounded-xl px-4 py-3 text-[11px] text-red-500">
+      {error}
+    </div>
+  )
+
+  const { user: u, community: c, opted_in, snapshot_at } = data || {}
+
+  const pctLabel = (pct) => {
+    if (pct == null) return null
+    if (pct >= 75) return { label: `Top ${100 - pct}%`, cls: 'text-emerald-600 dark:text-emerald-400 bg-emerald-50 dark:bg-emerald-900/20' }
+    if (pct >= 50) return { label: `Top ${100 - pct}%`, cls: 'text-blue-600 dark:text-blue-400 bg-blue-50 dark:bg-blue-900/20' }
+    return { label: `Bottom ${pct}%`, cls: 'text-gray-500 bg-gray-100 dark:bg-gray-800' }
+  }
+
+  const StatRow = ({ label, userVal, communityVal, pct, unit = '' }) => {
+    const badge = pctLabel(pct)
+    return (
+      <div className="flex items-center justify-between py-2.5 border-b border-gray-100 dark:border-gray-800 last:border-0">
+        <span className="text-[11px] text-gray-500 dark:text-gray-400">{label}</span>
+        <div className="flex items-center gap-3">
+          {communityVal != null && (
+            <span className="text-[10px] text-gray-400">
+              Community avg: <span className="font-semibold text-gray-600 dark:text-gray-300">{communityVal}{unit}</span>
+            </span>
+          )}
+          <span className={`text-[11px] font-bold ${userVal != null ? 'text-gray-900 dark:text-white' : 'text-gray-400'}`}>
+            {userVal != null ? `${userVal}${unit}` : '—'}
+          </span>
+          {badge && (
+            <span className={`text-[9px] font-semibold px-1.5 py-0.5 rounded-md ${badge.cls}`}>
+              {badge.label}
+            </span>
+          )}
+        </div>
+      </div>
+    )
+  }
+
+  return (
+    <div className="space-y-4">
+
+      {/* Header + opt-in toggle */}
+      <div className="flex flex-wrap items-start justify-between gap-3">
+        <div>
+          <p className="text-[13px] font-bold text-gray-900 dark:text-white">Community Benchmarks</p>
+          <p className="text-[10px] text-gray-400 mt-0.5">
+            Anonymous, opt-in only. Your name and trades are never shared — only aggregate stats.
+          </p>
+        </div>
+        <button
+          onClick={opted_in ? handleOptOut : handleOptIn}
+          disabled={working}
+          className={`text-[11px] px-3 py-1.5 rounded-xl font-semibold transition-colors disabled:opacity-50 ${
+            opted_in
+              ? 'bg-gray-100 dark:bg-gray-800 text-gray-600 dark:text-gray-300 hover:bg-red-50 dark:hover:bg-red-900/20 hover:text-red-500'
+              : 'bg-blue-600 text-white hover:bg-blue-700'
+          }`}
+        >
+          {working ? '…' : opted_in ? 'Opt Out' : 'Contribute My Stats'}
+        </button>
+      </div>
+
+      {/* No trades yet */}
+      {!u && (
+        <div className="bg-gray-50 dark:bg-gray-800/50 rounded-xl px-4 py-6 text-center">
+          <p className="text-[12px] text-gray-400">No closed trades yet. Close at least one trade to see your stats.</p>
+        </div>
+      )}
+
+      {/* Not enough peers yet */}
+      {u && !c && (
+        <div className="bg-amber-50 dark:bg-amber-900/20 border border-amber-100 dark:border-amber-800/50 rounded-xl px-4 py-3">
+          <p className="text-[11px] text-amber-600 dark:text-amber-400 font-semibold mb-0.5">Not enough peers yet</p>
+          <p className="text-[10px] text-amber-500 dark:text-amber-500">
+            Community comparisons appear once 3+ traders have contributed stats. Invite others to Tradeo!
+          </p>
+        </div>
+      )}
+
+      {/* Your stats */}
+      {u && (
+        <div className="bg-white dark:bg-gray-900 rounded-2xl border border-gray-100 dark:border-gray-800 overflow-hidden">
+          <div className="px-4 py-3 border-b border-gray-100 dark:border-gray-800 flex items-center justify-between">
+            <p className="text-[10px] font-semibold uppercase tracking-widest text-gray-400">Your Performance</p>
+            {opted_in && snapshot_at && (
+              <p className="text-[9px] text-gray-400">
+                Contributed {new Date(snapshot_at).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}
+              </p>
+            )}
+          </div>
+          <div className="px-4">
+            <StatRow
+              label="Win Rate"
+              userVal={u.win_rate != null ? `${u.win_rate}%` : null}
+              communityVal={c ? `${c.avg_win_rate}%` : null}
+              pct={c?.percentiles?.win_rate}
+            />
+            <StatRow
+              label="Avg R:R"
+              userVal={u.avg_rr}
+              communityVal={c?.avg_rr}
+              pct={c?.percentiles?.avg_rr}
+            />
+            <StatRow
+              label="Avg Hold (days)"
+              userVal={u.avg_hold_days}
+              communityVal={c?.avg_hold_days}
+              pct={c?.percentiles?.avg_hold_days}
+            />
+            <StatRow
+              label="Total Closed Trades"
+              userVal={u.total_trades}
+              communityVal={c?.avg_total_trades}
+              pct={null}
+            />
+          </div>
+        </div>
+      )}
+
+      {/* Community overview */}
+      {c && (
+        <div className="bg-white dark:bg-gray-900 rounded-2xl border border-gray-100 dark:border-gray-800 overflow-hidden">
+          <div className="px-4 py-3 border-b border-gray-100 dark:border-gray-800">
+            <p className="text-[10px] font-semibold uppercase tracking-widest text-gray-400">
+              Community · {c.peer_count} traders
+            </p>
+          </div>
+          <div className="px-4 grid grid-cols-2 sm:grid-cols-4 divide-x divide-gray-100 dark:divide-gray-800">
+            {[
+              { label: 'Avg Win Rate', val: c.avg_win_rate != null ? `${c.avg_win_rate}%` : '—' },
+              { label: 'Avg R:R',      val: c.avg_rr       != null ? c.avg_rr             : '—' },
+              { label: 'Avg Hold',     val: c.avg_hold_days != null ? `${c.avg_hold_days}d` : '—' },
+              { label: 'Avg Trades',   val: c.avg_total_trades != null ? c.avg_total_trades : '—' },
+            ].map(({ label, val }) => (
+              <div key={label} className="py-4 px-3 text-center">
+                <p className="text-[16px] font-bold text-gray-900 dark:text-white">{val}</p>
+                <p className="text-[9px] text-gray-400 mt-0.5">{label}</p>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+
+      {/* Privacy note */}
+      <p className="text-[9px] text-gray-400 text-center px-4">
+        Only opted-in traders appear in community stats. Stats refresh each time you click "Contribute My Stats".
+        No individual trade data is ever stored or shared.
+      </p>
+    </div>
+  )
 }
 
 function RulesPanel() {
@@ -3314,7 +3518,7 @@ function LogsPage() {
   // ── Render ───────────────────────────────────────────────────────────────────
 
   return (
-    <div className="w-full px-6 pt-6 pb-12 max-w-7xl mx-auto">
+    <div className="w-full px-3 sm:px-6 pt-4 sm:pt-6 pb-12 max-w-7xl mx-auto">
 
       {/* ── Modals ── */}
       {showChecklist && (
@@ -3414,14 +3618,14 @@ function LogsPage() {
       )}
 
       {/* ── Page header ── */}
-      <div className="flex items-start justify-between mb-6">
+      <div className="flex flex-wrap items-start justify-between gap-3 mb-6">
         <div>
           <h1 className="text-[17px] font-bold text-gray-900 dark:text-white tracking-tight">
             {tr('trader.title')}
           </h1>
           <p className="text-[11px] text-gray-400 mt-0.5">{tr('trader.subtitle')}</p>
         </div>
-        <div className="flex items-center gap-2">
+        <div className="flex items-center gap-2 flex-shrink-0">
           <button
             onClick={() => setShowImport(true)}
             className="flex items-center gap-1.5 bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-700 hover:border-gray-300 dark:hover:border-gray-600 text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-200 px-3.5 py-2 rounded-xl text-[11px] font-semibold transition-colors"
@@ -3429,7 +3633,8 @@ function LogsPage() {
             <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-8l-4-4m0 0L8 8m4-4v12" />
             </svg>
-            Import CSV
+            <span className="hidden sm:inline">Import CSV</span>
+            <span className="sm:hidden">Import</span>
           </button>
           <button
             onClick={() => { setEditTrade(null); setShowChecklist(true) }}
@@ -3591,16 +3796,17 @@ function LogsPage() {
       )}
 
       {/* ── Tabs + Journal button ── */}
-      <div className="flex items-center gap-1.5 mb-4">
+      <div className="flex items-center gap-1.5 mb-4 overflow-x-auto no-scrollbar pb-0.5">
         {[
-          { key: 'trades',  label: tr('trader.tabLog') },
-          { key: 'journal', label: tr('trader.tabJournal') },
-          { key: 'stats',   label: 'Stats' },
-          { key: 'rules',   label: 'Rules' },
-          { key: 'tax',     label: 'Tax' },
+          { key: 'trades',     label: tr('trader.tabLog') },
+          { key: 'journal',    label: tr('trader.tabJournal') },
+          { key: 'stats',      label: 'Stats' },
+          { key: 'rules',      label: 'Rules' },
+          { key: 'tax',        label: 'Tax' },
+          { key: 'benchmarks', label: 'Benchmarks' },
         ].map(tab => (
           <button key={tab.key} onClick={() => setActiveTab(tab.key)}
-            className={`px-3.5 py-1.5 rounded-lg text-[11px] font-semibold transition-all ${
+            className={`flex-shrink-0 px-3.5 py-1.5 rounded-lg text-[11px] font-semibold transition-all ${
               activeTab === tab.key
                 ? 'bg-gray-900 dark:bg-white text-white dark:text-gray-900'
                 : 'bg-white dark:bg-gray-900 text-gray-500 dark:text-gray-400 border border-gray-200 dark:border-gray-800 hover:bg-gray-50 dark:hover:bg-gray-800'
@@ -3735,7 +3941,7 @@ function LogsPage() {
             </div>
           ) : (
             <div className="overflow-x-auto">
-              <table className="w-full">
+              <table className="w-full min-w-[640px]">
                 <thead>
                   <tr className="border-b border-gray-100 dark:border-gray-800">
                     {/* Checkbox select-all */}
@@ -3972,6 +4178,11 @@ function LogsPage() {
       {/* ── Tax tab ── */}
       {activeTab === 'tax' && (
         <TaxPanel />
+      )}
+
+      {/* ── Benchmarks tab ── */}
+      {activeTab === 'benchmarks' && (
+        <BenchmarkPanel />
       )}
 
     </div>
