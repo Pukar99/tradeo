@@ -151,3 +151,8 @@ export const addRule             = (data)     => API.post('/api/rules', data)
 export const updateRule          = (id, data) => API.put(`/api/rules/${id}`, data)
 export const deleteRule          = (id)       => API.delete(`/api/rules/${id}`)
 export const getRuleViolations   = ()         => API.get('/api/rules/violations')
+
+// Community Benchmarks
+export const getBenchmarkCompare = ()         => API.get('/api/benchmark/compare')
+export const benchmarkContribute = ()         => API.post('/api/benchmark/contribute')
+export const benchmarkOptOut     = ()         => API.post('/api/benchmark/opt-out')
