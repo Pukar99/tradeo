@@ -9,7 +9,8 @@ import {
   getStockPrice
 } from '../api'
 import { useContextMenu } from '../components/ContextMenu'
-import { useChatRefresh } from '../utils/chatEvents'
+import { useChatRefresh, dispatchDebrief } from '../utils/chatEvents'
+import { getTradeDebrief } from '../api'
 
 // ── Constants ─────────────────────────────────────────────────────────────────
 
@@ -47,6 +48,18 @@ const MARKET_CONDITIONS = [
 
 const INPUT = 'w-full bg-gray-50 dark:bg-gray-800/80 border border-gray-200 dark:border-gray-700 rounded-lg px-3 py-2 text-[12px] text-gray-800 dark:text-white placeholder-gray-400 focus:outline-none focus:ring-1 focus:ring-blue-500 focus:border-blue-500 transition-all'
 const LABEL = 'block text-[10px] font-semibold uppercase tracking-widest text-gray-400 dark:text-gray-500 mb-1.5'
+
+const SETUP_TAGS = ['Breakout', 'Pullback', 'Reversal', 'IPO Entry', 'Rights Entry', 'FOMO', 'Fundamental', 'Other']
+const SETUP_TAG_STYLE = {
+  Breakout:      'bg-blue-50 dark:bg-blue-900/20 border-blue-200 dark:border-blue-800/40 text-blue-600 dark:text-blue-400',
+  Pullback:      'bg-violet-50 dark:bg-violet-900/20 border-violet-200 dark:border-violet-800/40 text-violet-600 dark:text-violet-400',
+  Reversal:      'bg-amber-50 dark:bg-amber-900/20 border-amber-200 dark:border-amber-800/40 text-amber-600 dark:text-amber-400',
+  'IPO Entry':   'bg-emerald-50 dark:bg-emerald-900/20 border-emerald-200 dark:border-emerald-800/40 text-emerald-600 dark:text-emerald-400',
+  'Rights Entry':'bg-teal-50 dark:bg-teal-900/20 border-teal-200 dark:border-teal-800/40 text-teal-600 dark:text-teal-400',
+  FOMO:          'bg-red-50 dark:bg-red-900/20 border-red-200 dark:border-red-800/40 text-red-500 dark:text-red-400',
+  Fundamental:   'bg-indigo-50 dark:bg-indigo-900/20 border-indigo-200 dark:border-indigo-800/40 text-indigo-600 dark:text-indigo-400',
+  Other:         'bg-gray-50 dark:bg-gray-800/50 border-gray-200 dark:border-gray-700 text-gray-500 dark:text-gray-400',
+}
 
 // ── Modal shell ───────────────────────────────────────────────────────────────
 
@@ -115,7 +128,7 @@ function AddTradeModal({ onClose, onSave, editTrade, openTrades = [] }) {
   const [form, setForm] = useState({
     date: new Date().toISOString().split('T')[0],
     symbol: '', position: 'LONG', quantity: '',
-    entry_price: '', sl: '', tp: '', notes: '',
+    entry_price: '', sl: '', tp: '', notes: '', setup_tag: '', entry_reason: '',
   })
   const [brokerMsg, setBrokerMsg]               = useState('')
   const [brokerParsed, setBrokerParsed]         = useState(null)
@@ -137,6 +150,8 @@ function AddTradeModal({ onClose, onSave, editTrade, openTrades = [] }) {
         sl: editTrade.sl || '',
         tp: editTrade.tp || '',
         notes: editTrade.notes || '',
+        setup_tag: editTrade.setup_tag || '',
+        entry_reason: editTrade.entry_reason || '',
       })
     }
   }, [editTrade])
@@ -375,13 +390,40 @@ function AddTradeModal({ onClose, onSave, editTrade, openTrades = [] }) {
             </div>
           )}
 
+          {/* Setup Tag */}
+          <div>
+            <label className={LABEL}>Setup Type <span className="normal-case font-normal text-gray-300">optional</span></label>
+            <select
+              value={form.setup_tag}
+              onChange={e => setForm(p => ({ ...p, setup_tag: e.target.value }))}
+              className={INPUT + ' cursor-pointer'}
+            >
+              <option value="">— None —</option>
+              {SETUP_TAGS.map(tag => (
+                <option key={tag} value={tag}>{tag}</option>
+              ))}
+            </select>
+          </div>
+
+          {/* Decision Log: Why */}
+          <div>
+            <label className={LABEL}>
+              Why I'm taking this trade
+              <span className="normal-case font-normal text-gray-300 ml-1">decision log</span>
+            </label>
+            <textarea value={form.entry_reason}
+              onChange={e => setForm(p => ({ ...p, entry_reason: e.target.value }))}
+              placeholder="e.g. Breakout above 52-week high on 2x volume, sector rotating into banking, SL at swing low 3%"
+              rows={2} className={INPUT + ' resize-none leading-relaxed'} />
+          </div>
+
           {/* Notes */}
           <div>
-            <label className={LABEL}>Trade Thesis</label>
+            <label className={LABEL}>Trade Thesis <span className="normal-case font-normal text-gray-300">optional deeper notes</span></label>
             <textarea value={form.notes}
               onChange={e => setForm(p => ({ ...p, notes: e.target.value }))}
-              placeholder="Why are you taking this trade? Setup, confluence, catalyst..."
-              rows={3} className={INPUT + ' resize-none leading-relaxed'} />
+              placeholder="Technical confluence, fundamentals, news catalyst..."
+              rows={2} className={INPUT + ' resize-none leading-relaxed'} />
           </div>
 
           {/* Actions */}
@@ -409,10 +451,13 @@ function AddTradeModal({ onClose, onSave, editTrade, openTrades = [] }) {
 // ── Close Trade Modal ─────────────────────────────────────────────────────────
 
 function CloseTradeModal({ trade, onClose, onSave, isPartial }) {
-  const [exitPrice, setExitPrice] = useState('')
-  const [exitQty, setExitQty]     = useState('')
-  const [reason, setReason]       = useState('target')
-  const [saving, setSaving]       = useState(false)
+  const [exitPrice, setExitPrice]           = useState('')
+  const [exitQty, setExitQty]               = useState('')
+  const [reason, setReason]                 = useState('target')
+  const [exitReflection, setExitReflection] = useState('')
+  const [mfe, setMfe]                       = useState('')
+  const [mae, setMae]                       = useState('')
+  const [saving, setSaving]                 = useState(false)
 
   // P2-008: remaining_quantity is a Supabase string — parseInt to avoid silent coercion in arithmetic
   const remaining = parseInt(trade.remaining_quantity ?? trade.quantity) || 0
@@ -436,7 +481,14 @@ function CloseTradeModal({ trade, onClose, onSave, isPartial }) {
     setSaving(true)
     setCloseErr(null)
     try {
-      await onSave({ exit_price: parseFloat(exitPrice), exit_quantity: parseFloat(exitQty), reason })
+      await onSave({
+        exit_price: parseFloat(exitPrice),
+        exit_quantity: parseFloat(exitQty),
+        reason,
+        exit_reflection: exitReflection || null,
+        mfe: mfe !== '' ? parseFloat(mfe) : null,
+        mae: mae !== '' ? parseFloat(mae) : null,
+      })
       onClose()
     } catch (err) {
       setCloseErr(err.response?.data?.error || 'Failed to close trade')
@@ -505,6 +557,52 @@ function CloseTradeModal({ trade, onClose, onSave, isPartial }) {
             <p className={`text-2xl font-black tracking-tight ${pnlPreview >= 0 ? 'text-emerald-500' : 'text-red-400'}`}>
               {pnlPreview >= 0 ? '+' : '−'}Rs.{Math.abs(Math.round(pnlPreview)).toLocaleString()}
             </p>
+          </div>
+        )}
+
+        {/* MFE / MAE — only for full closes */}
+        {!isPartial && (
+          <div className="space-y-2">
+            <p className={LABEL}>Price extremes during hold <span className="normal-case font-normal text-gray-300">optional</span></p>
+            <div className="grid grid-cols-2 gap-3">
+              <div>
+                <label className="block text-[9px] font-semibold text-emerald-500 mb-1">MFE — Highest price seen</label>
+                <input
+                  type="number" step="0.01" value={mfe}
+                  onChange={e => setMfe(e.target.value)}
+                  placeholder="e.g. 325.00"
+                  className={INPUT}
+                />
+              </div>
+              <div>
+                <label className="block text-[9px] font-semibold text-red-400 mb-1">MAE — Lowest price seen</label>
+                <input
+                  type="number" step="0.01" value={mae}
+                  onChange={e => setMae(e.target.value)}
+                  placeholder="e.g. 280.00"
+                  className={INPUT}
+                />
+              </div>
+            </div>
+            <p className="text-[9px] text-gray-300 dark:text-gray-700">
+              Helps calibrate where to set TP and how tight your SL should be.
+            </p>
+          </div>
+        )}
+
+        {/* Exit reflection — only for full closes */}
+        {!isPartial && (
+          <div>
+            <label className={LABEL}>
+              What happened? What would you do differently?
+              <span className="normal-case font-normal text-gray-300 ml-1">decision log</span>
+            </label>
+            <textarea
+              value={exitReflection}
+              onChange={e => setExitReflection(e.target.value)}
+              placeholder="e.g. Hit TP cleanly. Should have held longer — stock ran 5% more after exit. Entry timing was good."
+              rows={2} className={INPUT + ' resize-none leading-relaxed'}
+            />
           </div>
         )}
 
@@ -1235,6 +1333,53 @@ function StatsPanel({ trades }) {
         </div>
       </div>
 
+      {/* ── Setup Tag breakdown ── */}
+      {(() => {
+        const tagRows = SETUP_TAGS.map(tag => {
+          const tagged = closed.filter(t => t.setup_tag === tag)
+          if (tagged.length === 0) return null
+          const tagWins = tagged.filter(t => (parseFloat(t.realized_pnl) || 0) > 0)
+          const wr = Math.round((tagWins.length / tagged.length) * 100)
+          const pnl = tagged.reduce((s, t) => s + (parseFloat(t.realized_pnl) || 0), 0)
+          return { tag, count: tagged.length, wr, pnl }
+        }).filter(Boolean)
+
+        if (tagRows.length === 0) return null
+        return (
+          <div>
+            <p className="text-[9px] uppercase tracking-widest font-bold text-gray-400 mb-2">Setup Type Breakdown</p>
+            <div className="bg-white dark:bg-gray-900 rounded-xl border border-gray-100 dark:border-gray-800 overflow-hidden divide-y divide-gray-50 dark:divide-gray-800/60">
+              {tagRows.map(({ tag, count, wr, pnl }) => (
+                <div key={tag} className="px-4 py-3">
+                  <div className="flex items-center justify-between mb-1.5">
+                    <div className="flex items-center gap-2">
+                      <span className={`text-[9px] font-semibold px-2 py-0.5 rounded-full border ${SETUP_TAG_STYLE[tag] || SETUP_TAG_STYLE.Other}`}>
+                        {tag}
+                      </span>
+                      <span className="text-[9px] text-gray-400">{count} trade{count !== 1 ? 's' : ''}</span>
+                    </div>
+                    <div className="flex items-center gap-3">
+                      <span className={`text-[10px] font-bold tabular-nums ${pnl >= 0 ? 'text-emerald-500' : 'text-red-400'}`}>
+                        {pnl > 0 ? '+' : pnl < 0 ? '−' : ''}Rs.{Math.abs(Math.round(pnl)).toLocaleString()}
+                      </span>
+                      <span className={`text-[11px] font-bold tabular-nums ${wr >= 50 ? 'text-emerald-500' : 'text-red-400'}`}>
+                        {wr}% WR
+                      </span>
+                    </div>
+                  </div>
+                  <div className="w-full bg-gray-100 dark:bg-gray-800 rounded-full h-1.5 overflow-hidden">
+                    <div
+                      className={`h-full rounded-full transition-all ${wr >= 50 ? 'bg-emerald-400' : 'bg-red-400'}`}
+                      style={{ width: `${wr}%` }}
+                    />
+                  </div>
+                </div>
+              ))}
+            </div>
+          </div>
+        )
+      })()}
+
       {/* ── Monthly P&L chart ── */}
       {months.length > 0 && (
         <div>
@@ -1289,6 +1434,80 @@ function StatsPanel({ trades }) {
           </div>
         </div>
       )}
+
+      {/* ── MFE / MAE Distribution ── */}
+      {(() => {
+        const mfeTrades = closed.filter(t => t.mfe != null && t.entry_price)
+        const maeTrades = closed.filter(t => t.mae != null && t.entry_price)
+        if (mfeTrades.length === 0 && maeTrades.length === 0) return null
+
+        const toBuckets = (items, field) => {
+          // % move from entry: for LONG = (field - entry)/entry*100, for SHORT = (entry - field)/entry*100
+          const pcts = items.map(t => {
+            const entry = parseFloat(t.entry_price)
+            const val   = parseFloat(t[field])
+            if (!entry) return 0
+            return t.position === 'LONG' ? (val - entry) / entry * 100 : (entry - val) / entry * 100
+          })
+          // Buckets: <2%, 2-5%, 5-10%, 10-20%, >20%
+          const labels = ['<2%', '2-5%', '5-10%', '10-20%', '>20%']
+          const counts = [0, 0, 0, 0, 0]
+          pcts.forEach(p => {
+            if (p < 2)       counts[0]++
+            else if (p < 5)  counts[1]++
+            else if (p < 10) counts[2]++
+            else if (p < 20) counts[3]++
+            else             counts[4]++
+          })
+          const max = Math.max(...counts, 1)
+          return { labels, counts, max }
+        }
+
+        const renderBars = (buckets, color) => (
+          <div className="space-y-1.5">
+            {buckets.labels.map((label, i) => (
+              <div key={label} className="flex items-center gap-2">
+                <span className="text-[9px] text-gray-400 w-10 text-right tabular-nums flex-shrink-0">{label}</span>
+                <div className="flex-1 bg-gray-100 dark:bg-gray-800 rounded-full h-2 overflow-hidden">
+                  <div
+                    className={`h-full rounded-full transition-all ${color}`}
+                    style={{ width: `${(buckets.counts[i] / buckets.max) * 100}%` }}
+                  />
+                </div>
+                <span className="text-[9px] tabular-nums text-gray-400 w-4 flex-shrink-0">{buckets.counts[i]}</span>
+              </div>
+            ))}
+          </div>
+        )
+
+        return (
+          <div>
+            <p className="text-[9px] uppercase tracking-widest font-bold text-gray-400 mb-2">MFE / MAE Distribution</p>
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+              {mfeTrades.length > 0 && (
+                <div className="bg-white dark:bg-gray-900 rounded-xl border border-gray-100 dark:border-gray-800 p-4">
+                  <p className="text-[10px] font-semibold text-emerald-500 mb-3">
+                    MFE — Max Favorable Excursion
+                    <span className="text-gray-400 font-normal ml-1">({mfeTrades.length} trades)</span>
+                  </p>
+                  {renderBars(toBuckets(mfeTrades, 'mfe'), 'bg-emerald-400')}
+                  <p className="text-[9px] text-gray-300 dark:text-gray-700 mt-3">How far price moved in your favor — where to set TP</p>
+                </div>
+              )}
+              {maeTrades.length > 0 && (
+                <div className="bg-white dark:bg-gray-900 rounded-xl border border-gray-100 dark:border-gray-800 p-4">
+                  <p className="text-[10px] font-semibold text-red-400 mb-3">
+                    MAE — Max Adverse Excursion
+                    <span className="text-gray-400 font-normal ml-1">({maeTrades.length} trades)</span>
+                  </p>
+                  {renderBars(toBuckets(maeTrades, 'mae'), 'bg-red-400')}
+                  <p className="text-[9px] text-gray-300 dark:text-gray-700 mt-3">How far price moved against you — calibrate SL width</p>
+                </div>
+              )}
+            </div>
+          </div>
+        )
+      })()}
 
     </div>
   )
@@ -1504,7 +1723,7 @@ function TradeRow({ trade, ltp, onEdit, onClose, onPartialClose, onDelete, onJou
     { label: 'Delete', icon: '🗑️', danger: true, action: () => onDelete(trade.id) },
   ]
 
-  const hasExpandContent = trade.notes || (trade.partial_exits?.length > 0) || trade.exit_price
+  const hasExpandContent = trade.notes || trade.entry_reason || trade.exit_reflection || (trade.partial_exits?.length > 0) || trade.exit_price
 
   return (
     <>
@@ -1549,9 +1768,16 @@ function TradeRow({ trade, ltp, onEdit, onClose, onPartialClose, onDelete, onJou
                   />
                 )}
               </div>
-              <p className={`text-[9px] font-semibold ${trade.position === 'LONG' ? 'text-emerald-500' : 'text-red-400'}`}>
-                {trade.position === 'LONG' ? '↑ Long' : '↓ Short'}
-              </p>
+              <div className="flex items-center gap-1.5 mt-0.5">
+                <p className={`text-[9px] font-semibold ${trade.position === 'LONG' ? 'text-emerald-500' : 'text-red-400'}`}>
+                  {trade.position === 'LONG' ? '↑ Long' : '↓ Short'}
+                </p>
+                {trade.setup_tag && (
+                  <span className={`text-[8px] font-semibold px-1.5 py-0.5 rounded-full border ${SETUP_TAG_STYLE[trade.setup_tag] || SETUP_TAG_STYLE.Other}`}>
+                    {trade.setup_tag}
+                  </span>
+                )}
+              </div>
             </div>
           </div>
         </td>
@@ -1647,6 +1873,26 @@ function TradeRow({ trade, ltp, onEdit, onClose, onPartialClose, onDelete, onJou
           <td colSpan={8} className="px-4 pt-0 pb-4">
             <div className="pt-3 border-t border-gray-100 dark:border-gray-800/60 grid grid-cols-1 gap-3">
 
+              {trade.entry_reason && (
+                <div className="flex gap-3">
+                  <div className="w-0.5 rounded-full bg-emerald-200 dark:bg-emerald-800/50 flex-shrink-0" />
+                  <div>
+                    <p className="text-[9px] uppercase tracking-widest font-semibold text-gray-400 mb-1">Why I took this</p>
+                    <p className="text-[11px] text-gray-600 dark:text-gray-300 leading-relaxed">{trade.entry_reason}</p>
+                  </div>
+                </div>
+              )}
+
+              {trade.exit_reflection && (
+                <div className="flex gap-3">
+                  <div className="w-0.5 rounded-full bg-violet-200 dark:bg-violet-800/50 flex-shrink-0" />
+                  <div>
+                    <p className="text-[9px] uppercase tracking-widest font-semibold text-gray-400 mb-1">What happened</p>
+                    <p className="text-[11px] text-gray-600 dark:text-gray-300 leading-relaxed">{trade.exit_reflection}</p>
+                  </div>
+                </div>
+              )}
+
               {trade.notes && (
                 <div className="flex gap-3">
                   <div className="w-0.5 rounded-full bg-blue-200 dark:bg-blue-800/50 flex-shrink-0" />
@@ -1681,11 +1927,25 @@ function TradeRow({ trade, ltp, onEdit, onClose, onPartialClose, onDelete, onJou
               {trade.exit_price && (
                 <div className="flex gap-3">
                   <div className="w-0.5 rounded-full bg-gray-200 dark:bg-gray-700 flex-shrink-0" />
-                  <div>
+                  <div className="flex-1">
                     <p className="text-[9px] uppercase tracking-widest font-semibold text-gray-400 mb-1">Full Exit</p>
-                    <p className="text-[11px] text-gray-600 dark:text-gray-300 tabular-nums font-medium">
-                      Rs.{parseFloat(trade.exit_price).toFixed(2)}
-                    </p>
+                    <div className="flex items-center gap-4 flex-wrap">
+                      <p className="text-[11px] text-gray-600 dark:text-gray-300 tabular-nums font-medium">
+                        Rs.{parseFloat(trade.exit_price).toFixed(2)}
+                      </p>
+                      {trade.mfe != null && (
+                        <span className="text-[10px] tabular-nums">
+                          <span className="font-semibold text-emerald-500">MFE</span>
+                          <span className="text-gray-500 dark:text-gray-400 ml-1">Rs.{parseFloat(trade.mfe).toFixed(2)}</span>
+                        </span>
+                      )}
+                      {trade.mae != null && (
+                        <span className="text-[10px] tabular-nums">
+                          <span className="font-semibold text-red-400">MAE</span>
+                          <span className="text-gray-500 dark:text-gray-400 ml-1">Rs.{parseFloat(trade.mae).toFixed(2)}</span>
+                        </span>
+                      )}
+                    </div>
                   </div>
                 </div>
               )}
@@ -1867,11 +2127,32 @@ function LogsPage() {
     }
   }
 
-  const handleCloseTrade = async ({ exit_price }) => {
+  const handleCloseTrade = async ({ exit_price, exit_reflection, mfe, mae }) => {
     try {
-      const res = await closeTradeLog(closeTrade.id, { exit_price })
-      setTrades(prev => prev.map(t => t.id === closeTrade.id ? res.data : t))
+      const trade = closeTrade
+      const res = await closeTradeLog(trade.id, { exit_price, exit_reflection, mfe, mae })
+      setTrades(prev => prev.map(t => t.id === trade.id ? res.data : t))
       setCloseTrade(null)
+
+      // Fire AI debrief in background — don't block UI
+      getTradeDebrief({
+        symbol:          trade.symbol,
+        position:        trade.position,
+        entry_price:     trade.entry_price,
+        exit_price,
+        realized_pnl:    res.data.realized_pnl,
+        quantity:        trade.remaining_quantity ?? trade.quantity,
+        setup_tag:       trade.setup_tag,
+        entry_reason:    trade.entry_reason,
+        exit_reflection,
+        mfe,
+        mae,
+        sl:              trade.sl,
+        tp:              trade.tp,
+        date:            trade.date,
+      }).then(debriefRes => {
+        dispatchDebrief({ symbol: trade.symbol, debrief: debriefRes.data.debrief })
+      }).catch(() => {}) // silent fail — debrief is non-critical
     } catch (err) {
       setActionErr(err.response?.data?.error || 'Failed to close trade')
     }
@@ -2081,6 +2362,42 @@ function LogsPage() {
       : (entry - ltp.price) * qty
     return sum + u
   }, 0)
+
+  // ── Drawdown from peak equity ─────────────────────────────────────────────
+  // Walk closed trades sorted by date, build running equity curve, find peak → drawdown
+  const drawdown = (() => {
+    const sorted = [...closedTrades].sort((a, b) => (a.updated_at || a.date) < (b.updated_at || b.date) ? -1 : 1)
+    if (sorted.length === 0) return null
+    let equity = 0, peak = 0, maxDD = 0
+    for (const t of sorted) {
+      equity += parseFloat(t.realized_pnl) || 0
+      if (equity > peak) peak = equity
+      const dd = peak - equity
+      if (dd > maxDD) maxDD = dd
+    }
+    const currentDD = peak - equity
+    return {
+      current: currentDD,          // Rs. drawdown from peak
+      peak,                        // peak equity reached
+      pct: peak > 0 ? (currentDD / peak) * 100 : 0,
+    }
+  })()
+
+  // ── Daily P&L streak (last 7 closed-trade days) ──────────────────────────
+  const dailyStreak = (() => {
+    // Group closed trades by date, sum P&L per day
+    const byDate = {}
+    for (const t of closedTrades) {
+      const d = (t.updated_at || t.date || '').slice(0, 10)
+      if (!d) continue
+      byDate[d] = (byDate[d] || 0) + (parseFloat(t.realized_pnl) || 0)
+    }
+    const days = Object.entries(byDate)
+      .sort(([a], [b]) => b.localeCompare(a)) // newest first
+      .slice(0, 7)
+      .reverse()                               // oldest first for display
+    return days.map(([date, pnl]) => ({ date, pnl, win: pnl > 0 }))
+  })()
 
   // ── Not logged in ────────────────────────────────────────────────────────────
 
@@ -2299,6 +2616,91 @@ function LogsPage() {
         ))}
       </div>
 
+      {/* ── Drawdown + Streak widgets ── */}
+      {(drawdown || dailyStreak.length > 0) && (
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 mb-4">
+
+          {/* Drawdown widget */}
+          {drawdown && (
+            <div className={`bg-white dark:bg-gray-900 rounded-xl border px-4 py-3 ${
+              drawdown.current > 0
+                ? 'border-red-200 dark:border-red-800/40'
+                : 'border-gray-100 dark:border-gray-800'
+            }`}>
+              <div className="flex items-center justify-between mb-2">
+                <p className="text-[9px] uppercase tracking-widest font-bold text-gray-400">Drawdown from Peak</p>
+                {drawdown.current > 0 && (
+                  <span className="text-[8px] font-semibold text-red-400 bg-red-50 dark:bg-red-900/20 px-1.5 py-0.5 rounded-full">
+                    {drawdown.pct.toFixed(1)}%
+                  </span>
+                )}
+              </div>
+              {drawdown.current > 0 ? (
+                <>
+                  <p className="text-[20px] font-black tracking-tight text-red-500 tabular-nums leading-none">
+                    −Rs.{Math.round(drawdown.current).toLocaleString()}
+                  </p>
+                  <p className="text-[9px] text-gray-400 mt-1">
+                    Peak equity: Rs.{Math.round(drawdown.peak).toLocaleString()}
+                  </p>
+                  {/* Drawdown bar */}
+                  <div className="mt-2 w-full bg-gray-100 dark:bg-gray-800 rounded-full h-1.5 overflow-hidden">
+                    <div
+                      className="h-full rounded-full bg-red-400 transition-all"
+                      style={{ width: `${Math.min(drawdown.pct, 100)}%` }}
+                    />
+                  </div>
+                </>
+              ) : (
+                <p className="text-[15px] font-black text-emerald-500 tabular-nums">At peak equity</p>
+              )}
+            </div>
+          )}
+
+          {/* Daily streak widget */}
+          {dailyStreak.length > 0 && (
+            <div className="bg-white dark:bg-gray-900 rounded-xl border border-gray-100 dark:border-gray-800 px-4 py-3">
+              <p className="text-[9px] uppercase tracking-widest font-bold text-gray-400 mb-2">
+                Daily P&L Streak <span className="normal-case font-normal text-gray-300">(last {dailyStreak.length} days)</span>
+              </p>
+              <div className="flex items-end gap-1.5">
+                {dailyStreak.map(({ date, pnl, win }, i) => (
+                  <div key={date} className="flex flex-col items-center flex-1 group relative">
+                    {/* Tooltip */}
+                    <div className="absolute bottom-full mb-1.5 left-1/2 -translate-x-1/2 hidden group-hover:flex flex-col items-center z-10 pointer-events-none">
+                      <div className="bg-gray-900 dark:bg-gray-700 text-white rounded-lg px-2 py-1 text-[9px] font-semibold whitespace-nowrap shadow-lg">
+                        {pnl > 0 ? '+' : '−'}Rs.{Math.abs(Math.round(pnl)).toLocaleString()}
+                        <span className="block text-[8px] text-gray-400 font-normal text-center">{date.slice(5)}</span>
+                      </div>
+                      <div className="w-1.5 h-1.5 bg-gray-900 dark:bg-gray-700 rotate-45 -mt-0.5" />
+                    </div>
+                    <div className={`w-full rounded-sm ${win ? 'bg-emerald-400' : 'bg-red-400'}`}
+                      style={{ height: '20px' }}
+                    />
+                    <span className="text-[8px] mt-1 text-gray-400 tabular-nums">{date.slice(8)}</span>
+                  </div>
+                ))}
+              </div>
+              {/* Current streak count */}
+              {(() => {
+                let streak = 0, type = null
+                for (let i = dailyStreak.length - 1; i >= 0; i--) {
+                  const { win } = dailyStreak[i]
+                  if (type === null) { type = win; streak = 1 }
+                  else if (win === type) streak++
+                  else break
+                }
+                return streak > 1 ? (
+                  <p className={`text-[9px] mt-2 font-semibold ${type ? 'text-emerald-500' : 'text-red-400'}`}>
+                    {streak} {type ? 'winning' : 'losing'} days in a row
+                  </p>
+                ) : null
+              })()}
+            </div>
+          )}
+        </div>
+      )}
+
       {/* ── Tabs + Journal button ── */}
       <div className="flex items-center gap-1.5 mb-4">
         {[
@@ -2408,7 +2810,7 @@ function LogsPage() {
                 <>
                   <span className="text-[10px] text-gray-400">
                     {filteredTrades.length} trade{filteredTrades.length !== 1 ? 's' : ''}
-                    {filteredTrades.some(t => t.notes || t.partial_exits?.length > 0 || t.exit_price) && (
+                    {filteredTrades.some(t => t.notes || t.entry_reason || t.exit_reflection || t.partial_exits?.length > 0 || t.exit_price) && (
                       <span className="text-gray-300 dark:text-gray-700"> · click to expand</span>
                     )}
                   </span>

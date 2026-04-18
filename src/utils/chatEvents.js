@@ -10,6 +10,14 @@ export function dispatchChatAction(action) {
   window.dispatchEvent(new CustomEvent(CHAT_EVENT, { detail: { action } }))
 }
 
+// ── Coach debrief event ───────────────────────────────────────────────────────
+// Fired after trade close — injects an AI debrief message into FloatingChat.
+export const DEBRIEF_EVENT = 'tradeo:coach-debrief'
+
+export function dispatchDebrief({ symbol, debrief }) {
+  window.dispatchEvent(new CustomEvent(DEBRIEF_EVENT, { detail: { symbol, debrief } }))
+}
+
 // Which actions should trigger a refresh per data domain
 export const REFRESH_MAP = {
   trades:   ['ADD_TRADE', 'CLOSE_TRADE', 'UPDATE_SL_TP', 'CONFIRM_DELETE', 'PARTIAL_CLOSE', 'SELECT_TRADE', 'UNDO'],
