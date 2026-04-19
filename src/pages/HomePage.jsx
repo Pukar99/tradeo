@@ -212,7 +212,7 @@ function LoggedOutHome() {
             <div className="bg-gradient-to-r from-gray-900 to-gray-800 dark:from-gray-950 dark:to-gray-900 px-8 py-6 border-b border-gray-700">
               <div className="flex items-center gap-2 mb-3">
                 <span className="w-1.5 h-1.5 bg-green-400 rounded-full animate-pulse" />
-                <span className="text-green-400 text-xs font-medium tracking-widest uppercase">NEPSE Trading Workspace</span>
+                <span className="text-green-400 text-xs font-medium tracking-widest uppercase">Trading Workspace</span>
               </div>
               <h1 className="text-2xl font-bold text-white leading-snug">
                 {t('hero.headline')}<br />

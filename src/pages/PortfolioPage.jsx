@@ -2,6 +2,7 @@ import { useState, useEffect, useCallback, useMemo } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { useAuth } from '../context/AuthContext'
 import { useLanguage } from '../context/LanguageContext'
+import { useMarket } from '../context/MarketContext'
 import { getTradeLog, getStockPrice } from '../api'
 import { useChatRefresh } from '../utils/chatEvents'
 import {
@@ -12,7 +13,9 @@ import {
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
 
-const fmtRs  = (n) => `Rs.${Math.abs(Math.round(n)).toLocaleString()}`
+const fmtRs  = (n, forex = false) => forex
+  ? `$${Math.abs(n).toFixed(2)}`
+  : `Rs.${Math.abs(Math.round(n)).toLocaleString()}`
 const fmtPct = (n) => `${n >= 0 ? '+' : ''}${parseFloat(n).toFixed(2)}%`
 const signCls = (n) => n >= 0 ? 'text-emerald-500' : 'text-red-400'
 const signBg  = (n) => n >= 0 ? 'bg-emerald-50 dark:bg-emerald-900/20' : 'bg-red-50 dark:bg-red-900/20'
@@ -357,6 +360,8 @@ function AllocationDonut({ openPositions }) {
 // ── Monthly P&L bar chart ─────────────────────────────────────────────────────
 
 function MonthlyPnlChart({ closedTrades }) {
+  const { market } = useMarket()
+  const fx = market === 'forex'
   const months = []
   const now = new Date()
   for (let i = 11; i >= 0; i--) {
@@ -389,7 +394,7 @@ function MonthlyPnlChart({ closedTrades }) {
           </p>
         </div>
         <span className={`text-[13px] font-bold ${signCls(totalYear)}`}>
-          {totalYear >= 0 ? '+' : ''}{fmtRs(totalYear)}
+          {totalYear >= 0 ? '+' : ''}{fmtRs(totalYear, fx)}
         </span>
       </div>
       {!hasData ? (
@@ -410,7 +415,7 @@ function MonthlyPnlChart({ closedTrades }) {
                   <div className="bg-white dark:bg-gray-900 border border-gray-100 dark:border-gray-800 rounded-lg px-2.5 py-1.5 shadow-lg">
                     <p className="text-[9px] text-gray-400">{label}</p>
                     <p className={`text-[11px] font-bold ${val >= 0 ? 'text-emerald-500' : 'text-red-400'}`}>
-                      {val >= 0 ? '+' : ''}{fmtRs(val)}
+                      {val >= 0 ? '+' : ''}{fmtRs(val, fx)}
                     </p>
                   </div>
                 )
@@ -430,6 +435,8 @@ function MonthlyPnlChart({ closedTrades }) {
 // ── Equity Curve ──────────────────────────────────────────────────────────────
 
 function EquityCurve({ closedTrades }) {
+  const { market } = useMarket()
+  const fx = market === 'forex'
   if (closedTrades.length === 0) return null
   const sorted = [...closedTrades]
     .filter(t => t.realized_pnl != null)
@@ -462,10 +469,10 @@ function EquityCurve({ closedTrades }) {
       <div className="flex items-center justify-between mb-2">
         <div>
           <p className="text-[10px] font-semibold uppercase tracking-widest text-gray-400">Equity Curve</p>
-          <p className="text-[9px] text-gray-400 mt-0.5">{sorted.length} closed trades · max DD: <span className="text-amber-500 font-medium">{fmtRs(maxDD)}</span></p>
+          <p className="text-[9px] text-gray-400 mt-0.5">{sorted.length} closed trades · max DD: <span className="text-amber-500 font-medium">{fmtRs(maxDD, fx)}</span></p>
         </div>
         <span className={`text-[13px] font-bold ${signCls(finalPnl)}`}>
-          {finalPnl >= 0 ? '+' : ''}{fmtRs(finalPnl)}
+          {finalPnl >= 0 ? '+' : ''}{fmtRs(finalPnl, fx)}
         </span>
       </div>
       <ResponsiveContainer width="100%" height={110}>
@@ -487,7 +494,7 @@ function EquityCurve({ closedTrades }) {
                 <div className="bg-white dark:bg-gray-900 border border-gray-100 dark:border-gray-800 rounded-lg px-2.5 py-1.5 shadow-lg">
                   <p className="text-[8px] text-gray-400">Trade #{d.tradeNum} · {d.date}</p>
                   <p className={`text-[11px] font-bold ${signCls(d.cumulative)}`}>
-                    {d.cumulative >= 0 ? '+' : ''}{fmtRs(d.cumulative)}
+                    {d.cumulative >= 0 ? '+' : ''}{fmtRs(d.cumulative, fx)}
                   </p>
                 </div>
               )
@@ -504,6 +511,8 @@ function EquityCurve({ closedTrades }) {
 // ── Position row (table style) ────────────────────────────────────────────────
 
 function PositionRow({ trade, onChart }) {
+  const { market } = useMarket()
+  const fx = market === 'forex'
   const [expanded, setExpanded] = useState(false)
   const qty      = parseFloat(trade.remaining_quantity ?? trade.quantity) || 0
   const entry    = parseFloat(trade.entry_price) || 0
@@ -545,14 +554,16 @@ function PositionRow({ trade, onChart }) {
 
         {/* Qty + entry */}
         <td className="px-3 py-3 text-[10px]">
-          <p className="font-semibold text-gray-700 dark:text-gray-300 tabular-nums">{qty}</p>
-          <p className="text-gray-400 tabular-nums">@ Rs.{entry.toFixed(2)}</p>
+          <p className="font-semibold text-gray-700 dark:text-gray-300 tabular-nums">
+            {fx && trade.lots ? `${parseFloat(trade.lots)} lot` : qty}
+          </p>
+          <p className="text-gray-400 tabular-nums">@ {fx ? '$' : 'Rs.'}{entry.toFixed(fx ? 2 : 2)}</p>
         </td>
 
         {/* LTP */}
         <td className="px-3 py-3 text-[11px] font-bold text-gray-800 dark:text-white tabular-nums">
           {trade.currentPrice != null
-            ? `Rs.${Number(trade.currentPrice).toLocaleString()}`
+            ? `${fx ? '$' : 'Rs.'}${Number(trade.currentPrice).toLocaleString()}`
             : <span className="text-gray-300 dark:text-gray-600 font-normal">—</span>}
         </td>
 
@@ -561,7 +572,7 @@ function PositionRow({ trade, onChart }) {
           {trade.unrealizedPnl != null ? (
             <div>
               <p className={`text-[11px] font-bold tabular-nums ${signCls(pnl)}`}>
-                {pnl >= 0 ? '+' : ''}{fmtRs(pnl)}
+                {pnl >= 0 ? '+' : ''}{fmtRs(pnl, fx)}
               </p>
               <p className={`text-[9px] font-medium ${signCls(pnlPct)}`}>{fmtPct(pnlPct)}</p>
             </div>
@@ -571,7 +582,7 @@ function PositionRow({ trade, onChart }) {
         </td>
 
         {/* Invested */}
-        <td className="px-3 py-3 text-[10px] text-gray-400 tabular-nums">{fmtRs(invested)}</td>
+        <td className="px-3 py-3 text-[10px] text-gray-400 tabular-nums">{fmtRs(invested, fx)}</td>
 
         {/* SL/TP */}
         <td className="px-3 py-3">
@@ -617,6 +628,8 @@ function PositionRow({ trade, onChart }) {
 // ── Grouped position rows ─────────────────────────────────────────────────────
 
 function GroupedPositionRows({ symbol, entries, onChart }) {
+  const { market } = useMarket()
+  const fx = market === 'forex'
   const [expanded, setExpanded] = useState(false)
   const totalQty      = entries.reduce((s, t) => s + (parseFloat(t.remaining_quantity ?? t.quantity) || 0), 0)
   const totalInvested = entries.reduce((s, t) => s + (parseFloat(t.entry_price) || 0) * (parseFloat(t.remaining_quantity ?? t.quantity) || 0), 0)
@@ -640,7 +653,7 @@ function GroupedPositionRows({ symbol, entries, onChart }) {
                 <p className="text-[12px] font-bold text-gray-900 dark:text-white tracking-tight">{symbol}</p>
                 <span className="text-[8px] font-semibold px-1.5 py-0.5 rounded-full text-blue-500 bg-blue-50 dark:bg-blue-900/20">{entries.length} entries</span>
               </div>
-              <p className="text-[9px] text-gray-400">avg @ Rs.{weightedAvg.toFixed(2)}</p>
+              <p className="text-[9px] text-gray-400">avg @ {fx ? '$' : 'Rs.'}{weightedAvg.toFixed(2)}</p>
             </div>
           </div>
         </td>
@@ -656,19 +669,19 @@ function GroupedPositionRows({ symbol, entries, onChart }) {
           <p className="text-gray-400">{entries.length} lots</p>
         </td>
         <td className="px-3 py-3 text-[11px] font-bold text-gray-800 dark:text-white tabular-nums">
-          {ltp != null ? `Rs.${Number(ltp).toLocaleString()}` : <span className="text-gray-300 dark:text-gray-600 font-normal">—</span>}
+          {ltp != null ? `${fx ? '$' : 'Rs.'}${Number(ltp).toLocaleString()}` : <span className="text-gray-300 dark:text-gray-600 font-normal">—</span>}
         </td>
         <td className="px-3 py-3">
           {allHavePnl ? (
             <div>
               <p className={`text-[11px] font-bold tabular-nums ${signCls(totalPnl)}`}>
-                {totalPnl >= 0 ? '+' : ''}{fmtRs(totalPnl)}
+                {totalPnl >= 0 ? '+' : ''}{fmtRs(totalPnl, fx)}
               </p>
               {pnlPct && <p className={`text-[9px] font-medium ${signCls(parseFloat(pnlPct))}`}>{fmtPct(pnlPct)}</p>}
             </div>
           ) : <span className="text-[10px] text-gray-300 dark:text-gray-700">—</span>}
         </td>
-        <td className="px-3 py-3 text-[10px] text-gray-400 tabular-nums">{fmtRs(totalInvested)}</td>
+        <td className="px-3 py-3 text-[10px] text-gray-400 tabular-nums">{fmtRs(totalInvested, fx)}</td>
         <td className="px-3 py-3">
           <div className="text-[9px] text-gray-400">—</div>
         </td>
@@ -833,16 +846,24 @@ function PortfolioPage() {
   const [perfTab, setPerfTab]           = useState('monthly')  // 'monthly' | 'equity'
   const [histTab, setHistTab]           = useState('open')     // 'open' | 'all'
 
-  const { user }   = useAuth()
-  const { t }      = useLanguage()
-  const navigate   = useNavigate()
+  const { user }     = useAuth()
+  const { t }        = useLanguage()
+  const { market }   = useMarket()
+  const navigate     = useNavigate()
+  // Currency-aware formatter scoped to this page instance
+  const isForexPf    = market === 'forex'
+  const fmtC = (n) => isForexPf
+    ? `$${Math.abs(n).toFixed(2)}`
+    : `Rs.${Math.abs(Math.round(n)).toLocaleString()}`
 
   const fetchData = useCallback(async () => {
     try {
       const res       = await getTradeLog()
       const allTrades = res.data ?? []
-      setTrades(allTrades)
-      const open = allTrades.filter(tr => tr.status === 'OPEN' || tr.status === 'PARTIAL')
+      // Filter to current market only (old trades with no market field → treat as nepse)
+      const mktTrades = allTrades.filter(tr => tr.market === market || (!tr.market && market === 'nepse'))
+      setTrades(mktTrades)
+      const open = mktTrades.filter(tr => tr.status === 'OPEN' || tr.status === 'PARTIAL')
 
       if (open.length === 0) {
         setOpenPositions([])
@@ -880,9 +901,9 @@ function PortfolioPage() {
       setFetchError('Failed to load portfolio data. Please refresh.')
       setLoading(false)
     }
-  }, [user?.id])
+  }, [user?.id, market])
 
-  useEffect(() => { if (user?.id) fetchData() }, [user?.id]) // eslint-disable-line react-hooks/exhaustive-deps
+  useEffect(() => { if (user?.id) fetchData() }, [user?.id, market, fetchData])
   useChatRefresh(['trades'], fetchData)
 
   const handleGoToChart = ({ symbol, entries, id, entry_price, sl, tp, position, remaining_quantity, quantity, date }) => {
@@ -1022,7 +1043,7 @@ function PortfolioPage() {
   // ── Render ────────────────────────────────────────────────────────────────
 
   return (
-    <div className="max-w-7xl mx-auto px-6 pt-5 pb-14 space-y-5">
+    <div className="max-w-7xl mx-auto px-3 sm:px-6 pt-4 sm:pt-5 pb-14 space-y-5">
 
       {/* ── Page header ─────────────────────────────────────────────────────── */}
       <div className="flex items-center justify-between">
@@ -1042,25 +1063,25 @@ function PortfolioPage() {
       </div>
 
       {/* ── Top stats strip ──────────────────────────────────────────────────── */}
-      <div className="grid grid-cols-2 sm:grid-cols-4 lg:grid-cols-8 gap-2">
+      <div className="grid grid-cols-2 sm:grid-cols-4 xl:grid-cols-8 gap-2">
         {[
           {
             label: 'Total P&L',
-            value: `${totalPnl >= 0 ? '+' : ''}${fmtRs(totalPnl)}`,
+            value: `${totalPnl >= 0 ? '+' : ''}${fmtC(totalPnl)}`,
             valueClass: signCls(totalPnl),
             sub: 'realized + unrealized',
             accent: totalPnl >= 0 ? 'border-t-emerald-400' : 'border-t-red-400',
           },
           {
             label: 'Realized',
-            value: `${totalRealized >= 0 ? '+' : ''}${fmtRs(totalRealized)}`,
+            value: `${totalRealized >= 0 ? '+' : ''}${fmtC(totalRealized)}`,
             valueClass: signCls(totalRealized),
             sub: `${closedTrades.length} closed trades`,
             accent: 'border-t-blue-400',
           },
           {
             label: 'Unrealized',
-            value: `${totalUnrealized >= 0 ? '+' : ''}${fmtRs(totalUnrealized)}`,
+            value: `${totalUnrealized >= 0 ? '+' : ''}${fmtC(totalUnrealized)}`,
             valueClass: signCls(totalUnrealized),
             sub: `${openPositions.length} open${ltpLoading ? ' · updating…' : ''}`,
             accent: 'border-t-violet-400',
@@ -1081,7 +1102,7 @@ function PortfolioPage() {
           },
           {
             label: 'Expectancy',
-            value: expectancy != null ? `${expectancy >= 0 ? '+' : ''}${fmtRs(expectancy)}` : '—',
+            value: expectancy != null ? `${expectancy >= 0 ? '+' : ''}${fmtC(expectancy)}` : '—',
             valueClass: expectancy != null ? signCls(expectancy) : 'text-gray-400',
             sub: 'per trade avg',
             accent: 'border-t-pink-400',
@@ -1095,9 +1116,9 @@ function PortfolioPage() {
           },
           {
             label: 'Peak Equity',
-            value: peakEquity > 0 ? `+${fmtRs(peakEquity)}` : '—',
+            value: peakEquity > 0 ? `+${fmtC(peakEquity)}` : '—',
             valueClass: 'text-blue-500',
-            sub: `current: ${currentEquity >= 0 ? '+' : ''}${fmtRs(currentEquity)}`,
+            sub: `current: ${currentEquity >= 0 ? '+' : ''}${fmtC(currentEquity)}`,
             accent: 'border-t-blue-400',
           },
         ].map((s, i) => (
@@ -1158,7 +1179,7 @@ function PortfolioPage() {
                     <p className="text-[9px] text-gray-400 uppercase tracking-widest">Best Trade</p>
                     <div className="flex items-center justify-between">
                       <span className="text-[11px] font-bold text-gray-800 dark:text-white">{bestTrade.symbol}</span>
-                      <span className="text-[11px] font-bold text-emerald-500">+{fmtRs(bestTrade.realized_pnl)}</span>
+                      <span className="text-[11px] font-bold text-emerald-500">+{fmtC(bestTrade.realized_pnl)}</span>
                     </div>
                   </div>
                 </div>
@@ -1175,7 +1196,7 @@ function PortfolioPage() {
                     <p className="text-[9px] text-gray-400 uppercase tracking-widest">Worst Trade</p>
                     <div className="flex items-center justify-between">
                       <span className="text-[11px] font-bold text-gray-800 dark:text-white">{worstTrade.symbol}</span>
-                      <span className="text-[11px] font-bold text-red-400">{fmtRs(worstTrade.realized_pnl)}</span>
+                      <span className="text-[11px] font-bold text-red-400">{fmtC(worstTrade.realized_pnl)}</span>
                     </div>
                   </div>
                 </div>
@@ -1267,7 +1288,7 @@ function PortfolioPage() {
             />
           ) : (
             <div className="overflow-x-auto no-scrollbar flex-1">
-              <table className="w-full">
+              <table className="w-full min-w-[600px]">
                 <thead>
                   <tr className="border-b border-gray-100 dark:border-gray-800">
                     {['Symbol', 'Dir', 'Qty / Entry', 'LTP', 'P&L', 'Invested', 'SL / TP', ''].map((h, i) => (
@@ -1292,10 +1313,10 @@ function PortfolioPage() {
           {openPositions.length > 0 && (
             <div className="px-5 py-3 border-t border-gray-100 dark:border-gray-800 flex items-center justify-between">
               <span className="text-[10px] text-gray-400">
-                Total invested: <span className="font-semibold text-gray-700 dark:text-gray-300">{fmtRs(totalInvested)}</span>
+                Total invested: <span className="font-semibold text-gray-700 dark:text-gray-300">{fmtC(totalInvested)}</span>
               </span>
               <span className={`text-[11px] font-bold ${signCls(totalUnrealized)}`}>
-                {totalUnrealized >= 0 ? '+' : ''}{fmtRs(totalUnrealized)} unrealized
+                {totalUnrealized >= 0 ? '+' : ''}{fmtC(totalUnrealized)} unrealized
               </span>
             </div>
           )}
@@ -1423,10 +1444,10 @@ function PortfolioPage() {
                         {qty}{qty !== t.quantity && <span className="text-gray-300 dark:text-gray-700">/{t.quantity}</span>}
                       </td>
                       <td className="px-4 py-3 text-[10px] font-medium text-gray-700 dark:text-gray-300 tabular-nums whitespace-nowrap">
-                        Rs.{Number(t.entry_price).toFixed(2)}
+                        {fmtC(Number(t.entry_price))}
                       </td>
                       <td className="px-4 py-3 text-[10px] text-gray-500 tabular-nums whitespace-nowrap">
-                        {t.exit_price ? `Rs.${Number(t.exit_price).toFixed(2)}` : <span className="text-gray-300 dark:text-gray-700">—</span>}
+                        {t.exit_price ? fmtC(Number(t.exit_price)) : <span className="text-gray-300 dark:text-gray-700">—</span>}
                       </td>
                       <td className="px-4 py-3">
                         <div className="text-[9px] space-y-0.5">
@@ -1438,7 +1459,7 @@ function PortfolioPage() {
                       <td className="px-4 py-3 whitespace-nowrap">
                         {t.status === 'CLOSED' || pnl !== 0 ? (
                           <span className={`text-[11px] font-bold tabular-nums ${signCls(pnl)}`}>
-                            {pnl >= 0 ? '+' : ''}{fmtRs(pnl)}
+                            {pnl >= 0 ? '+' : ''}{fmtC(pnl)}
                           </span>
                         ) : <span className="text-[10px] text-gray-300 dark:text-gray-700">—</span>}
                       </td>
