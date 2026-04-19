@@ -6,9 +6,9 @@ export default defineConfig({
   plugins: [react()],
   test: {
     // Vitest config — runs frontend unit tests
-    environment:    'jsdom',
+    // Pure math/logic tests need no DOM; 'node' env avoids jsdom ESM conflicts
+    environment:    'node',
     globals:         true,
-    setupFiles:     ['./tests/unit/setup.js'],
     include:        ['tests/unit/**/*.test.{js,jsx}'],
     coverage: {
       provider:    'v8',

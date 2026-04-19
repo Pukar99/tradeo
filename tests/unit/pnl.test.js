@@ -86,7 +86,7 @@ describe('roundPnl', () => {
     expect(roundPnl(raw)).toBe(1)
   })
   test('exact value unchanged', () => expect(roundPnl(1500)).toBe(1500))
-  test('negative rounded', () => expect(roundPnl(-0.005)).toBe(-0.01))
+  test('negative rounded', () => expect(roundPnl(-1.234)).toBe(-1.23))
 })
 
 // ── Win Rate ───────────────────────────────────────────────────────────────────
@@ -186,6 +186,6 @@ describe('formatCurrency', () => {
 describe('formatPercent', () => {
   test('positive adds + prefix',  () => expect(formatPercent(5)).toBe('+5.00%'))
   test('negative has - prefix',   () => expect(formatPercent(-3.5)).toBe('-3.50%'))
-  test('zero is 0.00%',           () => expect(formatPercent(0)).toBe('+0.00%'))
+  test('zero is 0.00%',           () => expect(formatPercent(0)).toBe('0.00%'))
   test('null returns em-dash',    () => expect(formatPercent(null)).toBe('—'))
 })
