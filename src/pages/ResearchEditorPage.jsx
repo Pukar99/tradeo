@@ -174,16 +174,16 @@ function ResearchEditorPage() {
   if (!user) return null
 
   if (loading) return (
-    <div className="w-full px-6 py-6 max-w-4xl mx-auto">
+    <div className="w-full px-3 sm:px-6 py-6 max-w-4xl mx-auto">
       <p className="text-gray-400 text-sm">Loading editor...</p>
     </div>
   )
 
   return (
-    <div className="w-full px-6 py-6 max-w-4xl mx-auto">
+    <div className="w-full px-3 sm:px-6 py-6 max-w-4xl mx-auto">
 
       {/* Header */}
-      <div className="flex items-center justify-between mb-5">
+      <div className="flex flex-wrap items-center justify-between gap-3 mb-5">
         <button
           onClick={() => navigate('/research')}
           className="flex items-center gap-1.5 text-[11px] text-gray-400 hover:text-gray-600 dark:hover:text-gray-300 transition-colors"
@@ -219,7 +219,7 @@ function ResearchEditorPage() {
 
       <div className="bg-white dark:bg-gray-900 rounded-2xl border border-gray-100 dark:border-gray-800 overflow-hidden mb-4">
 
-        <div className="px-6 py-5 border-b border-gray-100 dark:border-gray-800">
+        <div className="px-3 sm:px-6 py-5 border-b border-gray-100 dark:border-gray-800">
           <input
             type="text"
             value={title}
@@ -229,7 +229,7 @@ function ResearchEditorPage() {
           />
         </div>
 
-        <div className="px-6 py-3 border-b border-gray-100 dark:border-gray-800 flex items-center gap-3">
+        <div className="px-3 sm:px-6 py-3 border-b border-gray-100 dark:border-gray-800 flex flex-wrap items-center gap-3">
           <p className="text-[10px] font-semibold uppercase tracking-widest text-gray-400">Format</p>
           <div className="flex gap-1.5">
             {[{ val: 'editor', label: 'Editor' }, { val: 'pdf', label: 'PDF Upload' }].map(({ val, label }) => (

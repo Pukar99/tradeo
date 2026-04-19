@@ -13,6 +13,19 @@ function calcMA(data, period = 20) {
   }).filter(Boolean)
 }
 
+function calcEMA(data, period) {
+  if (data.length < period) return []
+  const k = 2 / (period + 1)
+  const out = []
+  let ema = data.slice(0, period).reduce((s, d) => s + d.close, 0) / period
+  out.push({ time: data[period - 1].time, value: +ema.toFixed(2) })
+  for (let i = period; i < data.length; i++) {
+    ema = data[i].close * k + ema * (1 - k)
+    out.push({ time: data[i].time, value: +ema.toFixed(2) })
+  }
+  return out
+}
+
 function calcRSI(data, period = 14) {
   if (data.length < period + 1) return []
   const out = []
@@ -55,17 +68,17 @@ function calcMACD(data, fast = 12, slow = 26, sig = 9) {
 
 async function loadLC() { return import('lightweight-charts') }
 
-// ── Embedded Symbol Search (inside chart) ─────────────────────────────────────
+// ── Embedded Symbol Search ─────────────────────────────────────────────────────
 
 function ChartSymbolSearch() {
   const { selectedSymbol, selectSymbol } = useScreen()
-  const [query, setQuery]     = useState('')
-  const [open, setOpen]       = useState(false)
-  const [symbols, setSymbols] = useState({ stocks: [], indexes: [] })
-  const [cursor, setCursor]   = useState(-1)
-  const [loadErr, setLoadErr] = useState(null)
-  const inputRef       = useRef(null)
-  const listRef        = useRef(null)
+  const [query,  setQuery]  = useState('')
+  const [open,   setOpen]   = useState(false)
+  const [symbols,setSymbols]= useState({ stocks: [], indexes: [] })
+  const [cursor, setCursor] = useState(-1)
+  const [loadErr,setLoadErr]= useState(null)
+  const inputRef        = useRef(null)
+  const listRef         = useRef(null)
   const mouseDownInList = useRef(false)
 
   useEffect(() => {
@@ -83,10 +96,10 @@ function ChartSymbolSearch() {
     ? allItems.slice(0, 20)
     : allItems.filter(i => i.label.toLowerCase().includes(query.toLowerCase())).slice(0, 30)
 
-  function handleSelect(item) {
+  const handleSelect = useCallback((item) => {
     selectSymbol(item.label, item.indexId || null)
     setQuery(''); setOpen(false); setCursor(-1)
-  }
+  }, [selectSymbol])
 
   function handleKey(e) {
     if (!open) { setOpen(true); return }
@@ -101,10 +114,12 @@ function ChartSymbolSearch() {
   }, [cursor])
 
   return (
-    <div className="relative w-full max-w-xs">
-      <div className="flex items-center gap-2 bg-gray-50 dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-xl px-3 py-1.5"
-        onClick={() => { setOpen(true); setTimeout(() => inputRef.current?.focus(), 50) }}>
-        <svg className="w-3.5 h-3.5 text-gray-400 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+    <div className="relative w-full max-w-[220px]">
+      <div
+        className="flex items-center gap-1.5 bg-gray-50 dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg px-2 py-1 cursor-pointer"
+        onClick={() => { setOpen(true); setTimeout(() => inputRef.current?.focus(), 40) }}
+      >
+        <svg className="w-3 h-3 text-gray-400 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor">
           <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-4.35-4.35M17 11A6 6 0 1 1 5 11a6 6 0 0 1 12 0z" />
         </svg>
         <input
@@ -115,20 +130,23 @@ function ChartSymbolSearch() {
           onBlur={() => { if (!mouseDownInList.current) setOpen(false) }}
           onKeyDown={handleKey}
           placeholder={selectedSymbol}
-          className="bg-transparent text-[12px] text-gray-700 dark:text-gray-200 placeholder-gray-400 outline-none w-full cursor-pointer"
+          autoComplete="off"
+          className="bg-transparent text-[11px] font-semibold text-gray-700 dark:text-gray-200 placeholder-gray-500 dark:placeholder-gray-400 outline-none w-full"
         />
       </div>
 
       {open && filtered.length > 0 && (
-        <div className="absolute top-full mt-1 left-0 right-0 z-50 bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-700 rounded-xl shadow-lg max-h-64 overflow-y-auto">
+        <div className="absolute top-full mt-1 left-0 right-0 z-50 bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-700 rounded-xl shadow-xl max-h-60 overflow-y-auto">
           <ul ref={listRef}>
             {filtered.map((item, i) => (
-              <li key={item.label} onMouseDown={() => { mouseDownInList.current = true; handleSelect(item); mouseDownInList.current = false }}
-                className={`flex items-center justify-between px-3 py-2 cursor-pointer transition-colors ${
+              <li key={item.label}
+                onMouseDown={() => { mouseDownInList.current = true; handleSelect(item); mouseDownInList.current = false }}
+                className={`flex items-center justify-between px-3 py-1.5 cursor-pointer transition-colors ${
                   i === cursor ? 'bg-blue-50 dark:bg-blue-950' : 'hover:bg-gray-50 dark:hover:bg-gray-800'
-                }`}>
-                <span className="text-[12px] font-semibold text-gray-800 dark:text-gray-100">{item.label}</span>
-                <span className={`text-[9px] font-medium px-1.5 py-0.5 rounded-md ${
+                }`}
+              >
+                <span className="text-[11px] font-semibold text-gray-800 dark:text-gray-100">{item.label}</span>
+                <span className={`text-[8px] font-medium px-1.5 py-0.5 rounded ${
                   item.sub === 'Index'
                     ? 'bg-blue-100 dark:bg-blue-900 text-blue-600 dark:text-blue-300'
                     : 'bg-gray-100 dark:bg-gray-800 text-gray-500'
@@ -140,43 +158,43 @@ function ChartSymbolSearch() {
       )}
 
       {open && filtered.length === 0 && query.length > 0 && (
-        <div className="absolute top-full mt-1 left-0 right-0 z-50 bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-700 rounded-xl shadow-lg px-3 py-3 text-[11px] text-gray-400">
-          {loadErr ? loadErr : `No results for "${query}"`}
+        <div className="absolute top-full mt-1 left-0 right-0 z-50 bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-700 rounded-xl shadow-lg px-3 py-2 text-[10px] text-gray-400">
+          {loadErr || `No results for "${query}"`}
         </div>
       )}
     </div>
   )
 }
 
-// ── Embedded Controls (timeframe, chart type, indicators) ─────────────────────
+// ── HUD Controls — timeframe, chart type, indicators ──────────────────────────
 
-const TIMEFRAMES = ['1D', '1W', '1M', '6M', '1Y', '3Y', 'ALL']
-const INDICATORS = ['MA', 'RSI', 'MACD']
+const TIMEFRAMES = ['1W', '1M', '3M', '6M', '1Y', '3Y', 'ALL']
+const INDICATORS = ['MA', 'EMA', 'RSI', 'MACD']
 
 function ChartHUDControls() {
   const { chartType, setChartType, timeframe, setTimeframe, activeIndicators, toggleIndicator } = useScreen()
 
   return (
-    <div className="flex items-center gap-2 flex-wrap">
+    <div className="flex items-center gap-1.5 flex-wrap">
       {/* Chart type */}
-      <div className="flex items-center bg-gray-100 dark:bg-gray-800 rounded-lg p-0.5">
-        {['candlestick', 'line'].map(type => (
+      <div className="flex items-center bg-gray-100 dark:bg-gray-800 rounded-md p-0.5">
+        {[['candlestick','Candle'], ['line','Line']].map(([type, label]) => (
           <button key={type} onClick={() => setChartType(type)}
-            className={`px-2.5 py-0.5 rounded-md text-[10px] font-semibold capitalize transition-colors ${
+            className={`px-2 py-0.5 rounded text-[9px] font-semibold transition-colors ${
               chartType === type
                 ? 'bg-white dark:bg-gray-700 text-gray-900 dark:text-white shadow-sm'
-                : 'text-gray-500 dark:text-gray-400'
+                : 'text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-300'
             }`}>
-            {type === 'candlestick' ? 'Candle' : 'Line'}
+            {label}
           </button>
         ))}
       </div>
 
       {/* Timeframes */}
-      <div className="flex items-center bg-gray-100 dark:bg-gray-800 rounded-lg p-0.5">
+      <div className="flex items-center bg-gray-100 dark:bg-gray-800 rounded-md p-0.5">
         {TIMEFRAMES.map(tf => (
           <button key={tf} onClick={() => setTimeframe(tf)}
-            className={`px-2 py-0.5 rounded-md text-[10px] font-semibold transition-colors ${
+            className={`px-1.5 py-0.5 rounded text-[9px] font-semibold transition-colors ${
               timeframe === tf
                 ? 'bg-white dark:bg-gray-700 text-gray-900 dark:text-white shadow-sm'
                 : 'text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-300'
@@ -187,13 +205,13 @@ function ChartHUDControls() {
       </div>
 
       {/* Indicators */}
-      <div className="flex items-center gap-1">
+      <div className="flex items-center gap-0.5">
         {INDICATORS.map(ind => (
           <button key={ind} onClick={() => toggleIndicator(ind)}
-            className={`px-2 py-0.5 rounded-lg text-[10px] font-semibold border transition-colors ${
+            className={`px-1.5 py-0.5 rounded text-[9px] font-semibold border transition-colors ${
               activeIndicators.includes(ind)
                 ? 'bg-blue-500 border-blue-500 text-white'
-                : 'border-gray-200 dark:border-gray-700 text-gray-500 dark:text-gray-400 hover:border-blue-300'
+                : 'border-gray-200 dark:border-gray-700 text-gray-500 dark:text-gray-400 hover:border-blue-300 hover:text-blue-500'
             }`}>
             {ind}
           </button>
@@ -203,26 +221,26 @@ function ChartHUDControls() {
   )
 }
 
-// ── Embedded HUD — symbol + live price + change ───────────────────────────────
+// ── HUD Price + Symbol ─────────────────────────────────────────────────────────
 
 function ChartHUDPrice({ latestClose, chartData }) {
-  const { selectedSymbol, isIndex } = useScreen()
+  const { selectedSymbol } = useScreen()
 
-  const lastBar = chartData.at(-1)
-  const change  = lastBar?.diff_pct ?? lastBar?.per_change ?? null
+  const lastBar = chartData.length > 0 ? chartData[chartData.length - 1] : null
+  const change  = lastBar ? (lastBar.diff_pct ?? lastBar.per_change ?? null) : null
   const isPos   = parseFloat(change) >= 0
   const close   = latestClose ?? lastBar?.close
 
   return (
-    <div className="flex items-baseline gap-2" translate="no">
-      <span className="text-[13px] font-bold text-gray-900 dark:text-white tracking-wide">{selectedSymbol}</span>
-      {close && (
+    <div className="flex items-baseline gap-2 pointer-events-none" translate="no">
+      <span className="text-[12px] font-bold text-gray-700 dark:text-gray-300 tracking-wide">{selectedSymbol}</span>
+      {close != null && (
         <>
-          <span className="text-[20px] font-bold text-gray-900 dark:text-white tabular-nums leading-none">
+          <span className="text-[20px] font-black text-gray-900 dark:text-white tabular-nums leading-none">
             {parseFloat(close).toLocaleString('en-NP', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
           </span>
           {change != null && (
-            <span className={`text-[11px] font-semibold ${isPos ? 'text-emerald-500' : 'text-red-400'}`}>
+            <span className={`text-[11px] font-bold ${isPos ? 'text-emerald-500' : 'text-red-400'}`}>
               {isPos ? '▲' : '▼'} {Math.abs(parseFloat(change)).toFixed(2)}%
             </span>
           )}
@@ -232,23 +250,19 @@ function ChartHUDPrice({ latestClose, chartData }) {
   )
 }
 
-// ── Active position badge — supports multiple entries ─────────────────────────
+// ── Position Badge ─────────────────────────────────────────────────────────────
 
-const ENTRY_DOT_COLORS = ['bg-blue-400', 'bg-amber-400', 'bg-violet-400', 'bg-emerald-400', 'bg-pink-400']
+const ENTRY_DOT_COLORS  = ['bg-blue-400', 'bg-amber-400', 'bg-violet-400', 'bg-emerald-400', 'bg-pink-400']
 const ENTRY_TEXT_COLORS = ['text-blue-400', 'text-amber-400', 'text-violet-400', 'text-emerald-400', 'text-pink-400']
 
 function PositionBadge({ positions, latestClose }) {
   if (!positions?.length) return null
 
-  const close = parseFloat(latestClose) || 0
-
-  // Aggregate: weighted avg entry, total qty, combined unrealized P&L
-  // Use remaining_quantity (partial-close aware); fall back to quantity for legacy entries
-  const totalQty   = positions.reduce((s, p) => s + (p.remaining_quantity ?? p.quantity ?? 0), 0)
-  const avgEntry   = totalQty > 0
+  const close    = parseFloat(latestClose) || 0
+  const totalQty = positions.reduce((s, p) => s + (p.remaining_quantity ?? p.quantity ?? 0), 0)
+  const avgEntry = totalQty > 0
     ? positions.reduce((s, p) => s + parseFloat(p.entry_price) * (p.remaining_quantity ?? p.quantity ?? 0), 0) / totalQty
     : 0
-  // isLong: true only when ALL entries are LONG (mixed portfolios treated as aggregate)
   const isLong     = positions.every(p => p.position !== 'SHORT')
   const totalUnreal = close
     ? positions.reduce((s, p) => {
@@ -258,22 +272,21 @@ function PositionBadge({ positions, latestClose }) {
         return s + (long ? (close - e) * qty : (e - close) * qty)
       }, 0)
     : 0
-  const pnlPct     = avgEntry ? ((close - avgEntry) / avgEntry * 100) * (isLong ? 1 : -1) : 0
-  const isPos      = totalUnreal >= 0
-  const isSingle   = positions.length === 1
+  const pnlPct  = avgEntry ? ((close - avgEntry) / avgEntry * 100) * (isLong ? 1 : -1) : 0
+  const isPos   = totalUnreal >= 0
+  const isSingle = positions.length === 1
 
   return (
     <div className="absolute bottom-8 left-3 z-20 pointer-events-none" translate="no">
-      <div className="bg-white/96 dark:bg-gray-900/96 backdrop-blur-sm border border-gray-200 dark:border-gray-700 rounded-2xl shadow-lg overflow-hidden w-60">
-
+      <div className="bg-white/96 dark:bg-gray-900/96 backdrop-blur-sm border border-gray-200 dark:border-gray-700 rounded-2xl shadow-lg overflow-hidden w-56">
         {/* Header */}
         <div className={`flex items-center justify-between px-3 py-1.5 ${isLong ? 'bg-blue-50 dark:bg-blue-950/40' : 'bg-red-50 dark:bg-red-950/40'}`}>
           <div className="flex items-center gap-1.5">
-            <span className={`text-[8px] font-bold uppercase px-1.5 py-0.5 rounded-md ${
+            <span className={`text-[7px] font-bold uppercase px-1.5 py-0.5 rounded ${
               isLong ? 'bg-blue-100 dark:bg-blue-900 text-blue-600' : 'bg-red-100 dark:bg-red-900 text-red-500'
             }`}>{positions[0]?.position}</span>
             <span className="text-[10px] font-bold text-gray-800 dark:text-gray-100">
-              {isSingle ? positions[0].symbol ?? '' : `${positions.length} entries`}
+              {isSingle ? (positions[0].symbol ?? '') : `${positions.length} entries`}
             </span>
           </div>
           {close > 0 && (
@@ -283,81 +296,66 @@ function PositionBadge({ positions, latestClose }) {
           )}
         </div>
 
-        {/* Summary row (always shown) */}
-        <div className="px-3 pt-2 pb-1 grid grid-cols-3 gap-x-3 gap-y-1 border-b border-gray-100 dark:border-gray-800">
+        {/* Summary */}
+        <div className="px-3 pt-2 pb-1 grid grid-cols-3 gap-x-2 gap-y-1 border-b border-gray-100 dark:border-gray-800">
           <div>
             <p className="text-[7px] text-gray-400 uppercase tracking-widest mb-0.5">Avg Entry</p>
-            <p className="text-[10px] font-semibold text-blue-400 tabular-nums">{avgEntry.toFixed(2)}</p>
+            <p className="text-[9px] font-semibold text-blue-400 tabular-nums">{avgEntry.toFixed(2)}</p>
           </div>
           <div>
-            <p className="text-[7px] text-gray-400 uppercase tracking-widest mb-0.5">Total Qty</p>
-            <p className="text-[10px] font-semibold text-gray-700 dark:text-gray-300 tabular-nums">{totalQty}</p>
+            <p className="text-[7px] text-gray-400 uppercase tracking-widest mb-0.5">Qty</p>
+            <p className="text-[9px] font-semibold text-gray-700 dark:text-gray-300 tabular-nums">{totalQty}</p>
           </div>
           {close > 0 && (
             <div>
-              <p className="text-[7px] text-gray-400 uppercase tracking-widest mb-0.5">Unrealized</p>
-              <p className={`text-[10px] font-semibold tabular-nums ${isPos ? 'text-emerald-500' : 'text-red-400'}`}>
+              <p className="text-[7px] text-gray-400 uppercase tracking-widest mb-0.5">Unreal</p>
+              <p className={`text-[9px] font-semibold tabular-nums ${isPos ? 'text-emerald-500' : 'text-red-400'}`}>
                 {isPos ? '+' : '−'}Rs.{Math.abs(Math.round(totalUnreal)).toLocaleString()}
               </p>
             </div>
           )}
         </div>
 
-        {/* Per-entry breakdown */}
-        <div className="px-3 py-2 space-y-2">
+        {/* Per-entry */}
+        <div className="px-3 py-2 space-y-1.5">
           {positions.map((pos, idx) => {
-            const e     = parseFloat(pos.entry_price)
-            const qty   = pos.remaining_quantity ?? pos.quantity ?? 0
-            const long  = pos.position !== 'SHORT'
-            const u     = close ? (long ? (close - e) * qty : (e - close) * qty) : null
-            const rr    = pos.sl && pos.tp
+            const e   = parseFloat(pos.entry_price)
+            const qty = pos.remaining_quantity ?? pos.quantity ?? 0
+            const long = pos.position !== 'SHORT'
+            const u   = close ? (long ? (close - e) * qty : (e - close) * qty) : null
+            const rr  = pos.sl && pos.tp
               ? (Math.abs(parseFloat(pos.tp) - e) / Math.abs(e - parseFloat(pos.sl))).toFixed(1)
               : null
             return (
-              <div key={pos.id ?? idx} className="flex items-start gap-2">
-                <div className={`w-1.5 h-1.5 rounded-full mt-1 flex-shrink-0 ${ENTRY_DOT_COLORS[idx % ENTRY_DOT_COLORS.length]}`} />
-                <div className="flex-1 grid grid-cols-3 gap-x-3 gap-y-0.5">
+              <div key={pos.id ?? idx} className="flex items-start gap-1.5">
+                <div className={`w-1.5 h-1.5 rounded-full mt-0.5 shrink-0 ${ENTRY_DOT_COLORS[idx % ENTRY_DOT_COLORS.length]}`} />
+                <div className="grid grid-cols-3 gap-x-2 gap-y-0.5 flex-1">
                   <div>
                     <p className="text-[7px] text-gray-400 uppercase tracking-widest">Entry</p>
-                    <p className={`text-[10px] font-semibold tabular-nums ${ENTRY_TEXT_COLORS[idx % ENTRY_TEXT_COLORS.length]}`}>{e.toFixed(2)}</p>
+                    <p className={`text-[9px] font-semibold tabular-nums ${ENTRY_TEXT_COLORS[idx % ENTRY_TEXT_COLORS.length]}`}>{e.toFixed(2)}</p>
                   </div>
                   <div>
                     <p className="text-[7px] text-gray-400 uppercase tracking-widest">Qty</p>
-                    <p className="text-[10px] font-semibold text-gray-600 dark:text-gray-400 tabular-nums">{qty}</p>
+                    <p className="text-[9px] font-semibold text-gray-600 dark:text-gray-400 tabular-nums">{qty}</p>
                   </div>
                   {u !== null && (
                     <div>
                       <p className="text-[7px] text-gray-400 uppercase tracking-widest">P&L</p>
-                      <p className={`text-[10px] font-semibold tabular-nums ${u >= 0 ? 'text-emerald-500' : 'text-red-400'}`}>
+                      <p className={`text-[9px] font-semibold tabular-nums ${u >= 0 ? 'text-emerald-500' : 'text-red-400'}`}>
                         {u >= 0 ? '+' : '−'}{Math.abs(Math.round(u)).toLocaleString()}
                       </p>
                     </div>
                   )}
-                  {pos.sl && (
-                    <div>
-                      <p className="text-[7px] text-gray-400 uppercase tracking-widest">SL</p>
-                      <p className="text-[10px] font-semibold text-red-400 tabular-nums">{parseFloat(pos.sl).toFixed(2)}</p>
-                    </div>
-                  )}
-                  {pos.tp && (
-                    <div>
-                      <p className="text-[7px] text-gray-400 uppercase tracking-widest">TP</p>
-                      <p className="text-[10px] font-semibold text-emerald-400 tabular-nums">{parseFloat(pos.tp).toFixed(2)}</p>
-                    </div>
-                  )}
-                  {rr && (
-                    <div>
-                      <p className="text-[7px] text-gray-400 uppercase tracking-widest">R:R</p>
-                      <p className="text-[10px] font-semibold text-violet-400">1:{rr}</p>
-                    </div>
-                  )}
+                  {pos.sl && <div><p className="text-[7px] text-gray-400 uppercase tracking-widest">SL</p><p className="text-[9px] font-semibold text-red-400 tabular-nums">{parseFloat(pos.sl).toFixed(2)}</p></div>}
+                  {pos.tp && <div><p className="text-[7px] text-gray-400 uppercase tracking-widest">TP</p><p className="text-[9px] font-semibold text-emerald-400 tabular-nums">{parseFloat(pos.tp).toFixed(2)}</p></div>}
+                  {rr   && <div><p className="text-[7px] text-gray-400 uppercase tracking-widest">R:R</p><p className="text-[9px] font-semibold text-violet-400">1:{rr}</p></div>}
                 </div>
               </div>
             )
           })}
         </div>
 
-        {/* Price range bar — use first position's SL/TP if single, skip if multiple and SLs differ */}
+        {/* SL→TP progress bar (single position only) */}
         {isSingle && (() => {
           const pos  = positions[0]
           const sl   = pos.sl ? parseFloat(pos.sl) : null
@@ -365,15 +363,15 @@ function PositionBadge({ positions, latestClose }) {
           const e    = parseFloat(pos.entry_price)
           if (!sl || !tp || !close) return null
           const range    = tp - sl
-          const entryPct = Math.min(100, Math.max(0, ((e - sl) / range) * 100))
+          const entryPct = Math.min(100, Math.max(0, ((e  - sl) / range) * 100))
           const closePct = Math.min(100, Math.max(0, ((close - sl) / range) * 100))
           return (
             <div className="px-3 pb-2.5">
-              <div className="relative h-1.5 rounded-full bg-gray-100 dark:bg-gray-800 overflow-visible mb-1">
-                <div className="absolute inset-0 rounded-full bg-gradient-to-r from-red-400 via-gray-200 to-emerald-400 dark:via-gray-700" />
+              <div className="relative h-1.5 rounded-full overflow-visible mb-1">
+                <div className="absolute inset-0 rounded-full bg-gradient-to-r from-red-400 via-gray-200 dark:via-gray-700 to-emerald-400" />
                 <div className="absolute top-1/2 -translate-y-1/2 w-0.5 h-3 bg-blue-400 rounded-full" style={{ left: `${entryPct}%` }} />
                 <div className={`absolute w-2.5 h-2.5 rounded-full border-2 border-white dark:border-gray-900 shadow ${isPos ? 'bg-emerald-400' : 'bg-red-400'}`}
-                  style={{ left: `${closePct}%`, top: '50%', transform: 'translate(-50%, -50%)' }} />
+                  style={{ left: `${closePct}%`, top: '50%', transform: 'translate(-50%,-50%)' }} />
               </div>
               <div className="flex justify-between text-[7px]">
                 <span className="text-red-400">{sl.toFixed(2)}</span>
@@ -388,10 +386,12 @@ function PositionBadge({ positions, latestClose }) {
   )
 }
 
-// ── Hover movers overlay ──────────────────────────────────────────────────────
+// ── Movers Overlay ─────────────────────────────────────────────────────────────
 
 function MoversOverlay({ movers, date, pinned, onClear }) {
   if (!movers || (!movers.gainers?.length && !movers.losers?.length)) return null
+  const { selectSymbol } = useScreen()
+
   return (
     <div translate="no" className={`absolute top-14 right-2 z-20 w-52 rounded-2xl border shadow-lg backdrop-blur-sm text-[10px] overflow-hidden
       ${pinned
@@ -400,17 +400,22 @@ function MoversOverlay({ movers, date, pinned, onClear }) {
       }`}>
       <div className="flex items-center justify-between px-3 py-1.5 border-b border-gray-100 dark:border-gray-800">
         <span className="text-[9px] font-semibold text-gray-400 uppercase tracking-widest">{date}</span>
-        {pinned && (
+        {pinned ? (
           <button onClick={onClear} className="text-[9px] text-blue-400 hover:text-blue-600 font-semibold flex items-center gap-0.5">
             <span>📌</span> Pinned
           </button>
+        ) : (
+          <span className="text-[8px] text-gray-300 dark:text-gray-600">Click to pin</span>
         )}
       </div>
       <div className="grid grid-cols-2 divide-x divide-gray-100 dark:divide-gray-800">
         <div className="px-2 py-2">
           <p className="text-[8px] font-semibold text-emerald-500 uppercase tracking-widest mb-1">Gainers</p>
           {(movers.gainers || []).slice(0, 5).map((s, i) => (
-            <div key={i} className="flex justify-between items-center py-0.5">
+            <div key={i}
+              onClick={() => selectSymbol(s.s)}
+              className="flex justify-between items-center py-0.5 cursor-pointer hover:bg-gray-50 dark:hover:bg-gray-800/50 rounded px-0.5 transition-colors"
+            >
               <span className="font-semibold text-gray-700 dark:text-gray-200">{s.s}</span>
               <span className="text-emerald-500 font-semibold">+{s.p}%</span>
             </div>
@@ -419,7 +424,10 @@ function MoversOverlay({ movers, date, pinned, onClear }) {
         <div className="px-2 py-2">
           <p className="text-[8px] font-semibold text-red-400 uppercase tracking-widest mb-1">Losers</p>
           {(movers.losers || []).slice(0, 5).map((s, i) => (
-            <div key={i} className="flex justify-between items-center py-0.5">
+            <div key={i}
+              onClick={() => selectSymbol(s.s)}
+              className="flex justify-between items-center py-0.5 cursor-pointer hover:bg-gray-50 dark:hover:bg-gray-800/50 rounded px-0.5 transition-colors"
+            >
               <span className="font-semibold text-gray-700 dark:text-gray-200">{s.s}</span>
               <span className="text-red-400 font-semibold">{s.p}%</span>
             </div>
@@ -430,7 +438,7 @@ function MoversOverlay({ movers, date, pinned, onClear }) {
   )
 }
 
-// ── OHLC Tooltip (crosshair hover) ────────────────────────────────────────────
+// ── OHLC Tooltip ──────────────────────────────────────────────────────────────
 
 function OHLCTooltip({ bar, change }) {
   if (!bar) return null
@@ -451,14 +459,11 @@ function OHLCTooltip({ bar, change }) {
         </div>
         {bar.open != null && (
           <div className="grid grid-cols-4 gap-x-3 text-[9px]">
-            <span className="text-gray-400">O</span>
-            <span className="text-gray-400">H</span>
-            <span className="text-gray-400">L</span>
-            <span className="text-gray-400">C</span>
+            {['O','H','L','C'].map(l => <span key={l} className="text-gray-400">{l}</span>)}
             <span className="text-gray-700 dark:text-gray-300">{bar.open?.toLocaleString()}</span>
             <span className="text-emerald-500">{bar.high?.toLocaleString()}</span>
             <span className="text-red-400">{bar.low?.toLocaleString()}</span>
-            <span className="text-gray-700 dark:text-gray-300">{bar.close?.toLocaleString()}</span>
+            <span className="font-semibold text-gray-700 dark:text-gray-300">{bar.close?.toLocaleString()}</span>
           </div>
         )}
       </div>
@@ -466,7 +471,7 @@ function OHLCTooltip({ bar, change }) {
   )
 }
 
-// ── Skeleton loader ───────────────────────────────────────────────────────────
+// ── Skeleton ───────────────────────────────────────────────────────────────────
 
 function ChartSkeleton() {
   return (
@@ -474,14 +479,31 @@ function ChartSkeleton() {
       <div className="flex gap-1 items-end h-full">
         {Array.from({ length: 40 }).map((_, i) => (
           <div key={i} className="flex-1 bg-gray-100 dark:bg-gray-800 rounded-sm"
-            style={{ height: `${30 + Math.random() * 60}%` }} />
+            style={{ height: `${30 + (Math.sin(i * 0.4) * 30 + 40)}%` }} />
         ))}
       </div>
     </div>
   )
 }
 
-// ── Main ──────────────────────────────────────────────────────────────────────
+// ── Sub-pane label ─────────────────────────────────────────────────────────────
+
+function SubPaneLabel({ title, sub, color, legend }) {
+  return (
+    <div className="flex items-center gap-2 px-3 pt-1 pb-0.5 shrink-0">
+      <span className={`text-[8px] font-bold uppercase tracking-widest`} style={{ color }}>{title}</span>
+      {sub && <span className="text-[8px] text-gray-400">{sub}</span>}
+      {legend && legend.map((l, i) => (
+        <span key={i} className="flex items-center gap-1">
+          <span className="w-2 h-0.5 rounded inline-block" style={{ background: l.color }} />
+          <span className="text-[8px] text-gray-400">{l.label}</span>
+        </span>
+      ))}
+    </div>
+  )
+}
+
+// ── Main StockChart ────────────────────────────────────────────────────────────
 
 export default function StockChart() {
   const { isDark } = useTheme()
@@ -491,14 +513,14 @@ export default function StockChart() {
     activePositions,
   } = useScreen()
 
-  const mainRef      = useRef(null)
-  const rsiRef       = useRef(null)
-  const macdRef      = useRef(null)
-  const chartsRef    = useRef({})
-  const seriesRef    = useRef({})
-  const moversCache  = useRef({})
-  // Live ref so async crosshair callbacks always read current pin state without re-subscribing
-  const pinnedDateRef = useRef(pinnedDate)
+  const mainRef    = useRef(null)
+  const rsiRef     = useRef(null)
+  const macdRef    = useRef(null)
+  const chartsRef  = useRef({})
+  const seriesRef  = useRef({})
+  const moversCache    = useRef({})
+  const pendingHover   = useRef(null)  // debounce movers fetch
+  const pinnedDateRef  = useRef(pinnedDate)
 
   const [chartData,   setChartData]   = useState([])
   const [loading,     setLoading]     = useState(true)
@@ -515,11 +537,13 @@ export default function StockChart() {
     up:     '#10b981',
     down:   '#ef4444',
     ma:     '#3b82f6',
+    ema:    '#f59e0b',
     rsi:    '#a78bfa',
     macd:   '#60a5fa',
     signal: '#f59e0b',
   }
 
+  // Debounced movers fetch — avoids spamming on every crosshair pixel
   const getMovers = useCallback(async (date) => {
     if (!date) return null
     if (moversCache.current[date]) return moversCache.current[date]
@@ -541,12 +565,15 @@ export default function StockChart() {
     req.then(r => {
       const data = r.data.data || []
       setChartData(data)
-      setLatestClose(data.length ? data[data.length - 1].close : null)
+      setLatestClose(data.length > 0 ? data[data.length - 1].close : null)
       setLoading(false)
-    }).catch(e => { setError(e.response?.data?.error || 'Failed to load data'); setLoading(false) })
-  }, [selectedSymbol, selectedIndexId, timeframe])
+    }).catch(e => {
+      setError(e.response?.data?.error || 'Failed to load chart data')
+      setLoading(false)
+    })
+  }, [selectedSymbol, selectedIndexId, timeframe]) // eslint-disable-line react-hooks/exhaustive-deps
 
-  // Build charts
+  // Build / rebuild charts
   useEffect(() => {
     if (loading || !chartData.length || !mainRef.current) return
 
@@ -560,21 +587,26 @@ export default function StockChart() {
     let roCleanup = null
 
     loadLC().then(({ createChart, CrosshairMode, LineStyle }) => {
-      if (cancelled) return
+      if (cancelled || !mainRef.current) return
+
       const base = {
-        layout:    { background: { color: C.bg }, textColor: C.text, fontSize: 11 },
+        layout:         { background: { color: C.bg }, textColor: C.text, fontSize: 11 },
         attributionLogo: false,
-        grid:      { vertLines: { color: C.grid }, horzLines: { color: C.grid } },
-        crosshair: { mode: CrosshairMode.Normal,
+        grid:           { vertLines: { color: C.grid }, horzLines: { color: C.grid } },
+        crosshair: {
+          mode:     CrosshairMode.Normal,
           vertLine: { width: 1, color: '#363a45', style: LineStyle.Solid },
-          horzLine: { width: 1, color: '#363a45', style: LineStyle.Solid } },
+          horzLine: { width: 1, color: '#363a45', style: LineStyle.Solid },
+        },
         rightPriceScale: { borderColor: C.border, scaleMargins: { top: 0.08, bottom: 0.12 } },
         timeScale: { borderColor: C.border, timeVisible: true, fixLeftEdge: true, fixRightEdge: false, rightOffset: 5 },
         handleScroll: true, handleScale: true,
       }
 
       const main = createChart(mainRef.current, {
-        ...base, width: mainRef.current.clientWidth, height: mainRef.current.clientHeight,
+        ...base,
+        width:  mainRef.current.clientWidth,
+        height: mainRef.current.clientHeight,
       })
       chartsRef.current.main = main
 
@@ -595,16 +627,25 @@ export default function StockChart() {
       }
       seriesRef.current.price = priceSeries
 
+      // MA overlay
       if (activeIndicators.includes('MA')) {
         const ma = calcMA(chartData, 20)
         if (ma.length) {
-          const s = main.addLineSeries({ color: '#3b82f680', lineWidth: 1.5, priceLineVisible: false, title: 'MA20' })
+          const s = main.addLineSeries({ color: C.ma + '90', lineWidth: 1.5, priceLineVisible: false, title: 'MA20' })
           s.setData(ma)
         }
       }
 
-      // Position lines — supports multiple entries for the same symbol
-      // Each position gets its own entry line color; SL/TP share red/green
+      // EMA overlay
+      if (activeIndicators.includes('EMA')) {
+        const ema = calcEMA(chartData, 20)
+        if (ema.length) {
+          const s = main.addLineSeries({ color: C.ema + 'cc', lineWidth: 1.5, priceLineVisible: false, title: 'EMA20' })
+          s.setData(ema)
+        }
+      }
+
+      // Position lines + markers
       const ENTRY_COLORS = ['#60a5fa', '#f59e0b', '#a78bfa', '#34d399', '#f472b6']
       const markers = []
 
@@ -616,28 +657,21 @@ export default function StockChart() {
           const startIdx   = entryStr ? chartData.findIndex(d => d.time >= entryStr) : 0
           const fromData   = startIdx >= 0 ? chartData.slice(startIdx) : chartData.slice(-Math.min(chartData.length, 60))
 
-          const addPosLine = (price, color, lineStyle, label, dashed = false) => {
+          const addPosLine = (price, color, lineStyle, label) => {
             if (!price || !fromData.length) return
             const s = main.addLineSeries({
-              color,
-              lineWidth:             dashed ? 1 : 2,
-              lineStyle,
-              priceLineVisible:      false,
-              lastValueVisible:      true,
-              title:                 activePositions.length > 1 ? `${label}${idx + 1}` : label,
+              color, lineWidth: 1.5, lineStyle,
+              priceLineVisible: false, lastValueVisible: true,
+              title: activePositions.length > 1 ? `${label}${idx + 1}` : label,
               crosshairMarkerVisible: false,
             })
             s.setData(fromData.map(d => ({ time: d.time, value: parseFloat(price) })))
           }
 
-          // Entry — solid, unique color per position
           addPosLine(entry_price, entryColor, 0, 'Entry')
-          // SL — dashed red (slightly different shade per position to distinguish)
           addPosLine(sl, idx === 0 ? '#f87171' : '#fca5a5', 2, 'SL')
-          // TP — dashed green
           addPosLine(tp, idx === 0 ? '#34d399' : '#6ee7b7', 2, 'TP')
 
-          // Arrow marker at entry candle
           if (fromData.length) {
             markers.push({
               time:     fromData[0].time,
@@ -649,36 +683,38 @@ export default function StockChart() {
             })
           }
         })
-
         if (markers.length) {
-          // sort markers by time (required by lightweight-charts)
           markers.sort((a, b) => a.time < b.time ? -1 : 1)
           priceSeries.setMarkers(markers)
         }
       }
 
-      // Volume inline
+      // Volume histogram
       const volSeries = main.addHistogramSeries({ priceFormat: { type: 'volume' }, priceScaleId: 'vol' })
-      main.priceScale('vol').applyOptions({ scaleMargins: { top: 0.78, bottom: 0.02 } })
+      main.priceScale('vol').applyOptions({ scaleMargins: { top: 0.80, bottom: 0 } })
       volSeries.setData(chartData.map(d => ({
         time: d.time, value: d.volume || d.turnover || 0,
         color: d.close >= d.open ? C.up + '44' : C.down + '44',
       })))
 
-      // Hover + click
-      // pinnedDateRef keeps a live ref so async callbacks always read the current value
-      // without needing to re-subscribe on every pin state change
-      main.subscribeCrosshairMove(async param => {
+      // Crosshair events — debounce movers fetch by 80ms
+      main.subscribeCrosshairMove(param => {
         if (pinnedDateRef.current) return
         if (cancelled) return
         if (!param.time) { setTooltip(null); setOverlayData(null); onHover(null, null); return }
         const bar = param.seriesData?.get(priceSeries)
         if (!bar) return
         setTooltip({ ...bar, time: param.time, change: changeMap[param.time] })
-        const movers = await getMovers(param.time)
-        if (cancelled || pinnedDateRef.current) return
-        setOverlayData({ date: param.time, movers, pinned: false })
-        onHover(param.time, movers)
+
+        // Debounce: cancel previous pending fetch
+        if (pendingHover.current) clearTimeout(pendingHover.current)
+        pendingHover.current = setTimeout(async () => {
+          if (cancelled || pinnedDateRef.current) return
+          const movers = await getMovers(param.time)
+          if (cancelled || pinnedDateRef.current) return
+          setOverlayData({ date: param.time, movers, pinned: false })
+          onHover(param.time, movers)
+        }, 80)
       })
 
       main.subscribeClick(async param => {
@@ -686,6 +722,7 @@ export default function StockChart() {
         if (!param.time) return
         const bar = param.seriesData?.get(priceSeries)
         if (!bar) return
+        if (pendingHover.current) { clearTimeout(pendingHover.current); pendingHover.current = null }
         const movers = await getMovers(param.time)
         if (cancelled) return
         setTooltip({ ...bar, time: param.time, change: changeMap[param.time] })
@@ -698,7 +735,9 @@ export default function StockChart() {
         const rsiData = calcRSI(chartData)
         if (rsiData.length) {
           const rc = createChart(rsiRef.current, {
-            ...base, width: rsiRef.current.clientWidth, height: rsiRef.current.clientHeight,
+            ...base,
+            width: rsiRef.current.clientWidth,
+            height: rsiRef.current.clientHeight,
             rightPriceScale: { ...base.rightPriceScale, scaleMargins: { top: 0.1, bottom: 0.1 } },
           })
           chartsRef.current.rsi = rc
@@ -715,7 +754,9 @@ export default function StockChart() {
         const { macd, signal, hist } = calcMACD(chartData)
         if (macd.length) {
           const mc = createChart(macdRef.current, {
-            ...base, width: macdRef.current.clientWidth, height: macdRef.current.clientHeight,
+            ...base,
+            width: macdRef.current.clientWidth,
+            height: macdRef.current.clientHeight,
           })
           chartsRef.current.macd = mc
           mc.addLineSeries({ color: C.macd, lineWidth: 1.5, priceLineVisible: false }).setData(macd)
@@ -729,22 +770,39 @@ export default function StockChart() {
 
       main.timeScale().fitContent()
 
+      // Resize both width AND height
       const ro = new ResizeObserver(() => {
-        if (mainRef.current) main.applyOptions({ width: mainRef.current.clientWidth })
-        if (rsiRef.current  && chartsRef.current.rsi)  chartsRef.current.rsi.applyOptions({ width: rsiRef.current.clientWidth })
-        if (macdRef.current && chartsRef.current.macd) chartsRef.current.macd.applyOptions({ width: macdRef.current.clientWidth })
+        if (mainRef.current && chartsRef.current.main) {
+          chartsRef.current.main.applyOptions({
+            width:  mainRef.current.clientWidth,
+            height: mainRef.current.clientHeight,
+          })
+        }
+        if (rsiRef.current && chartsRef.current.rsi) {
+          chartsRef.current.rsi.applyOptions({
+            width:  rsiRef.current.clientWidth,
+            height: rsiRef.current.clientHeight,
+          })
+        }
+        if (macdRef.current && chartsRef.current.macd) {
+          chartsRef.current.macd.applyOptions({
+            width:  macdRef.current.clientWidth,
+            height: macdRef.current.clientHeight,
+          })
+        }
       })
-      ro.observe(mainRef.current)
+      if (mainRef.current) ro.observe(mainRef.current)
       roCleanup = () => ro.disconnect()
     })
 
     return () => {
       cancelled = true
+      if (pendingHover.current) clearTimeout(pendingHover.current)
       if (roCleanup) roCleanup()
       Object.values(chartsRef.current).forEach(c => { try { c.remove() } catch (_) {} })
       chartsRef.current = {}
     }
-  }, [chartData, isDark, chartType, activeIndicators, activePositions])
+  }, [chartData, isDark, chartType, activeIndicators, activePositions]) // eslint-disable-line react-hooks/exhaustive-deps
 
   useEffect(() => {
     pinnedDateRef.current = pinnedDate
@@ -757,36 +815,42 @@ export default function StockChart() {
   const mainPct  = indCount === 0 ? 100 : indCount === 1 ? 70 : 55
 
   if (error) return (
-    <div className="flex flex-col items-center justify-center h-full gap-2 text-center">
+    <div className="flex flex-col items-center justify-center h-full gap-3 text-center px-4">
       <svg className="w-8 h-8 text-gray-300" fill="none" viewBox="0 0 24 24" stroke="currentColor">
         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M9.172 16.172a4 4 0 015.656 0M9 10h.01M15 10h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
       </svg>
       <p className="text-[12px] text-gray-400">{error}</p>
+      <button
+        onClick={() => { setError(null); setLoading(true) }}
+        className="text-[10px] text-blue-500 hover:underline"
+      >Retry</button>
     </div>
   )
 
   return (
     <div className="relative flex flex-col w-full h-full bg-white dark:bg-gray-950">
 
-      {/* ── Embedded HUD — top-left: symbol + price ── */}
-      <div className="absolute top-2 left-3 z-30 flex flex-col gap-1.5 pointer-events-none">
-        {!loading && <ChartHUDPrice latestClose={latestClose} chartData={chartData} />}
+      {/* ── Embedded HUD top bar: search + controls ── */}
+      <div className="absolute top-0 left-0 right-0 z-30 flex items-center gap-2 px-3 py-1 bg-white/92 dark:bg-gray-900/92 backdrop-blur-sm border-b border-gray-100 dark:border-gray-800">
+        <ChartSymbolSearch />
+        <div className="w-px h-4 bg-gray-200 dark:bg-gray-700 shrink-0" />
+        <ChartHUDControls />
       </div>
 
-      {/* ── Embedded HUD — top bar: search + controls ── */}
-      <div className="absolute top-0 left-0 right-0 z-30 flex items-center gap-2 px-3 py-0.5 bg-white/90 dark:bg-gray-900/90 backdrop-blur-sm border-b border-gray-100 dark:border-gray-800">
-        <ChartSymbolSearch />
-        <div className="w-px h-4 bg-white/10 shrink-0" />
-        <ChartHUDControls />
+      {/* ── Price overlay top-left ── */}
+      <div className="absolute top-10 left-3 z-20 pointer-events-none">
+        {!loading && chartData.length > 0 && (
+          <ChartHUDPrice latestClose={latestClose} chartData={chartData} />
+        )}
       </div>
 
       {/* ── Position badge ── */}
       <PositionBadge positions={activePositions} latestClose={latestClose} />
 
-      {/* ── OHLC tooltip on hover ── */}
+      {/* ── OHLC tooltip ── */}
       <OHLCTooltip bar={tooltip} change={tooltip?.change} />
 
-      {/* ── Movers overlay on hover/click ── */}
+      {/* ── Movers overlay ── */}
       {overlayData?.movers && (
         <MoversOverlay
           movers={overlayData.movers}
@@ -805,34 +869,31 @@ export default function StockChart() {
         </div>
       )}
 
+      {/* ── Chart area ── */}
       {loading ? (
         <ChartSkeleton />
       ) : (
         <>
-          <div ref={mainRef} style={{ height: `${mainPct}%`, paddingTop: '34px', boxSizing: 'border-box' }} className="w-full" />
+          {/* Main price chart — paddingTop accounts for HUD bar */}
+          <div
+            ref={mainRef}
+            style={{ height: `${mainPct}%`, paddingTop: '38px', boxSizing: 'border-box' }}
+            className="w-full"
+          />
 
           {showRSI && (
-            <div className="w-full border-t border-gray-100 dark:border-gray-800 shrink-0">
-              <div className="flex items-center gap-2 px-3 pt-1">
-                <span className="text-[8px] font-bold text-purple-400 uppercase tracking-widest">RSI</span>
-                <span className="text-[8px] text-gray-400">14</span>
-                <span className="text-[8px] text-gray-300 dark:text-gray-600">· 70 overbought · 30 oversold</span>
-              </div>
-              <div ref={rsiRef} style={{ height: '88px' }} className="w-full" />
+            <div className="w-full border-t border-gray-100 dark:border-gray-800 flex flex-col shrink-0" style={{ height: `${(100 - mainPct) / indCount}%` }}>
+              <SubPaneLabel title="RSI" sub="14" color="#a78bfa"
+                legend={[{ color: '#ef444480', label: '70 OB' }, { color: '#10b98180', label: '30 OS' }]} />
+              <div ref={rsiRef} className="w-full flex-1" />
             </div>
           )}
 
           {showMACD && (
-            <div className="w-full border-t border-gray-100 dark:border-gray-800 shrink-0">
-              <div className="flex items-center gap-2 px-3 pt-1">
-                <span className="text-[8px] font-bold text-blue-400 uppercase tracking-widest">MACD</span>
-                <span className="text-[8px] text-gray-400">12 / 26 / 9</span>
-                <span className="w-2 h-0.5 bg-blue-400 rounded inline-block" />
-                <span className="text-[8px] text-gray-400">MACD</span>
-                <span className="w-2 h-0.5 bg-amber-400 rounded inline-block" />
-                <span className="text-[8px] text-gray-400">Signal</span>
-              </div>
-              <div ref={macdRef} style={{ height: '88px' }} className="w-full" />
+            <div className="w-full border-t border-gray-100 dark:border-gray-800 flex flex-col shrink-0" style={{ height: `${(100 - mainPct) / indCount}%` }}>
+              <SubPaneLabel title="MACD" sub="12 / 26 / 9" color="#60a5fa"
+                legend={[{ color: '#60a5fa', label: 'MACD' }, { color: '#f59e0b', label: 'Signal' }]} />
+              <div ref={macdRef} className="w-full flex-1" />
             </div>
           )}
         </>
