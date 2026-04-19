@@ -48,6 +48,18 @@ const MARKET_CONDITIONS = [
 const INPUT = 'w-full bg-gray-50 dark:bg-gray-800/80 border border-gray-200 dark:border-gray-700 rounded-lg px-3 py-2 text-[12px] text-gray-800 dark:text-white placeholder-gray-400 focus:outline-none focus:ring-1 focus:ring-blue-500 focus:border-blue-500 transition-all'
 const LABEL = 'block text-[10px] font-semibold uppercase tracking-widest text-gray-400 dark:text-gray-500 mb-1.5'
 
+const SETUP_TAGS = ['Breakout', 'Pullback', 'Reversal', 'IPO Entry', 'Rights Entry', 'FOMO', 'Fundamental', 'Other']
+const SETUP_TAG_STYLE = {
+  Breakout:      'bg-blue-50 dark:bg-blue-900/20 border-blue-200 dark:border-blue-800/40 text-blue-600 dark:text-blue-400',
+  Pullback:      'bg-violet-50 dark:bg-violet-900/20 border-violet-200 dark:border-violet-800/40 text-violet-600 dark:text-violet-400',
+  Reversal:      'bg-amber-50 dark:bg-amber-900/20 border-amber-200 dark:border-amber-800/40 text-amber-600 dark:text-amber-400',
+  'IPO Entry':   'bg-emerald-50 dark:bg-emerald-900/20 border-emerald-200 dark:border-emerald-800/40 text-emerald-600 dark:text-emerald-400',
+  'Rights Entry':'bg-teal-50 dark:bg-teal-900/20 border-teal-200 dark:border-teal-800/40 text-teal-600 dark:text-teal-400',
+  FOMO:          'bg-red-50 dark:bg-red-900/20 border-red-200 dark:border-red-800/40 text-red-500 dark:text-red-400',
+  Fundamental:   'bg-indigo-50 dark:bg-indigo-900/20 border-indigo-200 dark:border-indigo-800/40 text-indigo-600 dark:text-indigo-400',
+  Other:         'bg-gray-50 dark:bg-gray-800/50 border-gray-200 dark:border-gray-700 text-gray-500 dark:text-gray-400',
+}
+
 // ── Modal shell ───────────────────────────────────────────────────────────────
 
 function Modal({ onClose, children, wide }) {
@@ -123,6 +135,7 @@ function AddTradeModal({ onClose, onSave, editTrade, openTrades = [] }) {
   const [slWarning, setSlWarning]               = useState('')
   const [rrRatio, setRrRatio]                   = useState(null)
   const [saving, setSaving]                     = useState(false)
+  const [saveErr, setSaveErr]                   = useState('')
   const [showBroker, setShowBroker]             = useState(false)
 
   useEffect(() => {
@@ -184,8 +197,12 @@ function AddTradeModal({ onClose, onSave, editTrade, openTrades = [] }) {
   const handleSubmit = async (e) => {
     e.preventDefault()
     setSaving(true)
+    setSaveErr('')
     try { await onSave(form); onClose() }
-    catch (err) { console.error(err) }
+    catch (err) {
+      console.error(err)
+      setSaveErr(err.response?.data?.message || err.response?.data?.error || 'Failed to save trade')
+    }
     finally { setSaving(false) }
   }
 
@@ -383,6 +400,12 @@ function AddTradeModal({ onClose, onSave, editTrade, openTrades = [] }) {
               rows={3} className={INPUT + ' resize-none leading-relaxed'} />
           </div>
 
+          {saveErr && (
+            <p className="text-[11px] text-red-500 bg-red-50 dark:bg-red-900/20 border border-red-100 dark:border-red-800/50 rounded-xl px-3 py-2">
+              {saveErr}
+            </p>
+          )}
+
           {/* Actions */}
           <div className="flex gap-2 pt-1">
             <button type="button" onClick={onClose}
@@ -535,15 +558,18 @@ function JournalModal({ onClose, onSave, tradeId, tradeName, editJournal }) {
     notes:                 editJournal?.notes                 || '',
   })
   const [saving, setSaving] = useState(false)
+  const [saveErr, setSaveErr] = useState('')
 
   const handleSubmit = async (e) => {
     e.preventDefault()
     setSaving(true)
+    setSaveErr('')
     try {
       await onSave({ ...form, trade_id: tradeId || null })
       onClose()
     } catch (err) {
       console.error(err)
+      setSaveErr(err.response?.data?.message || err.response?.data?.error || 'Failed to save journal entry')
     } finally {
       setSaving(false)
     }
@@ -628,6 +654,12 @@ function JournalModal({ onClose, onSave, tradeId, tradeName, editJournal }) {
             placeholder="Market observations, lessons learned..."
             rows={2} className={INPUT + ' resize-none leading-relaxed'} />
         </div>
+
+        {saveErr && (
+          <p className="text-[11px] text-red-500 bg-red-50 dark:bg-red-900/20 border border-red-100 dark:border-red-800/50 rounded-xl px-3 py-2">
+            {saveErr}
+          </p>
+        )}
 
         <div className="flex gap-2 pt-1">
           <button type="button" onClick={onClose}
@@ -1220,6 +1252,53 @@ function StatsPanel({ trades }) {
         </div>
       </div>
 
+      {/* ── Setup Tag breakdown ── */}
+      {(() => {
+        const tagRows = SETUP_TAGS.map(tag => {
+          const tagged = closed.filter(t => t.setup_tag === tag)
+          if (tagged.length === 0) return null
+          const tagWins = tagged.filter(t => (t.realized_pnl || 0) > 0)
+          const wr = Math.round((tagWins.length / tagged.length) * 100)
+          const pnl = tagged.reduce((s, t) => s + (parseFloat(t.realized_pnl) || 0), 0)
+          return { tag, count: tagged.length, wr, pnl }
+        }).filter(Boolean)
+
+        if (tagRows.length === 0) return null
+        return (
+          <div>
+            <p className="text-[9px] uppercase tracking-widest font-bold text-gray-400 mb-2">Setup Type Breakdown</p>
+            <div className="bg-white dark:bg-gray-900 rounded-xl border border-gray-100 dark:border-gray-800 overflow-hidden divide-y divide-gray-50 dark:divide-gray-800/60">
+              {tagRows.map(({ tag, count, wr, pnl }) => (
+                <div key={tag} className="px-4 py-3">
+                  <div className="flex items-center justify-between mb-1.5">
+                    <div className="flex items-center gap-2">
+                      <span className={`text-[9px] font-semibold px-2 py-0.5 rounded-full border ${SETUP_TAG_STYLE[tag] || SETUP_TAG_STYLE.Other}`}>
+                        {tag}
+                      </span>
+                      <span className="text-[9px] text-gray-400">{count} trade{count !== 1 ? 's' : ''}</span>
+                    </div>
+                    <div className="flex items-center gap-3">
+                      <span className={`text-[10px] font-bold tabular-nums ${pnl >= 0 ? 'text-emerald-500' : 'text-red-400'}`}>
+                        {pnl > 0 ? '+' : pnl < 0 ? '−' : ''}Rs.{Math.abs(Math.round(pnl)).toLocaleString()}
+                      </span>
+                      <span className={`text-[11px] font-bold tabular-nums ${wr >= 50 ? 'text-emerald-500' : 'text-red-400'}`}>
+                        {wr}% WR
+                      </span>
+                    </div>
+                  </div>
+                  <div className="w-full bg-gray-100 dark:bg-gray-800 rounded-full h-1.5 overflow-hidden">
+                    <div
+                      className={`h-full rounded-full transition-all ${wr >= 50 ? 'bg-emerald-400' : 'bg-red-400'}`}
+                      style={{ width: `${wr}%` }}
+                    />
+                  </div>
+                </div>
+              ))}
+            </div>
+          </div>
+        )
+      })()}
+
       {/* ── Monthly P&L chart ── */}
       {months.length > 0 && (
         <div>
@@ -1274,6 +1353,78 @@ function StatsPanel({ trades }) {
           </div>
         </div>
       )}
+
+      {/* ── MFE / MAE Distribution ── */}
+      {(() => {
+        const mfeTrades = closed.filter(t => t.mfe != null && t.entry_price)
+        const maeTrades = closed.filter(t => t.mae != null && t.entry_price)
+        if (mfeTrades.length === 0 && maeTrades.length === 0) return null
+
+        const toBuckets = (items, field) => {
+          const pcts = items.map(t => {
+            const entry = parseFloat(t.entry_price)
+            const val   = parseFloat(t[field])
+            if (!entry) return 0
+            return t.position === 'LONG' ? (val - entry) / entry * 100 : (entry - val) / entry * 100
+          })
+          const labels = ['<2%', '2-5%', '5-10%', '10-20%', '>20%']
+          const counts = [0, 0, 0, 0, 0]
+          pcts.forEach(p => {
+            if (p < 2)       counts[0]++
+            else if (p < 5)  counts[1]++
+            else if (p < 10) counts[2]++
+            else if (p < 20) counts[3]++
+            else             counts[4]++
+          })
+          const max = Math.max(...counts, 1)
+          return { labels, counts, max }
+        }
+
+        const renderBars = (buckets, color) => (
+          <div className="space-y-1.5">
+            {buckets.labels.map((label, i) => (
+              <div key={label} className="flex items-center gap-2">
+                <span className="text-[9px] text-gray-400 w-10 text-right tabular-nums flex-shrink-0">{label}</span>
+                <div className="flex-1 bg-gray-100 dark:bg-gray-800 rounded-full h-2 overflow-hidden">
+                  <div
+                    className={`h-full rounded-full transition-all ${color}`}
+                    style={{ width: `${(buckets.counts[i] / buckets.max) * 100}%` }}
+                  />
+                </div>
+                <span className="text-[9px] tabular-nums text-gray-400 w-4 flex-shrink-0">{buckets.counts[i]}</span>
+              </div>
+            ))}
+          </div>
+        )
+
+        return (
+          <div>
+            <p className="text-[9px] uppercase tracking-widest font-bold text-gray-400 mb-2">MFE / MAE Distribution</p>
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+              {mfeTrades.length > 0 && (
+                <div className="bg-white dark:bg-gray-900 rounded-xl border border-gray-100 dark:border-gray-800 p-4">
+                  <p className="text-[10px] font-semibold text-emerald-500 mb-3">
+                    MFE — Max Favorable Excursion
+                    <span className="text-gray-400 font-normal ml-1">({mfeTrades.length} trades)</span>
+                  </p>
+                  {renderBars(toBuckets(mfeTrades, 'mfe'), 'bg-emerald-400')}
+                  <p className="text-[9px] text-gray-300 dark:text-gray-700 mt-3">How far price moved in your favor — where to set TP</p>
+                </div>
+              )}
+              {maeTrades.length > 0 && (
+                <div className="bg-white dark:bg-gray-900 rounded-xl border border-gray-100 dark:border-gray-800 p-4">
+                  <p className="text-[10px] font-semibold text-red-400 mb-3">
+                    MAE — Max Adverse Excursion
+                    <span className="text-gray-400 font-normal ml-1">({maeTrades.length} trades)</span>
+                  </p>
+                  {renderBars(toBuckets(maeTrades, 'mae'), 'bg-red-400')}
+                  <p className="text-[9px] text-gray-300 dark:text-gray-700 mt-3">How far price moved against you — calibrate SL width</p>
+                </div>
+              )}
+            </div>
+          </div>
+        )
+      })()}
 
     </div>
   )
@@ -2045,7 +2196,7 @@ function TraderPage() {
   // ── Render ───────────────────────────────────────────────────────────────────
 
   return (
-    <div className="w-full px-6 pt-6 pb-12 max-w-7xl mx-auto">
+    <div className="w-full px-3 sm:px-6 pt-4 sm:pt-6 pb-12 max-w-7xl mx-auto">
 
       {actionErr && (
         <div className="mb-4 flex items-center justify-between bg-red-50 dark:bg-red-900/20 border border-red-100 dark:border-red-800/50 rounded-xl px-4 py-2.5">
@@ -2138,14 +2289,14 @@ function TraderPage() {
       )}
 
       {/* ── Page header ── */}
-      <div className="flex items-start justify-between mb-6">
+      <div className="flex flex-wrap items-start justify-between gap-3 mb-6">
         <div>
           <h1 className="text-[17px] font-bold text-gray-900 dark:text-white tracking-tight">
             {tr('trader.title')}
           </h1>
           <p className="text-[11px] text-gray-400 mt-0.5">{tr('trader.subtitle')}</p>
         </div>
-        <div className="flex items-center gap-2">
+        <div className="flex items-center gap-2 flex-shrink-0">
           <button
             onClick={() => setShowImport(true)}
             className="flex items-center gap-1.5 bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-700 hover:border-gray-300 dark:hover:border-gray-600 text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-200 px-3.5 py-2 rounded-xl text-[11px] font-semibold transition-colors"
@@ -2153,7 +2304,8 @@ function TraderPage() {
             <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-8l-4-4m0 0L8 8m4-4v12" />
             </svg>
-            Import CSV
+            <span className="hidden sm:inline">Import CSV</span>
+            <span className="sm:hidden">Import</span>
           </button>
           <button
             onClick={() => { setEditTrade(null); setShowAddModal(true) }}
@@ -2230,14 +2382,14 @@ function TraderPage() {
       </div>
 
       {/* ── Tabs + Journal button ── */}
-      <div className="flex items-center gap-1.5 mb-4">
+      <div className="flex items-center gap-1.5 mb-4 overflow-x-auto no-scrollbar pb-0.5">
         {[
           { key: 'trades',  label: tr('trader.tabLog') },
           { key: 'journal', label: tr('trader.tabJournal') },
           { key: 'stats',   label: 'Stats' },
         ].map(tab => (
           <button key={tab.key} onClick={() => setActiveTab(tab.key)}
-            className={`px-3.5 py-1.5 rounded-lg text-[11px] font-semibold transition-all ${
+            className={`flex-shrink-0 px-3.5 py-1.5 rounded-lg text-[11px] font-semibold transition-all ${
               activeTab === tab.key
                 ? 'bg-gray-900 dark:bg-white text-white dark:text-gray-900'
                 : 'bg-white dark:bg-gray-900 text-gray-500 dark:text-gray-400 border border-gray-200 dark:border-gray-800 hover:bg-gray-50 dark:hover:bg-gray-800'
@@ -2346,7 +2498,7 @@ function TraderPage() {
             </div>
           ) : (
             <div className="overflow-x-auto">
-              <table className="w-full">
+              <table className="w-full min-w-[640px]">
                 <thead>
                   <tr className="border-b border-gray-100 dark:border-gray-800">
                     {[
