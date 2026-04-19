@@ -1,7 +1,8 @@
 import { useState, useCallback } from 'react'
 import axios from 'axios'
+import { BASE_URL } from '../../api'
 
-const API = axios.create({ baseURL: 'http://localhost:5000' })
+const API = axios.create({ baseURL: BASE_URL })
 API.interceptors.request.use(cfg => {
   const t = localStorage.getItem('token')
   if (t) cfg.headers.Authorization = `Bearer ${t}`

@@ -2,7 +2,7 @@ import { useState, useEffect, useRef } from 'react'
 import { useAuth } from '../context/AuthContext'
 import { useTheme } from '../context/ThemeContext'
 import { useLanguage } from '../context/LanguageContext'
-import { sendAgentMessage, getChatSuggestions } from '../api'
+import { sendAgentMessage, getChatSuggestions, BASE_URL } from '../api'
 import { dispatchChatAction, DEBRIEF_EVENT } from '../utils/chatEvents'
 import { useNavigate } from 'react-router-dom'
 
@@ -917,7 +917,7 @@ function AIChat({ isFullPage = false, onClose }) {
       const formData = new FormData()
       formData.append('audio', blob, 'audio.webm')
       const token = localStorage.getItem('token')
-      const res   = await fetch('http://localhost:5000/api/chat/transcribe', {
+      const res   = await fetch(`${BASE_URL}/api/chat/transcribe`, {
         method: 'POST',
         headers: { Authorization: `Bearer ${token}` },
         body:    formData,
@@ -1044,7 +1044,7 @@ function AIChat({ isFullPage = false, onClose }) {
       abortCtrlRef.current = ctrl
 
       const token = localStorage.getItem('token')
-      const response = await fetch('http://localhost:5000/api/chat/agent', {
+      const response = await fetch(`${BASE_URL}/api/chat/agent`, {
         method: 'POST',
         signal: ctrl.signal,
         headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },

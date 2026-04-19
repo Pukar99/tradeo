@@ -1,8 +1,9 @@
 import { useState, useEffect, useRef, useCallback } from 'react'
 import { useTheme } from '../../context/ThemeContext'
+import { BASE_URL } from '../../api'
 
 const getToken = () => localStorage.getItem('token')
-const API = 'http://localhost:5000/api'
+const API = `${BASE_URL}/api`
 
 // ─────────────────────────────────────────────────────────────────────────────
 // CONSTANTS
