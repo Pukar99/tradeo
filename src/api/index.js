@@ -12,6 +12,23 @@ API.interceptors.request.use((config) => {
   return config
 })
 
+// Auto-logout on 401 (expired/invalid token)
+API.interceptors.response.use(
+  (response) => response,
+  (error) => {
+    if (error.response?.status === 401) {
+      localStorage.removeItem('token')
+      localStorage.removeItem('user')
+      sessionStorage.removeItem('briefingShown')
+      // Redirect to login if not already there
+      if (!window.location.pathname.startsWith('/login')) {
+        window.location.href = '/login'
+      }
+    }
+    return Promise.reject(error)
+  }
+)
+
 // Auth
 export const loginUser = (data) => API.post('/api/auth/login', data)
 export const signupUser = (data) => API.post('/api/auth/signup', data)
@@ -167,3 +184,4 @@ export const getMeroshareResults     = (accountId)     => API.get('/api/meroshar
 export const applyMeroshareIPO       = (data)          => API.post('/api/meroshare/apply', data)
 export const applyMeroshareIPOBulk   = (data)          => API.post('/api/meroshare/apply-bulk', data)
 export const getMerosharePortfolio   = (accountId)     => API.get('/api/meroshare/portfolio', { params: accountId ? { account_id: accountId } : {} })
+export const cancelMeroshareIPO      = (data)          => API.post('/api/meroshare/cancel', data)

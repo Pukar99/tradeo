@@ -19,10 +19,16 @@ const formatDate = (dateStr) => {
 }
 
 function Avatar({ person, size = 'w-7 h-7' }) {
+  const [imgError, setImgError] = useState(false)
   return (
     <div className={`${size} rounded-full bg-gradient-to-br from-blue-400 to-indigo-500 flex items-center justify-center flex-shrink-0 overflow-hidden`}>
-      {person?.avatar_url ? (
-        <img src={person.avatar_url} alt={person.name} className="w-full h-full object-cover" />
+      {person?.avatar_url && !imgError ? (
+        <img
+          src={person.avatar_url}
+          alt={person.name}
+          className="w-full h-full object-cover"
+          onError={() => setImgError(true)}
+        />
       ) : (
         <span className="text-white text-[10px] font-bold">
           {person?.name?.[0]?.toUpperCase() || '?'}
@@ -244,7 +250,7 @@ function ResearchPage() {
   }
 
   if (fetchError) return (
-    <div className="w-full px-6 py-10 max-w-6xl mx-auto text-center">
+    <div className="w-full px-3 sm:px-6 py-10 max-w-6xl mx-auto text-center">
       <p className="text-[12px] text-red-400 mb-3">{fetchError}</p>
       <button
         onClick={() => { setFetchError(null); setLoading(true); fetchData() }}
@@ -261,7 +267,7 @@ function ResearchPage() {
   const cardProps = { onDelete: handleDelete, onVerify: handleVerify, onPin: handlePin, isAdmin, currentUserId: user?.id }
 
   return (
-    <div className="w-full px-6 pt-6 pb-10 max-w-6xl mx-auto">
+    <div className="w-full px-3 sm:px-6 pt-4 sm:pt-6 pb-10 max-w-6xl mx-auto">
 
       {actionErr && (
         <div className="mb-4 flex items-center justify-between bg-red-50 dark:bg-red-900/20 border border-red-100 dark:border-red-800/50 rounded-xl px-4 py-2.5">
@@ -271,7 +277,7 @@ function ResearchPage() {
       )}
 
       {/* Header */}
-      <div className="flex items-start justify-between mb-6">
+      <div className="flex flex-wrap items-start justify-between gap-3 mb-6">
         <div>
           <h1 className="text-lg font-semibold text-gray-900 dark:text-white tracking-tight">Research Hub</h1>
           <p className="text-[11px] text-gray-400 mt-0.5">Private trading research — members only</p>
