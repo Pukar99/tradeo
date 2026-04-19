@@ -1,12 +1,13 @@
 import { useAuth } from '../context/AuthContext'
 import { useLanguage } from '../context/LanguageContext'
+import { useMarket } from '../context/MarketContext'
 import { useContextMenu } from '../components/ContextMenu'
 import { useChatRefresh } from '../utils/chatEvents'
 import TaskBoard from '../components/dashboard/TaskBoard'
 import DisciplineScore from '../components/dashboard/DisciplineScore'
 import MonthlyGoals from '../components/dashboard/MonthlyGoals'
 import { Link, useNavigate } from 'react-router-dom'
-import { useState, useEffect, useCallback } from 'react'
+import { useState, useEffect, useCallback, useRef } from 'react'
 import {
   getTradeLog, getStockPrice,
   getWatchlist, addToWatchlist,
@@ -1007,9 +1008,322 @@ function CenterDashboard({ navigate }) {
   )
 }
 
+// ── Forex session clock ───────────────────────────────────────────────────────
+// All times in NPT (UTC+5:45). Sessions overlap is normal in Forex.
+const FOREX_SESSIONS = [
+  { name: 'Sydney',  open: { h: 3,  m: 45 }, close: { h: 12, m: 45 }, color: 'bg-sky-500',    dot: 'bg-sky-400'    },
+  { name: 'Tokyo',   open: { h: 5,  m: 45 }, close: { h: 14, m: 45 }, color: 'bg-pink-500',   dot: 'bg-pink-400'   },
+  { name: 'London',  open: { h: 13, m: 45 }, close: { h: 22, m: 45 }, color: 'bg-blue-600',   dot: 'bg-blue-500'   },
+  { name: 'New York',open: { h: 18, m: 45 }, close: { h: 1,  m: 45 }, color: 'bg-amber-500',  dot: 'bg-amber-400'  },
+]
+
+function getNptNow() {
+  const now = new Date()
+  // NPT = UTC + 5h 45m
+  const utcMs = now.getTime() + now.getTimezoneOffset() * 60000
+  return new Date(utcMs + (5 * 60 + 45) * 60000)
+}
+
+function isSessionOpen(session, nptNow) {
+  const h = nptNow.getHours()
+  const m = nptNow.getMinutes()
+  const total = h * 60 + m
+  const open  = session.open.h  * 60 + session.open.m
+  const close = session.close.h * 60 + session.close.m
+  if (close < open) {
+    // crosses midnight (e.g. NY: 18:45 → 01:45 next day)
+    return total >= open || total < close
+  }
+  return total >= open && total < close
+}
+
+function minutesUntil(target, nptNow) {
+  const h = nptNow.getHours()
+  const m = nptNow.getMinutes()
+  const total = h * 60 + m
+  const t = target.h * 60 + target.m
+  let diff = t - total
+  if (diff < 0) diff += 24 * 60
+  return diff
+}
+
+function fmtDuration(mins) {
+  if (mins < 60) return `${mins}m`
+  return `${Math.floor(mins / 60)}h ${mins % 60}m`
+}
+
+function ForexSessionClock() {
+  const [nptNow, setNptNow] = useState(getNptNow)
+
+  useEffect(() => {
+    const id = setInterval(() => setNptNow(getNptNow()), 30000)
+    return () => clearInterval(id)
+  }, [])
+
+  const timeStr = nptNow.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit', hour12: true })
+  const dateStr = nptNow.toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric' })
+
+  return (
+    <div className="bg-white dark:bg-gray-900 rounded-2xl border border-gray-100 dark:border-gray-800 overflow-hidden">
+      <div className="flex items-center justify-between px-5 py-3 border-b border-gray-100 dark:border-gray-800">
+        <h3 className="text-[12px] font-semibold text-gray-700 dark:text-gray-300 uppercase tracking-wide">Market Sessions</h3>
+        <div className="text-right">
+          <p className="text-xs font-semibold text-gray-800 dark:text-white">{timeStr}</p>
+          <p className="text-[10px] text-gray-400">NPT · {dateStr}</p>
+        </div>
+      </div>
+      <div className="divide-y divide-gray-50 dark:divide-gray-800">
+        {FOREX_SESSIONS.map(sess => {
+          const open = isSessionOpen(sess, nptNow)
+          const minsToOpen  = open ? null : minutesUntil(sess.open,  nptNow)
+          const minsToClose = open ? minutesUntil(sess.close, nptNow) : null
+          return (
+            <div key={sess.name} className={`flex items-center justify-between px-5 py-3 transition-colors ${open ? 'bg-green-50/40 dark:bg-green-900/10' : ''}`}>
+              <div className="flex items-center gap-2.5">
+                <span className={`w-2 h-2 rounded-full flex-shrink-0 ${open ? sess.dot + ' animate-pulse' : 'bg-gray-300 dark:bg-gray-600'}`} />
+                <div>
+                  <p className={`text-xs font-semibold ${open ? 'text-gray-900 dark:text-white' : 'text-gray-400'}`}>{sess.name}</p>
+                  <p className="text-[10px] text-gray-400">
+                    {sess.open.h.toString().padStart(2,'0')}:{sess.open.m.toString().padStart(2,'0')} – {sess.close.h.toString().padStart(2,'0')}:{sess.close.m.toString().padStart(2,'0')} NPT
+                  </p>
+                </div>
+              </div>
+              <div className="text-right">
+                {open ? (
+                  <>
+                    <span className="text-[10px] font-semibold text-green-600 dark:text-green-400 bg-green-100 dark:bg-green-900/50 px-2 py-0.5 rounded-full">OPEN</span>
+                    {minsToClose !== null && (
+                      <p className="text-[10px] text-gray-400 mt-0.5">Closes in {fmtDuration(minsToClose)}</p>
+                    )}
+                  </>
+                ) : (
+                  <>
+                    <span className="text-[10px] font-medium text-gray-400 bg-gray-100 dark:bg-gray-800 px-2 py-0.5 rounded-full">CLOSED</span>
+                    {minsToOpen !== null && (
+                      <p className="text-[10px] text-gray-400 mt-0.5">Opens in {fmtDuration(minsToOpen)}</p>
+                    )}
+                  </>
+                )}
+              </div>
+            </div>
+          )
+        })}
+      </div>
+    </div>
+  )
+}
+
+// ── Gold price widget ─────────────────────────────────────────────────────────
+function GoldPriceWidget() {
+  const [gold, setGold] = useState(null)
+  const [prev, setPrev] = useState(null)
+  const [error, setError] = useState(false)
+  const [loading, setLoading] = useState(true)
+  const prevRef = useRef(null)
+
+  const fetchGold = useCallback(async () => {
+    try {
+      // Using open exchange rates / Frankfurt Open Data for gold proxy
+      // We use Yahoo Finance compatible public endpoint
+      const res = await fetch('https://query1.finance.yahoo.com/v8/finance/chart/GC=F?interval=1m&range=1d', {
+        headers: { 'Accept': 'application/json' }
+      })
+      if (!res.ok) throw new Error('fetch failed')
+      const json = await res.json()
+      const meta = json?.chart?.result?.[0]?.meta
+      if (!meta) throw new Error('no meta')
+      const price = parseFloat(meta.regularMarketPrice) || null
+      const prevClose = parseFloat(meta.chartPreviousClose) || parseFloat(meta.previousClose) || null
+      if (price) {
+        setPrev(prevRef.current)
+        prevRef.current = price
+        setGold({ price, prevClose, symbol: meta.symbol, currency: meta.currency || 'USD' })
+        setError(false)
+      }
+    } catch {
+      setError(true)
+    } finally {
+      setLoading(false)
+    }
+  }, [])
+
+  useEffect(() => {
+    fetchGold()
+    const id = setInterval(fetchGold, 60000) // refresh every 1 min
+    return () => clearInterval(id)
+  }, [fetchGold])
+
+  const change    = gold && gold.prevClose ? gold.price - gold.prevClose : null
+  const changePct = gold && gold.prevClose && gold.prevClose > 0 ? ((change / gold.prevClose) * 100).toFixed(2) : null
+  const isUp      = change != null ? change >= 0 : null
+  const flash     = prev !== null && gold !== null && prev !== gold.price
+    ? (gold.price > prev ? 'text-green-500' : 'text-red-500')
+    : ''
+
+  return (
+    <div className="bg-white dark:bg-gray-900 rounded-2xl border border-gray-100 dark:border-gray-800 overflow-hidden">
+      <div className="flex items-center justify-between px-5 py-3 border-b border-gray-100 dark:border-gray-800">
+        <div className="flex items-center gap-2">
+          <span className="text-base">🥇</span>
+          <h3 className="text-[12px] font-semibold text-gray-700 dark:text-gray-300 uppercase tracking-wide">Gold · XAUUSD</h3>
+        </div>
+        <button onClick={fetchGold} className="text-[10px] text-gray-400 hover:text-gray-600 dark:hover:text-gray-200 transition-colors">↻ Refresh</button>
+      </div>
+      <div className="px-5 py-4">
+        {loading ? (
+          <div className="h-12 animate-pulse bg-gray-100 dark:bg-gray-800 rounded-xl" />
+        ) : error ? (
+          <div className="text-center py-3">
+            <p className="text-xs text-gray-400">Unable to fetch Gold price.</p>
+            <p className="text-[10px] text-gray-300 dark:text-gray-600 mt-1">Market may be closed or network unavailable.</p>
+          </div>
+        ) : gold ? (
+          <>
+            <div className="flex items-end justify-between">
+              <div>
+                <p className={`text-3xl font-bold tabular-nums tracking-tight transition-colors duration-300 ${flash || (isUp ? 'text-gray-900 dark:text-white' : 'text-gray-900 dark:text-white')}`}>
+                  ${gold.price.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                </p>
+                <p className="text-[10px] text-gray-400 mt-0.5">per troy oz · {gold.currency}</p>
+              </div>
+              <div className="text-right">
+                {change != null && (
+                  <p className={`text-sm font-semibold ${isUp ? 'text-green-500' : 'text-red-500'}`}>
+                    {isUp ? '+' : ''}{change.toFixed(2)}
+                  </p>
+                )}
+                {changePct != null && (
+                  <p className={`text-xs font-medium px-2 py-0.5 rounded-full mt-1 ${isUp ? 'bg-green-100 dark:bg-green-900/50 text-green-600 dark:text-green-400' : 'bg-red-100 dark:bg-red-900/50 text-red-500'}`}>
+                    {isUp ? '+' : ''}{changePct}%
+                  </p>
+                )}
+              </div>
+            </div>
+            {gold.prevClose && (
+              <div className="mt-3 pt-3 border-t border-gray-50 dark:border-gray-800 flex justify-between text-[10px] text-gray-400">
+                <span>Prev. Close: ${gold.prevClose.toFixed(2)}</span>
+                <span className="flex items-center gap-1">
+                  <span className="w-1.5 h-1.5 bg-green-400 rounded-full animate-pulse" />
+                  Live · updates every 1m
+                </span>
+              </div>
+            )}
+          </>
+        ) : null}
+      </div>
+    </div>
+  )
+}
+
+// ── Forex open positions widget ───────────────────────────────────────────────
+function ForexOpenPositions({ navigate }) {
+  const [positions, setPositions] = useState([])
+  const [stats, setStats] = useState(null)
+  const [loading, setLoading] = useState(true)
+
+  useEffect(() => {
+    ;(async () => {
+      try {
+        const res = await getTradeLog()
+        const open = res.data.filter(t => (t.status === 'OPEN' || t.status === 'PARTIAL') && t.market === 'forex')
+        const closed = res.data.filter(t => t.status === 'CLOSED' && t.market === 'forex')
+        const realizedPnl = closed.reduce((s, t) => s + (parseFloat(t.realized_pnl) || 0), 0)
+        const profitable = closed.filter(t => (parseFloat(t.realized_pnl) || 0) > 0).length
+        const winRate = closed.length > 0 ? Math.round((profitable / closed.length) * 100) : null
+        setPositions(open)
+        setStats({ realizedPnl, winRate, openCount: open.length, closedCount: closed.length })
+      } catch { /* ignore */ }
+      finally { setLoading(false) }
+    })()
+  }, [])
+
+  if (loading) return <div className="bg-white dark:bg-gray-900 rounded-2xl border border-gray-100 dark:border-gray-800 h-32 animate-pulse" />
+
+  return (
+    <div className="bg-white dark:bg-gray-900 rounded-2xl border border-gray-100 dark:border-gray-800 overflow-hidden">
+      <div className="flex items-center justify-between px-5 py-3 border-b border-gray-100 dark:border-gray-800">
+        <h3 className="text-[12px] font-semibold text-gray-700 dark:text-gray-300 uppercase tracking-wide">
+          Forex Positions
+          {stats?.openCount > 0 && <span className="ml-2 text-[10px] font-normal text-gray-400">({stats.openCount})</span>}
+        </h3>
+        <button onClick={() => navigate('/logs')} className="text-xs text-blue-500 hover:text-blue-700 transition-colors">›</button>
+      </div>
+
+      {/* Quick stats */}
+      {stats && (
+        <div className="grid grid-cols-3 divide-x divide-gray-100 dark:divide-gray-800 border-b border-gray-100 dark:border-gray-800">
+          <div className="px-4 py-2.5 text-center">
+            <p className="text-[10px] text-gray-400 uppercase tracking-wide">Realized P/L</p>
+            <p className={`text-sm font-bold ${stats.realizedPnl >= 0 ? 'text-green-500' : 'text-red-500'}`}>
+              {stats.realizedPnl >= 0 ? '+' : ''}${Math.abs(stats.realizedPnl).toFixed(2)}
+            </p>
+          </div>
+          <div className="px-4 py-2.5 text-center">
+            <p className="text-[10px] text-gray-400 uppercase tracking-wide">Win Rate</p>
+            <p className="text-sm font-bold text-gray-900 dark:text-white">
+              {stats.winRate !== null ? `${stats.winRate}%` : '—'}
+            </p>
+          </div>
+          <div className="px-4 py-2.5 text-center">
+            <p className="text-[10px] text-gray-400 uppercase tracking-wide">Closed</p>
+            <p className="text-sm font-bold text-gray-900 dark:text-white">{stats.closedCount}</p>
+          </div>
+        </div>
+      )}
+
+      {positions.length === 0 ? (
+        <div className="p-8 text-center">
+          <p className="text-gray-400 text-sm">No open Forex positions.</p>
+          <button onClick={() => navigate('/logs')} className="mt-2 text-blue-500 text-xs hover:underline">+ Log a trade</button>
+        </div>
+      ) : (
+        <div className="divide-y divide-gray-50 dark:divide-gray-800">
+          {positions.map(t => (
+            <div key={t.id} className="flex items-center justify-between px-5 py-3">
+              <div>
+                <div className="flex items-center gap-2">
+                  <p className="text-sm font-semibold text-gray-900 dark:text-white">{t.symbol}</p>
+                  <span className={`text-xs px-1.5 py-0.5 rounded font-medium ${
+                    t.position === 'LONG'
+                      ? 'bg-green-100 text-green-700 dark:bg-green-900 dark:text-green-300'
+                      : 'bg-red-100 text-red-700 dark:bg-red-900 dark:text-red-300'
+                  }`}>{t.position}</span>
+                </div>
+                <p className="text-[10px] text-gray-400 mt-0.5">
+                  {t.lots ? `${t.lots} lot${parseFloat(t.lots) !== 1 ? 's' : ''}` : `${t.quantity} units`}
+                  {t.entry_price ? ` @ ${parseFloat(t.entry_price).toFixed(t.symbol?.includes('JPY') ? 3 : 5)}` : ''}
+                </p>
+              </div>
+              <div className="text-right">
+                {t.realized_pnl != null && (
+                  <p className={`text-sm font-semibold ${parseFloat(t.realized_pnl) >= 0 ? 'text-green-500' : 'text-red-500'}`}>
+                    {parseFloat(t.realized_pnl) >= 0 ? '+' : ''}${Math.abs(parseFloat(t.realized_pnl)).toFixed(2)}
+                  </p>
+                )}
+              </div>
+            </div>
+          ))}
+        </div>
+      )}
+    </div>
+  )
+}
+
+// ── Forex center dashboard ────────────────────────────────────────────────────
+function ForexCenterDashboard({ navigate }) {
+  return (
+    <div className="flex flex-col gap-4">
+      <GoldPriceWidget />
+      <ForexSessionClock />
+      <ForexOpenPositions navigate={navigate} />
+    </div>
+  )
+}
+
 // ── Logged-in layout ──────────────────────────────────────────────────────────
 function LoggedInHome() {
   const { user } = useAuth()
+  const { isForex } = useMarket()
   const navigate = useNavigate()
   const [disciplineKey, setDisciplineKey] = useState(0)
 
@@ -1050,9 +1364,9 @@ function LoggedInHome() {
           <MonthlyGoals />
         </div>
 
-        {/* CENTER — Stats + Positions + Watchlist */}
+        {/* CENTER — Stats + Positions + Watchlist (NEPSE) / Gold + Sessions + Positions (Forex) */}
         <div className="col-span-12 lg:col-span-6">
-          <CenterDashboard navigate={navigate} />
+          {isForex ? <ForexCenterDashboard navigate={navigate} /> : <CenterDashboard navigate={navigate} />}
         </div>
 
         {/* RIGHT — Discipline Score + Journal shortcuts */}

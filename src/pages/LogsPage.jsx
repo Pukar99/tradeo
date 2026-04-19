@@ -2,6 +2,7 @@ import { useState, useEffect, useCallback } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { useAuth } from '../context/AuthContext'
 import { useLanguage } from '../context/LanguageContext'
+import { useMarket } from '../context/MarketContext'
 import {
   getTradeLog, addTradeLog, updateTradeLog,
   closeTradeLog, partialCloseTradeLog, deleteTradeLog, bulkDeleteTradeLog,
@@ -13,6 +14,13 @@ import { useChatRefresh, dispatchDebrief } from '../utils/chatEvents'
 import { getTradeDebrief, getWhatIf, getRules, addRule, updateRule, deleteRule, getRuleViolations, getTaxReport, getBenchmarkCompare, benchmarkContribute, benchmarkOptOut } from '../api'
 
 // ── Constants ─────────────────────────────────────────────────────────────────
+
+const FOREX_SYMBOLS = [
+  'XAUUSD','XAGUSD',        // metals
+  'EURUSD','GBPUSD','USDJPY','USDCHF','AUDUSD','NZDUSD','USDCAD', // majors
+  'EURJPY','GBPJPY','EURGBP','AUDCAD','CADJPY','CHFJPY',          // crosses
+  'BTCUSD','ETHUSD',        // crypto CFDs
+]
 
 const NEPSE_SYMBOLS = [
   'NTC','NABIL','SCB','EBL','NICA','HBL','KBL','MBL','CZBIL','SBI',
@@ -278,11 +286,16 @@ function ChecklistModal({ onPass, onClose }) {
 
 // ── Add / Edit Trade Modal ────────────────────────────────────────────────────
 
-function AddTradeModal({ onClose, onSave, editTrade, openTrades = [] }) {
+function AddTradeModal({ onClose, onSave, editTrade, openTrades = [], market = 'nepse' }) {
+  const isForex = market === 'forex'
+
   const [form, setForm] = useState({
     date: new Date().toISOString().split('T')[0],
     symbol: '', position: 'LONG', quantity: '',
     entry_price: '', sl: '', tp: '', notes: '', setup_tag: '', entry_reason: '',
+    market,
+    lots: '',
+    pip_value: '',
   })
   const [brokerMsg, setBrokerMsg]               = useState('')
   const [brokerParsed, setBrokerParsed]         = useState(null)
@@ -306,9 +319,12 @@ function AddTradeModal({ onClose, onSave, editTrade, openTrades = [] }) {
         notes: editTrade.notes || '',
         setup_tag: editTrade.setup_tag || '',
         entry_reason: editTrade.entry_reason || '',
+        market: editTrade.market || market,
+        lots: editTrade.lots || '',
+        pip_value: editTrade.pip_value || '',
       })
     }
-  }, [editTrade])
+  }, [editTrade, market])
 
   useEffect(() => {
     const e = parseFloat(form.entry_price)
@@ -331,7 +347,8 @@ function AddTradeModal({ onClose, onSave, editTrade, openTrades = [] }) {
   const handleSymbolInput = (val) => {
     const upper = val.toUpperCase()
     setForm(p => ({ ...p, symbol: upper }))
-    setSymbolSuggestions(upper.length >= 1 ? NEPSE_SYMBOLS.filter(s => s.startsWith(upper)).slice(0, 5) : [])
+    const pool = isForex ? FOREX_SYMBOLS : NEPSE_SYMBOLS
+    setSymbolSuggestions(upper.length >= 1 ? pool.filter(s => s.startsWith(upper)).slice(0, 6) : [])
   }
 
   const handleBrokerParse = () => {
@@ -477,27 +494,58 @@ function AddTradeModal({ onClose, onSave, editTrade, openTrades = [] }) {
             </div>
           </div>
 
-          {/* Row 3: Qty + Entry */}
+          {/* Row 3: Qty/Lots + Entry */}
           <div className="grid grid-cols-2 gap-3">
-            <div>
-              <label className={LABEL}>Quantity</label>
-              <input type="number" value={form.quantity}
-                onChange={e => setForm(p => ({ ...p, quantity: e.target.value }))}
-                placeholder="100" className={INPUT} required />
-            </div>
-            <div>
-              <label className={LABEL}>Entry Price <span className="normal-case text-gray-300 font-normal">Rs.</span></label>
-              <input type="number" step="0.01" value={form.entry_price}
-                onChange={e => setForm(p => ({ ...p, entry_price: e.target.value }))}
-                placeholder="0.00" className={INPUT} required />
-            </div>
+            {isForex ? (
+              <>
+                <div>
+                  <label className={LABEL}>Lots <span className="normal-case text-gray-300 font-normal">e.g. 0.01, 0.1, 1</span></label>
+                  <input type="number" step="0.01" value={form.lots}
+                    onChange={e => setForm(p => ({ ...p, lots: e.target.value, quantity: e.target.value }))}
+                    placeholder="0.10" className={INPUT} required />
+                </div>
+                <div>
+                  <label className={LABEL}>Entry Price <span className="normal-case text-gray-300 font-normal">USD</span></label>
+                  <input type="number" step="0.00001" value={form.entry_price}
+                    onChange={e => setForm(p => ({ ...p, entry_price: e.target.value }))}
+                    placeholder="2000.00" className={INPUT} required />
+                </div>
+              </>
+            ) : (
+              <>
+                <div>
+                  <label className={LABEL}>Quantity</label>
+                  <input type="number" value={form.quantity}
+                    onChange={e => setForm(p => ({ ...p, quantity: e.target.value }))}
+                    placeholder="100" className={INPUT} required />
+                </div>
+                <div>
+                  <label className={LABEL}>Entry Price <span className="normal-case text-gray-300 font-normal">Rs.</span></label>
+                  <input type="number" step="0.01" value={form.entry_price}
+                    onChange={e => setForm(p => ({ ...p, entry_price: e.target.value }))}
+                    placeholder="0.00" className={INPUT} required />
+                </div>
+              </>
+            )}
           </div>
+
+          {/* Forex: pip value field */}
+          {isForex && (
+            <div>
+              <label className={LABEL}>Pip Value <span className="normal-case text-gray-300 font-normal">$ per pip (optional)</span></label>
+              <input type="number" step="0.01" value={form.pip_value}
+                onChange={e => setForm(p => ({ ...p, pip_value: e.target.value }))}
+                placeholder="e.g. 1.00 for 0.1 lot XAUUSD"
+                className={INPUT} />
+              <p className="text-[9px] text-gray-400 mt-1">For Gold: 1 pip = $0.1 per 0.01 lot. Broker may vary.</p>
+            </div>
+          )}
 
           {/* Row 4: SL + TP */}
           <div className="grid grid-cols-2 gap-3">
             <div>
               <label className={LABEL}>Stop Loss <span className="normal-case font-normal text-gray-300">optional</span></label>
-              <input type="number" step="0.01" value={form.sl}
+              <input type="number" step={isForex ? '0.00001' : '0.01'} value={form.sl}
                 onChange={e => setForm(p => ({ ...p, sl: e.target.value }))}
                 placeholder="0.00" className={INPUT} />
               {!form.sl && (
@@ -509,7 +557,7 @@ function AddTradeModal({ onClose, onSave, editTrade, openTrades = [] }) {
             </div>
             <div>
               <label className={LABEL}>Take Profit <span className="normal-case font-normal text-gray-300">optional</span></label>
-              <input type="number" step="0.01" value={form.tp}
+              <input type="number" step={isForex ? '0.00001' : '0.01'} value={form.tp}
                 onChange={e => setForm(p => ({ ...p, tp: e.target.value }))}
                 placeholder="0.00" className={INPUT} />
             </div>
@@ -2849,10 +2897,15 @@ function TradeRow({ trade, ltp, onEdit, onClose, onPartialClose, onDelete, onJou
                   />
                 )}
               </div>
-              <div className="flex items-center gap-1.5 mt-0.5">
+              <div className="flex items-center gap-1.5 mt-0.5 flex-wrap">
                 <p className={`text-[9px] font-semibold ${trade.position === 'LONG' ? 'text-emerald-500' : 'text-red-400'}`}>
                   {trade.position === 'LONG' ? '↑ Long' : '↓ Short'}
                 </p>
+                {trade.market === 'forex' && (
+                  <span className="text-[8px] font-semibold px-1.5 py-0.5 rounded-full border bg-purple-50 dark:bg-purple-900/20 border-purple-200 dark:border-purple-800/40 text-purple-600 dark:text-purple-400">
+                    FX
+                  </span>
+                )}
                 {trade.setup_tag && (
                   <span className={`text-[8px] font-semibold px-1.5 py-0.5 rounded-full border ${SETUP_TAG_STYLE[trade.setup_tag] || SETUP_TAG_STYLE.Other}`}>
                     {trade.setup_tag}
@@ -2863,11 +2916,19 @@ function TradeRow({ trade, ltp, onEdit, onClose, onPartialClose, onDelete, onJou
           </div>
         </td>
 
-        {/* Qty */}
+        {/* Qty / Lots */}
         <td className="px-4 py-3.5" translate="no">
-          <span className="text-[11px] font-semibold text-gray-700 dark:text-gray-200 tabular-nums">{remaining}</span>
-          {remaining !== trade.quantity && (
-            <span className="text-[9px] text-gray-300 dark:text-gray-700 tabular-nums"> /{trade.quantity}</span>
+          {trade.market === 'forex' && trade.lots ? (
+            <div>
+              <span className="text-[11px] font-semibold text-gray-700 dark:text-gray-200 tabular-nums">{parseFloat(trade.lots)} lot</span>
+            </div>
+          ) : (
+            <div>
+              <span className="text-[11px] font-semibold text-gray-700 dark:text-gray-200 tabular-nums">{remaining}</span>
+              {remaining !== trade.quantity && (
+                <span className="text-[9px] text-gray-300 dark:text-gray-700 tabular-nums"> /{trade.quantity}</span>
+              )}
+            </div>
           )}
         </td>
 
@@ -2913,14 +2974,22 @@ function TradeRow({ trade, ltp, onEdit, onClose, onPartialClose, onDelete, onJou
         <td className="px-4 py-3.5" translate="no">
           {pnl !== 0 ? (
             <p className={`text-[12px] font-bold tabular-nums ${pnl > 0 ? 'text-emerald-500' : 'text-red-400'}`}>
-              {pnl > 0 ? '+' : '−'}Rs.{Math.abs(Math.round(pnl)).toLocaleString()}
+              {pnl > 0 ? '+' : '−'}{trade.market === 'forex' ? '$' : 'Rs.'}
+              {trade.market === 'forex'
+                ? Math.abs(pnl).toFixed(2)
+                : Math.abs(Math.round(pnl)).toLocaleString()
+              }
             </p>
           ) : (
             <span className="text-[11px] text-gray-300 dark:text-gray-700">—</span>
           )}
           {unrealized !== null && (
             <p className={`text-[9px] tabular-nums font-medium mt-0.5 ${unrealized > 0 ? 'text-emerald-400' : 'text-red-400'}`}>
-              {unrealized > 0 ? '+' : '−'}Rs.{Math.abs(Math.round(unrealized)).toLocaleString()} unreal.
+              {unrealized > 0 ? '+' : '−'}{trade.market === 'forex' ? '$' : 'Rs.'}
+              {trade.market === 'forex'
+                ? Math.abs(unrealized).toFixed(2)
+                : Math.abs(Math.round(unrealized)).toLocaleString()
+              } unreal.
             </p>
           )}
         </td>
@@ -3130,6 +3199,7 @@ function JournalCard({ journal, trades, onEdit, onDelete, idx }) {
 function LogsPage() {
   const { user }   = useAuth()
   const { t: tr }  = useLanguage()
+  const { market } = useMarket()
   const navigate   = useNavigate()
 
   const [trades, setTrades]             = useState([])
@@ -3415,6 +3485,7 @@ function LogsPage() {
 
   const filteredTrades = trades
     .filter(t =>
+      (t.market === market || (!t.market && market === 'nepse')) &&
       (filterStatus === 'ALL' || t.status === filterStatus) &&
       (!searchSymbol || t.symbol.includes(searchSymbol.toUpperCase()))
     )
@@ -3430,13 +3501,14 @@ function LogsPage() {
       return 0
     })
 
-  const closedTrades    = trades.filter(t => t.status === 'CLOSED')
-  const openTrades      = trades.filter(t => t.status === 'OPEN' || t.status === 'PARTIAL')
+  const marketTrades    = trades.filter(t => t.market === market || (!t.market && market === 'nepse'))
+  const closedTrades    = marketTrades.filter(t => t.status === 'CLOSED')
+  const openTrades      = marketTrades.filter(t => t.status === 'OPEN' || t.status === 'PARTIAL')
   const winners         = closedTrades.filter(t => (t.realized_pnl || 0) > 0).length
   const winRate         = closedTrades.length > 0 ? Math.round((winners / closedTrades.length) * 100) : null
-  const totalPnl        = trades.reduce((sum, t) => sum + (t.realized_pnl || 0), 0)
-  const openCount       = trades.filter(t => t.status === 'OPEN').length
-  const partialCount    = trades.filter(t => t.status === 'PARTIAL').length
+  const totalPnl        = marketTrades.reduce((sum, t) => sum + (t.realized_pnl || 0), 0)
+  const openCount       = marketTrades.filter(t => t.status === 'OPEN').length
+  const partialCount    = marketTrades.filter(t => t.status === 'PARTIAL').length
 
   // Total unrealized P&L across all open/partial positions using live LTP
   const totalUnrealized = openTrades.reduce((sum, t) => {
@@ -3533,6 +3605,7 @@ function LogsPage() {
           onSave={handleAddTrade}
           editTrade={editTrade}
           openTrades={openTrades}
+          market={editTrade?.market || market}
         />
       )}
       {showImport && (
