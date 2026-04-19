@@ -23,6 +23,7 @@ const PIE_COLORS = ['#3b82f6', '#ef4444', '#f59e0b', '#22c55e', '#8b5cf6']
 
 const TABS = [
   { id: 'nepse',       label: 'NEPSE Calc',   desc: 'Trade Calculator' },
+  { id: 'forex',       label: 'Forex Calc',   desc: 'Lot Size & Pip Value' },
   { id: 'position',   label: 'Position',      desc: 'Size & Risk/Reward' },
   { id: 'performance',label: 'Performance',   desc: 'Win Rate & Drawdown' },
   { id: 'sip',        label: 'SIP',           desc: 'Systematic Investment' },
@@ -327,6 +328,221 @@ function NEPSECalculator() {
 }
 
 // ─── POSITION & RISK CALCULATOR ────────────────────────────
+// ─── FOREX POSITION CALCULATOR ────────────────────────────────
+// Supports Gold (XAUUSD), Forex majors, and Crypto CFDs
+// Lot sizes: Standard=100k units, Mini=10k, Micro=1k
+// Gold: 1 standard lot = 100 troy oz. Pip = $0.01 per oz
+// Most forex pairs: pip = 4th decimal. JPY pairs: pip = 2nd decimal
+const FOREX_INSTRUMENTS = [
+  { id: 'XAUUSD',  label: 'Gold (XAUUSD)',  pipSize: 0.01,  lotUnits: 100,   pipPerLot: 1.00,  isJpy: false },
+  { id: 'XAGUSD',  label: 'Silver (XAGUSD)',pipSize: 0.001, lotUnits: 5000,  pipPerLot: 5.00,  isJpy: false },
+  { id: 'EURUSD',  label: 'EUR/USD',         pipSize: 0.0001,lotUnits: 100000,pipPerLot: 10.00, isJpy: false },
+  { id: 'GBPUSD',  label: 'GBP/USD',         pipSize: 0.0001,lotUnits: 100000,pipPerLot: 10.00, isJpy: false },
+  { id: 'USDJPY',  label: 'USD/JPY',         pipSize: 0.01,  lotUnits: 100000,pipPerLot: null,  isJpy: true  },
+  { id: 'USDCHF',  label: 'USD/CHF',         pipSize: 0.0001,lotUnits: 100000,pipPerLot: null,  isJpy: false },
+  { id: 'AUDUSD',  label: 'AUD/USD',         pipSize: 0.0001,lotUnits: 100000,pipPerLot: 10.00, isJpy: false },
+  { id: 'NZDUSD',  label: 'NZD/USD',         pipSize: 0.0001,lotUnits: 100000,pipPerLot: 10.00, isJpy: false },
+  { id: 'USDCAD',  label: 'USD/CAD',         pipSize: 0.0001,lotUnits: 100000,pipPerLot: null,  isJpy: false },
+  { id: 'BTCUSD',  label: 'BTC/USD',         pipSize: 1,     lotUnits: 1,     pipPerLot: 1.00,  isJpy: false },
+  { id: 'ETHUSD',  label: 'ETH/USD',         pipSize: 0.01,  lotUnits: 1,     pipPerLot: 0.01,  isJpy: false },
+  { id: 'custom',  label: 'Custom…',          pipSize: null,  lotUnits: null,  pipPerLot: null,  isJpy: false },
+]
+
+function ForexCalculator() {
+  const [instrId,  setInstrId]  = useState('XAUUSD')
+  const [lots,     setLots]     = useState('0.10')
+  const [entryStr, setEntryStr] = useState('')
+  const [slStr,    setSlStr]    = useState('')
+  const [tpStr,    setTpStr]    = useState('')
+  const [capital,  setCapital]  = useState('')
+  const [riskPct,  setRiskPct]  = useState('2')
+  const [customPip,setCustomPip]= useState('')
+  const [customPPL,setCustomPPL]= useState('')
+  const [result,   setResult]   = useState(null)
+  const [err,      setErr]      = useState(null)
+
+  const instr = FOREX_INSTRUMENTS.find(i => i.id === instrId) || FOREX_INSTRUMENTS[0]
+  const pipSize    = instrId === 'custom' ? (parseFloat(customPip) || 0)  : instr.pipSize
+  const pipPerLot  = instrId === 'custom' ? (parseFloat(customPPL) || 0)  : (instr.pipPerLot || 0)
+
+  const calculate = () => {
+    setErr(null)
+    const lotsVal  = parseFloat(lots)  || 0
+    const entry    = parseFloat(entryStr) || 0
+    const sl       = parseFloat(slStr)    || 0
+    const tp       = parseFloat(tpStr)    || 0
+    const cap      = parseFloat(capital)  || 0
+    const riskPctV = parseFloat(riskPct)  || 2
+
+    if (!lotsVal || !entry || !sl) {
+      setErr('Enter lots, entry price, and stop loss.')
+      return
+    }
+    if (pipSize <= 0 || pipPerLot <= 0) {
+      setErr('Invalid pip size or pip value per lot. Check instrument selection.')
+      return
+    }
+
+    const priceDiffSL = Math.abs(entry - sl)
+    const pipsSL      = priceDiffSL / pipSize
+    if (pipsSL < 0.5) {
+      setErr('Stop loss is too close to entry — check price values.')
+      return
+    }
+
+    const dollarRiskPerLot = pipsSL * pipPerLot
+    const totalRisk        = dollarRiskPerLot * lotsVal
+    const pipValueTotal    = pipPerLot * lotsVal  // $ per pip for position
+
+    const priceDiffTP      = tp ? Math.abs(tp - entry) : null
+    const pipsTP           = priceDiffTP ? priceDiffTP / pipSize : null
+    const reward           = pipsTP ? pipsTP * pipPerLot * lotsVal : null
+    const rr               = reward && totalRisk > 0 ? (reward / totalRisk).toFixed(2) : null
+
+    // Suggested lot size based on capital & risk %
+    let suggestedLots = null
+    if (cap > 0 && dollarRiskPerLot > 0) {
+      const maxRiskDollars = cap * riskPctV / 100
+      suggestedLots = (maxRiskDollars / dollarRiskPerLot).toFixed(2)
+    }
+
+    setResult({ pipsSL, pipsTP, totalRisk, pipValueTotal, reward, rr, suggestedLots })
+  }
+
+  const decPrec = instrId === 'USDJPY' || instrId === 'XAGUSD' ? 3 : instrId === 'BTCUSD' ? 1 : instrId === 'XAUUSD' ? 2 : 5
+
+  return (
+    <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+      {/* Inputs */}
+      <div className="bg-white dark:bg-gray-900 rounded-2xl border border-gray-100 dark:border-gray-800 p-5 space-y-3">
+        <p className="text-[11px] font-semibold uppercase tracking-widest text-gray-400">Forex Lot Size & Pip Calculator</p>
+
+        {/* Instrument */}
+        <div>
+          <label className={LABEL}>Instrument</label>
+          <select value={instrId} onChange={e => setInstrId(e.target.value)} className={INPUT}>
+            {FOREX_INSTRUMENTS.map(i => <option key={i.id} value={i.id}>{i.label}</option>)}
+          </select>
+        </div>
+
+        {/* Custom pip inputs */}
+        {instrId === 'custom' && (
+          <div className="grid grid-cols-2 gap-3">
+            <div>
+              <label className={LABEL}>Pip Size (e.g. 0.0001)</label>
+              <input type="number" step="0.00001" value={customPip} onChange={e => setCustomPip(e.target.value)} placeholder="0.0001" className={INPUT} />
+            </div>
+            <div>
+              <label className={LABEL}>Pip Value / lot ($)</label>
+              <input type="number" step="0.01" value={customPPL} onChange={e => setCustomPPL(e.target.value)} placeholder="10.00" className={INPUT} />
+            </div>
+          </div>
+        )}
+
+        <div className="grid grid-cols-2 gap-3">
+          <div>
+            <label className={LABEL}>Lot Size</label>
+            <input type="number" step="0.01" value={lots} onChange={e => setLots(e.target.value)} placeholder="0.10" className={INPUT} />
+            <p className="text-[9px] text-gray-400 mt-1">Micro=0.01 · Mini=0.1 · Std=1</p>
+          </div>
+          <div>
+            <label className={LABEL}>Risk % (for suggestion)</label>
+            <input type="number" step="0.5" value={riskPct} onChange={e => setRiskPct(e.target.value)} placeholder="2" className={INPUT} />
+          </div>
+        </div>
+
+        <div>
+          <label className={LABEL}>Account Capital ($) <span className="normal-case font-normal text-gray-300">for suggested lot</span></label>
+          <input type="number" value={capital} onChange={e => setCapital(e.target.value)} placeholder="10000" className={INPUT} />
+        </div>
+
+        <div className="grid grid-cols-3 gap-3">
+          <div>
+            <label className={LABEL}>Entry</label>
+            <input type="number" step={pipSize || 0.0001} value={entryStr} onChange={e => setEntryStr(e.target.value)} placeholder={instrId === 'XAUUSD' ? '2300.00' : '1.0850'} className={INPUT} />
+          </div>
+          <div>
+            <label className={LABEL}>Stop Loss</label>
+            <input type="number" step={pipSize || 0.0001} value={slStr} onChange={e => setSlStr(e.target.value)} placeholder={instrId === 'XAUUSD' ? '2280.00' : '1.0800'} className={INPUT} />
+          </div>
+          <div>
+            <label className={LABEL}>Take Profit <span className="normal-case font-normal text-gray-300">opt.</span></label>
+            <input type="number" step={pipSize || 0.0001} value={tpStr} onChange={e => setTpStr(e.target.value)} placeholder={instrId === 'XAUUSD' ? '2340.00' : '1.0950'} className={INPUT} />
+          </div>
+        </div>
+
+        {err && <div className="text-[10px] text-red-500 bg-red-50 dark:bg-red-900/20 rounded-xl px-3 py-2 border border-red-100 dark:border-red-800/50">{err}</div>}
+
+        <button
+          onClick={calculate}
+          disabled={!lots || !entryStr || !slStr}
+          className="w-full bg-purple-600 hover:bg-purple-700 text-white py-2.5 rounded-xl text-[11px] font-semibold disabled:opacity-40 transition-colors"
+        >
+          Calculate
+        </button>
+      </div>
+
+      {/* Results */}
+      <div>
+        {!result ? (
+          <EmptyState text="Enter trade details to calculate pip value and lot risk" />
+        ) : (
+          <div className="bg-white dark:bg-gray-900 rounded-2xl border border-gray-100 dark:border-gray-800 p-5 space-y-4">
+            <div className="grid grid-cols-2 gap-2">
+              <StatCard label="Lot Size" value={`${parseFloat(lots)} lot${parseFloat(lots) !== 1 ? 's' : ''}`} color="text-purple-500" />
+              <StatCard label="Pip Value (pos.)" value={`$${result.pipValueTotal.toFixed(2)} / pip`} color="text-blue-500" />
+              <StatCard label="SL Distance" value={`${result.pipsSL.toFixed(1)} pips`} />
+              <StatCard label="Dollar Risk" value={`-$${result.totalRisk.toFixed(2)}`} color="text-red-400" />
+              {result.pipsTP && <StatCard label="TP Distance" value={`${result.pipsTP.toFixed(1)} pips`} />}
+              {result.reward && <StatCard label="Potential Profit" value={`+$${result.reward.toFixed(2)}`} color="text-emerald-500" />}
+              {result.rr && (
+                <StatCard
+                  label="Risk : Reward"
+                  value={`1 : ${result.rr}`}
+                  color={parseFloat(result.rr) >= 2 ? 'text-emerald-500' : parseFloat(result.rr) >= 1 ? 'text-amber-500' : 'text-red-400'}
+                />
+              )}
+              {result.suggestedLots && (
+                <StatCard
+                  label={`Suggested Lot (${riskPct}% risk)`}
+                  value={`${result.suggestedLots} lots`}
+                  color="text-amber-500"
+                />
+              )}
+            </div>
+
+            {/* Pip value reference */}
+            {instrId !== 'custom' && (
+              <div className="mt-2 bg-gray-50 dark:bg-gray-800/50 rounded-xl p-3 space-y-1">
+                <p className="text-[9px] font-semibold uppercase tracking-widest text-gray-400 mb-1.5">Reference — {instrId}</p>
+                <div className="grid grid-cols-3 gap-2 text-center">
+                  {[
+                    { lot: 0.01, label: 'Micro' },
+                    { lot: 0.10, label: 'Mini'  },
+                    { lot: 1.00, label: 'Std'   },
+                  ].map(({ lot, label }) => (
+                    <div key={label} className="bg-white dark:bg-gray-900 rounded-lg py-2">
+                      <p className="text-[9px] text-gray-400">{label} ({lot})</p>
+                      <p className="text-[11px] font-bold text-gray-800 dark:text-white">
+                        ${(pipPerLot * lot).toFixed(2)}/pip
+                      </p>
+                    </div>
+                  ))}
+                </div>
+                <p className="text-[9px] text-gray-400 text-center pt-1">
+                  {instrId === 'XAUUSD' ? 'Gold: 1 pip = $0.01/oz · 1 std lot = 100oz' :
+                   instrId === 'USDJPY' ? 'JPY pairs: pip value varies with exchange rate' :
+                   'Pip value in USD for USD-quoted pairs'}
+                </p>
+              </div>
+            )}
+          </div>
+        )}
+      </div>
+    </div>
+  )
+}
+
 function PositionCalculator() {
   const [form, setForm] = useState({
     capital: '', riskPct: '2', entryPrice: '', slPrice: '', tpPrice: ''
@@ -972,7 +1188,7 @@ function RiskLabPage() {
   const { t } = useLanguage()
 
   return (
-    <div className="max-w-5xl mx-auto px-6 pt-6 pb-10 space-y-5">
+    <div className="max-w-5xl mx-auto px-3 sm:px-6 pt-4 sm:pt-6 pb-10 space-y-5">
 
       {/* Header */}
       <div>
@@ -1004,6 +1220,7 @@ function RiskLabPage() {
 
       {/* Content */}
       {activeTab === 'nepse'       && <NEPSECalculator />}
+      {activeTab === 'forex'       && <ForexCalculator />}
       {activeTab === 'position'    && <PositionCalculator />}
       {activeTab === 'performance' && <PerformanceCalculator />}
       {activeTab === 'sip'         && <SIPCalculator />}

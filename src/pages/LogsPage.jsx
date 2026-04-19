@@ -436,7 +436,7 @@ function AddTradeModal({ onClose, onSave, editTrade, openTrades = [], market = '
               </button>
               {brokerParsed && (
                 <span className="text-[10px] text-emerald-500 font-medium">
-                  ✓ {brokerParsed.position} {brokerParsed.quantity} {brokerParsed.symbol} @ Rs.{brokerParsed.entry_price}
+                  ✓ {brokerParsed.position} {brokerParsed.quantity} {brokerParsed.symbol} @ {isForex ? '$' : 'Rs.'}{brokerParsed.entry_price}
                 </span>
               )}
             </div>
@@ -709,7 +709,7 @@ function CloseTradeModal({ trade, onClose, onSave, isPartial }) {
     <Modal onClose={onClose}>
       <ModalHeader
         title={isPartial ? 'Partial Close' : 'Close Trade'}
-        sub={`${trade.symbol} · ${trade.position} · ${remaining} units @ Rs.${entryPrice.toFixed(2)}`}
+        sub={`${trade.symbol} · ${trade.position} · ${trade.market === 'forex' && trade.lots ? `${parseFloat(trade.lots)} lot` : `${remaining} units`} @ ${trade.market === 'forex' ? '$' : 'Rs.'}${entryPrice.toFixed(trade.market === 'forex' ? 2 : 2)}`}
         onClose={onClose}
       />
       <form onSubmit={handleSubmit} className="p-5 space-y-4">
@@ -725,8 +725,8 @@ function CloseTradeModal({ trade, onClose, onSave, isPartial }) {
         )}
 
         <div>
-          <label className={LABEL}>Exit Price <span className="normal-case font-normal text-gray-300">Rs.</span></label>
-          <input type="number" step="0.01" value={exitPrice}
+          <label className={LABEL}>Exit Price <span className="normal-case font-normal text-gray-300">{trade.market === 'forex' ? 'USD' : 'Rs.'}</span></label>
+          <input type="number" step={trade.market === 'forex' ? '0.00001' : '0.01'} value={exitPrice}
             onChange={e => setExitPrice(e.target.value)}
             placeholder="0.00" className={INPUT} required />
         </div>
@@ -757,7 +757,11 @@ function CloseTradeModal({ trade, onClose, onSave, isPartial }) {
           }`}>
             <p className="text-[10px] uppercase tracking-widest text-gray-400 font-semibold mb-1">Estimated P&L</p>
             <p className={`text-2xl font-black tracking-tight ${pnlPreview >= 0 ? 'text-emerald-500' : 'text-red-400'}`}>
-              {pnlPreview >= 0 ? '+' : '−'}Rs.{Math.abs(Math.round(pnlPreview)).toLocaleString()}
+              {pnlPreview >= 0 ? '+' : '−'}{trade.market === 'forex' ? '$' : 'Rs.'}
+              {trade.market === 'forex'
+                ? Math.abs(pnlPreview).toFixed(2)
+                : Math.abs(Math.round(pnlPreview)).toLocaleString()
+              }
             </p>
           </div>
         )}
@@ -2112,7 +2116,8 @@ function RulesPanel() {
 
 // ── Stats Panel ───────────────────────────────────────────────────────────────
 
-function StatsPanel({ trades }) {
+function StatsPanel({ trades, market = 'nepse' }) {
+  const isForexMkt = market === 'forex'
   const closed = trades.filter(t => t.status === 'CLOSED')
   const open   = trades.filter(t => t.status === 'OPEN' || t.status === 'PARTIAL')
 
@@ -2198,7 +2203,9 @@ function StatsPanel({ trades }) {
   const longWinRate  = longTrades.length  > 0 ? (longTrades.filter(t => (parseFloat(t.realized_pnl) || 0) > 0).length  / longTrades.length)  * 100 : null
   const shortWinRate = shortTrades.length > 0 ? (shortTrades.filter(t => (parseFloat(t.realized_pnl) || 0) > 0).length / shortTrades.length) * 100 : null
 
-  const fmt = (n) => n > 0 ? `+Rs.${Math.abs(Math.round(n)).toLocaleString()}` : `−Rs.${Math.abs(Math.round(n)).toLocaleString()}`
+  const fmt = (n) => isForexMkt
+    ? (n > 0 ? `+$${Math.abs(n).toFixed(2)}` : `−$${Math.abs(n).toFixed(2)}`)
+    : (n > 0 ? `+Rs.${Math.abs(Math.round(n)).toLocaleString()}` : `−Rs.${Math.abs(Math.round(n)).toLocaleString()}`)
   const fmtColor = (n) => n > 0 ? 'text-emerald-500' : n < 0 ? 'text-red-400' : 'text-gray-400'
 
   const StatCard = ({ label, value, valueClass = 'text-gray-900 dark:text-white', sub }) => (
@@ -2380,7 +2387,7 @@ function StatsPanel({ trades }) {
                     </div>
                     <div className="flex items-center gap-3">
                       <span className={`text-[10px] font-bold tabular-nums ${pnl >= 0 ? 'text-emerald-500' : 'text-red-400'}`}>
-                        {pnl > 0 ? '+' : pnl < 0 ? '−' : ''}Rs.{Math.abs(Math.round(pnl)).toLocaleString()}
+                        {pnl > 0 ? '+' : pnl < 0 ? '−' : ''}{isForexMkt ? '$' : 'Rs.'}{isForexMkt ? Math.abs(pnl).toFixed(2) : Math.abs(Math.round(pnl)).toLocaleString()}
                       </span>
                       <span className={`text-[11px] font-bold tabular-nums ${wr >= 50 ? 'text-emerald-500' : 'text-red-400'}`}>
                         {wr}% WR
@@ -2419,7 +2426,7 @@ function StatsPanel({ trades }) {
                           {/* Tooltip */}
                           <div className="absolute bottom-full mb-1 left-1/2 -translate-x-1/2 hidden group-hover:flex flex-col items-center z-10 pointer-events-none">
                             <div className="bg-gray-900 dark:bg-gray-700 text-white rounded-lg px-2 py-1 text-[9px] font-semibold whitespace-nowrap shadow-lg">
-                              {isPos ? '+' : '−'}Rs.{Math.abs(Math.round(val)).toLocaleString()}
+                              {isPos ? '+' : '−'}{isForexMkt ? '$' : 'Rs.'}{isForexMkt ? Math.abs(val).toFixed(2) : Math.abs(Math.round(val)).toLocaleString()}
                             </div>
                             <div className="w-1.5 h-1.5 bg-gray-900 dark:bg-gray-700 rotate-45 -mt-0.5" />
                           </div>
@@ -4240,7 +4247,7 @@ function LogsPage() {
       })()}
       {/* ── Stats tab ── */}
       {activeTab === 'stats' && (
-        <StatsPanel trades={trades} />
+        <StatsPanel trades={marketTrades} market={market} />
       )}
 
       {/* ── Rules tab ── */}
