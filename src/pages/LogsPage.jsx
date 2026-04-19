@@ -3278,6 +3278,7 @@ function LogsPage() {
       }
     } catch (err) {
       console.error(err)
+      setActionErr('Failed to load trades. Please refresh.')
     } finally {
       setLoading(false)
     }
