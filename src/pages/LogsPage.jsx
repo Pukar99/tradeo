@@ -572,7 +572,7 @@ function AddTradeModal({ onClose, onSave, editTrade, openTrades = [], market = '
                   You already have {duplicates.length} open {form.symbol} position{duplicates.length > 1 ? 's' : ''}
                 </p>
                 <p className="text-[10px] text-amber-600 dark:text-amber-500 mt-0.5">
-                  {dupTotalQty} units · Avg entry Rs.{dupWeightedAvg?.toFixed(2) ?? '—'} · Adding a separate entry row
+                  {dupTotalQty} units · Avg entry {isForex ? '$' : 'Rs.'}{dupWeightedAvg?.toFixed(2) ?? '—'} · Adding a separate entry row
                 </p>
               </div>
             </div>
@@ -1903,7 +1903,7 @@ function RulesPanel() {
         {view === 'violations' && summary && (
           <div className="flex items-center gap-3">
             <span className="text-[10px] text-gray-400">{summary.trades_with_violations} trades with violations</span>
-            <span className="text-[10px] font-semibold text-red-500">Rs.{summary.total_cost.toLocaleString()} cost</span>
+            <span className="text-[10px] font-semibold text-red-500">{summary.total_cost.toLocaleString()} cost</span>
           </div>
         )}
       </div>
@@ -2233,7 +2233,7 @@ function StatsPanel({ trades, market = 'nepse' }) {
             label="Profit Factor"
             value={profitFactor !== null ? (profitFactor === Infinity ? '∞' : profitFactor.toFixed(2)) : '—'}
             valueClass={profitFactor !== null ? (profitFactor >= 1.5 ? 'text-emerald-500' : profitFactor >= 1 ? 'text-amber-500' : 'text-red-400') : 'text-gray-400'}
-            sub={profitFactor !== null && profitFactor !== Infinity ? `${Math.round(grossWin).toLocaleString()} / ${Math.round(grossLoss).toLocaleString()}` : null}
+            sub={profitFactor !== null && profitFactor !== Infinity ? `${isForexMkt ? '$' : 'Rs.'}${isForexMkt ? grossWin.toFixed(2) : Math.round(grossWin).toLocaleString()} / ${isForexMkt ? '$' : 'Rs.'}${isForexMkt ? grossLoss.toFixed(2) : Math.round(grossLoss).toLocaleString()}` : null}
           />
           <StatCard
             label="Avg Win"
@@ -2545,6 +2545,9 @@ function StatsPanel({ trades, market = 'nepse' }) {
 function GroupedTradeRow({ symbol, entries, ltp, onEdit, onClose, onPartialClose, onDelete, onJournal, onGoToChart, onToggleSelect, selectedIds }) {
   const [expanded, setExpanded] = useState(false)
   const { onContextMenu, ContextMenuPortal } = useContextMenu()
+  const { market: gMarket } = useMarket()
+  const gFx = gMarket === 'forex'
+  const gFmtPnl = (n) => `${n > 0 ? '+' : '−'}${gFx ? '$' : 'Rs.'}${gFx ? Math.abs(n).toFixed(2) : Math.abs(Math.round(n)).toLocaleString()}`
 
   const totalQty   = entries.reduce((s, t) => s + (t.remaining_quantity ?? t.quantity), 0)
   const avgEntry   = totalQty > 0
@@ -2660,12 +2663,12 @@ function GroupedTradeRow({ symbol, entries, ltp, onEdit, onClose, onPartialClose
         <td className="px-4 py-3" translate="no">
           {totalPnl !== 0 ? (
             <p className={`text-[12px] font-bold tabular-nums ${totalPnl > 0 ? 'text-emerald-500' : 'text-red-400'}`}>
-              {totalPnl > 0 ? '+' : '−'}Rs.{Math.abs(Math.round(totalPnl)).toLocaleString()}
+              {gFmtPnl(totalPnl)}
             </p>
           ) : <span className="text-[11px] text-gray-300 dark:text-gray-700">—</span>}
           {unrealized !== null && (
             <p className={`text-[9px] tabular-nums font-medium mt-0.5 ${unrealized > 0 ? 'text-emerald-400' : 'text-red-400'}`}>
-              {unrealized > 0 ? '+' : '−'}Rs.{Math.abs(Math.round(unrealized)).toLocaleString()} unreal.
+              {gFmtPnl(unrealized)} unreal.
             </p>
           )}
         </td>
@@ -2715,6 +2718,8 @@ function WhatIfPanel({ trade }) {
   const [loading, setLoading] = useState(false)
   const [error,   setError]   = useState(null)
   const [fetched, setFetched] = useState(false)
+  const wiFx = trade.market === 'forex'
+  const wiCur = wiFx ? '$' : 'Rs.'
 
   // Resolve exit date from updated_at or a fallback
   const exitDate = (trade.updated_at || trade.date || '').slice(0, 10)
@@ -2778,7 +2783,7 @@ function WhatIfPanel({ trade }) {
               ].map(({ label, snap }) => snap && (
                 <div key={label} className="inline-flex items-center gap-1.5 bg-white dark:bg-gray-900 border border-gray-100 dark:border-gray-800 rounded-lg px-2 py-1">
                   <span className="text-[8px] text-gray-400 font-medium">{label}</span>
-                  <span className="text-[9px] font-semibold text-gray-700 dark:text-gray-300 tabular-nums">Rs.{snap.close.toLocaleString()}</span>
+                  <span className="text-[9px] font-semibold text-gray-700 dark:text-gray-300 tabular-nums">{wiCur}{snap.close.toLocaleString()}</span>
                   <span className={`text-[9px] font-bold tabular-nums ${deltaColor(snap.delta)}`}>{fmtDelta(snap.delta)}</span>
                 </div>
               ))}
@@ -2789,7 +2794,7 @@ function WhatIfPanel({ trade }) {
               {data.peak && (
                 <div className="flex items-center gap-1.5">
                   <span className="text-[8px] text-gray-400">Peak</span>
-                  <span className="text-[9px] font-semibold text-gray-700 dark:text-gray-300 tabular-nums">Rs.{data.peak.price.toLocaleString()}</span>
+                  <span className="text-[9px] font-semibold text-gray-700 dark:text-gray-300 tabular-nums">{wiCur}{data.peak.price.toLocaleString()}</span>
                   <span className={`text-[9px] font-bold ${deltaColor(data.peak.delta)}`}>{fmtDelta(data.peak.delta)}</span>
                   <span className="text-[8px] text-gray-300 dark:text-gray-700">{data.peak.date}</span>
                 </div>
@@ -2797,7 +2802,7 @@ function WhatIfPanel({ trade }) {
               {data.valley && (
                 <div className="flex items-center gap-1.5">
                   <span className="text-[8px] text-gray-400">Valley</span>
-                  <span className="text-[9px] font-semibold text-gray-700 dark:text-gray-300 tabular-nums">Rs.{data.valley.price.toLocaleString()}</span>
+                  <span className="text-[9px] font-semibold text-gray-700 dark:text-gray-300 tabular-nums">{wiCur}{data.valley.price.toLocaleString()}</span>
                   <span className={`text-[9px] font-bold ${deltaColor(data.valley.delta)}`}>{fmtDelta(data.valley.delta)}</span>
                   <span className="text-[8px] text-gray-300 dark:text-gray-700">{data.valley.date}</span>
                 </div>
@@ -2807,7 +2812,7 @@ function WhatIfPanel({ trade }) {
             {/* Context note */}
             {data.dataPoints != null && (
               <p className="text-[8px] text-gray-300 dark:text-gray-700 italic">
-                {data.dataPoints} trading days of post-exit data · % vs your exit Rs.{parseFloat(trade.exit_price).toFixed(2)}
+                {data.dataPoints} trading days of post-exit data · % vs your exit {wiCur}{parseFloat(trade.exit_price).toFixed(2)}
               </p>
             )}
           </div>
@@ -2822,6 +2827,9 @@ function WhatIfPanel({ trade }) {
 function TradeRow({ trade, ltp, onEdit, onClose, onPartialClose, onDelete, onJournal, onGoToChart, indented = false, isSelected = false, onToggleSelect }) {
   const [expanded, setExpanded] = useState(false)
   const { onContextMenu, ContextMenuPortal } = useContextMenu()
+  const trFx = trade.market === 'forex'
+  const trFmtPrice = (n) => `${trFx ? '$' : 'Rs.'}${trFx ? parseFloat(n).toFixed(2) : parseFloat(n).toLocaleString()}`
+  const trFmtPnl = (n) => `${n > 0 ? '+' : '−'}${trFx ? '$' : 'Rs.'}${trFx ? Math.abs(n).toFixed(2) : Math.abs(Math.round(n)).toLocaleString()}`
 
   // P2-008: Supabase NUMERIC → string; parseFloat/parseInt before arithmetic
   const remaining  = parseInt(trade.remaining_quantity ?? trade.quantity) || 0
@@ -3069,10 +3077,10 @@ function TradeRow({ trade, ltp, onEdit, onClose, onPartialClose, onDelete, onJou
                       {trade.partial_exits.map((pe, i) => (
                         <div key={i} className="inline-flex items-center gap-1.5 bg-white dark:bg-gray-900 border border-gray-100 dark:border-gray-800 rounded-lg px-2.5 py-1.5">
                           <span className="text-[10px] font-semibold text-gray-700 dark:text-gray-300 tabular-nums">
-                            {pe.exit_quantity} @ Rs.{parseFloat(pe.exit_price).toFixed(2)}
+                            {pe.exit_quantity} @ {trFmtPrice(pe.exit_price)}
                           </span>
                           <span className={`text-[10px] font-bold tabular-nums ${pe.pnl >= 0 ? 'text-emerald-500' : 'text-red-400'}`}>
-                            {pe.pnl >= 0 ? '+' : '−'}Rs.{Math.abs(Math.round(pe.pnl)).toLocaleString()}
+                            {trFmtPnl(pe.pnl)}
                           </span>
                         </div>
                       ))}
@@ -3088,18 +3096,18 @@ function TradeRow({ trade, ltp, onEdit, onClose, onPartialClose, onDelete, onJou
                     <p className="text-[9px] uppercase tracking-widest font-semibold text-gray-400 mb-1">Full Exit</p>
                     <div className="flex items-center gap-4 flex-wrap">
                       <p className="text-[11px] text-gray-600 dark:text-gray-300 tabular-nums font-medium">
-                        Rs.{parseFloat(trade.exit_price).toFixed(2)}
+                        {trFmtPrice(trade.exit_price)}
                       </p>
                       {trade.mfe != null && (
                         <span className="text-[10px] tabular-nums">
                           <span className="font-semibold text-emerald-500">MFE</span>
-                          <span className="text-gray-500 dark:text-gray-400 ml-1">Rs.{parseFloat(trade.mfe).toFixed(2)}</span>
+                          <span className="text-gray-500 dark:text-gray-400 ml-1">{trFmtPrice(trade.mfe)}</span>
                         </span>
                       )}
                       {trade.mae != null && (
                         <span className="text-[10px] tabular-nums">
                           <span className="font-semibold text-red-400">MAE</span>
-                          <span className="text-gray-500 dark:text-gray-400 ml-1">Rs.{parseFloat(trade.mae).toFixed(2)}</span>
+                          <span className="text-gray-500 dark:text-gray-400 ml-1">{trFmtPrice(trade.mae)}</span>
                         </span>
                       )}
                     </div>
@@ -3251,8 +3259,8 @@ function LogsPage() {
       const [tradesRes, journalsRes] = await Promise.all([getTradeLog(), getTradeJournal()])
       setTrades(tradesRes.data)
       setJournals(journalsRes.data)
-      // After trades load, fetch LTP for all unique OPEN/PARTIAL symbols
-      const openTrades = tradesRes.data.filter(t => t.status === 'OPEN' || t.status === 'PARTIAL')
+      // After trades load, fetch LTP for NEPSE OPEN/PARTIAL symbols only (not Forex)
+      const openTrades = tradesRes.data.filter(t => (t.status === 'OPEN' || t.status === 'PARTIAL') && t.market !== 'forex')
       const uniqueSymbols = [...new Set(openTrades.map(t => t.symbol))]
       if (uniqueSymbols.length > 0) {
         const results = await Promise.allSettled(uniqueSymbols.map(sym => getStockPrice(sym)))
@@ -3489,6 +3497,11 @@ function LogsPage() {
       : { col, dir: col === 'pnl' ? 'desc' : 'asc' }
     )
   }
+
+  const isForex = market === 'forex'
+  const fmtCur = (n, decimals = false) => isForex
+    ? `$${Math.abs(decimals ? n.toFixed(2) : Math.round(n)).toLocaleString()}`
+    : `Rs.${Math.abs(Math.round(n)).toLocaleString()}`
 
   const filteredTrades = trades
     .filter(t =>
@@ -3733,7 +3746,7 @@ function LogsPage() {
         {[
           {
             label: 'Trades',
-            value: trades.length,
+            value: marketTrades.length,
             color: 'text-gray-900 dark:text-white',
             sub:   null,
           },
@@ -3752,31 +3765,31 @@ function LogsPage() {
           {
             label: 'Realized P&L',
             value: totalPnl !== 0
-              ? `${totalPnl > 0 ? '+' : '−'}Rs.${Math.abs(Math.round(totalPnl)).toLocaleString()}`
+              ? `${totalPnl > 0 ? '+' : '−'}${fmtCur(totalPnl)}`
               : '—',
             color: totalPnl > 0 ? 'text-emerald-500' : totalPnl < 0 ? 'text-red-400' : 'text-gray-400',
             sub:   null,
           },
           {
             label: 'Unrealized',
-            value: Object.keys(ltpMap).length > 0
+            value: (!isForex && Object.keys(ltpMap).length > 0)
               ? (totalUnrealized !== 0
-                  ? `${totalUnrealized > 0 ? '+' : '−'}Rs.${Math.abs(Math.round(totalUnrealized)).toLocaleString()}`
+                  ? `${totalUnrealized > 0 ? '+' : '−'}${fmtCur(totalUnrealized)}`
                   : '—')
-              : openTrades.length > 0 ? 'Loading…' : '—',
+              : (!isForex && openTrades.length > 0) ? 'Loading…' : '—',
             color: totalUnrealized > 0 ? 'text-emerald-500' : totalUnrealized < 0 ? 'text-red-400' : 'text-gray-400',
-            sub:   Object.keys(ltpMap).length > 0 ? 'at current LTP' : null,
+            sub:   (!isForex && Object.keys(ltpMap).length > 0) ? 'at current LTP' : isForex ? 'manual entry' : null,
           },
           {
             label: 'Net P&L',
             value: (() => {
-              const net = totalPnl + (Object.keys(ltpMap).length > 0 ? totalUnrealized : 0)
+              const net = totalPnl + (!isForex && Object.keys(ltpMap).length > 0 ? totalUnrealized : 0)
               return net !== 0
-                ? `${net > 0 ? '+' : '−'}Rs.${Math.abs(Math.round(net)).toLocaleString()}`
+                ? `${net > 0 ? '+' : '−'}${fmtCur(net)}`
                 : '—'
             })(),
             color: (() => {
-              const net = totalPnl + (Object.keys(ltpMap).length > 0 ? totalUnrealized : 0)
+              const net = totalPnl + (!isForex && Object.keys(ltpMap).length > 0 ? totalUnrealized : 0)
               return net > 0 ? 'text-emerald-500' : net < 0 ? 'text-red-400' : 'text-gray-400'
             })(),
             sub: 'realized + unreal.',
@@ -3812,10 +3825,10 @@ function LogsPage() {
               {drawdown.current > 0 ? (
                 <>
                   <p className="text-[20px] font-black tracking-tight text-red-500 tabular-nums leading-none">
-                    −Rs.{Math.round(drawdown.current).toLocaleString()}
+                    −{fmtCur(drawdown.current)}
                   </p>
                   <p className="text-[9px] text-gray-400 mt-1">
-                    Peak equity: Rs.{Math.round(drawdown.peak).toLocaleString()}
+                    Peak equity: {fmtCur(drawdown.peak)}
                   </p>
                   {/* Drawdown bar */}
                   <div className="mt-2 w-full bg-gray-100 dark:bg-gray-800 rounded-full h-1.5 overflow-hidden">
@@ -3843,7 +3856,7 @@ function LogsPage() {
                     {/* Tooltip */}
                     <div className="absolute bottom-full mb-1.5 left-1/2 -translate-x-1/2 hidden group-hover:flex flex-col items-center z-10 pointer-events-none">
                       <div className="bg-gray-900 dark:bg-gray-700 text-white rounded-lg px-2 py-1 text-[9px] font-semibold whitespace-nowrap shadow-lg">
-                        {pnl > 0 ? '+' : '−'}Rs.{Math.abs(Math.round(pnl)).toLocaleString()}
+                        {pnl > 0 ? '+' : '−'}{fmtCur(pnl)}
                         <span className="block text-[8px] text-gray-400 font-normal text-center">{date.slice(5)}</span>
                       </div>
                       <div className="w-1.5 h-1.5 bg-gray-900 dark:bg-gray-700 rotate-45 -mt-0.5" />

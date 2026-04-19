@@ -313,7 +313,8 @@ function CenterDashboard({ navigate }) {
         getWatchlist()
       ])
 
-      const tradeData = tradesRes.data
+      // Filter to NEPSE trades only (CenterDashboard is the NEPSE view)
+      const tradeData = tradesRes.data.filter(t => t.market !== 'forex')
       const open = tradeData.filter(t => t.status === 'OPEN' || t.status === 'PARTIAL')
       const closed = tradeData.filter(t => t.status === 'CLOSED')
 
