@@ -22,6 +22,7 @@ function ProfilePage() {
   const navigate = useNavigate()
   const fileInputRef = useRef(null)
   const [profile, setProfile] = useState(null)
+  const [avatarImgError, setAvatarImgError] = useState(false)
   const [loading, setLoading] = useState(true)
   const [fetchError, setFetchError] = useState('')
   const [editing, setEditing] = useState(false)
@@ -215,7 +216,7 @@ function ProfilePage() {
   }
 
   if (loading) return (
-    <div className="w-full px-6 py-6 flex items-center justify-center min-h-64">
+    <div className="w-full px-3 sm:px-6 py-6 flex items-center justify-center min-h-64">
       <div className="text-center">
         <div className="w-10 h-10 border-4 border-blue-500 border-t-transparent rounded-full animate-spin mx-auto mb-3" />
         <p className="text-gray-400 text-sm">Loading profile...</p>
@@ -224,7 +225,7 @@ function ProfilePage() {
   )
 
   if (fetchError) return (
-    <div className="w-full px-6 py-6 flex flex-col items-center justify-center min-h-64 gap-4">
+    <div className="w-full px-3 sm:px-6 py-6 flex flex-col items-center justify-center min-h-64 gap-4">
       <p className="text-red-400 text-sm">{fetchError}</p>
       <button
         onClick={() => { setLoading(true); fetchProfile() }}
@@ -241,7 +242,7 @@ function ProfilePage() {
   const isAdmin = profile.user.id === ADMIN_USER_ID
 
   return (
-    <div className="w-full px-6 pt-6 pb-10 max-w-5xl mx-auto">
+    <div className="w-full px-3 sm:px-6 pt-4 sm:pt-6 pb-10 max-w-5xl mx-auto">
 
       {/* ── Hero Banner ── */}
       <div className="relative bg-gradient-to-br from-gray-900 via-blue-950 to-gray-900 rounded-2xl overflow-hidden mb-6 shadow-xl">
@@ -250,17 +251,17 @@ function ProfilePage() {
           <div className="absolute bottom-0 right-0 w-64 h-64 bg-purple-500 rounded-full filter blur-3xl" />
         </div>
 
-        <div className="relative p-8">
+        <div className="relative p-4 sm:p-8">
           <div className="flex items-start justify-between flex-wrap gap-4">
-            <div className="flex items-center gap-6">
+            <div className="flex items-center gap-4 sm:gap-6">
               <div className="relative">
-                <div className="w-24 h-24 rounded-2xl overflow-hidden border-4 border-white border-opacity-20 shadow-xl">
-                  {profile.user.avatar_url ? (
+                <div className="w-16 h-16 sm:w-24 sm:h-24 rounded-2xl overflow-hidden border-4 border-white border-opacity-20 shadow-xl">
+                  {profile.user.avatar_url && !avatarImgError ? (
                     <img
                       src={profile.user.avatar_url}
                       alt={profile.user.name}
                       className="w-full h-full object-cover"
-                      onError={e => { e.target.style.display = 'none' }}
+                      onError={() => setAvatarImgError(true)}
                     />
                   ) : (
                     <div className="w-full h-full bg-gradient-to-br from-blue-500 to-purple-600 flex items-center justify-center">
@@ -371,7 +372,7 @@ function ProfilePage() {
             </div>
           )}
 
-          <div className="grid grid-cols-2 gap-4 mb-4">
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 mb-4">
             <div>
               <label className="block text-xs text-gray-500 dark:text-gray-400 mb-1">
                 Full Name <span className="text-red-400">*</span>
@@ -465,7 +466,7 @@ function ProfilePage() {
                 </div>
               )}
               <form onSubmit={handleChangePassword} autoComplete="off">
-                <div className="grid grid-cols-3 gap-4 mb-4">
+                <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 mb-4">
                   <div>
                     <label className="block text-xs text-gray-500 dark:text-gray-400 mb-1">Current Password</label>
                     <input

@@ -1,23 +1,34 @@
 import { BrowserRouter, Routes, Route, useLocation } from 'react-router-dom'
-import { Component, useEffect, useState } from 'react'
+import { Component, useEffect, useState, lazy, Suspense } from 'react'
 import Navbar from './components/Navbar'
-import HomePage from './pages/HomePage'
-import ScreenPage from './pages/ScreenPage'
-import PortfolioPage from './pages/PortfolioPage'
-import NotFoundPage from './pages/NotFoundPage'
-import LoginPage from './pages/LoginPage'
-import SignupPage from './pages/SignupPage'
-import LogsPage from './pages/LogsPage'
-import ResearchPage from './pages/ResearchPage'
-import ResearchEditorPage from './pages/ResearchEditorPage'
-import ResearchViewPage from './pages/ResearchViewPage'
-import ProfilePage from './pages/ProfilePage'
-import ChatPage from './pages/ChatPage'
-import RiskLabPage from './pages/RiskLabPage'
-import CalendarPage from './pages/CalendarPage'
-import IPOPage from './pages/IPOPage'
 import FloatingChat from './components/FloatingChat'
 import MorningBriefing from './components/MorningBriefing'
+
+// Lazy-loaded pages — each becomes its own JS chunk, reducing initial bundle size
+const HomePage           = lazy(() => import('./pages/HomePage'))
+const ScreenPage         = lazy(() => import('./pages/ScreenPage'))
+const PortfolioPage      = lazy(() => import('./pages/PortfolioPage'))
+const NotFoundPage       = lazy(() => import('./pages/NotFoundPage'))
+const LoginPage          = lazy(() => import('./pages/LoginPage'))
+const SignupPage         = lazy(() => import('./pages/SignupPage'))
+const LogsPage           = lazy(() => import('./pages/LogsPage'))
+const ResearchPage       = lazy(() => import('./pages/ResearchPage'))
+const ResearchEditorPage = lazy(() => import('./pages/ResearchEditorPage'))
+const ResearchViewPage   = lazy(() => import('./pages/ResearchViewPage'))
+const ProfilePage        = lazy(() => import('./pages/ProfilePage'))
+const ChatPage           = lazy(() => import('./pages/ChatPage'))
+const RiskLabPage        = lazy(() => import('./pages/RiskLabPage'))
+const CalendarPage       = lazy(() => import('./pages/CalendarPage'))
+const IPOPage            = lazy(() => import('./pages/IPOPage'))
+
+// Shared page-level loading spinner
+function PageSpinner() {
+  return (
+    <div className="flex items-center justify-center min-h-[60vh]">
+      <div className="w-8 h-8 border-2 border-blue-500 border-t-transparent rounded-full animate-spin" />
+    </div>
+  )
+}
 import { PriceAlertContainer, useAlertToasts } from './components/PriceAlertToast'
 import { usePriceAlerts } from './hooks/usePriceAlerts'
 import { useAuth } from './context/AuthContext'
@@ -84,24 +95,26 @@ function AppContent() {
   return (
     <div className="min-h-screen bg-gray-50 dark:bg-gray-900 transition-colors">
       {!isAuthPage && <Navbar />}
-      <Routes>
-        <Route path="/" element={<HomePage />} />
-        <Route path="/screen" element={<ScreenPage />} />
-        <Route path="/portfolio" element={<PortfolioPage />} />
-        <Route path="/logs" element={<LogsPage />} />
-        <Route path="/research" element={<ResearchPage />} />
-        <Route path="/research/new" element={<ResearchEditorPage />} />
-        <Route path="/research/edit/:id" element={<ResearchEditorPage />} />
-        <Route path="/research/:id" element={<ResearchViewPage />} />
-        <Route path="/profile" element={<ProfilePage />} />
-        <Route path="/chat" element={<ChatPage />} />
-        <Route path="/risklab" element={<RiskLabPage />} />
-        <Route path="/calendar" element={<CalendarPage />} />
-        <Route path="/ipo" element={<IPOPage />} />
-        <Route path="/login" element={<LoginPage />} />
-        <Route path="/signup" element={<SignupPage />} />
-        <Route path="*" element={<NotFoundPage />} />
-      </Routes>
+      <Suspense fallback={<PageSpinner />}>
+        <Routes>
+          <Route path="/" element={<HomePage />} />
+          <Route path="/screen" element={<ScreenPage />} />
+          <Route path="/portfolio" element={<PortfolioPage />} />
+          <Route path="/logs" element={<LogsPage />} />
+          <Route path="/research" element={<ResearchPage />} />
+          <Route path="/research/new" element={<ResearchEditorPage />} />
+          <Route path="/research/edit/:id" element={<ResearchEditorPage />} />
+          <Route path="/research/:id" element={<ResearchViewPage />} />
+          <Route path="/profile" element={<ProfilePage />} />
+          <Route path="/chat" element={<ChatPage />} />
+          <Route path="/risklab" element={<RiskLabPage />} />
+          <Route path="/calendar" element={<CalendarPage />} />
+          <Route path="/ipo" element={<IPOPage />} />
+          <Route path="/login" element={<LoginPage />} />
+          <Route path="/signup" element={<SignupPage />} />
+          <Route path="*" element={<NotFoundPage />} />
+        </Routes>
+      </Suspense>
       {!isAuthPage && <FloatingChat />}
       {showBriefing && user && (
         <MorningBriefing onClose={() => setShowBriefing(false)} />
