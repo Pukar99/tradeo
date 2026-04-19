@@ -1,12 +1,13 @@
 import { useState, useEffect } from 'react'
 import axios from 'axios'
+import { BASE_URL } from '../api'
 
 function NEPSEIndex() {
   const [data, setData] = useState(null)
   const [loading, setLoading] = useState(true)
 
   useEffect(() => {
-    axios.get('http://localhost:5000/api/market/nepse-chart?range=1m')
+    axios.get(`${BASE_URL}/api/market/nepse-chart?range=1m`)
       .then(res => {
         const chartData = res.data.data
         if (chartData.length > 0) {
