@@ -46,7 +46,7 @@ export function AnalysisProvider({ children }) {
     }
   }, [])
 
-  // On mount: read navigate state from TraderPage "Go to Chart"
+  // On mount: read navigate state from LogsPage "Go to Chart"
   useEffect(() => {
     const state = location.state
     if (state?.symbol) {

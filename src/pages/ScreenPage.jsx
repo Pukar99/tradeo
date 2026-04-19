@@ -9,12 +9,22 @@ import BacktestPage                  from '../components/backtest/BacktestPage'
 import InsightPage                   from '../components/complex/InsightPage'
 import BreakdownPage                 from '../components/complex/BreakdownPage'
 import SectorStrengthPage            from '../components/complex/SectorStrengthPage'
+import MarketRegimePage              from '../components/complex/MarketRegimePage'
+import SmartScreenerPage             from '../components/complex/SmartScreenerPage'
+import SwingStructurePage            from '../components/complex/SwingStructurePage'
+import TradeBehaviorPage             from '../components/complex/TradeBehaviorPage'
+import VolatilityMapPage             from '../components/complex/VolatilityMapPage'
 
 const COMPLEX_TABS = [
   { id: 'Backtesting', label: 'Backtesting' },
   { id: 'Insight',     label: 'Insight'     },
   { id: 'Breakdown',   label: 'Breakdown'   },
   { id: 'Sectors',     label: 'Sectors'     },
+  { id: 'Regime',      label: 'Regime'      },
+  { id: 'Screener',    label: 'Screener'    },
+  { id: 'Structure',   label: 'Structure'   },
+  { id: 'Behavior',    label: 'Behavior'    },
+  { id: 'Volatility',  label: 'Volatility'  },
 ]
 
 function ComplexContent({ activeTab, onSelectSector }) {
@@ -22,6 +32,11 @@ function ComplexContent({ activeTab, onSelectSector }) {
   if (activeTab === 'Insight')     return <InsightPage />
   if (activeTab === 'Breakdown')   return <BreakdownPage />
   if (activeTab === 'Sectors')     return <SectorStrengthPage onSelectSector={onSelectSector} />
+  if (activeTab === 'Regime')      return <MarketRegimePage />
+  if (activeTab === 'Screener')    return <SmartScreenerPage />
+  if (activeTab === 'Structure')   return <SwingStructurePage />
+  if (activeTab === 'Behavior')    return <TradeBehaviorPage />
+  if (activeTab === 'Volatility')  return <VolatilityMapPage />
   return (
     <div className="flex-1 flex items-center justify-center text-[12px] text-gray-400">
       {activeTab} — coming soon

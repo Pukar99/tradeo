@@ -347,7 +347,6 @@ function TaskBoard({ onTaskComplete }) {
   const handleTaskDone = async (taskId) => {
     try {
       const res = await toggleFixedTask(taskId)
-      console.log('[toggle]', taskId, res.data)
       setFixedTasks(prev => prev.map(t => t.id === taskId ? { ...t, completed: true } : t))
       if (onTaskComplete) onTaskComplete()
     } catch (err) { console.error('[toggle error]', err.response?.data || err.message) }
