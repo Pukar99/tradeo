@@ -159,7 +159,7 @@ export default function CalendarPage() {
   const nextMonth = () => { if (month === 11) { setYear(y => y + 1); setMonth(0) } else setMonth(m => m + 1) }
 
   if (loading) return (
-    <div className="max-w-6xl mx-auto px-6 py-8 flex items-center justify-center min-h-64">
+    <div className="max-w-6xl mx-auto px-3 sm:px-6 py-8 flex items-center justify-center min-h-64">
       <div className="text-center">
         <div className="w-8 h-8 border-2 border-blue-400 border-t-transparent rounded-full animate-spin mx-auto mb-3" />
         <p className="text-[11px] text-gray-400">Loading corporate actions…</p>
@@ -168,7 +168,7 @@ export default function CalendarPage() {
   )
 
   if (error) return (
-    <div className="max-w-6xl mx-auto px-6 py-8">
+    <div className="max-w-6xl mx-auto px-3 sm:px-6 py-8">
       <div className="bg-red-50 dark:bg-red-900/15 border border-red-200 dark:border-red-800 rounded-xl px-4 py-3">
         <p className="text-[11px] text-red-500">{error}</p>
       </div>
@@ -187,7 +187,7 @@ export default function CalendarPage() {
   const todayStr = today.toISOString().slice(0, 10)
 
   return (
-    <div className="max-w-6xl mx-auto px-6 pt-5 pb-14">
+    <div className="max-w-6xl mx-auto px-3 sm:px-6 pt-5 pb-14">
 
       {/* ── Header ── */}
       <div className="flex items-center justify-between mb-4 flex-wrap gap-3">

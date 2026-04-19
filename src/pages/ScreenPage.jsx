@@ -1,24 +1,27 @@
-import { useState } from 'react'
-import { ScreenProvider }         from '../context/ScreenContext'
-import { ComplexTabProvider }     from '../hooks/useComplexTab.jsx'
-import StockChart                 from '../components/screen/StockChart'
-import MarketStatusBadge          from '../components/screen/MarketStatusBadge'
-import LeftPanel                  from '../components/screen/LeftPanel'
-import RightPanel                 from '../components/screen/RightPanel'
-import BacktestPage               from '../components/backtest/BacktestPage'
-import InsightPage                from '../components/complex/InsightPage'
-import BreakdownPage              from '../components/complex/BreakdownPage'
+import { useState, useContext } from 'react'
+import { ScreenProvider, useScreen } from '../context/ScreenContext'
+import { ComplexTabProvider }        from '../hooks/useComplexTab.jsx'
+import StockChart                    from '../components/screen/StockChart'
+import MarketStatusBadge             from '../components/screen/MarketStatusBadge'
+import LeftPanel                     from '../components/screen/LeftPanel'
+import RightPanel                    from '../components/screen/RightPanel'
+import BacktestPage                  from '../components/backtest/BacktestPage'
+import InsightPage                   from '../components/complex/InsightPage'
+import BreakdownPage                 from '../components/complex/BreakdownPage'
+import SectorStrengthPage            from '../components/complex/SectorStrengthPage'
 
 const COMPLEX_TABS = [
   { id: 'Backtesting', label: 'Backtesting' },
   { id: 'Insight',     label: 'Insight'     },
   { id: 'Breakdown',   label: 'Breakdown'   },
+  { id: 'Sectors',     label: 'Sectors'     },
 ]
 
-function ComplexContent({ activeTab }) {
+function ComplexContent({ activeTab, onSelectSector }) {
   if (activeTab === 'Backtesting') return <BacktestPage />
   if (activeTab === 'Insight')     return <InsightPage />
   if (activeTab === 'Breakdown')   return <BreakdownPage />
+  if (activeTab === 'Sectors')     return <SectorStrengthPage onSelectSector={onSelectSector} />
   return (
     <div className="flex-1 flex items-center justify-center text-[12px] text-gray-400">
       {activeTab} — coming soon
@@ -27,6 +30,7 @@ function ComplexContent({ activeTab }) {
 }
 
 function ScreenInner() {
+  const { selectSymbol } = useScreen()
   const [mode,       setMode]       = useState(() => sessionStorage.getItem('screen_mode')       || 'simple')
   const [complexTab, setComplexTab] = useState(() => sessionStorage.getItem('screen_complexTab') || 'Backtesting')
 
@@ -37,6 +41,12 @@ function ScreenInner() {
   const handleComplexTab = (t) => {
     setComplexTab(t)
     sessionStorage.setItem('screen_complexTab', t)
+  }
+
+  // Called when user clicks a sector tile — switch to simple chart mode
+  const handleSelectSector = ({ index_id, name }) => {
+    selectSymbol(name, index_id)
+    handleMode('simple')
   }
 
   return (
@@ -82,7 +92,7 @@ function ScreenInner() {
       {/* ── Content ──────────────────────────────────────────────────────── */}
       {mode === 'complex' ? (
         <ComplexTabProvider>
-          <ComplexContent activeTab={complexTab} />
+          <ComplexContent activeTab={complexTab} onSelectSector={handleSelectSector} />
         </ComplexTabProvider>
       ) : (
         <div className="flex-1 flex overflow-hidden min-h-0">

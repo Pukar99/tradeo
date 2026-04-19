@@ -140,7 +140,12 @@ function FloatingChat() {
       {isOpen && (
         <div
           className="fixed z-50 glass-panel rounded-2xl overflow-hidden flex flex-col"
-          style={{ left: panelX, top: panelY, width: PANEL_W, height: PANEL_H }}
+          style={{
+            left: Math.max(EDGE_PAD, panelX),
+            top: panelY,
+            width: Math.min(PANEL_W, window.innerWidth - EDGE_PAD * 2),
+            height: Math.min(PANEL_H, window.innerHeight - 80),
+          }}
         >
           {/* Drag handle strip at top of panel */}
           <div
