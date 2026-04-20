@@ -16,6 +16,9 @@ export function ScreenProvider({ children }) {
   const [hoveredMovers, setHoveredMovers] = useState(null)  // { gainers, losers }
   const [pinnedMovers,  setPinnedMovers]  = useState(null)
 
+  // SMC overlay toggle
+  const [smcEnabled, setSmcEnabled] = useState(false)
+
   // Active positions array — supports multiple entries for same symbol
   // Each: { id, entry_price, sl, tp, position, quantity }
   // null when viewing watchlist or index
@@ -99,6 +102,7 @@ export function ScreenProvider({ children }) {
       hoveredDate, pinnedDate, activeDate,
       hoveredMovers, pinnedMovers, activeMovers,
       onHover, onPin, clearPin,
+      smcEnabled, setSmcEnabled,
       activePositions,
       // backwards-compat: components that read activePosition get the first entry
       activePosition: activePositions?.[0] ?? null,

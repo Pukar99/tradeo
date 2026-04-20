@@ -3,7 +3,7 @@ import { useNavigate } from 'react-router-dom'
 import { useAuth } from '../context/AuthContext'
 import { useLanguage } from '../context/LanguageContext'
 import { useMarket } from '../context/MarketContext'
-import { getTradeLog, getStockPrice } from '../api'
+import { getTradeLog, getStockPrice, getBatchPrices } from '../api'
 import { useChatRefresh } from '../utils/chatEvents'
 import {
   PieChart, Pie, Cell, Tooltip, ResponsiveContainer,
@@ -877,11 +877,11 @@ function PortfolioPage() {
       setLtpLoading(true)
       try {
         const uniqueSymbols = [...new Set(open.map(tr => tr.symbol))]
-        const results       = await Promise.allSettled(uniqueSymbols.map(sym => getStockPrice(sym)))
+        const batchRes = await getBatchPrices(uniqueSymbols)
         const priceMap = {}
-        uniqueSymbols.forEach((sym, i) => {
-          if (results[i].status === 'fulfilled') priceMap[sym] = results[i].value.data
-        })
+        for (const sym of uniqueSymbols) {
+          if (batchRes.data.prices?.[sym]) priceMap[sym] = batchRes.data.prices[sym]
+        }
         setOpenPositions(open.map(tr => {
           const p     = priceMap[tr.symbol]
           const qty   = parseFloat(tr.remaining_quantity ?? tr.quantity) || 0

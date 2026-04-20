@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState, useCallback } from 'react'
 import { useTheme } from '../../context/ThemeContext'
 import { useScreen } from '../../context/ScreenContext'
-import { getIndexChart, getStockChart, getTopMovers, getMarketSymbols } from '../../api'
+import { getIndexChart, getStockChart, getTopMovers, getMarketSymbols, getSMCScan } from '../../api'
 
 // ── Indicator math ────────────────────────────────────────────────────────────
 
@@ -66,6 +66,113 @@ function calcMACD(data, fast = 12, slow = 26, sig = 9) {
   }
 }
 
+// ── Bollinger Bands (20, 2) ──────────────────────────────────────────────────
+function calcBB(data, period = 20, mult = 2) {
+  const upper = [], lower = [], mid = []
+  for (let i = period - 1; i < data.length; i++) {
+    const slice = data.slice(i - period + 1, i + 1)
+    const avg = slice.reduce((s, d) => s + d.close, 0) / period
+    const std = Math.sqrt(slice.reduce((s, d) => s + (d.close - avg) ** 2, 0) / period)
+    mid.push({ time: data[i].time, value: +avg.toFixed(2) })
+    upper.push({ time: data[i].time, value: +(avg + mult * std).toFixed(2) })
+    lower.push({ time: data[i].time, value: +(avg - mult * std).toFixed(2) })
+  }
+  return { upper, lower, mid }
+}
+
+// ── VWAP (Volume-Weighted Average Price) ─────────────────────────────────────
+function calcVWAP(data) {
+  let cumVol = 0, cumTP = 0
+  return data.map(d => {
+    const tp = (d.high + d.low + d.close) / 3
+    const vol = d.volume || d.turnover || 0
+    cumVol += vol
+    cumTP += tp * vol
+    return { time: d.time, value: cumVol > 0 ? +(cumTP / cumVol).toFixed(2) : 0 }
+  }).filter(d => d.value > 0)
+}
+
+// ── ATR (Average True Range, 14) ─────────────────────────────────────────────
+function calcATR(data, period = 14) {
+  if (data.length < period + 1) return []
+  const trs = []
+  for (let i = 1; i < data.length; i++) {
+    const h = data[i].high, l = data[i].low, pc = data[i - 1].close
+    trs.push(Math.max(h - l, Math.abs(h - pc), Math.abs(l - pc)))
+  }
+  let atr = trs.slice(0, period).reduce((s, v) => s + v, 0) / period
+  const out = [{ time: data[period].time, value: +atr.toFixed(2) }]
+  for (let i = period; i < trs.length; i++) {
+    atr = (atr * (period - 1) + trs[i]) / period
+    out.push({ time: data[i + 1].time, value: +atr.toFixed(2) })
+  }
+  return out
+}
+
+// ── Stochastic (14, 3, 3) ────────────────────────────────────────────────────
+function calcStochastic(data, kPeriod = 14, dPeriod = 3) {
+  if (data.length < kPeriod) return { k: [], d: [] }
+  const rawK = []
+  for (let i = kPeriod - 1; i < data.length; i++) {
+    const slice = data.slice(i - kPeriod + 1, i + 1)
+    const hh = Math.max(...slice.map(d => d.high))
+    const ll = Math.min(...slice.map(d => d.low))
+    const val = hh === ll ? 50 : ((data[i].close - ll) / (hh - ll)) * 100
+    rawK.push({ time: data[i].time, value: +val.toFixed(2) })
+  }
+  // Smooth K to get %K (SMA of rawK over dPeriod)
+  const kLine = rawK.map((d, i) => {
+    if (i < dPeriod - 1) return null
+    const avg = rawK.slice(i - dPeriod + 1, i + 1).reduce((s, x) => s + x.value, 0) / dPeriod
+    return { time: d.time, value: +avg.toFixed(2) }
+  }).filter(Boolean)
+  // %D = SMA of %K
+  const dLine = kLine.map((d, i) => {
+    if (i < dPeriod - 1) return null
+    const avg = kLine.slice(i - dPeriod + 1, i + 1).reduce((s, x) => s + x.value, 0) / dPeriod
+    return { time: d.time, value: +avg.toFixed(2) }
+  }).filter(Boolean)
+  return { k: kLine, d: dLine }
+}
+
+// ── Supertrend (10, 3) ──────────────────────────────────────────────────────
+function calcSupertrend(data, period = 10, mult = 3) {
+  const atrVals = []
+  for (let i = 1; i < data.length; i++) {
+    const h = data[i].high, l = data[i].low, pc = data[i - 1].close
+    atrVals.push(Math.max(h - l, Math.abs(h - pc), Math.abs(l - pc)))
+  }
+  if (atrVals.length < period) return { up: [], down: [] }
+
+  const result = []
+  let atr = atrVals.slice(0, period).reduce((s, v) => s + v, 0) / period
+  let upperBand = ((data[period].high + data[period].low) / 2) + mult * atr
+  let lowerBand = ((data[period].high + data[period].low) / 2) - mult * atr
+  let supertrend = data[period].close > upperBand ? lowerBand : upperBand
+  let isUp = data[period].close > supertrend
+
+  result.push({ time: data[period].time, value: +supertrend.toFixed(2), isUp })
+
+  for (let i = period + 1; i < data.length; i++) {
+    atr = (atr * (period - 1) + atrVals[i - 1]) / period
+    const hl2 = (data[i].high + data[i].low) / 2
+    let newUpper = hl2 + mult * atr
+    let newLower = hl2 - mult * atr
+    newLower = newLower > lowerBand ? newLower : lowerBand
+    newUpper = newUpper < upperBand ? newUpper : upperBand
+    if (data[i].close > upperBand) { supertrend = newLower; isUp = true }
+    else if (data[i].close < lowerBand) { supertrend = newUpper; isUp = false }
+    else { supertrend = isUp ? newLower : newUpper }
+    upperBand = newUpper; lowerBand = newLower
+    result.push({ time: data[i].time, value: +supertrend.toFixed(2), isUp })
+  }
+
+  return {
+    up: result.filter(d => d.isUp).map(d => ({ time: d.time, value: d.value })),
+    down: result.filter(d => !d.isUp).map(d => ({ time: d.time, value: d.value })),
+  }
+}
+
 async function loadLC() { return import('lightweight-charts') }
 
 // ── Embedded Symbol Search ─────────────────────────────────────────────────────
@@ -124,6 +231,7 @@ function ChartSymbolSearch() {
         </svg>
         <input
           ref={inputRef}
+          data-chart-search
           value={query}
           onChange={e => { setQuery(e.target.value); setOpen(true); setCursor(-1) }}
           onFocus={() => setOpen(true)}
@@ -169,10 +277,10 @@ function ChartSymbolSearch() {
 // ── HUD Controls — timeframe, chart type, indicators ──────────────────────────
 
 const TIMEFRAMES = ['1W', '1M', '3M', '6M', '1Y', '3Y', 'ALL']
-const INDICATORS = ['MA', 'EMA', 'RSI', 'MACD']
+const INDICATORS = ['MA', 'EMA', 'BB', 'VWAP', 'RSI', 'MACD', 'ATR', 'STOCH', 'ST']
 
 function ChartHUDControls() {
-  const { chartType, setChartType, timeframe, setTimeframe, activeIndicators, toggleIndicator } = useScreen()
+  const { chartType, setChartType, timeframe, setTimeframe, activeIndicators, toggleIndicator, smcEnabled, setSmcEnabled } = useScreen()
 
   return (
     <div className="flex items-center gap-1.5 flex-wrap">
@@ -216,6 +324,14 @@ function ChartHUDControls() {
             {ind}
           </button>
         ))}
+        <button onClick={() => setSmcEnabled(p => !p)}
+          className={`px-1.5 py-0.5 rounded text-[9px] font-semibold border transition-colors ml-1 ${
+            smcEnabled
+              ? 'bg-purple-500 border-purple-500 text-white'
+              : 'border-gray-200 dark:border-gray-700 text-gray-500 dark:text-gray-400 hover:border-purple-300 hover:text-purple-500'
+          }`}>
+          SMC
+        </button>
       </div>
     </div>
   )
@@ -510,12 +626,14 @@ export default function StockChart() {
   const {
     selectedSymbol, selectedIndexId, chartType, timeframe,
     activeIndicators, isIndex, onHover, onPin, pinnedDate, clearPin,
-    activePositions,
+    activePositions, smcEnabled,
   } = useScreen()
 
   const mainRef    = useRef(null)
   const rsiRef     = useRef(null)
   const macdRef    = useRef(null)
+  const atrRef     = useRef(null)
+  const stochRef   = useRef(null)
   const chartsRef  = useRef({})
   const seriesRef  = useRef({})
   const moversCache    = useRef({})
@@ -528,6 +646,7 @@ export default function StockChart() {
   const [tooltip,     setTooltip]     = useState(null)
   const [overlayData, setOverlayData] = useState(null)
   const [latestClose, setLatestClose] = useState(null)
+  const [smcData,     setSmcData]     = useState(null)
 
   const C = {
     bg:     isDark ? '#030712' : '#ffffff',
@@ -572,6 +691,14 @@ export default function StockChart() {
       setLoading(false)
     })
   }, [selectedSymbol, selectedIndexId, timeframe]) // eslint-disable-line react-hooks/exhaustive-deps
+
+  // Fetch SMC data when enabled for stocks
+  useEffect(() => {
+    if (!smcEnabled || isIndex(selectedSymbol)) { setSmcData(null); return }
+    getSMCScan({ symbol: selectedSymbol, days: 250 })
+      .then(r => setSmcData(r.data))
+      .catch(() => setSmcData(null))
+  }, [smcEnabled, selectedSymbol]) // eslint-disable-line react-hooks/exhaustive-deps
 
   // Build / rebuild charts
   useEffect(() => {
@@ -645,6 +772,39 @@ export default function StockChart() {
         }
       }
 
+      // Bollinger Bands overlay
+      if (activeIndicators.includes('BB')) {
+        const { upper, lower, mid } = calcBB(chartData, 20, 2)
+        if (upper.length) {
+          const sU = main.addLineSeries({ color: '#a78bfa88', lineWidth: 1, priceLineVisible: false, title: 'BB+' })
+          const sL = main.addLineSeries({ color: '#a78bfa88', lineWidth: 1, priceLineVisible: false, title: 'BB-' })
+          const sM = main.addLineSeries({ color: '#a78bfa55', lineWidth: 1, lineStyle: 2, priceLineVisible: false, title: '' })
+          sU.setData(upper); sL.setData(lower); sM.setData(mid)
+        }
+      }
+
+      // VWAP overlay
+      if (activeIndicators.includes('VWAP') && !isIndex) {
+        const vwap = calcVWAP(chartData)
+        if (vwap.length) {
+          const s = main.addLineSeries({ color: '#f59e0bcc', lineWidth: 1.5, lineStyle: 2, priceLineVisible: false, title: 'VWAP' })
+          s.setData(vwap)
+        }
+      }
+
+      // Supertrend overlay
+      if (activeIndicators.includes('ST')) {
+        const { up, down } = calcSupertrend(chartData, 10, 3)
+        if (up.length) {
+          const sUp = main.addLineSeries({ color: '#34d399', lineWidth: 2, priceLineVisible: false, title: 'ST↑', lineStyle: 0 })
+          sUp.setData(up)
+        }
+        if (down.length) {
+          const sDn = main.addLineSeries({ color: '#f87171', lineWidth: 2, priceLineVisible: false, title: 'ST↓', lineStyle: 0 })
+          sDn.setData(down)
+        }
+      }
+
       // Position lines + markers
       const ENTRY_COLORS = ['#60a5fa', '#f59e0b', '#a78bfa', '#34d399', '#f472b6']
       const markers = []
@@ -696,6 +856,86 @@ export default function StockChart() {
         time: d.time, value: d.volume || d.turnover || 0,
         color: d.close >= d.open ? C.up + '44' : C.down + '44',
       })))
+
+      // SMC overlays — Order Blocks as horizontal bands, patterns as markers
+      if (smcData && smcEnabled) {
+        // Order Blocks — draw as horizontal lines from OB candle to chart end
+        const lastDate = chartData[chartData.length - 1]?.time
+        for (const ob of (smcData.order_blocks || [])) {
+          const obColor = ob.type === 'bullish' ? '#34d39960' : '#f8717160'
+          const obTop = Math.max(ob.high, ob.open, ob.close)
+          const obBottom = Math.min(ob.low, ob.open, ob.close)
+          // Draw OB zone as two lines (top and bottom of the zone)
+          const fromIdx = chartData.findIndex(d => d.time >= ob.date)
+          if (fromIdx < 0) continue
+          const obData = chartData.slice(fromIdx).map(d => ({ time: d.time, value: obTop }))
+          if (obData.length) {
+            const sTop = main.addLineSeries({ color: obColor, lineWidth: 1, lineStyle: 2, priceLineVisible: false, crosshairMarkerVisible: false, title: '' })
+            sTop.setData(obData)
+            const sBot = main.addLineSeries({ color: obColor, lineWidth: 1, lineStyle: 2, priceLineVisible: false, crosshairMarkerVisible: false, title: '' })
+            sBot.setData(chartData.slice(fromIdx).map(d => ({ time: d.time, value: obBottom })))
+          }
+        }
+
+        // FVG — draw gap zones
+        for (const gap of (smcData.fvg || []).slice(-8)) {
+          const gapColor = gap.type === 'bullish' ? '#60a5fa30' : '#f4728630'
+          const fromIdx = chartData.findIndex(d => d.time >= gap.date)
+          if (fromIdx < 0) continue
+          // Only extend FVG 10 candles forward
+          const gapSlice = chartData.slice(fromIdx, fromIdx + 10)
+          if (gapSlice.length) {
+            const sT = main.addLineSeries({ color: gapColor, lineWidth: 1, lineStyle: 1, priceLineVisible: false, crosshairMarkerVisible: false, title: '' })
+            sT.setData(gapSlice.map(d => ({ time: d.time, value: gap.top })))
+            const sB = main.addLineSeries({ color: gapColor, lineWidth: 1, lineStyle: 1, priceLineVisible: false, crosshairMarkerVisible: false, title: '' })
+            sB.setData(gapSlice.map(d => ({ time: d.time, value: gap.bottom })))
+          }
+        }
+
+        // BOS + CHoCH + patterns as markers on the price series
+        const smcMarkers = []
+        for (const b of (smcData.bos || [])) {
+          smcMarkers.push({
+            time: b.date, position: b.type === 'bullish' ? 'belowBar' : 'aboveBar',
+            color: b.type === 'bullish' ? '#34d399' : '#f87171',
+            shape: b.type === 'bullish' ? 'arrowUp' : 'arrowDown',
+            text: 'BOS', size: 1,
+          })
+        }
+        for (const ch of (smcData.choch || [])) {
+          smcMarkers.push({
+            time: ch.date, position: ch.type === 'bullish' ? 'belowBar' : 'aboveBar',
+            color: '#f59e0b',
+            shape: 'circle',
+            text: 'CHoCH', size: 1,
+          })
+        }
+        for (const sw of (smcData.sweeps || [])) {
+          smcMarkers.push({
+            time: sw.date, position: sw.type === 'buy_side' ? 'belowBar' : 'aboveBar',
+            color: '#a78bfa',
+            shape: 'square',
+            text: sw.type === 'buy_side' ? 'Sweep$' : 'Sweep$', size: 1,
+          })
+        }
+        for (const p of (smcData.patterns || []).slice(-10)) {
+          const isBullish = p.type.includes('bullish') || p.type === 'hammer' || p.type === 'inside_bar'
+          smcMarkers.push({
+            time: p.date, position: isBullish ? 'belowBar' : 'aboveBar',
+            color: isBullish ? '#22c55e' : '#ef4444',
+            shape: 'circle',
+            text: p.type.replace('_', ' ').replace('bullish ', '').replace('bearish ', '').slice(0, 6),
+            size: 0,
+          })
+        }
+
+        if (smcMarkers.length) {
+          // Merge with existing position markers if any
+          const existingMarkers = markers || []
+          const allMarkers = [...existingMarkers, ...smcMarkers].sort((a, b) => a.time < b.time ? -1 : 1)
+          priceSeries.setMarkers(allMarkers)
+        }
+      }
 
       // Crosshair events — debounce movers fetch by 80ms
       main.subscribeCrosshairMove(param => {
@@ -768,6 +1008,41 @@ export default function StockChart() {
         }
       }
 
+      // ATR sub-pane
+      if (activeIndicators.includes('ATR') && atrRef.current) {
+        const atrData = calcATR(chartData)
+        if (atrData.length) {
+          const ac = createChart(atrRef.current, {
+            ...base,
+            width: atrRef.current.clientWidth,
+            height: atrRef.current.clientHeight,
+          })
+          chartsRef.current.atr = ac
+          ac.addLineSeries({ color: '#f59e0b', lineWidth: 1.5, priceLineVisible: false, title: 'ATR14' }).setData(atrData)
+          main.timeScale().subscribeVisibleLogicalRangeChange(r => { if (r) ac.timeScale().setVisibleLogicalRange(r) })
+        }
+      }
+
+      // Stochastic sub-pane
+      if (activeIndicators.includes('STOCH') && stochRef.current) {
+        const { k, d } = calcStochastic(chartData)
+        if (k.length) {
+          const sc = createChart(stochRef.current, {
+            ...base,
+            width: stochRef.current.clientWidth,
+            height: stochRef.current.clientHeight,
+            rightPriceScale: { ...base.rightPriceScale, scaleMargins: { top: 0.1, bottom: 0.1 } },
+          })
+          chartsRef.current.stoch = sc
+          sc.addLineSeries({ color: '#60a5fa', lineWidth: 1.5, priceLineVisible: false, title: '%K' }).setData(k)
+          sc.addLineSeries({ color: '#f87171', lineWidth: 1.5, priceLineVisible: false, title: '%D' }).setData(d)
+          // 80/20 levels
+          sc.addLineSeries({ color: C.down + '60', lineWidth: 1, lineStyle: 2, priceLineVisible: false }).setData(k.map(p => ({ time: p.time, value: 80 })))
+          sc.addLineSeries({ color: C.up + '60', lineWidth: 1, lineStyle: 2, priceLineVisible: false }).setData(k.map(p => ({ time: p.time, value: 20 })))
+          main.timeScale().subscribeVisibleLogicalRangeChange(r => { if (r) sc.timeScale().setVisibleLogicalRange(r) })
+        }
+      }
+
       main.timeScale().fitContent()
 
       // Resize both width AND height
@@ -790,6 +1065,18 @@ export default function StockChart() {
             height: macdRef.current.clientHeight,
           })
         }
+        if (atrRef.current && chartsRef.current.atr) {
+          chartsRef.current.atr.applyOptions({
+            width:  atrRef.current.clientWidth,
+            height: atrRef.current.clientHeight,
+          })
+        }
+        if (stochRef.current && chartsRef.current.stoch) {
+          chartsRef.current.stoch.applyOptions({
+            width:  stochRef.current.clientWidth,
+            height: stochRef.current.clientHeight,
+          })
+        }
       })
       if (mainRef.current) ro.observe(mainRef.current)
       roCleanup = () => ro.disconnect()
@@ -802,17 +1089,19 @@ export default function StockChart() {
       Object.values(chartsRef.current).forEach(c => { try { c.remove() } catch (_) {} })
       chartsRef.current = {}
     }
-  }, [chartData, isDark, chartType, activeIndicators, activePositions]) // eslint-disable-line react-hooks/exhaustive-deps
+  }, [chartData, isDark, chartType, activeIndicators, activePositions, smcData, smcEnabled]) // eslint-disable-line react-hooks/exhaustive-deps
 
   useEffect(() => {
     pinnedDateRef.current = pinnedDate
     if (!pinnedDate) setOverlayData(prev => prev ? { ...prev, pinned: false } : null)
   }, [pinnedDate])
 
-  const showRSI  = activeIndicators.includes('RSI')
-  const showMACD = activeIndicators.includes('MACD')
-  const indCount = (showRSI ? 1 : 0) + (showMACD ? 1 : 0)
-  const mainPct  = indCount === 0 ? 100 : indCount === 1 ? 70 : 55
+  const showRSI   = activeIndicators.includes('RSI')
+  const showMACD  = activeIndicators.includes('MACD')
+  const showATR   = activeIndicators.includes('ATR')
+  const showSTOCH = activeIndicators.includes('STOCH')
+  const indCount  = (showRSI ? 1 : 0) + (showMACD ? 1 : 0) + (showATR ? 1 : 0) + (showSTOCH ? 1 : 0)
+  const mainPct   = indCount === 0 ? 100 : indCount === 1 ? 70 : indCount === 2 ? 55 : indCount === 3 ? 45 : 40
 
   if (error) return (
     <div className="flex flex-col items-center justify-center h-full gap-3 text-center px-4">
@@ -894,6 +1183,22 @@ export default function StockChart() {
               <SubPaneLabel title="MACD" sub="12 / 26 / 9" color="#60a5fa"
                 legend={[{ color: '#60a5fa', label: 'MACD' }, { color: '#f59e0b', label: 'Signal' }]} />
               <div ref={macdRef} className="w-full flex-1" />
+            </div>
+          )}
+
+          {showATR && (
+            <div className="w-full border-t border-gray-100 dark:border-gray-800 flex flex-col shrink-0" style={{ height: `${(100 - mainPct) / indCount}%` }}>
+              <SubPaneLabel title="ATR" sub="14" color="#f59e0b"
+                legend={[{ color: '#f59e0b', label: 'ATR' }]} />
+              <div ref={atrRef} className="w-full flex-1" />
+            </div>
+          )}
+
+          {showSTOCH && (
+            <div className="w-full border-t border-gray-100 dark:border-gray-800 flex flex-col shrink-0" style={{ height: `${(100 - mainPct) / indCount}%` }}>
+              <SubPaneLabel title="STOCH" sub="14 / 3 / 3" color="#60a5fa"
+                legend={[{ color: '#60a5fa', label: '%K' }, { color: '#f87171', label: '%D' }]} />
+              <div ref={stochRef} className="w-full flex-1" />
             </div>
           )}
         </>

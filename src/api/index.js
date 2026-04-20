@@ -4,6 +4,7 @@ export const BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:5000'
 
 const API = axios.create({
   baseURL: BASE_URL,
+  timeout: 15000, // 15s max — prevents hanging on dead Supabase
 })
 
 API.interceptors.request.use((config) => {
@@ -40,6 +41,7 @@ export const getStocks = () => API.get('/api/stocks')
 export const getMarketSummary = () => API.get('/api/market-summary')
 export const getTopGainers = () => API.get('/api/top-gainers')
 export const getStockPrice = (symbol) => API.get(`/api/market/stock-price/${symbol}`)
+export const getBatchPrices = (symbols) => API.get('/api/market/batch-prices', { params: { symbols: symbols.join(',') } })
 
 // Journal (old general journal - keep for now)
 export const getJournal = () => API.get('/api/journal')
@@ -151,6 +153,9 @@ export const getVolatilityClusters = (params) => API.get('/api/volatility/cluste
 
 // Complex Tab — Smart Screener
 export const runScreener = (params) => API.get('/api/screener/scan', { params })
+
+// SMC (Smart Money Concepts) Scanner
+export const getSMCScan = (params) => API.get('/api/smc/scan', { params })
 
 // AI Trade Coach — auto-debrief after trade close
 export const getTradeDebrief = (tradeData) => API.post('/api/chat/debrief', tradeData)

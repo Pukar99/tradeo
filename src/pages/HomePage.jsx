@@ -9,7 +9,7 @@ import MonthlyGoals from '../components/dashboard/MonthlyGoals'
 import { Link, useNavigate } from 'react-router-dom'
 import { useState, useEffect, useCallback, useRef } from 'react'
 import {
-  getTradeLog, getStockPrice,
+  getTradeLog, getStockPrice, getBatchPrices,
   getWatchlist, addToWatchlist,
   removeFromWatchlist
 } from '../api'
@@ -318,47 +318,46 @@ function CenterDashboard({ navigate }) {
       const open = tradeData.filter(t => t.status === 'OPEN' || t.status === 'PARTIAL')
       const closed = tradeData.filter(t => t.status === 'CLOSED')
 
-      const openWithPrices = await Promise.all(
-        open.map(async (t) => {
-          try {
-            const priceRes = await getStockPrice(t.symbol)
-            // Rule 1 — parseFloat all Supabase numerics
-            const entry = parseFloat(t.entry_price) || 0
-            const qty   = parseFloat(t.remaining_quantity || t.quantity) || 0
-            const ltp   = parseFloat(priceRes.data.price) || 0
-            const pnl   = t.position === 'LONG'
-              ? (ltp - entry) * qty
-              : (entry - ltp) * qty
-            // Rule 6 — guard division
-            const pnlPct = entry > 0 && qty > 0
-              ? ((pnl / (entry * qty)) * 100).toFixed(2)
-              : '0.00'
-            return {
-              ...t,
-              entry_price: entry,
-              quantity: qty,
-              remaining_quantity: qty,
-              sl: t.sl != null ? parseFloat(t.sl) : null,
-              tp: t.tp != null ? parseFloat(t.tp) : null,
-              currentPrice: ltp,
-              change: priceRes.data.change,
-              unrealizedPnl: Math.round(pnl),
-              pnlPct
-            }
-          } catch {
-            return {
-              ...t,
-              entry_price: parseFloat(t.entry_price) || 0,
-              quantity: parseFloat(t.remaining_quantity || t.quantity) || 0,
-              sl: t.sl != null ? parseFloat(t.sl) : null,
-              tp: t.tp != null ? parseFloat(t.tp) : null,
-              currentPrice: null,
-              unrealizedPnl: null,
-              pnlPct: null
-            }
-          }
-        })
-      )
+      // Batch-fetch all prices in ONE request (fixes N+1)
+      const allSymbols = [...new Set([
+        ...open.map(t => t.symbol),
+        ...watchRes.data.map(w => w.symbol)
+      ])].filter(Boolean)
+
+      let priceMap = {}
+      if (allSymbols.length > 0) {
+        try {
+          const batchRes = await getBatchPrices(allSymbols)
+          priceMap = batchRes.data.prices || {}
+        } catch {
+          // fallback: no prices, UI still works
+        }
+      }
+
+      const openWithPrices = open.map(t => {
+        const entry = parseFloat(t.entry_price) || 0
+        const qty   = parseFloat(t.remaining_quantity || t.quantity) || 0
+        const p     = priceMap[t.symbol]
+        const ltp   = p ? parseFloat(p.price) || 0 : 0
+        const pnl   = ltp
+          ? (t.position === 'LONG' ? (ltp - entry) * qty : (entry - ltp) * qty)
+          : 0
+        const pnlPct = entry > 0 && qty > 0 && ltp
+          ? ((pnl / (entry * qty)) * 100).toFixed(2)
+          : '0.00'
+        return {
+          ...t,
+          entry_price: entry,
+          quantity: qty,
+          remaining_quantity: qty,
+          sl: t.sl != null ? parseFloat(t.sl) : null,
+          tp: t.tp != null ? parseFloat(t.tp) : null,
+          currentPrice: ltp || null,
+          change: p?.change ?? null,
+          unrealizedPnl: ltp ? Math.round(pnl) : null,
+          pnlPct: ltp ? pnlPct : null
+        }
+      })
       setOpenPositions(openWithPrices)
 
       const totalUnrealized = openWithPrices.reduce((s, t) => s + (t.unrealizedPnl || 0), 0)
@@ -384,18 +383,12 @@ function CenterDashboard({ navigate }) {
         currentValue
       })
 
-      // Watchlist with prices
+      // Watchlist with prices (already fetched in batch above)
       const watchItems = watchRes.data
-      const watchWithPrices = await Promise.all(
-        watchItems.map(async (w) => {
-          try {
-            const priceRes = await getStockPrice(w.symbol)
-            return { ...w, currentPrice: parseFloat(priceRes.data.price) || null, change: priceRes.data.change }
-          } catch {
-            return { ...w, currentPrice: null }
-          }
-        })
-      )
+      const watchWithPrices = watchItems.map(w => {
+        const p = priceMap[w.symbol]
+        return { ...w, currentPrice: p ? parseFloat(p.price) || null : null, change: p?.change ?? null }
+      })
 
       // Portfolio tab = open positions (marked separately, not from watchlist table)
       const portfolioItems = openWithPrices.map(t => ({

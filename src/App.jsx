@@ -1,5 +1,6 @@
-import { BrowserRouter, Routes, Route, useLocation } from 'react-router-dom'
-import { Component, useEffect, useState, lazy, Suspense } from 'react'
+import { BrowserRouter, Routes, Route, useLocation, useNavigate } from 'react-router-dom'
+import { Component, useEffect, useState, useMemo, lazy, Suspense } from 'react'
+import { Toaster } from 'react-hot-toast'
 import Navbar from './components/Navbar'
 import FloatingChat from './components/FloatingChat'
 import MorningBriefing from './components/MorningBriefing'
@@ -32,6 +33,8 @@ function PageSpinner() {
 import { PriceAlertContainer, useAlertToasts } from './components/PriceAlertToast'
 import { usePriceAlerts } from './hooks/usePriceAlerts'
 import { useAuth } from './context/AuthContext'
+import { useTheme } from './context/ThemeContext'
+import { useHotkeys } from './hooks/useHotkeys'
 import { getProfile } from './api'
 
 // P4-005: catch uncaught render errors so the whole app doesn't white-screen
@@ -63,10 +66,26 @@ const AUTH_ROUTES = ['/login', '/signup']
 
 function AppContent() {
   const { user, updateUser } = useAuth()
+  const { toggleTheme } = useTheme()
   const location = useLocation()
+  const navigate = useNavigate()
   const [showBriefing, setShowBriefing] = useState(false)
   const { toasts, addToast, dismissToast } = useAlertToasts()
   usePriceAlerts({ user, onAlert: addToast })
+
+  // Global keyboard shortcuts for power traders
+  // Alt+key to avoid conflicting with text input
+  const hotkeys = useMemo(() => ({
+    'alt+d':  () => toggleTheme(),
+    'alt+h':  () => navigate('/'),
+    'alt+s':  () => navigate('/screen'),
+    'alt+l':  () => navigate('/logs'),
+    'alt+p':  () => navigate('/portfolio'),
+    'alt+c':  () => navigate('/chat'),
+    'alt+r':  () => navigate('/risklab'),
+    '/':      () => { if (location.pathname === '/screen') { document.querySelector('[data-chart-search]')?.focus() } },
+  }), [toggleTheme, navigate, location.pathname])
+  useHotkeys(hotkeys)
 
   const isAuthPage = AUTH_ROUTES.includes(location.pathname)
 
@@ -129,6 +148,15 @@ function App() {
     <ErrorBoundary>
       <BrowserRouter>
         <AppContent />
+        <Toaster
+          position="bottom-right"
+          toastOptions={{
+            duration: 3000,
+            style: { fontSize: '13px', borderRadius: '10px', padding: '10px 16px' },
+            success: { iconTheme: { primary: '#10b981', secondary: '#fff' } },
+            error: { duration: 4000 },
+          }}
+        />
       </BrowserRouter>
     </ErrorBoundary>
   )
