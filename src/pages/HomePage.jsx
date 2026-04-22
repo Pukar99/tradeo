@@ -576,7 +576,7 @@ function CenterDashboard({ navigate }) {
             </div>
           ) : (
             <div className="divide-y divide-gray-50 dark:divide-gray-800">
-              {openPositions.map(t => {
+              {openPositions.slice(0, 4).map(t => {
                 // Rule 6 — guard SL/TP distance divisions
                 const slDistPct = t.sl != null && t.currentPrice
                   ? t.position === 'SHORT'
@@ -663,6 +663,14 @@ function CenterDashboard({ navigate }) {
                   </div>
                 )
               })}
+              {openPositions.length > 4 && (
+                <button
+                  onClick={() => navigate('/portfolio')}
+                  className="w-full px-5 py-2.5 text-[11px] font-semibold text-blue-500 hover:text-blue-700 hover:bg-blue-50 dark:hover:bg-blue-900/20 transition-colors text-center"
+                >
+                  +{openPositions.length - 4} more positions — View all in Portfolio →
+                </button>
+              )}
             </div>
           )
         )}
