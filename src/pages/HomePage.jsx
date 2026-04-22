@@ -1263,9 +1263,17 @@ function LoggedInHome() {
   const navigate = useNavigate()
   const [initData, setInitData] = useState(null)
 
-  const fetchDashboard = useCallback(async () => {
+  // Module-level cache so navigating away and back within 60s skips the refetch
+  const fetchDashboard = useCallback(async (force = false) => {
+    const CACHE_TTL = 60_000
+    const cache = fetchDashboard._cache
+    if (!force && cache && Date.now() - cache.ts < CACHE_TTL) {
+      setInitData(cache.data)
+      return
+    }
     try {
       const res = await getDashboardInit()
+      fetchDashboard._cache = { data: res.data, ts: Date.now() }
       setInitData(res.data)
     } catch (err) {
       console.error(err)
@@ -1313,7 +1321,7 @@ function LoggedInHome() {
 
         {/* CENTER — Stats + Positions + Watchlist (NEPSE) / Gold + Sessions + Positions (Forex) */}
         <div className="col-span-12 lg:col-span-6">
-          {isForex ? <ForexCenterDashboard navigate={navigate} initData={initData} /> : <CenterDashboard navigate={navigate} initData={initData} onRefresh={fetchDashboard} />}
+          {isForex ? <ForexCenterDashboard navigate={navigate} initData={initData} /> : <CenterDashboard navigate={navigate} initData={initData} onRefresh={() => fetchDashboard(true)} />}
         </div>
 
         {/* RIGHT — Discipline Score + Journal shortcuts */}

@@ -93,10 +93,17 @@ function AppContent() {
   useEffect(() => {
     if (!userId) return
 
+    // Only re-fetch profile if cache is older than 5 minutes — avoids a request on every page load
+    const PROFILE_TTL = 5 * 60_000
+    const cacheKey = `tradeo_profile_ts_${userId}`
+    const lastFetch = parseInt(localStorage.getItem(cacheKey) || '0', 10)
+    if (Date.now() - lastFetch < PROFILE_TTL) return
+
     getProfile()
       .then(res => {
         if (res.data?.user?.avatar_url) {
           updateUser({ avatar_url: res.data.user.avatar_url })
+          localStorage.setItem(cacheKey, String(Date.now()))
         }
       })
       .catch(() => {})
