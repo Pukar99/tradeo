@@ -3,7 +3,7 @@ import { useAuth } from '../context/AuthContext'
 import {
   getMeroshareDpList, getMeroshareAccounts, addMeroshareAccount, deleteMeroshareAccount,
   getMeroshareIPOs, getMeroshareResults, applyMeroshareIPO, applyMeroshareIPOBulk,
-  getMerosharePortfolio, cancelMeroshareIPO,
+  getMerosharePortfolio, cancelMeroshareIPO, getMeroshareAllotment,
 } from '../api'
 
 const fmt = (n) => n != null ? Number(n).toLocaleString() : '—'
@@ -293,6 +293,7 @@ function ApplyModal({ ipo, accounts, activeAccountId, onClose }) {
   )
 }
 
+
 function Row({ label, value, bold }) {
   return (
     <div className="flex items-center justify-between">
@@ -319,6 +320,8 @@ function IPOPage() {
   const [applyIPO,     setApplyIPO]     = useState(null)
   const [deleting,     setDeleting]     = useState(null)
   const [cancelingId,  setCancelingId]  = useState(null)
+  const [allotmentMap, setAllotmentMap] = useState({})
+  const [checkingId,   setCheckingId]   = useState(null)
 
   useEffect(() => {
     getMeroshareDpList().then(r => setDpList(r.data)).catch(() => {})
@@ -360,6 +363,7 @@ function IPOPage() {
   const handleSelectAccount = (id) => {
     setSelectedAcc(id)
     setIpos([]); setResults([]); setPortfolio([])
+    setAllotmentMap({})
     setError(null)
   }
 
@@ -393,6 +397,22 @@ function IPOPage() {
       setCancelingId(null)
     }
   }
+
+
+  const handleCheckAllotment = useCallback(async (formId) => {
+    if (!formId) return
+    setCheckingId(formId)
+    try {
+      const res = await getMeroshareAllotment(selectedAcc, formId)
+      const data = res.data.allotment
+      if (!data || Object.keys(data).length === 0) throw new Error('Result not published yet')
+      setAllotmentMap(m => ({ ...m, [formId]: data }))
+    } catch (err) {
+      setAllotmentMap(m => ({ ...m, [formId]: { error: err.response?.data?.error || err.message || 'Failed' } }))
+    } finally {
+      setCheckingId(null)
+    }
+  }, [selectedAcc])
 
   if (!user) return null
 
@@ -632,46 +652,80 @@ function IPOPage() {
                   </div>
                 ) : (
                   <div className="bg-white dark:bg-gray-900 rounded-2xl border border-gray-100 dark:border-gray-800 overflow-hidden">
-                    <div className="px-4 py-3 border-b border-gray-100 dark:border-gray-800 flex items-center justify-between">
+                    <div className="px-4 py-3 border-b border-gray-100 dark:border-gray-800">
                       <p className="text-[11px] font-semibold text-gray-700 dark:text-gray-300">{results.length} applications</p>
                     </div>
                     <div className="overflow-x-auto">
-                      <table className="w-full min-w-[420px]">
+                      <table className="w-full min-w-[560px]">
                         <thead>
                           <tr className="border-b border-gray-100 dark:border-gray-800">
                             <th className="text-left px-4 py-2.5 text-[9px] font-semibold uppercase tracking-widest text-gray-400">Company</th>
-                            <th className="text-center px-4 py-2.5 text-[9px] font-semibold uppercase tracking-widest text-gray-400">Status</th>
-                            <th className="px-4 py-2.5 w-20" />
+                            <th className="text-center px-4 py-2.5 text-[9px] font-semibold uppercase tracking-widest text-gray-400">Applied</th>
+                            <th className="text-center px-4 py-2.5 text-[9px] font-semibold uppercase tracking-widest text-gray-400">Result</th>
+                            <th className="text-left px-4 py-2.5 text-[9px] font-semibold uppercase tracking-widest text-gray-400">Remark</th>
+                            <th className="px-4 py-2.5 w-28" />
                           </tr>
                         </thead>
                         <tbody>
-                          {results.map((r, i) => {
-                            const appId = r.applicantFormId || r.id
-                            const status = r.statusName || ''
-                            const canCancel = status === 'APPROVED' || status === 'BLOCKED_APPROVE'
-                            const label = {
-                              TRANSACTION_SUCCESS: 'SUCCESS',
-                              BLOCKED_APPROVE:     'PENDING',
-                              APPROVED:            'APPROVED',
-                              BLOCK_FAILED:        'FAILED',
-                            }[status] || status
-                            return (
-                              <tr key={i} className="border-b border-gray-50 dark:border-gray-800/50 last:border-0 hover:bg-gray-50 dark:hover:bg-gray-800/30">
+                          {results.flatMap((r, i) => {
+                            const appId      = r.applicantFormId || r.id
+                            const status     = r.statusName || ''
+                            const canCancel  = status === 'APPROVED' || status === 'BLOCKED_APPROVE'
+                            const allotment  = appId ? allotmentMap[appId] : null
+                            const isChecking = checkingId === appId
+
+                            const rows = [
+                              <tr key={i} className="border-b border-gray-50 dark:border-gray-800/50 hover:bg-gray-50 dark:hover:bg-gray-800/30">
                                 <td className="px-4 py-3">
                                   <p className="text-[11px] font-semibold text-gray-900 dark:text-white">{r.companyName}</p>
                                   <p className="text-[9px] text-gray-400">{r.scrip} · {r.shareTypeName}</p>
                                 </td>
-                                <td className="px-4 py-3 text-center"><StatusBadge status={label} /></td>
-                                <td className="px-4 py-3 text-right">
-                                  {canCancel && appId && (
-                                    <button onClick={() => handleCancelIPO(appId)} disabled={cancelingId === appId}
-                                      className="text-[10px] font-semibold text-red-500 hover:text-red-600 disabled:opacity-40">
-                                      {cancelingId === appId ? '…' : 'Cancel'}
-                                    </button>
+                                <td className="px-4 py-3 text-center">
+                                  {allotment && !allotment.error
+                                    ? <span className="text-[11px] font-semibold text-gray-700 dark:text-gray-300">{allotment.appliedKitta} kitta</span>
+                                    : <span className="text-[10px] text-gray-400">—</span>
+                                  }
+                                </td>
+                                <td className="px-4 py-3 text-center">
+                                  {allotment && !allotment.error ? (
+                                    <span className={`inline-flex items-center gap-1 text-[10px] font-semibold px-2 py-0.5 rounded border ${
+                                      allotment.receivedKitta > 0
+                                        ? 'bg-emerald-50 dark:bg-emerald-900/20 text-emerald-600 dark:text-emerald-400 border-emerald-200 dark:border-emerald-800/50'
+                                        : 'bg-red-50 dark:bg-red-900/20 text-red-500 dark:text-red-400 border-red-200 dark:border-red-800/50'
+                                    }`}>
+                                      {allotment.receivedKitta > 0 ? `✓ ${allotment.receivedKitta} kitta` : '✗ Not Allotted'}
+                                    </span>
+                                  ) : allotment?.error ? (
+                                    <span className="text-[9px] text-red-400">{allotment.error}</span>
+                                  ) : (
+                                    <span className="text-[9px] text-gray-300 dark:text-gray-600">—</span>
                                   )}
                                 </td>
+                                <td className="px-4 py-3">
+                                  {allotment && !allotment.error && (
+                                    <span className="text-[9px] text-gray-400">{allotment.meroshareRemark || allotment.reasonOrRemark || ''}</span>
+                                  )}
+                                </td>
+                                <td className="px-4 py-3 text-right">
+                                  <div className="flex items-center justify-end gap-2">
+                                    {appId && (
+                                      <button onClick={() => handleCheckAllotment(appId)} disabled={isChecking}
+                                        className="text-[10px] font-semibold text-blue-500 hover:text-blue-600 disabled:opacity-40 flex items-center gap-1">
+                                        {isChecking && <span className="w-2.5 h-2.5 border-2 border-blue-400/40 border-t-blue-500 rounded-full animate-spin" />}
+                                        {isChecking ? 'Checking…' : allotment && !allotment.error ? 'Refresh' : 'Check Result'}
+                                      </button>
+                                    )}
+                                    {canCancel && appId && (
+                                      <button onClick={() => handleCancelIPO(appId)} disabled={cancelingId === appId}
+                                        className="text-[10px] font-semibold text-red-500 hover:text-red-600 disabled:opacity-40">
+                                        {cancelingId === appId ? '…' : 'Cancel'}
+                                      </button>
+                                    )}
+                                  </div>
+                                </td>
                               </tr>
-                            )
+                            ]
+                            return rows
                           })}
                         </tbody>
                       </table>

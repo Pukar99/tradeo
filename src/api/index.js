@@ -192,3 +192,5 @@ export const applyMeroshareIPO       = (data)          => API.post('/api/merosha
 export const applyMeroshareIPOBulk   = (data)          => API.post('/api/meroshare/apply-bulk', data)
 export const getMerosharePortfolio   = (accountId)     => API.get('/api/meroshare/portfolio', { params: accountId ? { account_id: accountId } : {} })
 export const cancelMeroshareIPO      = (data)          => API.post('/api/meroshare/cancel', data)
+export const getMeroshareToken       = (accountId) => API.get('/api/meroshare/token', { params: accountId ? { account_id: accountId } : {} })
+export const getMeroshareAllotment   = (accountId, applicantFormId) => API.get('/api/meroshare/allotment', { params: { account_id: accountId, applicant_form_id: applicantFormId } })
