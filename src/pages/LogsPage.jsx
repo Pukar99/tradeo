@@ -7,7 +7,7 @@ import {
   getTradeLog, addTradeLog, updateTradeLog,
   closeTradeLog, partialCloseTradeLog, deleteTradeLog, bulkDeleteTradeLog,
   getTradeJournal, addTradeJournal, updateTradeJournal, deleteTradeJournal,
-  getStockPrice
+  getBatchPrices
 } from '../api'
 import { useContextMenu } from '../components/ContextMenu'
 import { useChatRefresh, dispatchDebrief } from '../utils/chatEvents'
@@ -394,9 +394,9 @@ function AddTradeModal({ onClose, onSave, editTrade, openTrades = [], market = '
         (t.status === 'OPEN' || t.status === 'PARTIAL')
       )
     : []
-  const dupTotalQty    = duplicates.reduce((s, t) => s + (t.remaining_quantity ?? t.quantity), 0)
-  const dupWeightedAvg = duplicates.length > 0
-    ? duplicates.reduce((s, t) => s + parseFloat(t.entry_price) * (t.remaining_quantity ?? t.quantity), 0) / dupTotalQty
+  const dupTotalQty    = duplicates.reduce((s, t) => s + (parseFloat(t.remaining_quantity ?? t.quantity) || 0), 0)
+  const dupWeightedAvg = dupTotalQty > 0
+    ? duplicates.reduce((s, t) => s + (parseFloat(t.entry_price) || 0) * (parseFloat(t.remaining_quantity ?? t.quantity) || 0), 0) / dupTotalQty
     : null
 
   return (
@@ -3263,18 +3263,16 @@ function LogsPage() {
       const openTrades = tradesRes.data.filter(t => (t.status === 'OPEN' || t.status === 'PARTIAL') && t.market !== 'forex')
       const uniqueSymbols = [...new Set(openTrades.map(t => t.symbol))]
       if (uniqueSymbols.length > 0) {
-        const results = await Promise.allSettled(uniqueSymbols.map(sym => getStockPrice(sym)))
-        const map = {}
-        results.forEach((r, i) => {
-          if (r.status === 'fulfilled') {
-            map[uniqueSymbols[i]] = {
-              price:      r.value.data.price,
-              change:     r.value.data.change,
-              latestDate: r.value.data.latestDate,
-            }
+        try {
+          const batchRes = await getBatchPrices(uniqueSymbols)
+          const prices = batchRes.data.prices || {}
+          const latestDate = batchRes.data.latestDate || ''
+          const map = {}
+          for (const sym of uniqueSymbols) {
+            if (prices[sym]) map[sym] = { price: prices[sym].price, change: prices[sym].change, latestDate }
           }
-        })
-        setLtpMap(map)
+          setLtpMap(map)
+        } catch { /* prices unavailable — trades still show */ }
       }
     } catch (err) {
       console.error(err)

@@ -71,8 +71,8 @@ function riskLevel(position, ltp, entry, sl) {
   const e = parseFloat(entry), s = parseFloat(sl), l = parseFloat(ltp)
   if (isNaN(e) || isNaN(s) || isNaN(l)) return 'unknown'
   const distPct = position === 'LONG'
-    ? ((l - s) / Math.abs(e - s || 1)) * 100
-    : ((s - l) / Math.abs(s - e || 1)) * 100
+    ? ((l - s) / (Math.abs(e - s) || 1)) * 100
+    : ((s - l) / (Math.abs(s - e) || 1)) * 100
   if (distPct < 0)   return 'breached'
   if (distPct < 15)  return 'critical'
   if (distPct < 35)  return 'warning'
@@ -117,8 +117,8 @@ function RiskHeatDashboard({ positions }) {
       const s = parseFloat(t.sl)
       const e = entry
       const raw = t.position === 'LONG'
-        ? ((parseFloat(ltp) - s) / Math.abs(e - s || 1)) * 100
-        : ((s - parseFloat(ltp)) / Math.abs(s - e || 1)) * 100
+        ? ((parseFloat(ltp) - s) / (Math.abs(e - s) || 1)) * 100
+        : ((s - parseFloat(ltp)) / (Math.abs(s - e) || 1)) * 100
       slDistPct = Math.max(0, Math.min(100, raw))
     }
 

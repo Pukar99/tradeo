@@ -63,16 +63,17 @@ function DimBar({ label, score, extra }) {
   )
 }
 
-function DisciplineScore() {
-  const [data, setData] = useState(null)
-  const [loading, setLoading] = useState(true)
+function DisciplineScore({ initData }) {
+  const [data, setData] = useState(initData || null)
+  const [loading, setLoading] = useState(!initData)
 
   useEffect(() => {
+    if (initData) { setData(initData); setLoading(false); return }
     getDiscipline()
       .then(res => setData(res.data))
       .catch(console.error)
       .finally(() => setLoading(false))
-  }, [])
+  }, [initData]) // re-sync when parent passes fresh data
 
   if (loading) return (
     <div className="bg-white dark:bg-gray-900 rounded-2xl border border-gray-100 dark:border-gray-800 p-4 space-y-3 animate-pulse">

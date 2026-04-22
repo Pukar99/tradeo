@@ -89,8 +89,9 @@ function AppContent() {
 
   const isAuthPage = AUTH_ROUTES.includes(location.pathname)
 
+  const userId = user?.id ?? null
   useEffect(() => {
-    if (!user) return
+    if (!userId) return
 
     getProfile()
       .then(res => {
@@ -100,16 +101,14 @@ function AppContent() {
       })
       .catch(() => {})
 
-    // Show briefing once per session (clears on tab close, not on refresh)
     const briefingShown = sessionStorage.getItem('briefingShown')
-    // P3-001: store timer ID and clear it on cleanup so it doesn't fire after unmount
     let timer
     if (!briefingShown) {
       timer = setTimeout(() => setShowBriefing(true), 1000)
       sessionStorage.setItem('briefingShown', 'true')
     }
     return () => clearTimeout(timer)
-  }, [user]) // re-run when user changes (login/logout in same session)
+  }, [userId]) // eslint-disable-line react-hooks/exhaustive-deps
 
   return (
     <div className="min-h-screen bg-gray-50 dark:bg-gray-900 transition-colors">

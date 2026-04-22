@@ -4,11 +4,11 @@ import { useLanguage } from '../../context/LanguageContext'
 import { useContextMenu } from '../ContextMenu'
 import { useChatRefresh } from '../../utils/chatEvents'
 
-function MonthlyGoals() {
+function MonthlyGoals({ initData }) {
   const { t } = useLanguage()
   const { onContextMenu, ContextMenuPortal } = useContextMenu()
-  const [goals, setGoals] = useState([])
-  const [loading, setLoading] = useState(true)
+  const [goals, setGoals] = useState(initData || [])
+  const [loading, setLoading] = useState(!initData)
   const [showForm, setShowForm] = useState(false)
   const [form, setForm] = useState({ title: '', description: '', target_date: '' })
   const [adding, setAdding] = useState(false)
@@ -27,7 +27,10 @@ function MonthlyGoals() {
     }
   }
 
-  useEffect(() => { fetchGoals() }, [])
+  useEffect(() => {
+    if (initData) { setGoals(initData); setLoading(false); return }
+    fetchGoals()
+  }, [initData]) // eslint-disable-line react-hooks/exhaustive-deps
   useChatRefresh(['goals'], fetchGoals)
 
   const completedCount = goals.filter(g => g.completed).length

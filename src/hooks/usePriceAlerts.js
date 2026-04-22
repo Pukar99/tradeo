@@ -1,24 +1,18 @@
-import { useEffect, useRef, useCallback } from 'react'
+import { useEffect, useRef } from 'react'
 import { checkPriceAlerts } from '../api'
 
-// NEPSE market hours: 11:00–15:00 NPT = 05:15–09:15 UTC
-// Poll every 60s during market hours, every 5min outside
-const MARKET_OPEN_UTC_H  = 5
-const MARKET_OPEN_UTC_M  = 15
-const MARKET_CLOSE_UTC_H = 9
-const MARKET_CLOSE_UTC_M = 15
+// NEPSE market close: 15:00 NPT = 09:15 UTC
+// We fetch once on startup, then once at 15:10 NPT (09:25 UTC) — after EOD data lands
+const EOD_UTC_H = 9
+const EOD_UTC_M = 25
 
-function isMarketHours() {
-  const now  = new Date()
-  const h    = now.getUTCHours()
-  const m    = now.getUTCMinutes()
-  const mins = h * 60 + m
-  const open  = MARKET_OPEN_UTC_H  * 60 + MARKET_OPEN_UTC_M
-  const close = MARKET_CLOSE_UTC_H * 60 + MARKET_CLOSE_UTC_M
-  // Mon(1)–Fri(5) only — NEPSE trades Sun–Thu (0=Sun,4=Thu)
-  const day = now.getUTCDay()
-  const isWeekday = day >= 0 && day <= 4  // Sun–Thu
-  return isWeekday && mins >= open && mins < close
+// How many ms until the next 15:10 NPT (09:25 UTC) today or tomorrow
+function msUntilEOD() {
+  const now = new Date()
+  const target = new Date(now)
+  target.setUTCHours(EOD_UTC_H, EOD_UTC_M, 0, 0)
+  if (target <= now) target.setUTCDate(target.getUTCDate() + 1)
+  return target - now
 }
 
 // Track which alerts we've already notified this session so we don't spam
@@ -33,12 +27,16 @@ function markNotified(id) {
 }
 
 export function usePriceAlerts({ user, onAlert }) {
-  const timerRef    = useRef(null)
-  const onAlertRef  = useRef(onAlert)
+  const timerRef   = useRef(null)
+  const onAlertRef = useRef(onAlert)
+  const userRef    = useRef(user)
   onAlertRef.current = onAlert
+  userRef.current    = user
 
-  const poll = useCallback(async () => {
-    if (!user) return
+  // pollRef holds the latest poll function — never changes identity, so safe in useEffect deps
+  const pollRef = useRef(null)
+  pollRef.current = async () => {
+    if (!userRef.current) return
     try {
       const res = await checkPriceAlerts()
       const { triggered = [] } = res.data
@@ -48,15 +46,12 @@ export function usePriceAlerts({ user, onAlert }) {
       const fresh = triggered.filter(a => !notified.has(String(a.id)))
       if (!fresh.length) return
 
-      // Request browser notification permission once
       if (Notification.permission === 'default') {
         await Notification.requestPermission().catch(() => {})
       }
 
       for (const alert of fresh) {
         markNotified(alert.id)
-
-        // Browser push notification
         if (Notification.permission === 'granted') {
           new Notification(`Tradeo Alert — ${alert.symbol}`, {
             body: `LTP Rs.${alert.ltp.toLocaleString()} is ${alert.direction} your alert Rs.${alert.price_alert.toLocaleString()} (${alert.dist_pct}% away)`,
@@ -64,25 +59,25 @@ export function usePriceAlerts({ user, onAlert }) {
             tag:  `tradeo_alert_${alert.id}`,
           })
         }
-
-        // In-app toast callback
         onAlertRef.current?.(alert)
       }
-    } catch {
-      // Silent — network errors don't break the app
-    }
-  }, [user])
+    } catch { /* silent */ }
+  }
 
+  const userId = user?.id ?? null
   useEffect(() => {
-    if (!user) return
+    if (!userId) return
 
-    const schedule = () => {
-      poll()
-      const interval = isMarketHours() ? 60_000 : 5 * 60_000
-      timerRef.current = setTimeout(schedule, interval)
+    pollRef.current()
+
+    const scheduleEOD = () => {
+      timerRef.current = setTimeout(() => {
+        pollRef.current()
+        scheduleEOD()
+      }, msUntilEOD())
     }
+    scheduleEOD()
 
-    schedule()
     return () => clearTimeout(timerRef.current)
-  }, [user, poll])
+  }, [userId]) // only re-run when user logs in/out — not on every render
 }

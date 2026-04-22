@@ -9,9 +9,8 @@ import MonthlyGoals from '../components/dashboard/MonthlyGoals'
 import { Link, useNavigate } from 'react-router-dom'
 import { useState, useEffect, useCallback, useRef } from 'react'
 import {
-  getTradeLog, getStockPrice, getBatchPrices,
-  getWatchlist, addToWatchlist,
-  removeFromWatchlist
+  getDashboardInit, getStockPrice,
+  addToWatchlist, removeFromWatchlist,
 } from '../api'
 
 const MOTIVATIONAL_QUOTES = [
@@ -274,7 +273,7 @@ function StatCard({ label, value, color, sub }) {
 }
 
 // ── Center dashboard (authenticated) ─────────────────────────────────────────
-function CenterDashboard({ navigate }) {
+function CenterDashboard({ navigate, initData, onRefresh }) {
   const { t: tr } = useLanguage()
   const [openPositions, setOpenPositions] = useState([])
   const [perfStats, setPerfStats] = useState(null)
@@ -282,7 +281,7 @@ function CenterDashboard({ navigate }) {
   const [watchlistTab, setWatchlistTab] = useState('active')
   const { onContextMenu: watchCtx, ContextMenuPortal: WatchMenuPortal } = useContextMenu()
   const [positionsCollapsed, setPositionsCollapsed] = useState(false)
-  const [loading, setLoading] = useState(true)
+  const [loading, setLoading] = useState(!initData)
   const [error, setError] = useState(null)
   const [showAddWatch, setShowAddWatch] = useState(false)
   const [newSymbol, setNewSymbol] = useState('')
@@ -304,121 +303,62 @@ function CenterDashboard({ navigate }) {
     return () => document.removeEventListener('keydown', fn)
   }, [])
 
-  // Rule 2 — useCallback so useChatRefresh gets a stable reference
-  const fetchData = useCallback(async () => {
-    try {
-      setError(null)
-      const [tradesRes, watchRes] = await Promise.all([
-        getTradeLog(),
-        getWatchlist()
-      ])
+  const applyData = useCallback((d) => {
+    const trades    = d.trades || []
+    const priceMap  = d.prices || {}
+    const tradeData = trades.filter(t => t.market !== 'forex')
+    const open      = tradeData.filter(t => t.status === 'OPEN' || t.status === 'PARTIAL')
+    const closed    = tradeData.filter(t => t.status === 'CLOSED')
 
-      // Filter to NEPSE trades only (CenterDashboard is the NEPSE view)
-      const tradeData = tradesRes.data.filter(t => t.market !== 'forex')
-      const open = tradeData.filter(t => t.status === 'OPEN' || t.status === 'PARTIAL')
-      const closed = tradeData.filter(t => t.status === 'CLOSED')
-
-      // Batch-fetch all prices in ONE request (fixes N+1)
-      const allSymbols = [...new Set([
-        ...open.map(t => t.symbol),
-        ...watchRes.data.map(w => w.symbol)
-      ])].filter(Boolean)
-
-      let priceMap = {}
-      if (allSymbols.length > 0) {
-        try {
-          const batchRes = await getBatchPrices(allSymbols)
-          priceMap = batchRes.data.prices || {}
-        } catch {
-          // fallback: no prices, UI still works
-        }
+    const openWithPrices = open.map(t => {
+      const entry = parseFloat(t.entry_price) || 0
+      const qty   = parseFloat(t.remaining_quantity || t.quantity) || 0
+      const p     = priceMap[t.symbol]
+      const ltp   = p ? parseFloat(p.price) || 0 : 0
+      const pnl   = ltp ? (t.position === 'LONG' ? (ltp - entry) * qty : (entry - ltp) * qty) : 0
+      const pnlPct = entry > 0 && qty > 0 && ltp ? ((pnl / (entry * qty)) * 100).toFixed(2) : '0.00'
+      return {
+        ...t,
+        entry_price: entry, quantity: qty, remaining_quantity: qty,
+        sl: t.sl != null ? parseFloat(t.sl) : null,
+        tp: t.tp != null ? parseFloat(t.tp) : null,
+        currentPrice: ltp || null, change: p?.change ?? null,
+        unrealizedPnl: ltp ? Math.round(pnl) : null, pnlPct: ltp ? pnlPct : null,
       }
+    })
+    setOpenPositions(openWithPrices)
 
-      const openWithPrices = open.map(t => {
-        const entry = parseFloat(t.entry_price) || 0
-        const qty   = parseFloat(t.remaining_quantity || t.quantity) || 0
-        const p     = priceMap[t.symbol]
-        const ltp   = p ? parseFloat(p.price) || 0 : 0
-        const pnl   = ltp
-          ? (t.position === 'LONG' ? (ltp - entry) * qty : (entry - ltp) * qty)
-          : 0
-        const pnlPct = entry > 0 && qty > 0 && ltp
-          ? ((pnl / (entry * qty)) * 100).toFixed(2)
-          : '0.00'
-        return {
-          ...t,
-          entry_price: entry,
-          quantity: qty,
-          remaining_quantity: qty,
-          sl: t.sl != null ? parseFloat(t.sl) : null,
-          tp: t.tp != null ? parseFloat(t.tp) : null,
-          currentPrice: ltp || null,
-          change: p?.change ?? null,
-          unrealizedPnl: ltp ? Math.round(pnl) : null,
-          pnlPct: ltp ? pnlPct : null
-        }
-      })
-      setOpenPositions(openWithPrices)
+    const totalUnrealized = openWithPrices.reduce((s, t) => s + (t.unrealizedPnl || 0), 0)
+    const totalRealized   = closed.reduce((s, t) => s + (parseFloat(t.realized_pnl) || 0), 0)
+    const profitable      = closed.filter(t => (parseFloat(t.realized_pnl) || 0) > 0).length
+    const winRate         = closed.length > 0 ? Math.round((profitable / closed.length) * 100) : 0
+    setPerfStats({
+      totalPnl: totalRealized + totalUnrealized, unrealizedPnl: totalUnrealized,
+      realizedPnl: totalRealized, winRate, openCount: openWithPrices.length,
+      closedCount: closed.length,
+      totalInvested:  openWithPrices.reduce((s, t) => s + (t.entry_price * t.quantity), 0),
+      currentValue:   openWithPrices.reduce((s, t) => s + ((t.currentPrice || t.entry_price) * t.quantity), 0),
+    })
 
-      const totalUnrealized = openWithPrices.reduce((s, t) => s + (t.unrealizedPnl || 0), 0)
-      // Rule 1 — parseFloat realized_pnl
-      const totalRealized = closed.reduce((s, t) => s + (parseFloat(t.realized_pnl) || 0), 0)
-      const profitable = closed.filter(t => (parseFloat(t.realized_pnl) || 0) > 0).length
-      const winRate = closed.length > 0 ? Math.round((profitable / closed.length) * 100) : 0
-      const totalInvested = openWithPrices.reduce(
-        (s, t) => s + (t.entry_price * t.quantity), 0
-      )
-      const currentValue = openWithPrices.reduce(
-        (s, t) => s + ((t.currentPrice || t.entry_price) * t.quantity), 0
-      )
-
-      setPerfStats({
-        totalPnl: totalRealized + totalUnrealized,
-        unrealizedPnl: totalUnrealized,
-        realizedPnl: totalRealized,
-        winRate,
-        openCount: openWithPrices.length,
-        closedCount: closed.length,
-        totalInvested,
-        currentValue
-      })
-
-      // Watchlist with prices (already fetched in batch above)
-      const watchItems = watchRes.data
-      const watchWithPrices = watchItems.map(w => {
-        const p = priceMap[w.symbol]
-        return { ...w, currentPrice: p ? parseFloat(p.price) || null : null, change: p?.change ?? null }
-      })
-
-      // Portfolio tab = open positions (marked separately, not from watchlist table)
-      const portfolioItems = openWithPrices.map(t => ({
-        id: `pos_${t.id}`,
-        symbol: t.symbol,
-        currentPrice: t.currentPrice,
-        change: t.change,
-        category: '__portfolio__',  // internal sentinel, not 'portfolio' to avoid clash
-        isPosition: true,
-        position: t.position,
-        quantity: t.quantity,
-        entry_price: t.entry_price,
-        unrealizedPnl: t.unrealizedPnl,
-        pnlPct: t.pnlPct,
-        sl: t.sl,
-        tp: t.tp,
-        status: t.status
-      }))
-
-      setWatchlist([...watchWithPrices, ...portfolioItems])
-    } catch (err) {
-      setError('Failed to load dashboard data.')
-      console.error(err)
-    } finally {
-      setLoading(false)
-    }
+    const watchWithPrices = (d.watchlist || []).map(w => {
+      const p = priceMap[w.symbol]
+      return { ...w, currentPrice: p ? parseFloat(p.price) || null : null, change: p?.change ?? null }
+    })
+    const portfolioItems = openWithPrices.map(t => ({
+      id: `pos_${t.id}`, symbol: t.symbol, currentPrice: t.currentPrice, change: t.change,
+      category: '__portfolio__', isPosition: true, position: t.position,
+      quantity: t.quantity, entry_price: t.entry_price, unrealizedPnl: t.unrealizedPnl,
+      pnlPct: t.pnlPct, sl: t.sl, tp: t.tp, status: t.status,
+    }))
+    setWatchlist([...watchWithPrices, ...portfolioItems])
   }, [])
 
-  useEffect(() => { fetchData() }, [fetchData])
-  useChatRefresh(['trades', 'watchlist'], fetchData)
+  // Hydrate from parent-supplied initData (avoids a second /init fetch)
+  useEffect(() => {
+    if (initData) { applyData(initData); setLoading(false) }
+  }, [initData, applyData])
+
+  useChatRefresh(['trades', 'watchlist'], onRefresh)
 
   const handleSymbolSearch = async () => {
     if (!newSymbol.trim()) return
@@ -452,8 +392,7 @@ function CenterDashboard({ navigate }) {
       setSymbolInfo(null)
       setShowAddWatch(false)
       setWatchForm({ price_alert: '', alert_date: '', alert_type: '', notes: '' })
-      // Rule 4 — await fetchData
-      await fetchData()
+      if (onRefresh) await onRefresh()
     } catch (err) {
       setWatchActionErr(err.response?.data?.message || 'Failed to add to watchlist.')
     }
@@ -491,7 +430,7 @@ function CenterDashboard({ navigate }) {
   if (error) return (
     <div className="bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 rounded-2xl p-6 text-center">
       <p className="text-red-600 dark:text-red-400 text-sm">{error}</p>
-      <button onClick={fetchData} className="mt-3 text-xs text-red-500 hover:underline">Retry</button>
+      <button onClick={onRefresh} className="mt-3 text-xs text-red-500 hover:underline">Retry</button>
     </div>
   )
 
@@ -752,7 +691,7 @@ function CenterDashboard({ navigate }) {
                     <StockAvatar symbol={symbolInfo.symbol} size="w-7 h-7" />
                     <div>
                       <p className="text-xs font-bold text-gray-900 dark:text-white">{symbolInfo.symbol}</p>
-                      <p className="text-xs text-gray-400">Rs.{parseFloat(symbolInfo.price).toLocaleString()}</p>
+                      <p className="text-xs text-gray-400">Rs.{parseFloat(symbolInfo.price || 0).toLocaleString()}</p>
                     </div>
                   </div>
                   <p className={`text-xs font-medium ${symbolInfo.change >= 0 ? 'text-green-500' : 'text-red-500'}`}>
@@ -1151,8 +1090,6 @@ function GoldPriceWidget() {
 
   useEffect(() => {
     fetchGold()
-    const id = setInterval(fetchGold, 60000) // refresh every 1 min
-    return () => clearInterval(id)
   }, [fetchGold])
 
   const change    = gold && gold.prevClose ? gold.price - gold.prevClose : null
@@ -1218,26 +1155,23 @@ function GoldPriceWidget() {
 }
 
 // ── Forex open positions widget ───────────────────────────────────────────────
-function ForexOpenPositions({ navigate }) {
+function ForexOpenPositions({ navigate, initData }) {
   const [positions, setPositions] = useState([])
   const [stats, setStats] = useState(null)
-  const [loading, setLoading] = useState(true)
+  const [loading, setLoading] = useState(!initData)
 
   useEffect(() => {
-    ;(async () => {
-      try {
-        const res = await getTradeLog()
-        const open = res.data.filter(t => (t.status === 'OPEN' || t.status === 'PARTIAL') && t.market === 'forex')
-        const closed = res.data.filter(t => t.status === 'CLOSED' && t.market === 'forex')
-        const realizedPnl = closed.reduce((s, t) => s + (parseFloat(t.realized_pnl) || 0), 0)
-        const profitable = closed.filter(t => (parseFloat(t.realized_pnl) || 0) > 0).length
-        const winRate = closed.length > 0 ? Math.round((profitable / closed.length) * 100) : null
-        setPositions(open)
-        setStats({ realizedPnl, winRate, openCount: open.length, closedCount: closed.length })
-      } catch { /* ignore */ }
-      finally { setLoading(false) }
-    })()
-  }, [])
+    const trades = initData?.trades
+    if (!trades) return
+    const open = trades.filter(t => (t.status === 'OPEN' || t.status === 'PARTIAL') && t.market === 'forex')
+    const closed = trades.filter(t => t.status === 'CLOSED' && t.market === 'forex')
+    const realizedPnl = closed.reduce((s, t) => s + (parseFloat(t.realized_pnl) || 0), 0)
+    const profitable = closed.filter(t => (parseFloat(t.realized_pnl) || 0) > 0).length
+    const winRate = closed.length > 0 ? Math.round((profitable / closed.length) * 100) : null
+    setPositions(open)
+    setStats({ realizedPnl, winRate, openCount: open.length, closedCount: closed.length })
+    setLoading(false)
+  }, [initData])
 
   if (loading) return <div className="bg-white dark:bg-gray-900 rounded-2xl border border-gray-100 dark:border-gray-800 h-32 animate-pulse" />
 
@@ -1312,12 +1246,12 @@ function ForexOpenPositions({ navigate }) {
 }
 
 // ── Forex center dashboard ────────────────────────────────────────────────────
-function ForexCenterDashboard({ navigate }) {
+function ForexCenterDashboard({ navigate, initData }) {
   return (
     <div className="flex flex-col gap-4">
       <GoldPriceWidget />
       <ForexSessionClock />
-      <ForexOpenPositions navigate={navigate} />
+      <ForexOpenPositions navigate={navigate} initData={initData} />
     </div>
   )
 }
@@ -1327,7 +1261,18 @@ function LoggedInHome() {
   const { user } = useAuth()
   const { isForex } = useMarket()
   const navigate = useNavigate()
-  const [disciplineKey, setDisciplineKey] = useState(0)
+  const [initData, setInitData] = useState(null)
+
+  const fetchDashboard = useCallback(async () => {
+    try {
+      const res = await getDashboardInit()
+      setInitData(res.data)
+    } catch (err) {
+      console.error(err)
+    }
+  }, [])
+
+  useEffect(() => { fetchDashboard() }, [fetchDashboard])
 
   const getGreeting = () => {
     const h = new Date().getHours()
@@ -1362,18 +1307,18 @@ function LoggedInHome() {
 
         {/* LEFT — TaskBoard + Monthly Goals */}
         <div className="col-span-12 lg:col-span-3 flex flex-col gap-4">
-          <TaskBoard onTaskComplete={() => setDisciplineKey(k => k + 1)} />
-          <MonthlyGoals />
+          <TaskBoard initData={initData?.tasks} mindsetContent={initData?.mindset?.content} />
+          <MonthlyGoals initData={initData?.goals} />
         </div>
 
         {/* CENTER — Stats + Positions + Watchlist (NEPSE) / Gold + Sessions + Positions (Forex) */}
         <div className="col-span-12 lg:col-span-6">
-          {isForex ? <ForexCenterDashboard navigate={navigate} /> : <CenterDashboard navigate={navigate} />}
+          {isForex ? <ForexCenterDashboard navigate={navigate} initData={initData} /> : <CenterDashboard navigate={navigate} initData={initData} onRefresh={fetchDashboard} />}
         </div>
 
         {/* RIGHT — Discipline Score + Journal shortcuts */}
         <div className="col-span-12 lg:col-span-3 flex flex-col gap-4">
-          <DisciplineScore key={disciplineKey} />
+          <DisciplineScore initData={initData?.discipline} />
 
           {/* Journal shortcuts */}
           <div className="bg-white dark:bg-gray-900 rounded-2xl border border-gray-100 dark:border-gray-800 flex flex-col">

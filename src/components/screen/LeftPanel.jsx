@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback } from 'react'
-import { getTradeLog, getWatchlist, removeFromWatchlist, updateWatchlist, addTradeLog, closeTradeLog, getStockPrice } from '../../api'
+import { getTradeLog, getWatchlist, removeFromWatchlist, updateWatchlist, addTradeLog, closeTradeLog, getBatchPrices } from '../../api'
 import { useContextMenu } from '../ContextMenu'
 import { useChatRefresh } from '../../utils/chatEvents'
 import { useScreen } from '../../context/ScreenContext'
@@ -247,42 +247,41 @@ export default function LeftPanel() {
       .catch(() => {})
   }, [])
 
-  useEffect(() => {
-    loadData()
-    // Refetch when user returns to this tab (e.g. after deleting from Dashboard)
-    const onFocus = () => loadData()
-    window.addEventListener('focus', onFocus)
-    return () => window.removeEventListener('focus', onFocus)
-  }, [loadData])
+  useEffect(() => { loadData() }, [loadData])
   useChatRefresh(['trades', 'watchlist'], loadData)
 
-  // Within 2% of SL or TP
+  // Within 2% of SL or TP — single batch request instead of N individual calls
   useEffect(() => {
-    if (!positions.length) { setAlertPositions([]); return }
+    const withAlerts = positions.filter(p => p.sl || p.tp)
+    if (!withAlerts.length) { setAlertPositions([]); return }
     let cancelled = false
-    Promise.all(
-      positions.filter(p => p.sl || p.tp).map(async p => {
-        try {
-          const r = await getStockPrice(p.symbol)
-          const price = parseFloat(r.data?.close || r.data?.price || 0)
-          if (!price) return null
-          const alerts = []
+    const symbols = [...new Set(withAlerts.map(p => p.symbol))]
+    getBatchPrices(symbols)
+      .then(res => {
+        if (cancelled) return
+        const priceMap = res.data?.prices || {}
+        const alerts = withAlerts.reduce((acc, p) => {
+          const price = parseFloat(priceMap[p.symbol]?.price || 0)
+          if (!price) return acc
+          const found = []
           if (p.sl) {
             const slV = parseFloat(p.sl)
-            if (Math.abs((price - slV) / slV * 100) <= 2) alerts.push({ type: 'SL', label: 'Near SL', threshold: slV })
+            if (Math.abs((price - slV) / slV * 100) <= 2) found.push({ type: 'SL', label: 'Near SL', threshold: slV })
           }
           if (p.tp) {
             const tpV = parseFloat(p.tp)
-            if (Math.abs((price - tpV) / tpV * 100) <= 2) alerts.push({ type: 'TP', label: 'Near TP', threshold: tpV })
+            if (Math.abs((price - tpV) / tpV * 100) <= 2) found.push({ type: 'TP', label: 'Near TP', threshold: tpV })
           }
-          return alerts.length ? { ...p, _latestPrice: price, _alerts: alerts } : null
-        } catch { return null }
+          if (found.length) acc.push({ ...p, _latestPrice: price, _alerts: found })
+          return acc
+        }, [])
+        setAlertPositions(alerts)
       })
-    ).then(res => { if (!cancelled) setAlertPositions(res.filter(Boolean)) })
+      .catch(() => {})
     return () => { cancelled = true }
   }, [positions])
 
-  const canTrade = !isIndex(selectedSymbol)
+  const canTrade = !isIndex()
   const { onContextMenu, ContextMenuPortal } = useContextMenu()
 
   // Escape key closes edit watchlist modal

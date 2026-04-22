@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useRef } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { useLanguage } from '../../context/LanguageContext'
 import {
@@ -54,18 +54,19 @@ function CountdownBar({ total, remaining }) {
 }
 
 // ── Mindset modal ─────────────────────────────────────────────────────────────
-function MindsetModal({ onClose, onDone }) {
-  const [content, setContent] = useState('')
-  const [loading, setLoading] = useState(true)
+function MindsetModal({ onClose, onDone, prefetchedContent }) {
+  const [content, setContent] = useState(prefetchedContent || '')
+  const [loading, setLoading] = useState(!prefetchedContent)
   const [canClose, setCanClose] = useState(false)
   const [countdown, setCountdown] = useState(5)
 
   useEffect(() => {
+    if (prefetchedContent) return
     getMindset()
       .then(res => setContent(res.data?.content || ''))
       .catch(() => {})
       .finally(() => setLoading(false))
-  }, [])
+  }, []) // eslint-disable-line react-hooks/exhaustive-deps
 
   useEffect(() => {
     if (!loading) {
@@ -139,13 +140,16 @@ function ExternalLinkModal({ task, onClose, onDone }) {
   const [phase, setPhase] = useState('confirm')
   const [countdown, setCountdown] = useState(5)
   const [canComplete, setCanComplete] = useState(false)
+  const timerRef = useRef(null)
+
+  useEffect(() => () => { if (timerRef.current) clearInterval(timerRef.current) }, [])
 
   const handleOpen = () => {
     window.open(task.url, '_blank')
     setPhase('waiting')
-    const timer = setInterval(() => {
+    timerRef.current = setInterval(() => {
       setCountdown(prev => {
-        if (prev <= 1) { clearInterval(timer); setCanComplete(true); return 0 }
+        if (prev <= 1) { clearInterval(timerRef.current); setCanComplete(true); return 0 }
         return prev - 1
       })
     }, 1000)
@@ -287,13 +291,13 @@ function TaskRow({ done, label, onClick, onDelete, hint }) {
 }
 
 // ── Main component ────────────────────────────────────────────────────────────
-function TaskBoard({ onTaskComplete }) {
+function TaskBoard({ initData, mindsetContent }) {
   const navigate = useNavigate()
   const { t } = useLanguage()
   const [fixedTasks, setFixedTasks]   = useState(FIXED_TASKS.map(t => ({ ...t, completed: false })))
   const [customTasks, setCustomTasks] = useState([])
   const [newTask, setNewTask]         = useState('')
-  const [loading, setLoading]         = useState(true)
+  const [loading, setLoading]         = useState(!initData)
   const [adding, setAdding]           = useState(false)
   const [showAdd, setShowAdd]         = useState(false)
   const [activeModal, setActiveModal] = useState(null)
@@ -310,23 +314,32 @@ function TaskBoard({ onTaskComplete }) {
     return () => window.removeEventListener('taskrow-context', handler)
   }, [_ocm])
 
+  const applyTaskData = (ft, ct) => {
+    setFixedTasks(FIXED_TASKS.map(task => ({
+      ...task,
+      completed: ft.find(f => f.id === task.id)?.completed || false
+    })))
+    setCustomTasks(ct)
+    setLoading(false)
+  }
+
   const fetchTasks = async () => {
     try {
       const res = await getTodayTasks()
-      const { fixedTasks: ft, customTasks: ct } = res.data
-      setFixedTasks(FIXED_TASKS.map(task => ({
-        ...task,
-        completed: ft.find(f => f.id === task.id)?.completed || false
-      })))
-      setCustomTasks(ct)
+      applyTaskData(res.data.fixedTasks, res.data.customTasks)
     } catch (err) {
       console.error(err)
-    } finally {
       setLoading(false)
     }
   }
 
-  useEffect(() => { fetchTasks() }, [])
+  useEffect(() => {
+    if (initData) {
+      applyTaskData(initData.fixedTasks, initData.customTasks)
+    } else {
+      fetchTasks()
+    }
+  }, []) // eslint-disable-line react-hooks/exhaustive-deps
 
   const totalTasks     = fixedTasks.length + customTasks.length
   const completedCount = fixedTasks.filter(t => t.completed).length + customTasks.filter(t => t.completed).length
@@ -348,7 +361,6 @@ function TaskBoard({ onTaskComplete }) {
     try {
       const res = await toggleFixedTask(taskId)
       setFixedTasks(prev => prev.map(t => t.id === taskId ? { ...t, completed: true } : t))
-      if (onTaskComplete) onTaskComplete()
     } catch (err) { console.error('[toggle error]', err.response?.data || err.message) }
   }
 
@@ -356,7 +368,6 @@ function TaskBoard({ onTaskComplete }) {
     try {
       await updateCustomTask(task.id, !task.completed)
       setCustomTasks(prev => prev.map(t => t.id === task.id ? { ...t, completed: !t.completed } : t))
-      if (onTaskComplete) onTaskComplete()
     } catch (err) { console.error(err) }
   }
 
@@ -407,7 +418,7 @@ function TaskBoard({ onTaskComplete }) {
     <>
       <ContextMenuPortal />
       {activeModal?.type === 'mindset' && (
-        <MindsetModal onClose={() => setActiveModal(null)} onDone={() => handleTaskDone(activeModal.task.id)} />
+        <MindsetModal onClose={() => setActiveModal(null)} onDone={() => handleTaskDone(activeModal.task.id)} prefetchedContent={mindsetContent} />
       )}
       {activeModal?.type === 'external' && (
         <ExternalLinkModal task={activeModal.task} onClose={() => setActiveModal(null)} onDone={() => handleTaskDone(activeModal.task.id)} />

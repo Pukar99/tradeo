@@ -1,7 +1,7 @@
 import { useState, useEffect, useCallback, useRef } from 'react'
 import { useAuth } from '../context/AuthContext'
 import { useNavigate } from 'react-router-dom'
-import { getTradeLog, getStockPrice, getWatchlist, getDiscipline, getTodayTasks, getTopMovers } from '../api'
+import { getDashboardInit, getTopMovers } from '../api'
 
 const NEPSE_QUOTES = [
   "The market rewards patience, not activity.",
@@ -14,7 +14,7 @@ const NEPSE_QUOTES = [
   "Trade what you see, not what you think.",
 ]
 
-function MorningBriefing({ onClose }) {
+function MorningBriefing({ onClose, initData }) {
   const { user } = useAuth()
   const navigate = useNavigate()
   const [loading, setLoading] = useState(true)
@@ -23,78 +23,55 @@ function MorningBriefing({ onClose }) {
   const containerRef = useRef(null)
   const quote = NEPSE_QUOTES[new Date().getDay() % NEPSE_QUOTES.length]
 
-  const fetchBriefingData = useCallback(async () => {
-    setFetchError(null)
-    setLoading(true)
+  const buildData = useCallback(async (d) => {
     try {
-      const [tradesRes, watchRes, disciplineRes, tasksRes] = await Promise.all([
-        getTradeLog(),
-        getWatchlist(),
-        getDiscipline(),
-        getTodayTasks()
-      ])
+      const trades    = d.trades || []
+      const priceMap  = d.prices || {}
+      const watchList = d.watchlist || []
+      const tasks     = d.tasks || {}
+      const discipline = d.discipline || null
 
-      const trades = tradesRes.data
-      const open = trades.filter(t => t.status === 'OPEN' || t.status === 'PARTIAL')
+      const open   = trades.filter(t => t.status === 'OPEN' || t.status === 'PARTIAL')
       const closed = trades.filter(t => t.status === 'CLOSED')
 
-      // P3-003: fetch all open position prices in parallel (Promise.allSettled)
-      const priceResults = await Promise.allSettled(open.map(t => getStockPrice(t.symbol)))
-      const openWithPrices = open.map((t, idx) => {
-        if (priceResults[idx].status === 'rejected') {
-          return { ...t, currentPrice: null, unrealizedPnl: null }
-        }
-        const priceRes = priceResults[idx].value
+      const openWithPrices = open.map(t => {
+        const p   = priceMap[t.symbol]
         const qty = parseFloat(t.remaining_quantity || t.quantity) || 0
-        const ltp = parseFloat(priceRes.data.price) || 0
+        const ltp = parseFloat(p?.price || 0)
         const entryPrice = parseFloat(t.entry_price) || 0
-        const pnl = t.position === 'LONG'
-          ? (ltp - entryPrice) * qty
-          : (entryPrice - ltp) * qty
-        const slDistPct = t.sl ? Math.abs(((ltp - parseFloat(t.sl)) / ltp) * 100) : null
-        const tpDistPct = t.tp ? Math.abs(((parseFloat(t.tp) - ltp) / ltp) * 100) : null
+        const pnl = ltp ? (t.position === 'LONG' ? (ltp - entryPrice) * qty : (entryPrice - ltp) * qty) : 0
+        const slDistPct = t.sl && ltp ? Math.abs(((ltp - parseFloat(t.sl)) / ltp) * 100) : null
+        const tpDistPct = t.tp && ltp ? Math.abs(((parseFloat(t.tp) - ltp) / ltp) * 100) : null
         return {
-          ...t, currentPrice: ltp,
-          change: priceRes.data.change,
-          unrealizedPnl: Math.round(pnl),
+          ...t, currentPrice: ltp || null,
+          change: p?.change ?? null,
+          unrealizedPnl: ltp ? Math.round(pnl) : null,
           slDistPct: slDistPct?.toFixed(1),
           tpDistPct: tpDistPct?.toFixed(1),
           nearSL: slDistPct != null && slDistPct < 3,
           nearTP: tpDistPct != null && tpDistPct < 3,
-          noSL: !t.sl
+          noSL: !t.sl,
         }
       })
 
-      // Top movers from market API — use the shared axios instance (no hardcoded URL)
       let topGainers = []
-      let topLosers = []
+      let topLosers  = []
       try {
         const mktRes = await getTopMovers()
         topGainers = mktRes.data.gainers?.slice(0, 3) || []
-        topLosers = mktRes.data.losers?.slice(0, 3) || []
-      } catch { /* market snapshot is non-critical */ }
+        topLosers  = mktRes.data.losers?.slice(0, 3)  || []
+      } catch { /* non-critical */ }
 
-      // Watchlist alerts due today — compare ISO date strings to avoid UTC/local skew
-      const todayISO = new Date().toISOString().slice(0, 10)
-      const watchAlerts = watchRes.data.filter(w => {
-        if (!w.alert_date) return false
-        const alertISO = w.alert_date.slice(0, 10)
-        return alertISO <= todayISO
-      })
+      const todayISO   = new Date().toISOString().slice(0, 10)
+      const watchAlerts = watchList.filter(w => w.alert_date && w.alert_date.slice(0, 10) <= todayISO)
 
-      // Tasks
-      const { fixedTasks: ft, customTasks: ct } = tasksRes.data
-      const completedYesterday = (ft || []).filter(f => f.completed).length
+      const ft = tasks.fixedTasks || []
+      const completedYesterday = ft.filter(f => f.completed).length
 
-      // Risk alerts
-      const riskAlerts = openWithPrices.filter(t => t.nearSL || t.noSL)
+      const riskAlerts  = openWithPrices.filter(t => t.nearSL || t.noSL)
       const nearTPAlerts = openWithPrices.filter(t => t.nearTP)
-
-      // Discipline
-      const discipline = disciplineRes.data
       const unrealizedTotal = openWithPrices.reduce((s, t) => s + (t.unrealizedPnl || 0), 0)
 
-      // AI suggestion
       let aiSuggestion = ''
       if (riskAlerts.length > 0) {
         aiSuggestion = `⚠️ ${riskAlerts[0].symbol} is ${riskAlerts[0].nearSL ? `only ${riskAlerts[0].slDistPct}% from your stoploss` : 'missing a stoploss'}. Review before trading today.`
@@ -109,19 +86,16 @@ function MorningBriefing({ onClose }) {
       }
 
       setData({
-        openPositions: openWithPrices,
-        topGainers, topLosers,
-        watchAlerts,
-        riskAlerts, nearTPAlerts,
-        discipline, unrealizedTotal,
-        completedYesterday, totalTasks: (ft || []).length,
+        openPositions: openWithPrices, topGainers, topLosers,
+        watchAlerts, riskAlerts, nearTPAlerts, discipline,
+        unrealizedTotal, completedYesterday, totalTasks: ft.length,
         aiSuggestion,
         winRate: closed.length > 0
           ? Math.round((closed.filter(t => (parseFloat(t.realized_pnl) || 0) > 0).length / closed.length) * 100)
-          : 0
+          : 0,
       })
     } catch (err) {
-      console.error('MorningBriefing fetch error:', err)
+      console.error('MorningBriefing error:', err)
       setFetchError('Could not load your briefing. Please try again.')
     } finally {
       setLoading(false)
@@ -129,8 +103,15 @@ function MorningBriefing({ onClose }) {
   }, [])
 
   useEffect(() => {
-    fetchBriefingData()
-  }, [fetchBriefingData])
+    if (initData) {
+      buildData(initData)
+    } else {
+      // Fallback: fetch own data if initData not provided
+      getDashboardInit()
+        .then(res => buildData(res.data))
+        .catch(() => { setFetchError('Could not load your briefing.'); setLoading(false) })
+    }
+  }, [initData, buildData])
 
   // Keyboard: Escape closes modal; trap focus inside overlay
   useEffect(() => {
