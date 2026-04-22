@@ -145,7 +145,7 @@ function ExternalLinkModal({ task, onClose, onDone }) {
   useEffect(() => () => { if (timerRef.current) clearInterval(timerRef.current) }, [])
 
   const handleOpen = () => {
-    window.open(task.url, '_blank')
+    window.open(task.url, '_blank', 'noopener,noreferrer')
     setPhase('waiting')
     timerRef.current = setInterval(() => {
       setCountdown(prev => {
