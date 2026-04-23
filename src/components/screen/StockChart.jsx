@@ -280,7 +280,7 @@ const TIMEFRAMES = ['1W', '1M', '3M', '6M', '1Y', '3Y', 'ALL']
 const INDICATORS = ['MA', 'EMA', 'BB', 'VWAP', 'RSI', 'MACD', 'ATR', 'STOCH', 'ST']
 
 function ChartHUDControls() {
-  const { chartType, setChartType, timeframe, setTimeframe, activeIndicators, toggleIndicator, smcEnabled, setSmcEnabled } = useScreen()
+  const { chartType, setChartType, timeframe, setTimeframe, activeIndicators = [], toggleIndicator, smcEnabled, setSmcEnabled } = useScreen() || {}
 
   return (
     <div className="flex items-center gap-1.5 flex-wrap">
@@ -625,9 +625,9 @@ export default function StockChart() {
   const { isDark } = useTheme()
   const {
     selectedSymbol, selectedIndexId, chartType, timeframe,
-    activeIndicators, isIndex, onHover, onPin, pinnedDate, clearPin,
+    activeIndicators = [], isIndex, onHover, onPin, pinnedDate, clearPin,
     activePositions, smcEnabled,
-  } = useScreen()
+  } = useScreen() || {}
 
   const mainRef    = useRef(null)
   const rsiRef     = useRef(null)
@@ -712,9 +712,10 @@ export default function StockChart() {
         if (latestCandle < expected) {
           console.log(`[CHART] Gap detected: latest=${latestCandle}, expected=${expected} — triggering backfill`)
           try {
+            const wasIndex = isIndex() // capture before any await
             const bf = await triggerBackfill(expected)
             if (bf.data?.filled) {
-              const reloaded = isIndex()
+              const reloaded = wasIndex
                 ? await getIndexChart({ index_id: selectedIndexId, timeframe })
                 : await getStockChart({ symbol: selectedSymbol, timeframe })
               const fresh = reloaded.data.data || []
