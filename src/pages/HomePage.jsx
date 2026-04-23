@@ -1305,6 +1305,7 @@ function LoggedInHome() {
   })
 
   return (
+    <>
     <div className="w-full px-4 py-4 bg-gray-50 dark:bg-gray-900 min-h-screen">
 
       {/* Greeting bar */}
@@ -1399,6 +1400,7 @@ function LoggedInHome() {
     {showBriefing && (
       <MorningBriefing initData={initData} onClose={() => setShowBriefing(false)} />
     )}
+    </>
   )
 }
 
