@@ -1,12 +1,12 @@
 import { useState, useEffect } from 'react'
-import { API } from '../api'
+import { getNepseChart } from '../api'
 
 function NEPSEIndex() {
   const [data, setData] = useState(null)
   const [loading, setLoading] = useState(true)
 
   useEffect(() => {
-    API.get(`/api/market/nepse-chart?range=1m`)
+    getNepseChart('1m')
       .then(res => {
         const chartData = res.data.data
         if (chartData.length > 0) {
@@ -15,11 +15,7 @@ function NEPSEIndex() {
           const change = prev
             ? ((last.close - prev.close) / prev.close * 100).toFixed(2)
             : '0.00'
-          setData({
-            close: last.close,
-            change,
-            date: last.time
-          })
+          setData({ close: last.close, change, date: last.time })
         }
       })
       .catch(() => {})
@@ -39,19 +35,13 @@ function NEPSEIndex() {
       <h3 className="text-sm font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wide">
         NEPSE Index
       </h3>
-      <h1 className={`text-3xl font-bold mt-1 ${
-        isPositive ? 'text-green-500' : 'text-red-500'
-      }`}>
+      <h1 className={`text-3xl font-bold mt-1 ${isPositive ? 'text-green-500' : 'text-red-500'}`}>
         {data?.close?.toFixed(2) || '—'}
       </h1>
-      <p className={`text-sm font-medium mt-1 ${
-        isPositive ? 'text-green-500' : 'text-red-500'
-      }`}>
+      <p className={`text-sm font-medium mt-1 ${isPositive ? 'text-green-500' : 'text-red-500'}`}>
         {isPositive ? '+' : ''}{data?.change}% last day
       </p>
-      <p className="text-xs text-gray-400 mt-1">
-        As of {data?.date}
-      </p>
+      <p className="text-xs text-gray-400 mt-1">As of {data?.date}</p>
     </div>
   )
 }

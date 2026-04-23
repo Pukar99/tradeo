@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from 'react'
+import { useState, useEffect, useCallback, useRef } from 'react'
 import { useAuth } from '../context/AuthContext'
 import {
   getMeroshareDpList, getMeroshareAccounts, addMeroshareAccount, deleteMeroshareAccount,
@@ -323,6 +323,9 @@ function IPOPage() {
   const [allotmentMap, setAllotmentMap] = useState({})
   const [checkingId,   setCheckingId]   = useState(null)
 
+  // Cache: `${accId}:${tab}` → fetched data. Cleared when account is deleted.
+  const tabCache = useRef({})
+
   useEffect(() => {
     getMeroshareDpList().then(r => setDpList(r.data)).catch(() => {})
     getMeroshareAccounts().then(r => {
@@ -332,21 +335,36 @@ function IPOPage() {
     }).catch(() => {})
   }, [])
 
-  const loadData = useCallback(async (accId, tab) => {
+  const loadData = useCallback(async (accId, tab, force = false) => {
     if (!accId) return
+    const cacheKey = `${accId}:${tab}`
+    // Return cached data immediately — skip network request
+    if (!force && tabCache.current[cacheKey]) {
+      const cached = tabCache.current[cacheKey]
+      if (tab === 'ipos')      { setIpos(cached); return }
+      if (tab === 'results')   { setResults(cached.results); return }
+      if (tab === 'portfolio') { setPortfolio(cached.holdings); setTotalValue(cached.totalValue); return }
+    }
     setLoading(true)
     setError(null)
     try {
       if (tab === 'ipos') {
         const res = await getMeroshareIPOs(accId)
-        setIpos(Array.isArray(res.data.ipos) ? res.data.ipos : [])
+        const data = Array.isArray(res.data.ipos) ? res.data.ipos : []
+        tabCache.current[cacheKey] = data
+        setIpos(data)
       } else if (tab === 'results') {
         const res = await getMeroshareResults(accId)
-        setResults(Array.isArray(res.data.results) ? res.data.results : [])
+        const data = Array.isArray(res.data.results) ? res.data.results : []
+        tabCache.current[cacheKey] = { results: data }
+        setResults(data)
       } else if (tab === 'portfolio') {
         const res = await getMerosharePortfolio(accId)
-        setPortfolio(Array.isArray(res.data.holdings) ? res.data.holdings : [])
-        setTotalValue(res.data.totalValue || null)
+        const holdings = Array.isArray(res.data.holdings) ? res.data.holdings : []
+        const totalValue = res.data.totalValue || null
+        tabCache.current[cacheKey] = { holdings, totalValue }
+        setPortfolio(holdings)
+        setTotalValue(totalValue)
       }
     } catch (err) {
       setError(err.response?.data?.error || 'Failed to load data')
@@ -372,6 +390,8 @@ function IPOPage() {
     setDeleting(id)
     try {
       await deleteMeroshareAccount(id)
+      // Clear cached data for the deleted account
+      Object.keys(tabCache.current).forEach(k => { if (k.startsWith(`${id}:`)) delete tabCache.current[k] })
       const updated = accounts.filter(x => x.id !== id)
       setAccounts(updated)
       if (selectedAcc === id) {

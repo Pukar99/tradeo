@@ -1,5 +1,5 @@
-import { useState, useEffect } from 'react'
-import { API } from '../api'
+import { useState, useEffect, useRef } from 'react'
+import { getMarketDates, getTopMovers } from '../api'
 
 function TopMovers() {
   const [data, setData] = useState(null)
@@ -7,24 +7,33 @@ function TopMovers() {
   const [selectedDate, setSelectedDate] = useState('')
   const [latestDate, setLatestDate] = useState('')
   const [loading, setLoading] = useState(true)
+  const cache = useRef({})
 
   useEffect(() => {
-    API.get(`/api/market/dates`)
+    getMarketDates()
       .then(res => {
         setDates(res.data.dates)
         setLatestDate(res.data.latestDate)
         setSelectedDate(res.data.latestDate)
       })
+      .catch(() => {})
   }, [])
 
   useEffect(() => {
     if (!selectedDate) return
+    if (cache.current[selectedDate]) {
+      setData(cache.current[selectedDate])
+      setLoading(false)
+      return
+    }
     setLoading(true)
-    API.get(`/api/market/top-movers?date=${selectedDate}`)
+    getTopMovers(selectedDate)
       .then(res => {
+        cache.current[selectedDate] = res.data
         setData(res.data)
         setLoading(false)
       })
+      .catch(() => setLoading(false))
   }, [selectedDate])
 
   return (

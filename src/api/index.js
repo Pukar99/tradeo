@@ -144,6 +144,8 @@ export const getLatestDate     = ()             => API.get('/api/market/latest-d
 export const getMarketDates    = ()             => API.get('/api/market/dates')
 export const getTopMovers      = (date)         => API.get('/api/market/top-movers', { params: { date } })
 export const getDaySummary     = (date)         => API.get('/api/market/day-summary', { params: { date } })
+export const getDayFull        = (date)         => API.get('/api/market/day-full',    { params: { date } })
+export const getNepseChart     = (range = '1m') => API.get('/api/market/nepse-chart', { params: { range } })
 export const getAIReport       = ()             => API.get('/api/market/ai-report')
 export const getIPOs           = ()             => API.get('/api/market/ipos')
 export const getMarketNews     = ()             => API.get('/api/market/news')

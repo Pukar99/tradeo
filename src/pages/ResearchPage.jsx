@@ -219,13 +219,24 @@ function ResearchPage() {
   }
 
   const handleVerify = async (postId) => {
-    try { await verifyResearchPost(postId); await fetchData() } catch (err) {
+    try {
+      await verifyResearchPost(postId)
+      // Optimistic update — no full re-fetch needed
+      const update = p => p.id === postId ? { ...p, is_verified: true } : p
+      setPosts(prev => prev.map(update))
+      setPendingPosts(prev => prev.filter(p => p.id !== postId))
+    } catch (err) {
       setActionErr(err.response?.data?.error || 'Failed to verify post')
     }
   }
 
   const handlePin = async (postId) => {
-    try { await pinResearchPost(postId); await fetchData() } catch (err) {
+    try {
+      await pinResearchPost(postId)
+      // Optimistic update — toggle pin, no full re-fetch needed
+      setPosts(prev => prev.map(p => p.id === postId ? { ...p, is_pinned: !p.is_pinned } : p))
+      setPendingPosts(prev => prev.map(p => p.id === postId ? { ...p, is_pinned: !p.is_pinned } : p))
+    } catch (err) {
       setActionErr(err.response?.data?.error || 'Failed to pin post')
     }
   }
