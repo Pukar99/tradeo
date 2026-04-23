@@ -280,7 +280,8 @@ const TIMEFRAMES = ['1W', '1M', '3M', '6M', '1Y', '3Y', 'ALL']
 const INDICATORS = ['MA', 'EMA', 'BB', 'VWAP', 'RSI', 'MACD', 'ATR', 'STOCH', 'ST']
 
 function ChartHUDControls() {
-  const { chartType, setChartType, timeframe, setTimeframe, activeIndicators = [], toggleIndicator, smcEnabled, setSmcEnabled } = useScreen() || {}
+  const { chartType, setChartType, timeframe, setTimeframe, activeIndicators: _ai, toggleIndicator, smcEnabled, setSmcEnabled } = useScreen() || {}
+  const activeIndicators = Array.isArray(_ai) ? _ai : []
 
   return (
     <div className="flex items-center gap-1.5 flex-wrap">
@@ -625,9 +626,10 @@ export default function StockChart() {
   const { isDark } = useTheme()
   const {
     selectedSymbol, selectedIndexId, chartType, timeframe,
-    activeIndicators = [], isIndex, onHover, onPin, pinnedDate, clearPin,
+    activeIndicators: _activeIndicators, isIndex, onHover, onPin, pinnedDate, clearPin,
     activePositions, smcEnabled,
   } = useScreen() || {}
+  const activeIndicators = Array.isArray(_activeIndicators) ? _activeIndicators : []
 
   const mainRef    = useRef(null)
   const rsiRef     = useRef(null)
