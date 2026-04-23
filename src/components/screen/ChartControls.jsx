@@ -4,7 +4,8 @@ const TIMEFRAMES  = ['1D', '1W', '1M', '6M', '1Y', '3Y', 'ALL']
 const INDICATORS  = ['MA', 'RSI', 'MACD']
 
 export default function ChartControls() {
-  const { chartType, setChartType, timeframe, setTimeframe, activeIndicators, toggleIndicator } = useScreen()
+  const { chartType, setChartType, timeframe, setTimeframe, activeIndicators: _ai, toggleIndicator } = useScreen() || {}
+  const activeIndicators = Array.isArray(_ai) ? _ai : []
 
   return (
     <div className="flex flex-wrap items-center gap-2">
