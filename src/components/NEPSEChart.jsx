@@ -1,7 +1,6 @@
 import { useEffect, useRef, useState } from 'react'
-import axios from 'axios'
+import { API } from '../api'
 import { useTheme } from '../context/ThemeContext'
-import { BASE_URL } from '../api'
 
 const ranges = [
   { label: '1M', value: '1m' },
@@ -126,7 +125,7 @@ function NEPSEChart() {
     if (!chartReady) return
     setLoading(true)
 
-    axios.get(`${BASE_URL}/api/market/nepse-chart?range=${range}`)
+    API.get(`/api/market/nepse-chart?range=${range}`)
       .then(res => {
         const chartData = res.data.data
         moversRef.current = res.data.movers || {}

@@ -1,14 +1,6 @@
 import { useState, useEffect, useCallback, useRef } from 'react'
 import { createChart, CrosshairMode } from 'lightweight-charts'
-import axios from 'axios'
-import { BASE_URL } from '../../api'
-
-const API = axios.create({ baseURL: BASE_URL })
-API.interceptors.request.use(cfg => {
-  const t = localStorage.getItem('token')
-  if (t) cfg.headers.Authorization = `Bearer ${t}`
-  return cfg
-})
+import { API } from '../../api'
 
 const STRUCTURE_CONFIG = {
   UPTREND:   { color: '#22c55e', label: 'UPTREND',   bg: 'bg-green-50 dark:bg-green-900/20',   border: 'border-green-200 dark:border-green-800',   text: 'text-green-600 dark:text-green-400'   },

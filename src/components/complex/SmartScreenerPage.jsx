@@ -1,13 +1,5 @@
 import { useState, useCallback } from 'react'
-import axios from 'axios'
-import { BASE_URL } from '../../api'
-
-const API = axios.create({ baseURL: BASE_URL })
-API.interceptors.request.use(cfg => {
-  const t = localStorage.getItem('token')
-  if (t) cfg.headers.Authorization = `Bearer ${t}`
-  return cfg
-})
+import { API } from '../../api'
 
 const TRIGGER_COLORS = {
   VOL_SPIKE:       'bg-amber-100 dark:bg-amber-900/30 text-amber-700 dark:text-amber-400',

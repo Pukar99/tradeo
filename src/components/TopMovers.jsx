@@ -1,6 +1,5 @@
 import { useState, useEffect } from 'react'
-import axios from 'axios'
-import { BASE_URL } from '../api'
+import { API } from '../api'
 
 function TopMovers() {
   const [data, setData] = useState(null)
@@ -10,7 +9,7 @@ function TopMovers() {
   const [loading, setLoading] = useState(true)
 
   useEffect(() => {
-    axios.get(`${BASE_URL}/api/market/dates`)
+    API.get(`/api/market/dates`)
       .then(res => {
         setDates(res.data.dates)
         setLatestDate(res.data.latestDate)
@@ -21,7 +20,7 @@ function TopMovers() {
   useEffect(() => {
     if (!selectedDate) return
     setLoading(true)
-    axios.get(`${BASE_URL}/api/market/top-movers?date=${selectedDate}`)
+    API.get(`/api/market/top-movers?date=${selectedDate}`)
       .then(res => {
         setData(res.data)
         setLoading(false)

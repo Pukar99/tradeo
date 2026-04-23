@@ -2,7 +2,7 @@ import axios from 'axios'
 
 export const BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:5000'
 
-const API = axios.create({
+export const API = axios.create({
   baseURL: BASE_URL,
   timeout: 15000, // 15s max — prevents hanging on dead Supabase
 })
@@ -50,6 +50,7 @@ export const updateJournalEntry = (id, data) => API.put(`/api/journal/${id}`, da
 export const deleteJournalEntry = (id) => API.delete(`/api/journal/${id}`)
 
 // Dashboard
+export const getDashboardInit = () => API.get('/api/dashboard/init')
 export const getTodayTasks = () => API.get('/api/dashboard/tasks/today')
 export const toggleFixedTask = (taskId) => API.post('/api/dashboard/tasks/toggle-fixed', { taskId })
 export const addCustomTask = (title) => API.post('/api/dashboard/tasks/custom', { title })
@@ -107,6 +108,7 @@ export const getTopVolume      = (params)       => API.get('/api/market/top-volu
 export const getLatestDate     = ()             => API.get('/api/market/latest-date')
 export const getMarketDates    = ()             => API.get('/api/market/dates')
 export const getTopMovers      = (date)         => API.get('/api/market/top-movers', { params: { date } })
+export const getDaySummary     = (date)         => API.get('/api/market/day-summary', { params: { date } })
 export const getAIReport       = ()             => API.get('/api/market/ai-report')
 export const getIPOs           = ()             => API.get('/api/market/ipos')
 export const getMarketNews     = ()             => API.get('/api/market/news')

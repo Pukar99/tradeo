@@ -339,7 +339,7 @@ function TaskBoard({ initData, mindsetContent }) {
     } else {
       fetchTasks()
     }
-  }, []) // eslint-disable-line react-hooks/exhaustive-deps
+  }, [initData]) // eslint-disable-line react-hooks/exhaustive-deps
 
   const totalTasks     = fixedTasks.length + customTasks.length
   const completedCount = fixedTasks.filter(t => t.completed).length + customTasks.filter(t => t.completed).length

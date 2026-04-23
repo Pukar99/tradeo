@@ -1,25 +1,17 @@
 import { useState, useEffect, useCallback, useRef } from 'react'
 import { createChart, CrosshairMode } from 'lightweight-charts'
-import axios from 'axios'
-import { BASE_URL } from '../../api'
-
-const API = axios.create({ baseURL: BASE_URL })
-API.interceptors.request.use(cfg => {
-  const t = localStorage.getItem('token')
-  if (t) cfg.headers.Authorization = `Bearer ${t}`
-  return cfg
-})
+import { API } from '../../api'
 
 const INDEX_LIST = [
   { index_id: 12, name: 'NEPSE All-Share'     },
   { index_id: 16, name: 'Sensitive Index'      },
   { index_id: 17, name: 'NEPSE 20 Index'       },
   { index_id: 18, name: 'Float Index'          },
-  { index_id: 1,  name: 'Banking Sub-Index'    },
-  { index_id: 5,  name: 'Hydropower Index'     },
-  { index_id: 6,  name: 'Life Insurance Index' },
-  { index_id: 8,  name: 'Manufacturing Index'  },
-  { index_id: 9,  name: 'Microfinance Index'   },
+  { index_id: 1,  name: 'Commercial Bank',            short: 'Bank'     },
+  { index_id: 5,  name: 'Hydropower',                 short: 'Hydro'    },
+  { index_id: 6,  name: 'Life Insurance',             short: 'Life'     },
+  { index_id: 8,  name: 'Manufacturing & Processing', short: 'Mfg'      },
+  { index_id: 9,  name: 'Microfinance',               short: 'MFI'      },
 ]
 
 const REGIME_CONFIG = {

@@ -1,14 +1,6 @@
 import { useState, useEffect, useCallback, useRef } from 'react'
 import { createChart, CrosshairMode } from 'lightweight-charts'
-import axios from 'axios'
-import { BASE_URL } from '../../api'
-
-const API = axios.create({ baseURL: BASE_URL })
-API.interceptors.request.use(cfg => {
-  const t = localStorage.getItem('token')
-  if (t) cfg.headers.Authorization = `Bearer ${t}`
-  return cfg
-})
+import { API } from '../../api'
 
 const STATE_CONFIG = {
   COMPRESSED: { color: '#3b82f6', bg: 'bg-blue-50 dark:bg-blue-900/20',    border: 'border-blue-200 dark:border-blue-800',    text: 'text-blue-700 dark:text-blue-400',   label: 'COMPRESSED' },

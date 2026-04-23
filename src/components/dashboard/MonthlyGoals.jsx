@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useCallback } from 'react'
 import { getGoals, addGoal, updateGoal, deleteGoal } from '../../api'
 import { useLanguage } from '../../context/LanguageContext'
 import { useContextMenu } from '../ContextMenu'
@@ -16,7 +16,7 @@ function MonthlyGoals({ initData }) {
   const [editForm, setEditForm] = useState({ title: '', description: '', target_date: '' })
   const [saving, setSaving] = useState(false)
 
-  const fetchGoals = async () => {
+  const fetchGoals = useCallback(async () => {
     try {
       const res = await getGoals()
       setGoals(res.data)
@@ -25,7 +25,7 @@ function MonthlyGoals({ initData }) {
     } finally {
       setLoading(false)
     }
-  }
+  }, [])
 
   useEffect(() => {
     if (initData) { setGoals(initData); setLoading(false); return }
