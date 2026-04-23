@@ -7,23 +7,58 @@ export const API = axios.create({
   timeout: 15000, // 15s max — prevents hanging on dead Supabase
 })
 
+// ── Request counter + 300ms dedup (dev-mode diagnostics) ─────────────────────
+const _reqLog = { count: 0, endpoints: {} }
+const _inFlight = new Map()  // key → timestamp of last fire
+const DEDUP_MS = 300
+
+if (import.meta.env.DEV) {
+  setInterval(() => {
+    if (_reqLog.count === 0) return
+    console.groupCollapsed(`[Tradeo API] ${_reqLog.count} requests in last 60s`)
+    Object.entries(_reqLog.endpoints)
+      .sort((a, b) => b[1] - a[1])
+      .forEach(([ep, n]) => console.log(`  ${n}× ${ep}`))
+    console.groupEnd()
+    _reqLog.count = 0
+    _reqLog.endpoints = {}
+  }, 60_000)
+}
+
 API.interceptors.request.use((config) => {
   const token = localStorage.getItem('token')
   if (token) {
     config.headers.Authorization = `Bearer ${token}`
   }
+
+  // Dedup identical GET requests fired within DEDUP_MS of each other
+  if (config.method === 'get') {
+    const key = config.url + JSON.stringify(config.params || '')
+    const last = _inFlight.get(key)
+    if (last && Date.now() - last < DEDUP_MS) {
+      return Promise.reject(Object.assign(new axios.Cancel('dedup'), { _dedup: true }))
+    }
+    _inFlight.set(key, Date.now())
+  }
+
+  if (import.meta.env.DEV) {
+    const ep = config.method.toUpperCase() + ' ' + config.url
+    _reqLog.count++
+    _reqLog.endpoints[ep] = (_reqLog.endpoints[ep] || 0) + 1
+  }
+
   return config
 })
 
-// Auto-logout on 401 (expired/invalid token)
+// Auto-logout on 401; silently swallow dedup cancellations
 API.interceptors.response.use(
   (response) => response,
   (error) => {
+    if (error._dedup) return new Promise(() => {})  // swallow — caller gets a pending promise
     if (error.response?.status === 401) {
       localStorage.removeItem('token')
       localStorage.removeItem('user')
       sessionStorage.removeItem('briefingShown')
-      // Redirect to login if not already there
       if (!window.location.pathname.startsWith('/login')) {
         window.location.href = '/login'
       }

@@ -1,9 +1,8 @@
 import { BrowserRouter, Routes, Route, useLocation, useNavigate } from 'react-router-dom'
-import { Component, useEffect, useState, useMemo, lazy, Suspense } from 'react'
+import { Component, useEffect, useMemo, lazy, Suspense } from 'react'
 import { Toaster } from 'react-hot-toast'
 import Navbar from './components/Navbar'
 import FloatingChat from './components/FloatingChat'
-import MorningBriefing from './components/MorningBriefing'
 
 // Lazy-loaded pages — each becomes its own JS chunk, reducing initial bundle size
 const HomePage           = lazy(() => import('./pages/HomePage'))
@@ -69,7 +68,6 @@ function AppContent() {
   const { toggleTheme } = useTheme()
   const location = useLocation()
   const navigate = useNavigate()
-  const [showBriefing, setShowBriefing] = useState(false)
   const { toasts, addToast, dismissToast } = useAlertToasts()
   usePriceAlerts({ user, onAlert: addToast })
 
@@ -107,14 +105,6 @@ function AppContent() {
         }
       })
       .catch(() => {})
-
-    const briefingShown = sessionStorage.getItem('briefingShown')
-    let timer
-    if (!briefingShown) {
-      timer = setTimeout(() => setShowBriefing(true), 1000)
-      sessionStorage.setItem('briefingShown', 'true')
-    }
-    return () => clearTimeout(timer)
   }, [userId]) // eslint-disable-line react-hooks/exhaustive-deps
 
   return (
@@ -141,9 +131,6 @@ function AppContent() {
         </Routes>
       </Suspense>
       {!isAuthPage && <FloatingChat />}
-      {showBriefing && user && (
-        <MorningBriefing onClose={() => setShowBriefing(false)} />
-      )}
       <PriceAlertContainer alerts={toasts} onDismiss={dismissToast} />
     </div>
   )

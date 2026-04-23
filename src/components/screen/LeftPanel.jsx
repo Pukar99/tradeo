@@ -239,11 +239,11 @@ export default function LeftPanel() {
   const [editWatchItem,  setEditWatchItem]  = useState(null)
 
   const loadData = useCallback(() => {
-    getTradeLog()
-      .then(r => setPositions((r.data || []).filter(t => t.status === 'OPEN' || t.status === 'PARTIAL')))
-      .catch(() => {})
-    getWatchlist()
-      .then(r => setWatchlist((r.data || []).filter(w => w.category === 'active' || w.category === 'pre' || w.category === 'pre-watch')))
+    Promise.all([getTradeLog(), getWatchlist()])
+      .then(([tradeRes, watchRes]) => {
+        setPositions((tradeRes.data || []).filter(t => t.status === 'OPEN' || t.status === 'PARTIAL'))
+        setWatchlist((watchRes.data || []).filter(w => w.category === 'active' || w.category === 'pre' || w.category === 'pre-watch'))
+      })
       .catch(() => {})
   }, [])
 

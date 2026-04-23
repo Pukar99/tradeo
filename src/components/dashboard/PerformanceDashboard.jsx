@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback } from 'react'
-import { getTradeLog, getStockPrice } from '../../api'
+import { getTradeLog, getBatchPrices } from '../../api'
 import { useChatRefresh } from '../../utils/chatEvents'
 import {
   LineChart, Line, XAxis, YAxis, CartesianGrid,
@@ -24,26 +24,24 @@ function PerformanceDashboard() {
         const open = tradeData.filter(t => t.status === 'OPEN' || t.status === 'PARTIAL')
         const closed = tradeData.filter(t => t.status === 'CLOSED')
 
-        // Fetch latest prices for open positions
-        const openWithPrices = await Promise.all(
-          open.map(async (trade) => {
-            try {
-              const priceRes = await getStockPrice(trade.symbol)
-              return {
-                ...trade,
-                currentPrice: priceRes.data.price,
-                latestDate: priceRes.data.latestDate
-              }
-            } catch {
-              return { ...trade, currentPrice: null }
-            }
-          })
-        )
+        // Fetch latest prices for all open positions in one batch request
+        let openWithPrices = open.map(t => ({ ...t, currentPrice: null }))
+        if (open.length > 0) {
+          try {
+            const symbols = [...new Set(open.map(t => t.symbol))]
+            const batchRes = await getBatchPrices(symbols)
+            const priceMap = batchRes.data.prices || {}
+            const latestDate = batchRes.data.latestDate || ''
+            openWithPrices = open.map(t => ({
+              ...t,
+              currentPrice: priceMap[t.symbol]?.price ?? null,
+              latestDate,
+            }))
+            if (latestDate) setPriceDate(latestDate)
+          } catch { /* prices unavailable — UI still works */ }
+        }
 
         setOpenPositions(openWithPrices)
-        if (openWithPrices[0]?.latestDate) {
-          setPriceDate(openWithPrices[0].latestDate)
-        }
 
         calculateStats(tradeData, openWithPrices, closed)
         buildEquityCurve(tradeData, openWithPrices)
