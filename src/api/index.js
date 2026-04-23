@@ -150,6 +150,7 @@ export const getAIReport       = ()             => API.get('/api/market/ai-repor
 export const getIPOs           = ()             => API.get('/api/market/ipos')
 export const getMarketNews     = ()             => API.get('/api/market/news')
 export const getSectorStrength = ()             => API.get('/api/market/sector-strength')
+export const triggerBackfill   = (date)         => API.post('/api/market/backfill', { date })
 
 // Trade Log (new system)
 export const getTradeLog = () => API.get('/api/tradelog')

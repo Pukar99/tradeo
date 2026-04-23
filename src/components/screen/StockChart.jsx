@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState, useCallback } from 'react'
 import { useTheme } from '../../context/ThemeContext'
 import { useScreen } from '../../context/ScreenContext'
-import { getIndexChart, getStockChart, getTopMovers, getMarketSymbols, getSMCScan } from '../../api'
+import { getIndexChart, getStockChart, getTopMovers, getMarketSymbols, getSMCScan, triggerBackfill } from '../../api'
 
 // ── Indicator math ────────────────────────────────────────────────────────────
 
@@ -677,15 +677,44 @@ export default function StockChart() {
   useEffect(() => {
     setLoading(true); setError(null); setTooltip(null); setOverlayData(null)
 
-    const req = isIndex(selectedSymbol)
+    const req = isIndex()
       ? getIndexChart({ index_id: selectedIndexId, timeframe })
       : getStockChart({ symbol: selectedSymbol, timeframe })
 
-    req.then(r => {
+    req.then(async r => {
       const data = r.data.data || []
       setChartData(data)
       setLatestClose(data.length > 0 ? data[data.length - 1].close : null)
       setLoading(false)
+
+      // Gap detection: if latest candle is older than yesterday (NPT), trigger backfill
+      if (data.length > 0) {
+        const latestCandle = data[data.length - 1].time // 'YYYY-MM-DD'
+        const nowNPT = new Date(Date.now() + (5 * 60 + 45) * 60 * 1000)
+        const todayNPT = nowNPT.toISOString().slice(0, 10)
+        const yesterdayNPT = new Date(nowNPT)
+        yesterdayNPT.setUTCDate(yesterdayNPT.getUTCDate() - 1)
+        const yesterdayStr = yesterdayNPT.toISOString().slice(0, 10)
+        // Only trigger outside market hours (after 3:15 PM NPT = 09:30 UTC)
+        const utcHour = new Date().getUTCHours()
+        const utcMin  = new Date().getUTCMinutes()
+        const afterClose = utcHour > 9 || (utcHour === 9 && utcMin >= 30)
+        if (latestCandle < yesterdayStr && afterClose) {
+          console.log(`[CHART] Gap detected: latest candle ${latestCandle}, expected up to ${yesterdayStr} — triggering backfill`)
+          try {
+            const bf = await triggerBackfill(yesterdayStr)
+            if (bf.data?.filled) {
+              // Reload chart after successful backfill
+              const reloaded = isIndex()
+                ? await getIndexChart({ index_id: selectedIndexId, timeframe })
+                : await getStockChart({ symbol: selectedSymbol, timeframe })
+              const fresh = reloaded.data.data || []
+              setChartData(fresh)
+              setLatestClose(fresh.length > 0 ? fresh[fresh.length - 1].close : null)
+            }
+          } catch { /* backfill is best-effort — chart still shows existing data */ }
+        }
+      }
     }).catch(e => {
       setError(e.response?.data?.error || 'Failed to load chart data')
       setLoading(false)
@@ -694,7 +723,7 @@ export default function StockChart() {
 
   // Fetch SMC data when enabled for stocks
   useEffect(() => {
-    if (!smcEnabled || isIndex(selectedSymbol)) { setSmcData(null); return }
+    if (!smcEnabled || isIndex()) { setSmcData(null); return }
     getSMCScan({ symbol: selectedSymbol, days: 250 })
       .then(r => setSmcData(r.data))
       .catch(() => setSmcData(null))
@@ -784,7 +813,7 @@ export default function StockChart() {
       }
 
       // VWAP overlay
-      if (activeIndicators.includes('VWAP') && !isIndex) {
+      if (activeIndicators.includes('VWAP') && !isIndex()) {
         const vwap = calcVWAP(chartData)
         if (vwap.length) {
           const s = main.addLineSeries({ color: '#f59e0bcc', lineWidth: 1.5, lineStyle: 2, priceLineVisible: false, title: 'VWAP' })
@@ -851,7 +880,7 @@ export default function StockChart() {
 
       // Volume histogram
       const volSeries = main.addHistogramSeries({ priceFormat: { type: 'volume' }, priceScaleId: 'vol' })
-      main.priceScale('vol').applyOptions({ scaleMargins: { top: 0.80, bottom: 0 } })
+      main.priceScale('vol').applyOptions({ scaleMargins: { top: 0.75, bottom: 0 } })
       volSeries.setData(chartData.map(d => ({
         time: d.time, value: d.volume || d.turnover || 0,
         color: d.close >= d.open ? C.up + '44' : C.down + '44',
@@ -1116,92 +1145,87 @@ export default function StockChart() {
     </div>
   )
 
-  return (
-    <div className="relative flex flex-col w-full h-full bg-white dark:bg-gray-950">
+  const subPanePct = indCount === 0 ? 0 : Math.round((100 - mainPct) / indCount)
 
-      {/* ── Embedded HUD top bar: search + controls ── */}
-      <div className="absolute top-0 left-0 right-0 z-30 flex items-center gap-2 px-3 py-1 bg-white/92 dark:bg-gray-900/92 backdrop-blur-sm border-b border-gray-100 dark:border-gray-800">
+  return (
+    <div className="flex flex-col w-full h-full bg-white dark:bg-gray-950 overflow-hidden">
+
+      {/* ── HUD top bar ── */}
+      <div className="shrink-0 z-30 flex items-center gap-2 px-3 py-1 bg-white dark:bg-gray-900 border-b border-gray-100 dark:border-gray-800">
         <ChartSymbolSearch />
         <div className="w-px h-4 bg-gray-200 dark:bg-gray-700 shrink-0" />
         <ChartHUDControls />
       </div>
 
-      {/* ── Price overlay top-left ── */}
-      <div className="absolute top-10 left-3 z-20 pointer-events-none">
-        {!loading && chartData.length > 0 && (
-          <ChartHUDPrice latestClose={latestClose} chartData={chartData} />
-        )}
-      </div>
-
-      {/* ── Position badge ── */}
-      <PositionBadge positions={activePositions} latestClose={latestClose} />
-
-      {/* ── OHLC tooltip ── */}
-      <OHLCTooltip bar={tooltip} change={tooltip?.change} />
-
-      {/* ── Movers overlay ── */}
-      {overlayData?.movers && (
-        <MoversOverlay
-          movers={overlayData.movers}
-          date={overlayData.date}
-          pinned={overlayData.pinned}
-          onClear={() => { clearPin(); setOverlayData(null); setTooltip(null) }}
-        />
-      )}
-
-      {/* Unpin hint */}
-      {overlayData?.pinned && (
-        <div className="absolute bottom-2 left-1/2 -translate-x-1/2 z-10 pointer-events-none">
-          <span className="text-[9px] text-gray-400 bg-white/80 dark:bg-gray-900/80 px-2 py-0.5 rounded-full border border-gray-200 dark:border-gray-700">
-            Click elsewhere to unpin
-          </span>
-        </div>
-      )}
+      {/* ── Overlays (absolute inside the chart area below) ── */}
 
       {/* ── Chart area ── */}
       {loading ? (
         <ChartSkeleton />
       ) : (
-        <>
-          {/* Main price chart — paddingTop accounts for HUD bar */}
+        <div className="relative flex-1 flex flex-col min-h-0 overflow-hidden">
+
+          {/* Price overlay top-left */}
+          <div className="absolute top-2 left-3 z-20 pointer-events-none">
+            {chartData.length > 0 && (
+              <ChartHUDPrice latestClose={latestClose} chartData={chartData} />
+            )}
+          </div>
+
+          {/* Position badge */}
+          <PositionBadge positions={activePositions} latestClose={latestClose} />
+
+          {/* OHLC tooltip */}
+          <OHLCTooltip bar={tooltip} change={tooltip?.change} />
+
+          {/* Pinned hint */}
+          {overlayData?.pinned && (
+            <div className="absolute bottom-2 left-1/2 -translate-x-1/2 z-10 pointer-events-none">
+              <span className="text-[9px] text-gray-400 bg-white/80 dark:bg-gray-900/80 px-2 py-0.5 rounded-full border border-gray-200 dark:border-gray-700">
+                📌 Movers shown in right panel — click to unpin
+              </span>
+            </div>
+          )}
+
+          {/* Main price chart */}
           <div
             ref={mainRef}
-            style={{ height: `${mainPct}%`, paddingTop: '38px', boxSizing: 'border-box' }}
-            className="w-full"
+            className="w-full shrink-0"
+            style={{ height: `${mainPct}%` }}
           />
 
           {showRSI && (
-            <div className="w-full border-t border-gray-100 dark:border-gray-800 flex flex-col shrink-0" style={{ height: `${(100 - mainPct) / indCount}%` }}>
+            <div className="w-full shrink-0 border-t border-gray-100 dark:border-gray-800 flex flex-col" style={{ height: `${subPanePct}%` }}>
               <SubPaneLabel title="RSI" sub="14" color="#a78bfa"
                 legend={[{ color: '#ef444480', label: '70 OB' }, { color: '#10b98180', label: '30 OS' }]} />
-              <div ref={rsiRef} className="w-full flex-1" />
+              <div ref={rsiRef} className="w-full flex-1 min-h-0" />
             </div>
           )}
 
           {showMACD && (
-            <div className="w-full border-t border-gray-100 dark:border-gray-800 flex flex-col shrink-0" style={{ height: `${(100 - mainPct) / indCount}%` }}>
+            <div className="w-full shrink-0 border-t border-gray-100 dark:border-gray-800 flex flex-col" style={{ height: `${subPanePct}%` }}>
               <SubPaneLabel title="MACD" sub="12 / 26 / 9" color="#60a5fa"
                 legend={[{ color: '#60a5fa', label: 'MACD' }, { color: '#f59e0b', label: 'Signal' }]} />
-              <div ref={macdRef} className="w-full flex-1" />
+              <div ref={macdRef} className="w-full flex-1 min-h-0" />
             </div>
           )}
 
           {showATR && (
-            <div className="w-full border-t border-gray-100 dark:border-gray-800 flex flex-col shrink-0" style={{ height: `${(100 - mainPct) / indCount}%` }}>
+            <div className="w-full shrink-0 border-t border-gray-100 dark:border-gray-800 flex flex-col" style={{ height: `${subPanePct}%` }}>
               <SubPaneLabel title="ATR" sub="14" color="#f59e0b"
                 legend={[{ color: '#f59e0b', label: 'ATR' }]} />
-              <div ref={atrRef} className="w-full flex-1" />
+              <div ref={atrRef} className="w-full flex-1 min-h-0" />
             </div>
           )}
 
           {showSTOCH && (
-            <div className="w-full border-t border-gray-100 dark:border-gray-800 flex flex-col shrink-0" style={{ height: `${(100 - mainPct) / indCount}%` }}>
+            <div className="w-full shrink-0 border-t border-gray-100 dark:border-gray-800 flex flex-col" style={{ height: `${subPanePct}%` }}>
               <SubPaneLabel title="STOCH" sub="14 / 3 / 3" color="#60a5fa"
                 legend={[{ color: '#60a5fa', label: '%K' }, { color: '#f87171', label: '%D' }]} />
-              <div ref={stochRef} className="w-full flex-1" />
+              <div ref={stochRef} className="w-full flex-1 min-h-0" />
             </div>
           )}
-        </>
+        </div>
       )}
     </div>
   )
