@@ -687,24 +687,33 @@ export default function StockChart() {
       setLatestClose(data.length > 0 ? data[data.length - 1].close : null)
       setLoading(false)
 
-      // Gap detection: if latest candle is older than yesterday (NPT), trigger backfill
+      // Gap detection: if latest candle is older than expected, trigger backfill
       if (data.length > 0) {
         const latestCandle = data[data.length - 1].time // 'YYYY-MM-DD'
         const nowNPT = new Date(Date.now() + (5 * 60 + 45) * 60 * 1000)
-        const todayNPT = nowNPT.toISOString().slice(0, 10)
-        const yesterdayNPT = new Date(nowNPT)
-        yesterdayNPT.setUTCDate(yesterdayNPT.getUTCDate() - 1)
-        const yesterdayStr = yesterdayNPT.toISOString().slice(0, 10)
-        // Only trigger outside market hours (after 3:15 PM NPT = 09:30 UTC)
-        const utcHour = new Date().getUTCHours()
-        const utcMin  = new Date().getUTCMinutes()
-        const afterClose = utcHour > 9 || (utcHour === 9 && utcMin >= 30)
-        if (latestCandle < yesterdayStr && afterClose) {
-          console.log(`[CHART] Gap detected: latest candle ${latestCandle}, expected up to ${yesterdayStr} — triggering backfill`)
+        const hNPT = nowNPT.getUTCHours()
+        const mNPT = nowNPT.getUTCMinutes()
+        // Market data available after 3:10 PM NPT
+        const afterClose = hNPT > 15 || (hNPT === 15 && mNPT >= 10)
+        if (!afterClose) return // market still open — no gap expected
+
+        // Find last trading day (skip weekends: Sat=6, Sun=0 from 2026-04-01)
+        const expected = (() => {
+          const d = new Date(nowNPT)
+          for (let i = 0; i < 7; i++) {
+            const s = d.toISOString().slice(0, 10)
+            const dow = d.getUTCDay()
+            const isWeekend = s >= '2026-04-01' ? (dow === 0 || dow === 6) : (dow === 5 || dow === 6)
+            if (!isWeekend) return s
+            d.setUTCDate(d.getUTCDate() - 1)
+          }
+        })()
+
+        if (latestCandle < expected) {
+          console.log(`[CHART] Gap detected: latest=${latestCandle}, expected=${expected} — triggering backfill`)
           try {
-            const bf = await triggerBackfill(yesterdayStr)
+            const bf = await triggerBackfill(expected)
             if (bf.data?.filled) {
-              // Reload chart after successful backfill
               const reloaded = isIndex()
                 ? await getIndexChart({ index_id: selectedIndexId, timeframe })
                 : await getStockChart({ symbol: selectedSymbol, timeframe })
