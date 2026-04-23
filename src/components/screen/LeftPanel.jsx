@@ -1,7 +1,7 @@
 import { useState, useEffect, useCallback } from 'react'
 import { getTradeLog, getWatchlist, removeFromWatchlist, updateWatchlist, addTradeLog, closeTradeLog, getBatchPrices } from '../../api'
 import { useContextMenu } from '../ContextMenu'
-import { useChatRefresh } from '../../utils/chatEvents'
+import { useChatRefresh, dispatchChatAction } from '../../utils/chatEvents'
 import { useScreen } from '../../context/ScreenContext'
 
 // ── BUY / SELL Modal ──────────────────────────────────────────────────────────
@@ -35,6 +35,7 @@ function TradeModal({ side, symbol, onClose, onSaved }) {
         entry_date:  new Date().toISOString().slice(0, 10),
         status:      'OPEN',
       })
+      dispatchChatAction('ADD_TRADE')
       onSaved()
       onClose()
     } catch (e) {
@@ -126,6 +127,7 @@ function CloseConfirm({ position, onClose, onDone }) {
     try {
       const latestClose = position._latestPrice || position.entry_price
       await closeTradeLog(position.id, { exit_price: latestClose, exit_date: new Date().toISOString().slice(0, 10) })
+      dispatchChatAction('CLOSE_TRADE')
       onDone()
       onClose()
     } catch (e) {
@@ -247,7 +249,7 @@ export default function LeftPanel() {
       .catch(() => {})
   }, [])
 
-  useEffect(() => { loadData() }, [loadData])
+  useEffect(() => { loadData() }, []) // eslint-disable-line react-hooks/exhaustive-deps
   useChatRefresh(['trades', 'watchlist'], loadData)
 
   // Within 2% of SL or TP — single batch request instead of N individual calls
@@ -452,8 +454,8 @@ export default function LeftPanel() {
         {/* SL/TP Alerts */}
         {alertPositions.length > 0 ? (
           <div className="flex-1 overflow-y-auto min-h-0 space-y-1.5">
-            {alertPositions.map((p, i) => (
-              <div key={i} className="rounded-xl border border-orange-200 dark:border-orange-900 bg-orange-50 dark:bg-orange-950/30 px-2 py-1.5">
+            {alertPositions.map((p) => (
+              <div key={p.id} className="rounded-xl border border-orange-200 dark:border-orange-900 bg-orange-50 dark:bg-orange-950/30 px-2 py-1.5">
                 <div className="flex items-center justify-between mb-0.5">
                   <button onClick={() => selectSymbol(p.symbol, null, p)}
                     className="text-[10px] font-bold text-gray-800 dark:text-gray-100 hover:text-blue-500 transition-colors">

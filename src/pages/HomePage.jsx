@@ -355,9 +355,10 @@ function CenterDashboard({ navigate, initData, onRefresh }) {
   }, [])
 
   // Hydrate from parent-supplied initData (avoids a second /init fetch)
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   useEffect(() => {
     if (initData) { applyData(initData); setLoading(false) }
-  }, [initData, applyData])
+  }, [initData])
 
   useChatRefresh(['trades', 'watchlist'], onRefresh)
 

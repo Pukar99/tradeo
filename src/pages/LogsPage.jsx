@@ -226,7 +226,7 @@ function ChecklistModal({ onPass, onClose }) {
             </div>
           ) : (
             items.map((item, i) => (
-              <button key={i} onClick={() => toggle(i)}
+              <button key={item} onClick={() => toggle(i)}
                 className={`w-full flex items-start gap-3 text-left px-3 py-2.5 rounded-xl border transition-all ${
                   checked.includes(i)
                     ? 'bg-emerald-50 dark:bg-emerald-900/20 border-emerald-200 dark:border-emerald-800/50'

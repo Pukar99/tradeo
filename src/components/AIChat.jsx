@@ -879,6 +879,7 @@ function AIChat({ isFullPage = false, onClose }) {
       setMessages(prev => [
         ...prev,
         {
+          id: Date.now(),
           role: 'assistant',
           content: `Coach · ${symbol || 'Trade'} closed\n\n${debrief}`,
           time: new Date(),
@@ -1032,7 +1033,7 @@ function AIChat({ isFullPage = false, onClose }) {
     if (!user) { navigate('/login'); return }
 
     setActiveForm(null)
-    const userMessage = { role: 'user', content: text, time: new Date() }
+    const userMessage = { id: Date.now(), role: 'user', content: text, time: new Date() }
     // P4-003: cap in-memory history at 100 messages to prevent memory bloat
     setMessages(prev => [...prev, userMessage].slice(-100))
     setInput('')
@@ -1137,6 +1138,7 @@ function AIChat({ isFullPage = false, onClose }) {
       }
 
       setMessages(prev => [...prev, {
+        id: Date.now(),
         role: 'assistant',
         content: data.reply,
         time: new Date(),
@@ -1147,6 +1149,7 @@ function AIChat({ isFullPage = false, onClose }) {
       if (err?.name === 'AbortError') return // intentional cancel — no error message
       console.error('AIChat handleSend error:', err)
       setMessages(prev => [...prev, {
+        id: Date.now(),
         role: 'assistant',
         content: err?.message?.includes('Failed to fetch')
           ? 'Cannot reach the server — check your connection and try again.'
@@ -1214,7 +1217,7 @@ function AIChat({ isFullPage = false, onClose }) {
 
     return (
       <div
-        key={i}
+        key={msg.id ?? i}
         className={`flex ${msg.role === 'user' ? 'justify-end' : 'justify-start'} gap-1.5 animate-fade-up`}
         style={{ animationDelay: `${Math.min(i, 6) * 40}ms` }}
       >
