@@ -903,7 +903,8 @@ function PortfolioPage() {
     }
   }, [user?.id, market])
 
-  useEffect(() => { if (user?.id) fetchData() }, [user?.id, market, fetchData])
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  useEffect(() => { if (user?.id) fetchData() }, [user?.id, market])
   useChatRefresh(['trades'], fetchData)
 
   const handleGoToChart = ({ symbol, entries, id, entry_price, sl, tp, position, remaining_quantity, quantity, date }) => {

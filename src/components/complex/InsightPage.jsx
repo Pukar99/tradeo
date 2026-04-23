@@ -12,16 +12,16 @@ const RECENT_N    = 5
 // Available indices for the selector
 const INDEX_OPTIONS = [
   { id: 12, label: 'NEPSE',    short: 'NEPSE'  },
-  { id: 1,  label: 'Banking',  short: 'BANK'   },
-  { id: 2,  label: 'Dev Bank', short: 'DBANK'  },
-  { id: 3,  label: 'Finance',  short: 'FIN'    },
-  { id: 4,  label: 'Hydro',    short: 'HYDRO'  },
-  { id: 5,  label: 'Mfg & Proc', short: 'MFG'  },
-  { id: 6,  label: 'Hotels',   short: 'HOTEL'  },
-  { id: 8,  label: 'Others',   short: 'OTH'    },
-  { id: 9,  label: 'Trading',  short: 'TRAD'   },
-  { id: 10, label: 'Insurance',short: 'INS'    },
-  { id: 11, label: 'Micro Fin',short: 'MICRO'  },
+  { id: 1,  label: 'Commercial Bank',           short: 'Bank'     },
+  { id: 2,  label: 'Development Bank',          short: 'DevBank'  },
+  { id: 3,  label: 'Finance',                   short: 'Finance'  },
+  { id: 4,  label: 'Hydropower',                short: 'Hydro'    },
+  { id: 5,  label: 'Manufacturing & Processing',short: 'Mfg'      },
+  { id: 6,  label: 'Hotel & Tourism',           short: 'Hotel'    },
+  { id: 8,  label: 'Others',                    short: 'Others'   },
+  { id: 9,  label: 'Trading',                   short: 'Trading'  },
+  { id: 10, label: 'Non-Life Insurance',         short: 'Non-Life' },
+  { id: 11, label: 'Microfinance',              short: 'MFI'      },
 ]
 
 // ─── Colour helpers ───────────────────────────────────────────────────────────

@@ -6,6 +6,7 @@ const ScreenContext = createContext(null)
 export function ScreenProvider({ children }) {
   const [selectedSymbol,  setSelectedSymbol]  = useState('NEPSE')
   const [selectedIndexId, setSelectedIndexId] = useState(12)
+  const [selectedIsIndex, setSelectedIsIndex] = useState(true)
   const [chartType,       setChartType]       = useState('candlestick')
   const [timeframe,       setTimeframe]       = useState('1Y')
   const [activeIndicators,setActiveIndicators]= useState([])
@@ -26,17 +27,12 @@ export function ScreenProvider({ children }) {
 
   const location = useLocation()
 
-  const isIndex = (sym) =>
-    sym === 'NEPSE' ||
-    sym.includes('Index') ||
-    sym.includes('Sub-Index') ||
-    sym.includes('NEPSE 20') ||
-    sym.includes('Float') ||
-    sym.includes('Sensitive')
+  const isIndex = () => selectedIsIndex
 
   const selectSymbol = useCallback((sym, indexId = null, positions = null) => {
     setSelectedSymbol(sym)
-    if (indexId) setSelectedIndexId(indexId)
+    setSelectedIsIndex(indexId != null)
+    if (indexId != null) setSelectedIndexId(indexId)
     setPinnedDate(null)
     setPinnedMovers(null)
     // positions can be null, a single object (legacy), or an array
@@ -74,11 +70,15 @@ export function ScreenProvider({ children }) {
     setHoveredMovers(movers)
   }, [])
 
+  // Click-locked movers — shown in RightPanel when a candle is clicked
+  const [clickedMovers, setClickedMovers] = useState(null) // { date, movers }
+
   // Called by StockChart on candle click — toggles pin
   const onPin = useCallback((date, movers) => {
     setPinnedDate(prev => {
       const next = prev === date ? null : date
       setPinnedMovers(next === null ? null : movers)
+      setClickedMovers(next === null ? null : { date, movers })
       return next
     })
   }, [])
@@ -86,6 +86,7 @@ export function ScreenProvider({ children }) {
   const clearPin = useCallback(() => {
     setPinnedDate(null)
     setPinnedMovers(null)
+    setClickedMovers(null)
   }, [])
 
   // Active date/movers = pinned takes priority over hovered
@@ -101,6 +102,7 @@ export function ScreenProvider({ children }) {
       selectSymbol,    isIndex,
       hoveredDate, pinnedDate, activeDate,
       hoveredMovers, pinnedMovers, activeMovers,
+      clickedMovers,
       onHover, onPin, clearPin,
       smcEnabled, setSmcEnabled,
       activePositions,

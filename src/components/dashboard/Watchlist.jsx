@@ -5,6 +5,7 @@ import {
   updateWatchlist,
   removeFromWatchlist,
   getStockPrice,
+  getBatchPrices,
   getTradeLog
 } from '../../api'
 import { useContextMenu } from '../ContextMenu'
@@ -205,63 +206,53 @@ function Watchlist() {
       const openTrades = tradeLogRes.data.filter(
         t => t.status === 'OPEN' || t.status === 'PARTIAL'
       )
-
-      const portfolioWithPrices = await Promise.all(
-        openTrades.map(async (t) => {
-          try {
-            const priceRes = await getStockPrice(t.symbol)
-            const qty = t.remaining_quantity || t.quantity
-            const ltp = priceRes.data.price
-            const pnl = t.position === 'LONG'
-              ? (ltp - t.entry_price) * qty
-              : (t.entry_price - ltp) * qty
-            return {
-              id: `tradelog_${t.id}`,
-              symbol: t.symbol,
-              quantity: qty,
-              avg_price: t.entry_price,
-              currentPrice: ltp,
-              change: priceRes.data.change,
-              latestDate: priceRes.data.latestDate,
-              position: t.position,
-              status: t.status,
-              sl: t.sl,
-              tp: t.tp,
-              pnl: Math.round(pnl),
-              category: 'portfolio',
-              isPortfolio: true
-            }
-          } catch {
-            return {
-              id: `tradelog_${t.id}`,
-              symbol: t.symbol,
-              quantity: t.remaining_quantity || t.quantity,
-              avg_price: t.entry_price,
-              currentPrice: null,
-              position: t.position,
-              status: t.status,
-              sl: t.sl,
-              tp: t.tp,
-              pnl: null,
-              category: 'portfolio',
-              isPortfolio: true
-            }
-          }
-        })
-      )
-
-      // Fetch prices for watchlist items
       const watchItems = watchRes.data.filter(w => w.category !== 'portfolio')
-      const watchWithPrices = await Promise.all(
-        watchItems.map(async (w) => {
-          try {
-            const priceRes = await getStockPrice(w.symbol)
-            return { ...w, currentPrice: priceRes.data.price, change: priceRes.data.change }
-          } catch {
-            return { ...w, currentPrice: null }
-          }
-        })
-      )
+
+      // Single batch request for all symbols — replaces N individual getStockPrice calls
+      const allSymbols = [...new Set([
+        ...openTrades.map(t => t.symbol),
+        ...watchItems.map(w => w.symbol),
+      ])].filter(Boolean)
+
+      let priceMap = {}
+      let latestDate = ''
+      if (allSymbols.length > 0) {
+        try {
+          const batchRes = await getBatchPrices(allSymbols)
+          priceMap = batchRes.data.prices || {}
+          latestDate = batchRes.data.latestDate || ''
+        } catch { /* prices unavailable — UI still works */ }
+      }
+
+      const portfolioWithPrices = openTrades.map(t => {
+        const qty = parseFloat(t.remaining_quantity || t.quantity) || 0
+        const p   = priceMap[t.symbol]
+        const ltp = p?.price ?? null
+        const pnl = ltp != null
+          ? (t.position === 'LONG' ? (ltp - t.entry_price) * qty : (t.entry_price - ltp) * qty)
+          : null
+        return {
+          id: `tradelog_${t.id}`,
+          symbol: t.symbol,
+          quantity: qty,
+          avg_price: t.entry_price,
+          currentPrice: ltp,
+          change: p?.change ?? null,
+          latestDate,
+          position: t.position,
+          status: t.status,
+          sl: t.sl,
+          tp: t.tp,
+          pnl: pnl != null ? Math.round(pnl) : null,
+          category: 'portfolio',
+          isPortfolio: true,
+        }
+      })
+
+      const watchWithPrices = watchItems.map(w => {
+        const p = priceMap[w.symbol]
+        return { ...w, currentPrice: p?.price ?? null, change: p?.change ?? null }
+      })
 
       setWatchlist([...watchWithPrices, ...portfolioWithPrices])
     } catch (err) {
