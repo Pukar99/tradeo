@@ -746,7 +746,7 @@ function TradeChart({ trade, isDark }) {
     // Fetch 1Y of data, we'll slice to the relevant window
     getStockChart({ symbol: trade.symbol, timeframe: '1Y' })
       .then(res => {
-        const data = res.data?.candles || res.data || []
+        const data = res.data?.data || res.data?.candles || []
         if (!data.length) { setErr(true); return }
 
         // Find the relevant slice: entry date → exit date (or today)
