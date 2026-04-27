@@ -1,6 +1,6 @@
 import { useState, useMemo, useEffect, useRef } from 'react'
 import { useContextMenu } from '../ContextMenu'
-import { getStockChart } from '../../api'
+import { getStockChart, autoCreateMarketJournal, getMarketJournals } from '../../api'
 
 // ── Shared style constants ────────────────────────────────────────────────────
 
@@ -520,9 +520,43 @@ function GroupedTradeRow({ symbol, entries, ltp, onEdit, onClose, onPartialClose
 // ── NepseMarketSummary — today's NEPSE snapshot for gallery header ────────────
 
 function NepseMarketSummary({ marketJournals }) {
-  const today = new Date().toISOString().slice(0, 10)
-  const entry = marketJournals.find(j => j.date === today)
-    || (marketJournals.length > 0 ? marketJournals[0] : null)
+  const [entry, setEntry] = useState(null)
+  const fetched = useRef(false)
+
+  // Use prop data immediately if available, otherwise fetch
+  useEffect(() => {
+    const today = new Date().toISOString().slice(0, 10)
+
+    // Try prop first (already loaded by LogsPage)
+    const fromProp = (marketJournals || []).find(j => j.date === today)
+      || (marketJournals?.length > 0 ? marketJournals[0] : null)
+
+    if (fromProp?.nepse_close != null) {
+      setEntry(fromProp)
+      return
+    }
+
+    // Otherwise self-fetch
+    if (fetched.current) return
+    fetched.current = true
+
+    // Try auto-create first (gets today's data), fallback to list
+    autoCreateMarketJournal(today)
+      .then(res => {
+        if (res?.data?.nepse_close != null) { setEntry(res.data); return }
+        return getMarketJournals().then(r => {
+          const list = r?.data || []
+          const found = list.find(j => j.date === today) || list[0] || null
+          if (found) setEntry(found)
+        })
+      })
+      .catch(() => {
+        getMarketJournals().then(r => {
+          const list = r?.data || []
+          if (list.length > 0) setEntry(list[0])
+        }).catch(() => {})
+      })
+  }, [marketJournals])
 
   if (!entry) return null
 
@@ -541,21 +575,24 @@ function NepseMarketSummary({ marketJournals }) {
 
   return (
     <div className="bg-white dark:bg-gray-900 rounded-2xl border border-gray-100 dark:border-gray-800 p-3.5 mb-4 shadow-sm">
-      <div className="flex items-center justify-between gap-4 flex-wrap">
+      <div className="flex items-center gap-4 flex-wrap">
 
         {/* NEPSE index */}
-        <div className="flex items-center gap-3">
-          <div className={`w-8 h-8 rounded-xl flex items-center justify-center flex-shrink-0 ${isUp ? 'bg-emerald-50 dark:bg-emerald-900/20' : isUp === false ? 'bg-red-50 dark:bg-red-900/20' : 'bg-gray-50 dark:bg-gray-800'}`}>
-            <span className={`text-[13px] font-black ${isUp ? 'text-emerald-500' : isUp === false ? 'text-red-400' : 'text-gray-400'}`}>
+        <div className="flex items-center gap-3 flex-shrink-0">
+          <div className={`w-9 h-9 rounded-xl flex items-center justify-center flex-shrink-0 ${isUp ? 'bg-emerald-50 dark:bg-emerald-900/20' : isUp === false ? 'bg-red-50 dark:bg-red-900/20' : 'bg-gray-50 dark:bg-gray-800'}`}>
+            <span className={`text-[14px] font-black ${isUp ? 'text-emerald-500' : isUp === false ? 'text-red-400' : 'text-gray-400'}`}>
               {isUp ? '↑' : isUp === false ? '↓' : '—'}
             </span>
           </div>
           <div>
-            <p className="text-[9px] font-semibold uppercase tracking-widest text-gray-400">NEPSE · {entry.date}</p>
-            <div className="flex items-baseline gap-1.5 mt-0.5">
-              {close != null && <span className="text-[14px] font-black text-gray-900 dark:text-white tabular-nums">{close.toLocaleString()}</span>}
+            <p className="text-[9px] font-semibold uppercase tracking-widest text-gray-400 mb-0.5">NEPSE · {entry.date}</p>
+            <div className="flex items-baseline gap-2">
+              {close != null
+                ? <span className="text-[16px] font-black text-gray-900 dark:text-white tabular-nums">{close.toLocaleString()}</span>
+                : <span className="text-[13px] font-bold text-gray-400">No data</span>
+              }
               {pct != null && (
-                <span className={`text-[11px] font-bold tabular-nums ${isUp ? 'text-emerald-500' : 'text-red-400'}`}>
+                <span className={`text-[12px] font-bold tabular-nums ${isUp ? 'text-emerald-500' : 'text-red-400'}`}>
                   {pct >= 0 ? '+' : ''}{pct.toFixed(2)}%
                 </span>
               )}
@@ -563,29 +600,35 @@ function NepseMarketSummary({ marketJournals }) {
           </div>
         </div>
 
-        {/* Breadth bar */}
+        {/* Divider */}
+        <div className="w-px h-8 bg-gray-100 dark:bg-gray-800 flex-shrink-0 hidden sm:block" />
+
+        {/* Breadth */}
         {(advancing + declining + unchanged) > 0 && (
-          <div className="flex-1 min-w-[140px] max-w-[200px]">
-            <div className="flex items-center justify-between mb-1">
-              <span className="text-[8px] font-semibold text-emerald-500">{advancing} ↑</span>
-              <span className="text-[8px] font-semibold text-gray-400">{unchanged} →</span>
-              <span className="text-[8px] font-semibold text-red-400">{declining} ↓</span>
+          <div className="flex-1 min-w-[120px] max-w-[180px]">
+            <div className="flex items-center justify-between mb-1.5">
+              <span className="text-[9px] font-bold text-emerald-500">{advancing} ↑</span>
+              <span className="text-[9px] font-semibold text-gray-400">{unchanged} →</span>
+              <span className="text-[9px] font-bold text-red-400">{declining} ↓</span>
             </div>
-            <div className="flex h-2 rounded-full overflow-hidden gap-px">
-              <div className="bg-emerald-400 rounded-l-full transition-all" style={{ width: `${advPct}%` }} />
-              <div className="bg-gray-200 dark:bg-gray-700 transition-all" style={{ width: `${100 - advPct - decPct}%` }} />
-              <div className="bg-red-400 rounded-r-full transition-all" style={{ width: `${decPct}%` }} />
+            <div className="flex h-1.5 rounded-full overflow-hidden">
+              <div className="bg-emerald-400" style={{ width: `${advPct}%` }} />
+              <div className="bg-gray-200 dark:bg-gray-700" style={{ width: `${100 - advPct - decPct}%` }} />
+              <div className="bg-red-400" style={{ width: `${decPct}%` }} />
             </div>
           </div>
         )}
 
+        {/* Divider */}
+        {gainers.length > 0 && <div className="w-px h-8 bg-gray-100 dark:bg-gray-800 flex-shrink-0 hidden sm:block" />}
+
         {/* Top gainers */}
         {gainers.length > 0 && (
-          <div className="hidden sm:block">
-            <p className="text-[8px] font-bold uppercase tracking-widest text-gray-400 mb-1">Top Gainers</p>
-            <div className="flex items-center gap-1.5">
+          <div className="hidden sm:block flex-shrink-0">
+            <p className="text-[8px] font-bold uppercase tracking-widest text-gray-400 mb-1.5">Top Gainers</p>
+            <div className="flex items-center gap-1">
               {gainers.slice(0, 3).map(g => (
-                <div key={g.symbol} className="flex items-center gap-1 bg-emerald-50 dark:bg-emerald-900/20 px-1.5 py-0.5 rounded-lg">
+                <div key={g.symbol} className="flex items-center gap-1 bg-emerald-50 dark:bg-emerald-900/20 border border-emerald-100 dark:border-emerald-800/30 px-2 py-0.5 rounded-lg">
                   <span className="text-[9px] font-bold text-emerald-700 dark:text-emerald-400">{g.symbol}</span>
                   <span className="text-[8px] font-semibold text-emerald-500 tabular-nums">+{parseFloat(g.diff_pct).toFixed(1)}%</span>
                 </div>
@@ -594,13 +637,16 @@ function NepseMarketSummary({ marketJournals }) {
           </div>
         )}
 
+        {/* Divider */}
+        {losers.length > 0 && <div className="w-px h-8 bg-gray-100 dark:bg-gray-800 flex-shrink-0 hidden lg:block" />}
+
         {/* Top losers */}
         {losers.length > 0 && (
-          <div className="hidden lg:block">
-            <p className="text-[8px] font-bold uppercase tracking-widest text-gray-400 mb-1">Top Losers</p>
-            <div className="flex items-center gap-1.5">
+          <div className="hidden lg:block flex-shrink-0">
+            <p className="text-[8px] font-bold uppercase tracking-widest text-gray-400 mb-1.5">Top Losers</p>
+            <div className="flex items-center gap-1">
               {losers.slice(0, 3).map(l => (
-                <div key={l.symbol} className="flex items-center gap-1 bg-red-50 dark:bg-red-900/20 px-1.5 py-0.5 rounded-lg">
+                <div key={l.symbol} className="flex items-center gap-1 bg-red-50 dark:bg-red-900/20 border border-red-100 dark:border-red-800/30 px-2 py-0.5 rounded-lg">
                   <span className="text-[9px] font-bold text-red-600 dark:text-red-400">{l.symbol}</span>
                   <span className="text-[8px] font-semibold text-red-400 tabular-nums">{parseFloat(l.diff_pct).toFixed(1)}%</span>
                 </div>
@@ -822,6 +868,110 @@ function CalendarView({ trades, ltpMap, onEdit, onClose, onPartialClose, onDelet
   )
 }
 
+// ── TradeChartFallback — static price range visual when OHLCV unavailable ────
+
+function TradeChartFallback({ trade, isDark }) {
+  const entry  = parseFloat(trade.entry_price) || 0
+  const exit   = trade.exit_price ? parseFloat(trade.exit_price) : null
+  const sl     = trade.sl ? parseFloat(trade.sl) : null
+  const tp     = trade.tp ? parseFloat(trade.tp) : null
+  const isLong = trade.position === 'LONG'
+  const pnl    = parseFloat(trade.realized_pnl) || 0
+
+  const prices = [entry, exit, sl, tp].filter(Boolean)
+  if (!prices.length) return null
+
+  const minP  = Math.min(...prices) * 0.97
+  const maxP  = Math.max(...prices) * 1.03
+  const range = maxP - minP || 1
+
+  const W = 340, H = 110, padL = 20, padR = 20, padT = 18, padB = 18
+  const chartH = H - padT - padB
+  const chartW = W - padL - padR
+
+  const toY = (p) => padT + chartH - ((p - minP) / range) * chartH
+  const bg      = isDark ? '#111827' : '#f9fafb'
+  const gridCol = isDark ? 'rgba(255,255,255,0.04)' : 'rgba(0,0,0,0.04)'
+  const textCol = isDark ? '#6b7280' : '#9ca3af'
+
+  const entryColor = isLong ? '#3b82f6' : '#f59e0b'
+  const exitColor  = exit ? (isLong ? (exit >= entry ? '#10b981' : '#f87171') : (exit <= entry ? '#10b981' : '#f87171')) : '#60a5fa'
+
+  return (
+    <svg width="100%" viewBox={`0 0 ${W} ${H}`} style={{ display: 'block' }}>
+      <rect width={W} height={H} fill={bg} />
+
+      {/* Grid lines */}
+      {[0.25, 0.5, 0.75].map(f => (
+        <line key={f} x1={padL} x2={W - padR} y1={padT + chartH * f} y2={padT + chartH * f}
+          stroke={gridCol} strokeWidth="1" />
+      ))}
+
+      {/* SL */}
+      {sl && (
+        <>
+          <line x1={padL} x2={W - padR} y1={toY(sl)} y2={toY(sl)}
+            stroke="#f87171" strokeWidth="1" strokeDasharray="4,3" opacity="0.7" />
+          <text x={padL + 3} y={toY(sl) - 3} fontSize="8" fill="#f87171" opacity="0.9">SL {sl.toFixed(0)}</text>
+        </>
+      )}
+
+      {/* TP */}
+      {tp && (
+        <>
+          <line x1={padL} x2={W - padR} y1={toY(tp)} y2={toY(tp)}
+            stroke="#10b981" strokeWidth="1" strokeDasharray="4,3" opacity="0.7" />
+          <text x={padL + 3} y={toY(tp) - 3} fontSize="8" fill="#10b981" opacity="0.9">TP {tp.toFixed(0)}</text>
+        </>
+      )}
+
+      {/* Entry line */}
+      <line x1={padL} x2={W - padR} y1={toY(entry)} y2={toY(entry)}
+        stroke={entryColor} strokeWidth="1.5" strokeDasharray="5,3" opacity="0.9" />
+      <text x={W - padR - 3} y={toY(entry) - 3} textAnchor="end" fontSize="8" fill={entryColor}>
+        Entry {entry.toFixed(0)}
+      </text>
+
+      {/* Exit line */}
+      {exit && (
+        <>
+          <line x1={padL} x2={W - padR} y1={toY(exit)} y2={toY(exit)}
+            stroke={exitColor} strokeWidth="1.5" opacity="0.9" />
+          <text x={W - padR - 3} y={toY(exit) + 10} textAnchor="end" fontSize="8" fill={exitColor}>
+            Exit {exit.toFixed(0)}
+          </text>
+          {/* P&L label */}
+          <text x={W / 2} y={(toY(entry) + toY(exit)) / 2 + 4} textAnchor="middle"
+            fontSize="9" fontWeight="700" fill={exitColor} opacity="0.85">
+            {pnl >= 0 ? '+' : ''}Rs.{Math.abs(Math.round(pnl)).toLocaleString()}
+          </text>
+        </>
+      )}
+
+      {/* No exit — show open label */}
+      {!exit && (
+        <text x={W / 2} y={H / 2 + 4} textAnchor="middle"
+          fontSize="9" fill={textCol} opacity="0.6">
+          Open Position · {trade.date}
+        </text>
+      )}
+
+      {/* Entry dot */}
+      <circle cx={exit ? padL + chartW * 0.25 : W / 2} cy={toY(entry)} r={4} fill={entryColor} />
+      {/* Exit dot */}
+      {exit && <circle cx={padL + chartW * 0.75} cy={toY(exit)} r={4} fill={exitColor} />}
+      {/* Connecting line between dots */}
+      {exit && (
+        <line
+          x1={padL + chartW * 0.25} y1={toY(entry)}
+          x2={padL + chartW * 0.75} y2={toY(exit)}
+          stroke={exitColor} strokeWidth="1.5" opacity="0.4" strokeDasharray="3,2"
+        />
+      )}
+    </svg>
+  )
+}
+
 // ── Trade Chart (SVG candlestick mini-chart for GalleryCard) ─────────────────
 
 function TradeChart({ trade, isDark }) {
@@ -868,14 +1018,11 @@ function TradeChart({ trade, isDark }) {
   }, [trade.symbol, trade.date, trade.exit_price, trade.updated_at, isFx])
 
   if (isFx) return null
-  if (err)   return (
-    <div className="h-[110px] flex items-center justify-center">
-      <p className="text-[9px] text-gray-300 dark:text-gray-700">No chart data</p>
-    </div>
-  )
+  if (err)   return <TradeChartFallback trade={trade} isDark={isDark} />
   if (!candles) return (
-    <div className="h-[110px] flex items-center justify-center">
-      <div className="w-4 h-4 border-2 border-blue-400 border-t-transparent rounded-full animate-spin opacity-50" />
+    <div className="h-[110px] flex items-center justify-center gap-2">
+      <div className="w-3 h-3 border-2 border-blue-400 border-t-transparent rounded-full animate-spin opacity-40" />
+      <span className="text-[9px] text-gray-300 dark:text-gray-700">Loading chart…</span>
     </div>
   )
 
