@@ -517,6 +517,103 @@ function GroupedTradeRow({ symbol, entries, ltp, onEdit, onClose, onPartialClose
   )
 }
 
+// ── NepseMarketSummary — today's NEPSE snapshot for gallery header ────────────
+
+function NepseMarketSummary({ marketJournals }) {
+  const today = new Date().toISOString().slice(0, 10)
+  const entry = marketJournals.find(j => j.date === today)
+    || (marketJournals.length > 0 ? marketJournals[0] : null)
+
+  if (!entry) return null
+
+  const pct       = entry.nepse_change_pct != null ? parseFloat(entry.nepse_change_pct) : null
+  const close     = entry.nepse_close != null ? parseFloat(entry.nepse_close) : null
+  const advancing = entry.advancing || 0
+  const declining = entry.declining || 0
+  const unchanged = entry.unchanged || 0
+  const total     = advancing + declining + unchanged || 1
+  const gainers   = Array.isArray(entry.top_gainers) ? entry.top_gainers : []
+  const losers    = Array.isArray(entry.top_losers)  ? entry.top_losers  : []
+  const isUp      = pct != null ? pct >= 0 : null
+
+  const advPct = Math.round((advancing / total) * 100)
+  const decPct = Math.round((declining / total) * 100)
+
+  return (
+    <div className="bg-white dark:bg-gray-900 rounded-2xl border border-gray-100 dark:border-gray-800 p-3.5 mb-4 shadow-sm">
+      <div className="flex items-center justify-between gap-4 flex-wrap">
+
+        {/* NEPSE index */}
+        <div className="flex items-center gap-3">
+          <div className={`w-8 h-8 rounded-xl flex items-center justify-center flex-shrink-0 ${isUp ? 'bg-emerald-50 dark:bg-emerald-900/20' : isUp === false ? 'bg-red-50 dark:bg-red-900/20' : 'bg-gray-50 dark:bg-gray-800'}`}>
+            <span className={`text-[13px] font-black ${isUp ? 'text-emerald-500' : isUp === false ? 'text-red-400' : 'text-gray-400'}`}>
+              {isUp ? '↑' : isUp === false ? '↓' : '—'}
+            </span>
+          </div>
+          <div>
+            <p className="text-[9px] font-semibold uppercase tracking-widest text-gray-400">NEPSE · {entry.date}</p>
+            <div className="flex items-baseline gap-1.5 mt-0.5">
+              {close != null && <span className="text-[14px] font-black text-gray-900 dark:text-white tabular-nums">{close.toLocaleString()}</span>}
+              {pct != null && (
+                <span className={`text-[11px] font-bold tabular-nums ${isUp ? 'text-emerald-500' : 'text-red-400'}`}>
+                  {pct >= 0 ? '+' : ''}{pct.toFixed(2)}%
+                </span>
+              )}
+            </div>
+          </div>
+        </div>
+
+        {/* Breadth bar */}
+        {(advancing + declining + unchanged) > 0 && (
+          <div className="flex-1 min-w-[140px] max-w-[200px]">
+            <div className="flex items-center justify-between mb-1">
+              <span className="text-[8px] font-semibold text-emerald-500">{advancing} ↑</span>
+              <span className="text-[8px] font-semibold text-gray-400">{unchanged} →</span>
+              <span className="text-[8px] font-semibold text-red-400">{declining} ↓</span>
+            </div>
+            <div className="flex h-2 rounded-full overflow-hidden gap-px">
+              <div className="bg-emerald-400 rounded-l-full transition-all" style={{ width: `${advPct}%` }} />
+              <div className="bg-gray-200 dark:bg-gray-700 transition-all" style={{ width: `${100 - advPct - decPct}%` }} />
+              <div className="bg-red-400 rounded-r-full transition-all" style={{ width: `${decPct}%` }} />
+            </div>
+          </div>
+        )}
+
+        {/* Top gainers */}
+        {gainers.length > 0 && (
+          <div className="hidden sm:block">
+            <p className="text-[8px] font-bold uppercase tracking-widest text-gray-400 mb-1">Top Gainers</p>
+            <div className="flex items-center gap-1.5">
+              {gainers.slice(0, 3).map(g => (
+                <div key={g.symbol} className="flex items-center gap-1 bg-emerald-50 dark:bg-emerald-900/20 px-1.5 py-0.5 rounded-lg">
+                  <span className="text-[9px] font-bold text-emerald-700 dark:text-emerald-400">{g.symbol}</span>
+                  <span className="text-[8px] font-semibold text-emerald-500 tabular-nums">+{parseFloat(g.diff_pct).toFixed(1)}%</span>
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
+
+        {/* Top losers */}
+        {losers.length > 0 && (
+          <div className="hidden lg:block">
+            <p className="text-[8px] font-bold uppercase tracking-widest text-gray-400 mb-1">Top Losers</p>
+            <div className="flex items-center gap-1.5">
+              {losers.slice(0, 3).map(l => (
+                <div key={l.symbol} className="flex items-center gap-1 bg-red-50 dark:bg-red-900/20 px-1.5 py-0.5 rounded-lg">
+                  <span className="text-[9px] font-bold text-red-600 dark:text-red-400">{l.symbol}</span>
+                  <span className="text-[8px] font-semibold text-red-400 tabular-nums">{parseFloat(l.diff_pct).toFixed(1)}%</span>
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
+
+      </div>
+    </div>
+  )
+}
+
 // ── MiniPriceBar — tiny SVG price-range bar for calendar cells ───────────────
 
 function MiniPriceBar({ trade, ltp }) {
@@ -744,8 +841,12 @@ function TradeChart({ trade, isDark }) {
       : today
 
     // Fetch 1Y of data, we'll slice to the relevant window
+    // Abort spinner after 8s if no response
+    const timer = setTimeout(() => setErr(true), 8000)
+
     getStockChart({ symbol: trade.symbol, timeframe: '1Y' })
       .then(res => {
+        clearTimeout(timer)
         const data = res.data?.data || res.data?.candles || []
         if (!data.length) { setErr(true); return }
 
@@ -763,7 +864,7 @@ function TradeChart({ trade, isDark }) {
           setCandles({ bars: slice, entry: entryDate, exit: exitDate, allData: data })
         }
       })
-      .catch(() => setErr(true))
+      .catch(() => { clearTimeout(timer); setErr(true) })
   }, [trade.symbol, trade.date, trade.exit_price, trade.updated_at, isFx])
 
   if (isFx) return null
@@ -1174,6 +1275,7 @@ function ViewSwitcher({ view, onChange }) {
 export default function TradesTab({
   trades = [],
   journals = [],
+  marketJournals = [],
   ltpMap = {},
   market,
   onEdit,
@@ -1475,6 +1577,9 @@ export default function TradesTab({
       {/* ── Gallery view ── */}
       {view === 'gallery' && (
         <div>
+          {/* Market summary — only for NEPSE tab */}
+          {!isForex && <NepseMarketSummary marketJournals={marketJournals} />}
+
           <div className="flex items-center gap-2 flex-wrap mb-4 px-0.5">
             <div className="flex items-center bg-gray-100 dark:bg-gray-800 rounded-lg p-0.5 gap-0.5">
               {[
