@@ -523,39 +523,33 @@ function NepseMarketSummary({ marketJournals }) {
   const [entry, setEntry] = useState(null)
   const fetched = useRef(false)
 
-  // Use prop data immediately if available, otherwise fetch
   useEffect(() => {
     const today = new Date().toISOString().slice(0, 10)
 
-    // Try prop first (already loaded by LogsPage)
+    // Use prop data the moment it arrives
     const fromProp = (marketJournals || []).find(j => j.date === today)
       || (marketJournals?.length > 0 ? marketJournals[0] : null)
+    if (fromProp) { setEntry(fromProp); return }
 
-    if (fromProp?.nepse_close != null) {
-      setEntry(fromProp)
-      return
-    }
-
-    // Otherwise self-fetch
+    // Props empty — fetch once ourselves
     if (fetched.current) return
     fetched.current = true
 
-    // Try auto-create first (gets today's data), fallback to list
-    autoCreateMarketJournal(today)
-      .then(res => {
-        if (res?.data?.nepse_close != null) { setEntry(res.data); return }
-        return getMarketJournals().then(r => {
-          const list = r?.data || []
-          const found = list.find(j => j.date === today) || list[0] || null
-          if (found) setEntry(found)
-        })
+    getMarketJournals()
+      .then(r => {
+        const list = r?.data || []
+        const found = list.find(j => j.date === today) || list[0] || null
+        if (found) { setEntry(found); return }
+        // No entries yet — trigger auto-create then re-fetch
+        return autoCreateMarketJournal(today)
+          .then(() => getMarketJournals())
+          .then(r2 => {
+            const list2 = r2?.data || []
+            const found2 = list2.find(j => j.date === today) || list2[0] || null
+            if (found2) setEntry(found2)
+          })
       })
-      .catch(() => {
-        getMarketJournals().then(r => {
-          const list = r?.data || []
-          if (list.length > 0) setEntry(list[0])
-        }).catch(() => {})
-      })
+      .catch(() => {})
   }, [marketJournals])
 
   if (!entry) return null
