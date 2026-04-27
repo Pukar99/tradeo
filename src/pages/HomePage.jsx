@@ -69,7 +69,7 @@ function LoggedOutHome() {
       <div className="relative select-none pointer-events-none px-4 py-4 flex flex-col gap-4">
 
         {/* Stats bar */}
-        <div className="grid grid-cols-4 gap-3 filter blur-[2px]">
+        <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 filter blur-[2px]">
           {dummyStats.map((s, i) => (
             <div key={i} className="bg-white dark:bg-gray-800 rounded-xl px-4 py-3 shadow-sm border border-gray-100 dark:border-gray-700">
               <p className="text-xs text-gray-400 mb-1">{s.label}</p>
@@ -80,7 +80,7 @@ function LoggedOutHome() {
 
         <div className="grid grid-cols-12 gap-4">
           {/* Left column */}
-          <div className="col-span-3 flex flex-col gap-4">
+          <div className="hidden lg:flex col-span-3 flex-col gap-4">
             <div className="bg-white dark:bg-gray-800 rounded-2xl p-4 shadow-sm border border-gray-100 dark:border-gray-700 filter blur-[2px]">
               <p className="text-xs font-semibold text-gray-500 mb-3">Discipline Score</p>
               <div className="flex items-center justify-center">
@@ -1307,7 +1307,7 @@ function LoggedInHome() {
 
   return (
     <>
-    <div className="w-full px-4 py-4 bg-gray-50 dark:bg-gray-900 min-h-screen">
+    <div className="w-full px-3 sm:px-4 py-3 sm:py-4 bg-gray-50 dark:bg-gray-900 min-h-screen">
 
       {/* Greeting bar */}
       <div className="flex items-center justify-between mb-3 px-1">
@@ -1315,7 +1315,7 @@ function LoggedInHome() {
           <p className="text-sm font-semibold text-gray-800 dark:text-gray-200">
             {getGreeting()}, {user?.name?.split(' ')[0] || 'Trader'} 👋
           </p>
-          <p className="text-xs text-gray-400">{today}</p>
+          <p className="text-[11px] text-gray-400">{today}</p>
         </div>
         <div className="hidden lg:flex items-center gap-2">
           <div className="w-1.5 h-1.5 bg-green-500 rounded-full animate-pulse" />
@@ -1323,11 +1323,11 @@ function LoggedInHome() {
         </div>
       </div>
 
-      {/* 3-Column Layout */}
-      <div className="grid grid-cols-12 gap-4">
+      {/* 3-Column Layout — stacks on mobile, side-by-side on lg */}
+      <div className="grid grid-cols-12 gap-3 sm:gap-4">
 
         {/* LEFT — TaskBoard + Monthly Goals */}
-        <div className="col-span-12 lg:col-span-3 flex flex-col gap-4">
+        <div className="col-span-12 lg:col-span-3 flex flex-col gap-3 sm:gap-4">
           <TaskBoard initData={initData?.tasks} mindsetContent={initData?.mindset?.content} />
           <MonthlyGoals initData={initData?.goals} />
         </div>
@@ -1338,7 +1338,7 @@ function LoggedInHome() {
         </div>
 
         {/* RIGHT — Discipline Score + Journal shortcuts */}
-        <div className="col-span-12 lg:col-span-3 flex flex-col gap-4">
+        <div className="col-span-12 lg:col-span-3 flex flex-col gap-3 sm:gap-4">
           <DisciplineScore initData={initData?.discipline} />
 
           {/* Journal shortcuts */}

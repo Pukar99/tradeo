@@ -1044,7 +1044,7 @@ function PortfolioPage() {
   // ── Render ────────────────────────────────────────────────────────────────
 
   return (
-    <div className="max-w-7xl mx-auto px-3 sm:px-6 pt-4 sm:pt-5 pb-14 space-y-5">
+    <div className="max-w-7xl mx-auto px-3 sm:px-4 lg:px-6 pt-3 sm:pt-4 lg:pt-5 pb-14 space-y-4 sm:space-y-5">
 
       {/* ── Page header ─────────────────────────────────────────────────────── */}
       <div className="flex items-center justify-between">

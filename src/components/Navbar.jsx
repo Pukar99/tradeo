@@ -354,14 +354,15 @@ function Navbar() {
       {/* ── Mobile menu drawer ──────────────────────────────────────────────── */}
       {mobileMenuOpen && (
         <div className="lg:hidden absolute top-full left-0 right-0 bg-white dark:bg-gray-950 border-b border-gray-200 dark:border-gray-800 shadow-lg z-40">
-          <div className="px-4 py-3 space-y-1">
+          <div className="px-4 py-2 space-y-0.5">
             {NAV_LINKS.map(link => (
               <Link
                 key={link.path}
                 to={link.path}
-                className={`flex items-center px-3 py-2.5 rounded-lg text-sm font-medium transition-colors ${
+                onClick={() => setMobileMenuOpen(false)}
+                className={`flex items-center px-3 py-3 min-h-[44px] rounded-lg text-sm font-medium transition-colors ${
                   isActive(link.path)
-                    ? 'bg-green-50 dark:bg-green-900 text-green-600 dark:text-green-400'
+                    ? 'bg-green-50 dark:bg-green-900/30 text-green-600 dark:text-green-400'
                     : 'text-gray-600 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-800 hover:text-gray-900 dark:hover:text-white'
                 }`}
               >
