@@ -38,6 +38,9 @@ export default defineConfig({
       },
     },
   },
+  optimizeDeps: {
+    include: ['html2canvas'],
+  },
   // Faster HMR in dev
   server: {
     hmr: true,
