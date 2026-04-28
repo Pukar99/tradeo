@@ -1,5 +1,46 @@
-import { useState, useEffect } from 'react'
-import { updateMarketJournal } from '../../api'
+import { useState, useEffect, useRef } from 'react'
+import { updateMarketJournal, getIndexChart } from '../../api'
+
+// ── NEPSE sparkline — 3-month line chart (pure SVG, 1 API call, cached by ref) ─
+function NepseSparkline({ isUp }) {
+  const [points, setPoints] = useState([])
+  const fetched = useRef(false)
+
+  useEffect(() => {
+    if (fetched.current) return
+    fetched.current = true
+    getIndexChart({ index_id: 12, timeframe: '3M' })
+      .then(r => {
+        const rows = r?.data?.data || []
+        const closes = rows.map(r => parseFloat(r.close)).filter(Boolean)
+        if (closes.length >= 2) setPoints(closes)
+      })
+      .catch(() => {})
+  }, [])
+
+  if (points.length < 2) {
+    return <div className="w-full h-[56px] bg-gray-50 dark:bg-gray-800/50 rounded-lg animate-pulse" />
+  }
+
+  const W = 280, H = 56
+  const min = Math.min(...points)
+  const max = Math.max(...points)
+  const range = max - min || 1
+  const toX = (i) => (i / (points.length - 1)) * W
+  const toY = (v) => H - ((v - min) / range) * (H - 6) - 3
+  const linePath = points.map((v, i) => `${i === 0 ? 'M' : 'L'}${toX(i).toFixed(1)},${toY(v).toFixed(1)}`).join(' ')
+  // Filled area path: go along the line then close at the bottom
+  const fillPath = `${linePath} L${W},${H} L0,${H} Z`
+  const color = isUp ? '#10b981' : '#f87171'
+  const fillColor = isUp ? 'rgba(16,185,129,0.08)' : 'rgba(248,113,113,0.08)'
+
+  return (
+    <svg width="100%" height={H} viewBox={`0 0 ${W} ${H}`} preserveAspectRatio="none" className="rounded-lg overflow-hidden">
+      <path d={fillPath} fill={fillColor} />
+      <path d={linePath} fill="none" stroke={color} strokeWidth="1.5" strokeLinejoin="round" strokeLinecap="round" />
+    </svg>
+  )
+}
 
 const MOODS = [
   { value: 'Bullish',  label: '↑ Bullish',  color: 'text-emerald-600 bg-emerald-50 dark:bg-emerald-900/30 dark:text-emerald-400 border-emerald-200 dark:border-emerald-800/40' },
@@ -82,6 +123,20 @@ export default function MarketJournalModal({ entry, onClose, onSaved }) {
         {entry && (
           <div className="px-5 pt-4 pb-3 bg-gray-50/60 dark:bg-gray-800/20 border-b border-gray-100 dark:border-gray-800">
             <p className="text-[9px] uppercase tracking-widest font-bold text-gray-400 mb-3">Market Data (Auto-populated)</p>
+
+            {/* NEPSE 3-month chart */}
+            <div className="mb-3">
+              <div className="flex items-center justify-between mb-1">
+                <p className="text-[8px] uppercase tracking-widest text-gray-400">NEPSE All-Share — 3 Month</p>
+                {nepseClose != null && (
+                  <span className={`text-[9px] font-bold tabular-nums ${nepseChange != null && nepseChange >= 0 ? 'text-emerald-500' : 'text-red-400'}`}>
+                    {nepseClose.toLocaleString()} {nepseChange != null ? `${nepseChange >= 0 ? '+' : ''}${nepseChange.toFixed(2)}%` : ''}
+                  </span>
+                )}
+              </div>
+              <NepseSparkline isUp={nepseChange == null || nepseChange >= 0} />
+            </div>
+
             <div className="grid grid-cols-2 sm:grid-cols-3 gap-2.5 mb-3">
               {/* NEPSE */}
               <div className="bg-white dark:bg-gray-900 rounded-lg border border-gray-100 dark:border-gray-800 px-3 py-2">

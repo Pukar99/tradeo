@@ -1,6 +1,6 @@
 import { useState, useMemo, useEffect, useRef } from 'react'
 import { useContextMenu } from '../ContextMenu'
-import { getStockChart, autoCreateMarketJournal, getMarketJournals } from '../../api'
+import { getStockChart, getIndexChart } from '../../api'
 
 // ── Shared style constants ────────────────────────────────────────────────────
 
@@ -517,45 +517,57 @@ function GroupedTradeRow({ symbol, entries, ltp, onEdit, onClose, onPartialClose
   )
 }
 
-// ── NepseMarketSummary — today's NEPSE snapshot for gallery header ────────────
+// ── NepseSparkline — 3-month NEPSE line chart (pure SVG) ─────────────────────
 
-function NepseMarketSummary({ marketJournals }) {
-  const [entry, setEntry] = useState(null)
+function NepseSparkline({ isUp }) {
+  const [points, setPoints] = useState([])
   const fetched = useRef(false)
 
   useEffect(() => {
-    const today = new Date().toISOString().slice(0, 10)
-
-    // Use prop data the moment it arrives
-    const fromProp = (marketJournals || []).find(j => j.date === today)
-      || (marketJournals?.length > 0 ? marketJournals[0] : null)
-    if (fromProp) { setEntry(fromProp); return }
-
-    // Props empty — fetch once ourselves
     if (fetched.current) return
     fetched.current = true
-
-    getMarketJournals()
+    getIndexChart({ index_id: 12, timeframe: '3M' })
       .then(r => {
-        const list = r?.data || []
-        const found = list.find(j => j.date === today) || list[0] || null
-        if (found) { setEntry(found); return }
-        // No entries yet — trigger auto-create then re-fetch
-        return autoCreateMarketJournal(today)
-          .then(() => getMarketJournals())
-          .then(r2 => {
-            const list2 = r2?.data || []
-            const found2 = list2.find(j => j.date === today) || list2[0] || null
-            if (found2) setEntry(found2)
-          })
+        const rows = r?.data?.data || []
+        if (rows.length < 2) return
+        setPoints(rows.map(r => parseFloat(r.close)).filter(Boolean))
       })
       .catch(() => {})
+  }, [])
+
+  if (points.length < 2) return null
+
+  const W = 120, H = 36
+  const min = Math.min(...points)
+  const max = Math.max(...points)
+  const range = max - min || 1
+  const toX = (i) => (i / (points.length - 1)) * W
+  const toY = (v) => H - ((v - min) / range) * (H - 4) - 2
+  const d = points.map((v, i) => `${i === 0 ? 'M' : 'L'}${toX(i).toFixed(1)},${toY(v).toFixed(1)}`).join(' ')
+  const color = isUp ? '#10b981' : '#f87171'
+
+  return (
+    <svg width={W} height={H} viewBox={`0 0 ${W} ${H}`} className="flex-shrink-0">
+      <path d={d} fill="none" stroke={color} strokeWidth="1.5" strokeLinejoin="round" strokeLinecap="round" opacity="0.8" />
+    </svg>
+  )
+}
+
+// ── NepseMarketSummary — today's NEPSE snapshot for gallery header ────────────
+// Data comes purely via props (from LogsPage.fetchData) — no self-fetch.
+
+function NepseMarketSummary({ marketJournals }) {
+  // Pick the most recent entry from the prop — no extra API calls
+  const entry = useMemo(() => {
+    const today = new Date().toISOString().slice(0, 10)
+    const list  = marketJournals || []
+    return list.find(j => j.date === today) || list[0] || null
   }, [marketJournals])
 
   if (!entry) return null
 
   const pct       = entry.nepse_change_pct != null ? parseFloat(entry.nepse_change_pct) : null
-  const close     = entry.nepse_close != null ? parseFloat(entry.nepse_close) : null
+  const close     = entry.nepse_close      != null ? parseFloat(entry.nepse_close)      : null
   const advancing = entry.advancing || 0
   const declining = entry.declining || 0
   const unchanged = entry.unchanged || 0
@@ -571,7 +583,7 @@ function NepseMarketSummary({ marketJournals }) {
     <div className="bg-white dark:bg-gray-900 rounded-2xl border border-gray-100 dark:border-gray-800 p-3.5 mb-4 shadow-sm">
       <div className="flex items-center gap-4 flex-wrap">
 
-        {/* NEPSE index */}
+        {/* NEPSE index value */}
         <div className="flex items-center gap-3 flex-shrink-0">
           <div className={`w-9 h-9 rounded-xl flex items-center justify-center flex-shrink-0 ${isUp ? 'bg-emerald-50 dark:bg-emerald-900/20' : isUp === false ? 'bg-red-50 dark:bg-red-900/20' : 'bg-gray-50 dark:bg-gray-800'}`}>
             <span className={`text-[14px] font-black ${isUp ? 'text-emerald-500' : isUp === false ? 'text-red-400' : 'text-gray-400'}`}>
@@ -594,6 +606,14 @@ function NepseMarketSummary({ marketJournals }) {
           </div>
         </div>
 
+        {/* 3-month sparkline */}
+        {close != null && (
+          <>
+            <div className="w-px h-8 bg-gray-100 dark:bg-gray-800 flex-shrink-0 hidden sm:block" />
+            <NepseSparkline isUp={isUp !== false} />
+          </>
+        )}
+
         {/* Divider */}
         <div className="w-px h-8 bg-gray-100 dark:bg-gray-800 flex-shrink-0 hidden sm:block" />
 
@@ -614,11 +634,11 @@ function NepseMarketSummary({ marketJournals }) {
         )}
 
         {/* Divider */}
-        {gainers.length > 0 && <div className="w-px h-8 bg-gray-100 dark:bg-gray-800 flex-shrink-0 hidden sm:block" />}
+        {gainers.length > 0 && <div className="w-px h-8 bg-gray-100 dark:bg-gray-800 flex-shrink-0 hidden md:block" />}
 
         {/* Top gainers */}
         {gainers.length > 0 && (
-          <div className="hidden sm:block flex-shrink-0">
+          <div className="hidden md:block flex-shrink-0">
             <p className="text-[8px] font-bold uppercase tracking-widest text-gray-400 mb-1.5">Top Gainers</p>
             <div className="flex items-center gap-1">
               {gainers.slice(0, 3).map(g => (
