@@ -149,7 +149,6 @@ export const getNepseChart     = (range = '1m') => API.get('/api/market/nepse-ch
 export const getAIReport       = ()             => API.get('/api/market/ai-report')
 export const getIPOs           = ()             => API.get('/api/market/ipos')
 export const getMarketNews     = ()             => API.get('/api/market/news')
-export const getSectorStrength = ()             => API.get('/api/market/sector-strength')
 export const triggerBackfill   = (date)         => API.post('/api/market/backfill', { date })
 
 // Trade Log (new system)
@@ -179,20 +178,6 @@ export const getStockReturns        = (params) => API.get('/api/breakdown/stock-
 export const getStockMonthDetail    = (params) => API.get('/api/breakdown/stock-month-detail', { params })
 export const getSectorMonthStocks   = (params) => API.get('/api/breakdown/sector-month-stocks', { params })
 
-// Complex Tab — Trade Behavior
-export const getBehaviorStats = (params) => API.get('/api/behavior/stats', { params })
-
-// Complex Tab — Market Regime
-export const getRegime = (params) => API.get('/api/regime/detect', { params })
-
-// Complex Tab — Swing Structure
-export const getSwings = (params) => API.get('/api/structure/swings', { params })
-
-// Complex Tab — Volatility
-export const getVolatilityClusters = (params) => API.get('/api/volatility/clusters', { params })
-
-// Complex Tab — Smart Screener
-export const runScreener = (params) => API.get('/api/screener/scan', { params })
 
 // SMC (Smart Money Concepts) Scanner
 export const getSMCScan = (params) => API.get('/api/smc/scan', { params })
