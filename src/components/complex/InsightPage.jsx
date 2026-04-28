@@ -9,19 +9,22 @@ const MONTHS_FULL = ['January','February','March','April','May','June','July','A
 const MONTHS_NP   = ['Pou','Mag','Fal','Cha','Bai','Jes','Ash','Shr','Bha','Asw','Kar','Man']
 const RECENT_N    = 5
 
-// Available indices for the selector
+// Available indices for the selector (index_id matches INDEX_MAP in dailyScraper.js)
 const INDEX_OPTIONS = [
-  { id: 12, label: 'NEPSE',    short: 'NEPSE'  },
-  { id: 1,  label: 'Commercial Bank',           short: 'Bank'     },
-  { id: 2,  label: 'Development Bank',          short: 'DevBank'  },
-  { id: 3,  label: 'Finance',                   short: 'Finance'  },
-  { id: 4,  label: 'Hydropower',                short: 'Hydro'    },
-  { id: 5,  label: 'Manufacturing & Processing',short: 'Mfg'      },
-  { id: 6,  label: 'Hotel & Tourism',           short: 'Hotel'    },
-  { id: 8,  label: 'Others',                    short: 'Others'   },
-  { id: 9,  label: 'Trading',                   short: 'Trading'  },
-  { id: 10, label: 'Non-Life Insurance',         short: 'Non-Life' },
-  { id: 11, label: 'Microfinance',              short: 'MFI'      },
+  { id: 12, label: 'NEPSE',                    short: 'NEPSE'    },
+  { id: 1,  label: 'Commercial Bank',          short: 'Bank'     },
+  { id: 2,  label: 'Development Bank',         short: 'DevBank'  },
+  { id: 3,  label: 'Finance',                  short: 'Finance'  },
+  { id: 4,  label: 'Hotels & Tourism',         short: 'Hotel'    },
+  { id: 5,  label: 'Hydro Power',              short: 'Hydro'    },
+  { id: 6,  label: 'Life Insurance',           short: 'Life'     },
+  { id: 8,  label: 'Manufacturing',            short: 'Mfg'      },
+  { id: 9,  label: 'Microfinance',             short: 'MFI'      },
+  { id: 10, label: 'Mutual Fund',              short: 'MF'       },
+  { id: 11, label: 'Non-Life Insurance',       short: 'Non-Life' },
+  { id: 13, label: 'Others',                   short: 'Others'   },
+  { id: 14, label: 'Trading',                  short: 'Trading'  },
+  { id: 15, label: 'Investment',               short: 'Invest'   },
 ]
 
 // ─── Colour helpers ───────────────────────────────────────────────────────────

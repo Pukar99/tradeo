@@ -8,19 +8,22 @@ const API = `${BASE_URL}/api`
 // ─────────────────────────────────────────────────────────────────────────────
 // CONSTANTS
 // ─────────────────────────────────────────────────────────────────────────────
+// index_id matches INDEX_MAP in dailyScraper.js — do not reorder
 const INDEX_OPTIONS = [
-  { id: 12, label: 'NEPSE',       short: 'NEPSE'    },
-  { id: 1,  label: 'Commercial Bank',           short: 'Bank'     },
-  { id: 2,  label: 'Development Bank',          short: 'DevBank'  },
-  { id: 3,  label: 'Finance',                   short: 'Finance'  },
-  { id: 4,  label: 'Microfinance',              short: 'MFI'      },
-  { id: 5,  label: 'Life Insurance',            short: 'Life'     },
-  { id: 6,  label: 'Non-Life Insurance',        short: 'Non-Life' },
-  { id: 7,  label: 'Hydropower',                short: 'Hydro'    },
-  { id: 8,  label: 'Manufacturing & Processing',short: 'Mfg'      },
-  { id: 9,  label: 'Hotel & Tourism',           short: 'Hotel'    },
-  { id: 10, label: 'Trading',                   short: 'Trading'  },
-  { id: 11, label: 'Investment',                short: 'Invest'   },
+  { id: 12, label: 'NEPSE',               short: 'NEPSE'    },
+  { id: 1,  label: 'Commercial Bank',     short: 'Bank'     },
+  { id: 2,  label: 'Development Bank',   short: 'DevBank'  },
+  { id: 3,  label: 'Finance',            short: 'Finance'  },
+  { id: 4,  label: 'Hotels & Tourism',   short: 'Hotel'    },
+  { id: 5,  label: 'Hydro Power',        short: 'Hydro'    },
+  { id: 6,  label: 'Life Insurance',     short: 'Life'     },
+  { id: 8,  label: 'Manufacturing',      short: 'Mfg'      },
+  { id: 9,  label: 'Microfinance',       short: 'MFI'      },
+  { id: 10, label: 'Mutual Fund',        short: 'MF'       },
+  { id: 11, label: 'Non-Life Insurance', short: 'Non-Life' },
+  { id: 13, label: 'Others',             short: 'Others'   },
+  { id: 14, label: 'Trading',            short: 'Trading'  },
+  { id: 15, label: 'Investment',         short: 'Invest'   },
 ]
 
 const MONTHS = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec']
