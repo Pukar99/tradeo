@@ -252,10 +252,15 @@ export default function LeftPanel() {
   useEffect(() => { loadData() }, []) // eslint-disable-line react-hooks/exhaustive-deps
   useChatRefresh(['trades', 'watchlist'], loadData)
 
-  // Within 2% of SL or TP — single batch request instead of N individual calls
+  // Within 2% of SL or TP — single batch request, only when the SL/TP position IDs change
+  const alertKeyRef = useRef('')
   useEffect(() => {
     const withAlerts = positions.filter(p => p.sl || p.tp)
-    if (!withAlerts.length) { setAlertPositions([]); return }
+    if (!withAlerts.length) { alertKeyRef.current = ''; setAlertPositions([]); return }
+    // Stable key: sorted ids — avoid re-fetching when array reference changes but data didn't
+    const key = withAlerts.map(p => p.id).sort().join(',')
+    if (key === alertKeyRef.current) return
+    alertKeyRef.current = key
     let cancelled = false
     const symbols = [...new Set(withAlerts.map(p => p.symbol))]
     getBatchPrices(symbols)

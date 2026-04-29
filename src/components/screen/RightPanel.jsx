@@ -362,21 +362,16 @@ export default function RightPanel() {
 
   const fetchForDate = useCallback(async (date) => {
     if (!date) return
-    // Return cached result immediately if available
     if (dayCache.current[date]) {
-      const cached = dayCache.current[date]
-      setDbMovers(cached.movers)
-      setDbVolume(cached.volume)
-      setSummary(cached.summary)
+      const c = dayCache.current[date]
+      setDbMovers(c.movers); setDbVolume(c.volume); setSummary(c.summary)
       return
     }
     setLoading(true); setMoversErr(null); setSummary(null)
     try {
       const r = await getDayFull(date)
       dayCache.current[date] = { movers: r.data.movers, volume: r.data.volume, summary: r.data.summary }
-      setDbMovers(r.data.movers)
-      setDbVolume(r.data.volume)
-      setSummary(r.data.summary)
+      setDbMovers(r.data.movers); setDbVolume(r.data.volume); setSummary(r.data.summary)
     } catch {
       setMoversErr('Failed to load market data')
     } finally {
@@ -384,18 +379,34 @@ export default function RightPanel() {
     }
   }, [])
 
-  // Load date list once
+  // On mount: fire both requests in parallel — getDayFull resolves latest date server-side
+  // so we don't need to wait for /dates before fetching day data (eliminates waterfall)
   useEffect(() => {
-    getMarketDates()
-      .then(r => {
-        setDates(r.data.dates)
-        setLatestDate(r.data.latestDate)
-        setSelectedDate(r.data.latestDate)
-      })
-      .catch(() => setDatesErr('Failed to load dates'))
-  }, [])
+    Promise.all([
+      getMarketDates(),
+      getDayFull(),   // no date = server returns latest
+    ]).then(([datesRes, dayRes]) => {
+      const dates      = datesRes.data.dates
+      const latestDate = datesRes.data.latestDate
+      setDates(dates)
+      setLatestDate(latestDate)
+      setSelectedDate(latestDate)
+      // Seed the cache with the day-full response so fetchForDate won't re-fetch it
+      const d = dayRes.data.date
+      if (d) {
+        dayCache.current[d] = { movers: dayRes.data.movers, volume: dayRes.data.volume, summary: dayRes.data.summary }
+        setDbMovers(dayRes.data.movers); setDbVolume(dayRes.data.volume); setSummary(dayRes.data.summary)
+      }
+    }).catch(() => setDatesErr('Failed to load dates'))
+  }, []) // eslint-disable-line react-hooks/exhaustive-deps
 
-  useEffect(() => { fetchForDate(selectedDate) }, [selectedDate, fetchForDate])
+  // When user navigates to a different date (not the initial load)
+  const prevSelectedDate = useRef('')
+  useEffect(() => {
+    if (!selectedDate || selectedDate === prevSelectedDate.current) return
+    prevSelectedDate.current = selectedDate
+    fetchForDate(selectedDate)
+  }, [selectedDate, fetchForDate])
 
   // When candle is pinned, use the same cached fetchForDate (movers from chart cache still shown via clickedMovers)
   useEffect(() => {
