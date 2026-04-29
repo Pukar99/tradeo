@@ -733,13 +733,15 @@ export default function StockChart() {
     })
   }, [selectedSymbol, selectedIndexId, timeframe]) // eslint-disable-line react-hooks/exhaustive-deps
 
-  // Fetch SMC data when enabled for stocks
+  // Fetch SMC data when enabled — use same timeframe as chart so dates align
   useEffect(() => {
     if (!smcEnabled || isIndex()) { setSmcData(null); return }
-    getSMCScan({ symbol: selectedSymbol, days: 250 })
+    const tfDays = { '1W': 7, '1M': 30, '3M': 90, '6M': 180, '1Y': 365, '3Y': 1095, 'ALL': 2000 }
+    const days = tfDays[timeframe] ?? 365
+    getSMCScan({ symbol: selectedSymbol, days })
       .then(r => setSmcData(r.data))
       .catch(() => setSmcData(null))
-  }, [smcEnabled, selectedSymbol]) // eslint-disable-line react-hooks/exhaustive-deps
+  }, [smcEnabled, selectedSymbol, timeframe]) // eslint-disable-line react-hooks/exhaustive-deps
 
   // Build / rebuild charts
   useEffect(() => {
@@ -956,16 +958,17 @@ export default function StockChart() {
             time: sw.date, position: sw.type === 'buy_side' ? 'belowBar' : 'aboveBar',
             color: '#a78bfa',
             shape: 'square',
-            text: sw.type === 'buy_side' ? 'Sweep$' : 'Sweep$', size: 1,
+            text: sw.type === 'buy_side' ? 'BuySw' : 'SelSw', size: 1,
           })
         }
         for (const p of (smcData.patterns || []).slice(-10)) {
           const isBullish = p.type.includes('bullish') || p.type === 'hammer' || p.type === 'inside_bar'
+          const label = p.type.replaceAll('_', ' ').replace('bullish ', '').replace('bearish ', '')
           smcMarkers.push({
             time: p.date, position: isBullish ? 'belowBar' : 'aboveBar',
             color: isBullish ? '#22c55e' : '#ef4444',
             shape: 'circle',
-            text: p.type.replace('_', ' ').replace('bullish ', '').replace('bearish ', '').slice(0, 6),
+            text: label.slice(0, 6),
             size: 0,
           })
         }
