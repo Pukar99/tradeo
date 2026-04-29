@@ -449,11 +449,13 @@ function CompanyList({ sectorIndex, year, month, onClose }) {
 
   useEffect(() => {
     if (!sectorIndex || !year || !month) return
+    const ctrl = new AbortController()
     setLoading(true); setStocks(null); setError(null)
     getSectorMonthStocks({ sector_index: sectorIndex, year, month })
-      .then(r => setStocks(r.data.stocks || []))
-      .catch(() => setError('Failed to load stocks'))
-      .finally(() => setLoading(false))
+      .then(r => { if (!ctrl.signal.aborted) setStocks(r.data.stocks || []) })
+      .catch(() => { if (!ctrl.signal.aborted) setError('Failed to load stocks') })
+      .finally(() => { if (!ctrl.signal.aborted) setLoading(false) })
+    return () => ctrl.abort()
   }, [sectorIndex, year, month])
 
   const maxAbs = stocks?.length ? Math.max(...stocks.map(s => Math.abs(s.return_pct ?? 0)), 0.1) : 1
@@ -522,7 +524,6 @@ function HistoricalRank({ value, allYears, month }) {
   if (!hist.length) return null
   const rank     = hist.filter(v => v <= value).length
   const pct      = Math.round((rank / hist.length) * 100)
-  const isGood   = pct >= 60
   const color    = pct >= 70 ? '#22c55e' : pct >= 45 ? '#f59e0b' : '#ef4444'
   const min      = hist[0]
   const max      = hist[hist.length - 1]
@@ -552,37 +553,41 @@ function HistoricalRank({ value, allYears, month }) {
 }
 
 // ─── Right Detail Panel ───────────────────────────────────────────────────────
-function DetailPanel({ cell, onClose, onNavigate, dark, allYears }) {
-  const [tab,              setTab]              = useState('chart')
-  const [loading,          setLoading]          = useState(false)
-  const [candles,          setCandles]          = useState(null)
-  const [stats,            setStats]            = useState(null)
-  const [sectors,          setSectors]          = useState(null)
-  const [available,        setAvailable]        = useState(true)
-  const [dataError,        setDataError]        = useState(null)
+function DetailPanel({ cell, onClose, onNavigate, dark, allYears, indexId }) {
+  const [tab,               setTab]               = useState('chart')
+  const [loading,           setLoading]           = useState(false)
+  const [candles,           setCandles]           = useState(null)
+  const [stats,             setStats]             = useState(null)
+  const [sectors,           setSectors]           = useState(null)
+  const [available,         setAvailable]         = useState(true)
+  const [dataError,         setDataError]         = useState(null)
   const [activeSectorIndex, setActiveSectorIndex] = useState(null)
 
   useEffect(() => {
     if (!cell) return
+    const ctrl = new AbortController()
     setLoading(true); setCandles(null); setStats(null); setSectors(null)
-    setAvailable(true); setDataError(null); setActiveSectorIndex(null)
+    setAvailable(true); setDataError(null); setActiveSectorIndex(null); setTab('chart')
 
     Promise.all([
-      getMonthDetail({ year: cell.year, month: cell.month }),
+      getMonthDetail({ index_id: indexId, year: cell.year, month: cell.month }),
       getSectorMonth({ year: cell.year, month: cell.month }),
     ])
       .then(([det, sec]) => {
+        if (ctrl.signal.aborted) return
         if (!det.data.available) { setAvailable(false); return }
         setCandles(det.data.candles || [])
         setStats(det.data.stats || null)
         setSectors(sec.data.sectors || [])
       })
       .catch(err => {
+        if (ctrl.signal.aborted) return
         const msg = err.response?.data?.message || err.response?.data?.error || 'Failed to load data'
         setDataError(msg)
       })
-      .finally(() => setLoading(false))
-  }, [cell?.year, cell?.month])
+      .finally(() => { if (!ctrl.signal.aborted) setLoading(false) })
+    return () => ctrl.abort()
+  }, [cell?.year, cell?.month, indexId])
 
   useEffect(() => {
     const h = e => { if (e.key === 'Escape') onClose() }
@@ -866,9 +871,8 @@ export default function InsightPage() {
   const doFetch = useCallback(async (indexId) => {
     setLoading(true); setError(''); setData(null); setSelected(null)
     try {
-      const r = await getMonthlyReturns({ index_id: indexId || selectedIndexId })
+      const r = await getMonthlyReturns({ index_id: indexId })
       setData(r.data)
-      // Auto-select latest available month
       if (r.data?.latest_data_date && r.data?.years?.length) {
         const dt  = new Date(r.data.latest_data_date)
         const yr  = dt.getFullYear()
@@ -878,13 +882,13 @@ export default function InsightPage() {
         setSelected({ year: yr, month: mo, value: val })
       }
     } catch (err) {
-      setError(err.response?.data?.message || err.response?.data?.error || 'Failed to load NEPSE data.')
+      setError(err.response?.data?.message || err.response?.data?.error || 'Failed to load data.')
     } finally {
       setLoading(false)
     }
-  }, [selectedIndexId])
+  }, [])
 
-  useEffect(() => { doFetch(selectedIndexId) }, [selectedIndexId]) // eslint-disable-line react-hooks/exhaustive-deps
+  useEffect(() => { doFetch(selectedIndexId) }, [selectedIndexId, doFetch])
 
   const allYears   = data?.years || []
   const latestDate = data?.latest_data_date || null
@@ -1208,6 +1212,7 @@ export default function InsightPage() {
         onNavigate={handleNavigate}
         dark={dark}
         allYears={allYears}
+        indexId={selectedIndexId}
       />
     </div>
   )
