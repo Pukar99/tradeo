@@ -3,6 +3,235 @@ import { useTheme } from '../../context/ThemeContext'
 import { useScreen } from '../../context/ScreenContext'
 import { getIndexChart, getStockChart, getTopMovers, getMarketSymbols, getSMCScan, triggerBackfill } from '../../api'
 
+// ── Drawing Tools ─────────────────────────────────────────────────────────────
+
+const DRAW_TOOLS = [
+  { id: 'trendline',   label: 'Trend',  title: 'Trendline',       icon: '╱'  },
+  { id: 'horizontal',  label: 'H-Line', title: 'Horizontal Line', icon: '―'  },
+  { id: 'vertical',    label: 'V-Line', title: 'Vertical Line',   icon: '|'  },
+  { id: 'ray',         label: 'Ray',    title: 'Ray (extends →)', icon: '→'  },
+  { id: 'fib',         label: 'Fib',    title: 'Fibonacci Retracement', icon: 'ψ' },
+  { id: 'path',        label: 'Path',   title: 'Path (multi-point)', icon: '⌇' },
+]
+
+const FIB_LEVELS = [0, 0.236, 0.382, 0.5, 0.618, 0.786, 1]
+const FIB_COLORS = ['#f87171','#fb923c','#facc15','#4ade80','#60a5fa','#a78bfa','#f472b6']
+
+function DrawingToolbar({ activeTool, setActiveTool, onClear, drawCount }) {
+  const [collapsed, setCollapsed] = useState(false)
+  return (
+    <div className="absolute left-3 top-1/2 -translate-y-1/2 z-30 flex flex-col gap-1 select-none"
+      style={{ userSelect: 'none' }}>
+      {/* Handle / toggle */}
+      <div
+        onClick={() => setCollapsed(p => !p)}
+        className="flex items-center justify-center w-7 h-5 rounded cursor-pointer bg-gray-900/80 border border-gray-700 hover:bg-gray-800 text-gray-400 text-[9px]"
+        title={collapsed ? 'Expand drawing toolbar' : 'Collapse'}
+      >{collapsed ? '▶' : '◀'}</div>
+
+      {!collapsed && (
+        <div className="flex flex-col gap-0.5 bg-gray-900/90 border border-gray-700 rounded-xl p-1 shadow-2xl backdrop-blur-sm">
+          {DRAW_TOOLS.map(t => (
+            <button
+              key={t.id}
+              title={t.title}
+              onClick={() => setActiveTool(p => p === t.id ? null : t.id)}
+              className={`flex flex-col items-center justify-center w-9 h-9 rounded-lg text-center transition-all ${
+                activeTool === t.id
+                  ? 'bg-blue-600 text-white shadow-inner'
+                  : 'text-gray-400 hover:bg-gray-700 hover:text-white'
+              }`}
+            >
+              <span className="text-[14px] font-bold leading-none">{t.icon}</span>
+              <span className="text-[7px] mt-0.5 leading-none">{t.label}</span>
+            </button>
+          ))}
+
+          {/* Divider */}
+          <div className="h-px bg-gray-700 my-0.5" />
+
+          {/* Clear all */}
+          <button
+            title="Clear all drawings"
+            onClick={onClear}
+            disabled={drawCount === 0}
+            className="flex flex-col items-center justify-center w-9 h-9 rounded-lg text-center transition-all text-gray-500 hover:bg-red-900/60 hover:text-red-400 disabled:opacity-30 disabled:cursor-not-allowed"
+          >
+            <span className="text-[13px] leading-none">✕</span>
+            <span className="text-[7px] mt-0.5 leading-none">Clear</span>
+          </button>
+        </div>
+      )}
+    </div>
+  )
+}
+
+// Convert chart logical coords → canvas pixel coords
+function chartToPixel(chart, time, price) {
+  try {
+    const x = chart.timeScale().timeToCoordinate(time)
+    const y = chart.priceScale('right').priceToCoordinate(price)
+    return (x == null || y == null) ? null : { x, y }
+  } catch { return null }
+}
+
+// Convert canvas mouse event → chart price/time
+function pixelToChart(chart, canvasEl, e) {
+  try {
+    const rect = canvasEl.getBoundingClientRect()
+    const x = e.clientX - rect.left
+    const y = e.clientY - rect.top
+    const time  = chart.timeScale().coordinateToTime(x)
+    const price = chart.priceScale('right').coordinateToPrice(y)
+    return { x, y, time, price }
+  } catch { return null }
+}
+
+function renderDrawings(ctx, canvas, chart, drawings, activeTool, preview, isDark) {
+  ctx.clearRect(0, 0, canvas.width, canvas.height)
+
+  const textColor = isDark ? '#e5e7eb' : '#111827'
+  const lineColor = '#3b82f6'
+
+  function drawLine(p1, p2, color = lineColor, dash = [], width = 1.5) {
+    if (!p1 || !p2) return
+    ctx.save()
+    ctx.strokeStyle = color
+    ctx.lineWidth = width
+    ctx.setLineDash(dash)
+    ctx.beginPath()
+    ctx.moveTo(p1.x, p1.y)
+    ctx.lineTo(p2.x, p2.y)
+    ctx.stroke()
+    ctx.restore()
+  }
+
+  function extendRay(p1, p2, w, h) {
+    // extend from p1 through p2 to canvas edge
+    const dx = p2.x - p1.x, dy = p2.y - p1.y
+    if (dx === 0 && dy === 0) return p2
+    const ts = []
+    if (dx !== 0) {
+      ts.push((w - p1.x) / dx)
+      ts.push((0 - p1.x) / dx)
+    }
+    if (dy !== 0) {
+      ts.push((h - p1.y) / dy)
+      ts.push((0 - p1.y) / dy)
+    }
+    const t = Math.min(...ts.filter(t => t > 0))
+    return { x: p1.x + dx * t, y: p1.y + dy * t }
+  }
+
+  function drawFib(p1, p2, color = lineColor) {
+    if (!p1 || !p2) return
+    const dy = p2.y - p1.y
+    ctx.save()
+    FIB_LEVELS.forEach((lvl, i) => {
+      const y = p1.y + dy * lvl
+      const c = FIB_COLORS[i]
+      ctx.strokeStyle = c; ctx.lineWidth = 1; ctx.setLineDash([4, 3])
+      ctx.beginPath(); ctx.moveTo(0, y); ctx.lineTo(canvas.width, y); ctx.stroke()
+      ctx.fillStyle = c; ctx.font = 'bold 9px monospace'
+      ctx.fillText(`${(lvl * 100).toFixed(1)}%`, 4, y - 2)
+      const price = chart.priceScale('right').coordinateToPrice(y)
+      if (price != null) {
+        ctx.fillStyle = isDark ? '#9ca3af' : '#6b7280'
+        ctx.font = '9px monospace'
+        ctx.fillText(price.toFixed(2), 44, y - 2)
+      }
+    })
+    // Draw the two anchor vertical lines
+    ctx.setLineDash([2, 4]); ctx.strokeStyle = color + '66'; ctx.lineWidth = 1
+    ctx.beginPath(); ctx.moveTo(p1.x, 0); ctx.lineTo(p1.x, canvas.height); ctx.stroke()
+    ctx.beginPath(); ctx.moveTo(p2.x, 0); ctx.lineTo(p2.x, canvas.height); ctx.stroke()
+    ctx.restore()
+  }
+
+  for (const d of drawings) {
+    if (d.type === 'horizontal') {
+      const p = chartToPixel(chart, d.time, d.price)
+      if (!p) continue
+      drawLine({ x: 0, y: p.y }, { x: canvas.width, y: p.y }, d.color, [], 1.5)
+      ctx.save(); ctx.fillStyle = d.color; ctx.font = 'bold 9px monospace'
+      ctx.fillText(d.price.toFixed(2), canvas.width - 52, p.y - 3)
+      ctx.restore()
+    } else if (d.type === 'vertical') {
+      const p = chartToPixel(chart, d.time, 0)
+      if (!p) continue
+      drawLine({ x: p.x, y: 0 }, { x: p.x, y: canvas.height }, d.color, [4, 3], 1.5)
+      ctx.save(); ctx.fillStyle = d.color; ctx.font = 'bold 9px monospace'
+      ctx.save(); ctx.translate(p.x + 4, 20); ctx.rotate(0)
+      ctx.fillText(d.time, 0, 0); ctx.restore()
+      ctx.restore()
+    } else if (d.type === 'trendline') {
+      const p1 = chartToPixel(chart, d.t1, d.p1)
+      const p2 = chartToPixel(chart, d.t2, d.p2)
+      drawLine(p1, p2, d.color, [], 1.5)
+      // Small dot endpoints
+      if (p1) { ctx.save(); ctx.fillStyle = d.color; ctx.beginPath(); ctx.arc(p1.x, p1.y, 3, 0, Math.PI*2); ctx.fill(); ctx.restore() }
+      if (p2) { ctx.save(); ctx.fillStyle = d.color; ctx.beginPath(); ctx.arc(p2.x, p2.y, 3, 0, Math.PI*2); ctx.fill(); ctx.restore() }
+    } else if (d.type === 'ray') {
+      const p1 = chartToPixel(chart, d.t1, d.p1)
+      const p2 = chartToPixel(chart, d.t2, d.p2)
+      if (p1 && p2) {
+        const ext = extendRay(p1, p2, canvas.width, canvas.height)
+        drawLine(p1, ext, d.color, [], 1.5)
+        if (p1) { ctx.save(); ctx.fillStyle = d.color; ctx.beginPath(); ctx.arc(p1.x, p1.y, 3, 0, Math.PI*2); ctx.fill(); ctx.restore() }
+      }
+    } else if (d.type === 'fib') {
+      const p1 = chartToPixel(chart, d.t1, d.p1)
+      const p2 = chartToPixel(chart, d.t2, d.p2)
+      drawFib(p1, p2, d.color)
+    } else if (d.type === 'path') {
+      if (d.points.length < 2) continue
+      ctx.save(); ctx.strokeStyle = d.color; ctx.lineWidth = 1.5; ctx.setLineDash([])
+      ctx.beginPath()
+      const pts = d.points.map(pt => chartToPixel(chart, pt.time, pt.price)).filter(Boolean)
+      if (pts.length < 2) { ctx.restore(); continue }
+      ctx.moveTo(pts[0].x, pts[0].y)
+      for (let i = 1; i < pts.length; i++) ctx.lineTo(pts[i].x, pts[i].y)
+      ctx.stroke()
+      pts.forEach(pt => { ctx.fillStyle = d.color; ctx.beginPath(); ctx.arc(pt.x, pt.y, 2.5, 0, Math.PI*2); ctx.fill() })
+      ctx.restore()
+    }
+  }
+
+  // Preview (in-progress drawing)
+  if (preview) {
+    const { tool, start, end, points } = preview
+    if (tool === 'horizontal' && start) {
+      const p = chartToPixel(chart, start.time, start.price)
+      if (p) drawLine({ x: 0, y: p.y }, { x: canvas.width, y: p.y }, '#60a5fa', [4, 3])
+    } else if (tool === 'vertical' && start) {
+      const p = chartToPixel(chart, start.time, 0)
+      if (p) drawLine({ x: p.x, y: 0 }, { x: p.x, y: canvas.height }, '#60a5fa', [4, 3])
+    } else if ((tool === 'trendline' || tool === 'ray' || tool === 'fib') && start && end) {
+      const p1 = chartToPixel(chart, start.time, start.price)
+      const p2 = chartToPixel(chart, end.time, end.price)
+      if (tool === 'fib') drawFib(p1, p2, '#60a5fa')
+      else if (tool === 'ray' && p1 && p2) {
+        const ext = extendRay(p1, p2, canvas.width, canvas.height)
+        drawLine(p1, ext, '#60a5fa', [3, 3])
+      } else drawLine(p1, p2, '#60a5fa', [3, 3])
+    } else if (tool === 'path' && points?.length) {
+      const pts = points.map(pt => chartToPixel(chart, pt.time, pt.price)).filter(Boolean)
+      if (end) {
+        const cur = chartToPixel(chart, end.time, end.price)
+        if (cur) pts.push(cur)
+      }
+      if (pts.length >= 2) {
+        ctx.save(); ctx.strokeStyle = '#60a5fa'; ctx.lineWidth = 1.5; ctx.setLineDash([3, 3])
+        ctx.beginPath(); ctx.moveTo(pts[0].x, pts[0].y)
+        for (let i = 1; i < pts.length; i++) ctx.lineTo(pts[i].x, pts[i].y)
+        ctx.stroke()
+        pts.forEach(pt => { ctx.fillStyle = '#60a5fa'; ctx.beginPath(); ctx.arc(pt.x, pt.y, 2.5, 0, Math.PI*2); ctx.fill() })
+        ctx.restore()
+      }
+    }
+  }
+}
+
 // ── Indicator math ────────────────────────────────────────────────────────────
 
 function calcMA(data, period = 20) {
@@ -639,16 +868,25 @@ export default function StockChart() {
   const chartsRef  = useRef({})
   const seriesRef  = useRef({})
   const moversCache    = useRef({})
-  const pendingHover   = useRef(null)  // debounce movers fetch
+  const pendingHover   = useRef(null)
   const pinnedDateRef  = useRef(pinnedDate)
 
-  const [chartData,   setChartData]   = useState([])
-  const [loading,     setLoading]     = useState(true)
-  const [error,       setError]       = useState(null)
-  const [tooltip,     setTooltip]     = useState(null)
-  const [overlayData, setOverlayData] = useState(null)
-  const [latestClose, setLatestClose] = useState(null)
-  const [smcData,     setSmcData]     = useState(null)
+  // Drawing tools
+  const canvasRef      = useRef(null)
+  const drawingsRef    = useRef([])   // persisted drawings [{type,color,...}]
+  const drawPreviewRef = useRef(null) // in-progress drawing state
+  const rafRef         = useRef(null) // requestAnimationFrame handle
+
+  const [chartData,      setChartData]      = useState([])
+  const [loading,        setLoading]        = useState(true)
+  const [error,          setError]          = useState(null)
+  const [tooltip,        setTooltip]        = useState(null)
+  const [overlayData,    setOverlayData]    = useState(null)
+  const [latestClose,    setLatestClose]    = useState(null)
+  const [smcData,        setSmcData]        = useState(null)
+  const [activeTool,     setActiveTool]     = useState(null)
+  const [drawVersion,    setDrawVersion]    = useState(0)  // bump to repaint canvas
+  const [chartBuiltVer,  setChartBuiltVer]  = useState(0)  // bumps when chart instance is created
 
   const C = {
     bg:     isDark ? '#030712' : '#ffffff',
@@ -779,6 +1017,7 @@ export default function StockChart() {
         height: mainRef.current.clientHeight,
       })
       chartsRef.current.main = main
+      setChartBuiltVer(v => v + 1)
 
       let priceSeries
       if (chartType === 'candlestick') {
@@ -1156,6 +1395,169 @@ export default function StockChart() {
     if (!pinnedDate) setOverlayData(prev => prev ? { ...prev, pinned: false } : null)
   }, [pinnedDate])
 
+  // Keep canvas sized to mainRef and repaint on every chart scroll/scale
+  useEffect(() => {
+    const chart = chartsRef.current.main
+    const canvas = canvasRef.current
+    if (!chart || !canvas || !mainRef.current) return
+
+    function syncSize() {
+      const w = mainRef.current?.clientWidth  || 0
+      const h = mainRef.current?.clientHeight || 0
+      if (canvas.width !== w || canvas.height !== h) {
+        canvas.width  = w
+        canvas.height = h
+      }
+    }
+
+    function repaint() {
+      syncSize()
+      const ctx = canvas.getContext('2d')
+      renderDrawings(ctx, canvas, chart, drawingsRef.current, activeTool, drawPreviewRef.current, isDark)
+    }
+
+    function scheduleRepaint() {
+      if (rafRef.current) cancelAnimationFrame(rafRef.current)
+      rafRef.current = requestAnimationFrame(repaint)
+    }
+
+    repaint()
+    // Re-draw whenever chart scrolls or scales
+    chart.timeScale().subscribeVisibleTimeRangeChange(scheduleRepaint)
+    const ro = new ResizeObserver(scheduleRepaint)
+    if (mainRef.current) ro.observe(mainRef.current)
+
+    return () => {
+      if (rafRef.current) cancelAnimationFrame(rafRef.current)
+      try { chart.timeScale().unsubscribeVisibleTimeRangeChange(scheduleRepaint) } catch (_) {}
+      ro.disconnect()
+    }
+  }, [chartBuiltVer, isDark, activeTool, drawVersion]) // eslint-disable-line react-hooks/exhaustive-deps
+
+  // Canvas mouse handlers for drawing
+  const activeToolRef = useRef(activeTool)
+  useEffect(() => { activeToolRef.current = activeTool }, [activeTool])
+
+  useEffect(() => {
+    const canvas = canvasRef.current
+    const getChart = () => chartsRef.current.main
+    if (!canvas) return
+
+    const DRAW_COLORS = ['#3b82f6','#10b981','#f59e0b','#ef4444','#a78bfa','#f472b6']
+    let colorIdx = 0
+    const nextColor = () => DRAW_COLORS[colorIdx++ % DRAW_COLORS.length]
+
+    function scheduleRepaint() {
+      const chart = getChart()
+      if (!chart || !canvasRef.current) return
+      if (rafRef.current) cancelAnimationFrame(rafRef.current)
+      rafRef.current = requestAnimationFrame(() => {
+        const ctx = canvasRef.current?.getContext('2d')
+        if (ctx && chart) renderDrawings(ctx, canvasRef.current, chart, drawingsRef.current, activeToolRef.current, drawPreviewRef.current, isDark)
+      })
+    }
+
+    function onMouseDown(e) {
+      const tool = activeToolRef.current
+      if (!tool) return
+      e.stopPropagation()
+      const chart = getChart()
+      if (!chart) return
+      const pt = pixelToChart(chart, canvas, e)
+      if (!pt || pt.time == null || pt.price == null) return
+
+      if (tool === 'horizontal') {
+        drawingsRef.current.push({ type: 'horizontal', time: pt.time, price: pt.price, color: nextColor() })
+        setDrawVersion(v => v + 1)
+        scheduleRepaint()
+      } else if (tool === 'vertical') {
+        drawingsRef.current.push({ type: 'vertical', time: pt.time, price: pt.price, color: nextColor() })
+        setDrawVersion(v => v + 1)
+        scheduleRepaint()
+      } else if (tool === 'trendline' || tool === 'ray' || tool === 'fib') {
+        drawPreviewRef.current = { tool, start: pt, end: pt, color: nextColor() }
+        scheduleRepaint()
+      } else if (tool === 'path') {
+        if (!drawPreviewRef.current) {
+          drawPreviewRef.current = { tool, points: [{ time: pt.time, price: pt.price }], end: pt, color: nextColor() }
+        } else {
+          drawPreviewRef.current.points.push({ time: pt.time, price: pt.price })
+          drawPreviewRef.current.end = pt
+        }
+        scheduleRepaint()
+      }
+    }
+
+    function onMouseMove(e) {
+      if (!drawPreviewRef.current) return
+      const chart = getChart()
+      if (!chart) return
+      const pt = pixelToChart(chart, canvas, e)
+      if (!pt) return
+      drawPreviewRef.current.end = pt
+      scheduleRepaint()
+    }
+
+    function onMouseUp(e) {
+      const tool = activeToolRef.current
+      const preview = drawPreviewRef.current
+      if (!preview || !tool) return
+      if (tool === 'path') return // path commits on double-click
+      const chart = getChart()
+      if (!chart) return
+      const pt = pixelToChart(chart, canvas, e)
+      if (!pt || pt.time == null || pt.price == null) return
+
+      if (tool === 'trendline' || tool === 'ray' || tool === 'fib') {
+        // Only commit if user actually moved (not just a click)
+        if (preview.start && (Math.abs(pt.x - (chartToPixel(chart, preview.start.time, preview.start.price)?.x ?? pt.x)) > 5)) {
+          drawingsRef.current.push({
+            type: tool, color: preview.color,
+            t1: preview.start.time, p1: preview.start.price,
+            t2: pt.time, p2: pt.price,
+          })
+          setDrawVersion(v => v + 1)
+        }
+        drawPreviewRef.current = null
+        scheduleRepaint()
+      }
+    }
+
+    function onDblClick(e) {
+      const tool = activeToolRef.current
+      const preview = drawPreviewRef.current
+      if (tool === 'path' && preview?.points?.length >= 2) {
+        drawingsRef.current.push({ type: 'path', color: preview.color, points: preview.points })
+        setDrawVersion(v => v + 1)
+        drawPreviewRef.current = null
+        scheduleRepaint()
+      }
+    }
+
+    function onContextMenu(e) {
+      const tool = activeToolRef.current
+      if (!tool) return
+      e.preventDefault()
+      // Right-click cancels in-progress drawing
+      drawPreviewRef.current = null
+      scheduleRepaint()
+    }
+
+    canvas.addEventListener('mousedown',   onMouseDown)
+    canvas.addEventListener('mousemove',   onMouseMove)
+    canvas.addEventListener('mouseup',     onMouseUp)
+    canvas.addEventListener('dblclick',    onDblClick)
+    canvas.addEventListener('contextmenu', onContextMenu)
+
+    return () => {
+      canvas.removeEventListener('mousedown',   onMouseDown)
+      canvas.removeEventListener('mousemove',   onMouseMove)
+      canvas.removeEventListener('mouseup',     onMouseUp)
+      canvas.removeEventListener('dblclick',    onDblClick)
+      canvas.removeEventListener('contextmenu', onContextMenu)
+    }
+  }, [isDark]) // eslint-disable-line react-hooks/exhaustive-deps
+
   const showRSI   = activeIndicators.includes('RSI')
   const showMACD  = activeIndicators.includes('MACD')
   const showATR   = activeIndicators.includes('ATR')
@@ -1238,12 +1640,49 @@ export default function StockChart() {
             </div>
           )}
 
-          {/* Main price chart */}
+          {/* Active drawing tool hint */}
+          {activeTool && (
+            <div className="absolute bottom-10 left-1/2 -translate-x-1/2 z-30 pointer-events-none">
+              <span className="text-[9px] text-white bg-blue-600/90 px-2.5 py-1 rounded-full shadow">
+                {activeTool === 'horizontal' ? 'Click to place horizontal line'
+                : activeTool === 'vertical'  ? 'Click to place vertical line'
+                : activeTool === 'path'      ? 'Click to add points · Double-click to finish · Right-click to cancel'
+                : activeTool === 'fib'       ? 'Click & drag to set Fibonacci range'
+                : 'Click & drag · Right-click to cancel'}
+              </span>
+            </div>
+          )}
+
+          {/* ── Drawing toolbar (floating, left-center) ── */}
+          <DrawingToolbar
+            activeTool={activeTool}
+            setActiveTool={setActiveTool}
+            drawCount={drawingsRef.current.length}
+            onClear={() => {
+              drawingsRef.current = []
+              drawPreviewRef.current = null
+              setActiveTool(null)
+              setDrawVersion(v => v + 1)
+            }}
+          />
+
+          {/* Main price chart + drawing canvas overlay */}
           <div
             ref={mainRef}
-            className="w-full shrink-0"
+            className="w-full shrink-0 relative"
             style={{ height: `${mainPct}%` }}
-          />
+          >
+            <canvas
+              ref={canvasRef}
+              className="absolute inset-0 z-10"
+              style={{
+                pointerEvents: activeTool ? 'auto' : 'none',
+                cursor: activeTool === 'path' ? 'crosshair'
+                      : activeTool ? 'crosshair'
+                      : 'default',
+              }}
+            />
+          </div>
 
           {showRSI && (
             <div className="w-full shrink-0 border-t border-gray-100 dark:border-gray-800 flex flex-col" style={{ height: `${subPanePct}%` }}>
