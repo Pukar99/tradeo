@@ -18,63 +18,61 @@ const FIB_LEVELS = [0, 0.236, 0.382, 0.5, 0.618, 0.786, 1]
 const FIB_COLORS = ['#f87171','#fb923c','#facc15','#4ade80','#60a5fa','#a78bfa','#f472b6']
 
 // Convert chart logical coords → canvas pixel coords
-function chartToPixel(chart, time, price) {
+// priceSeries must be a series instance (chart.priceScale('right') removed in lw-charts v4)
+function chartToPixel(chart, priceSeries, time, price) {
   try {
     const x = chart.timeScale().timeToCoordinate(time)
-    const y = chart.priceScale('right').priceToCoordinate(price)
+    const y = priceSeries.priceToCoordinate(price)
     return (x == null || y == null) ? null : { x, y }
   } catch { return null }
 }
 
-// Convert canvas mouse event → chart price/time
-function pixelToChart(chart, canvasEl, e) {
+// Convert mouse event coords (relative to containerEl) → chart price/time
+function pixelToChart(chart, priceSeries, containerEl, e) {
   try {
-    const rect = canvasEl.getBoundingClientRect()
+    const rect = containerEl.getBoundingClientRect()
     const x = e.clientX - rect.left
     const y = e.clientY - rect.top
     const time  = chart.timeScale().coordinateToTime(x)
-    const price = chart.priceScale('right').coordinateToPrice(y)
+    const price = priceSeries.coordinateToPrice(y)
     return { x, y, time, price }
   } catch { return null }
 }
 
-function renderDrawings(ctx, canvas, chart, drawings, activeTool, preview, isDark) {
+function renderDrawings(ctx, canvas, chart, priceSeries, drawings, preview, isDark) {
   ctx.clearRect(0, 0, canvas.width, canvas.height)
 
-  const textColor = isDark ? '#e5e7eb' : '#111827'
-  const lineColor = '#3b82f6'
+  // shorthand: convert price/time → pixel using the passed series
+  const c2p = (time, price) => chartToPixel(chart, priceSeries, time, price)
 
-  function drawLine(p1, p2, color = lineColor, dash = [], width = 1.5) {
+  function drawLine(p1, p2, color, dash = [], width = 1.5) {
     if (!p1 || !p2) return
     ctx.save()
-    ctx.strokeStyle = color
-    ctx.lineWidth = width
-    ctx.setLineDash(dash)
-    ctx.beginPath()
-    ctx.moveTo(p1.x, p1.y)
-    ctx.lineTo(p2.x, p2.y)
-    ctx.stroke()
+    ctx.strokeStyle = color; ctx.lineWidth = width; ctx.setLineDash(dash)
+    ctx.beginPath(); ctx.moveTo(p1.x, p1.y); ctx.lineTo(p2.x, p2.y); ctx.stroke()
     ctx.restore()
   }
 
-  function extendRay(p1, p2, w, h) {
-    // extend from p1 through p2 to canvas edge
+  function dot(p, color, r = 3) {
+    if (!p) return
+    ctx.save(); ctx.fillStyle = color
+    ctx.beginPath(); ctx.arc(p.x, p.y, r, 0, Math.PI * 2); ctx.fill()
+    ctx.restore()
+  }
+
+  function extendRay(p1, p2) {
     const dx = p2.x - p1.x, dy = p2.y - p1.y
     if (dx === 0 && dy === 0) return p2
     const ts = []
-    if (dx !== 0) {
-      ts.push((w - p1.x) / dx)
-      ts.push((0 - p1.x) / dx)
-    }
-    if (dy !== 0) {
-      ts.push((h - p1.y) / dy)
-      ts.push((0 - p1.y) / dy)
-    }
-    const t = Math.min(...ts.filter(t => t > 0))
+    if (dx > 0) ts.push((canvas.width - p1.x) / dx)
+    if (dx < 0) ts.push((0 - p1.x) / dx)
+    if (dy > 0) ts.push((canvas.height - p1.y) / dy)
+    if (dy < 0) ts.push((0 - p1.y) / dy)
+    const t = Math.min(...ts.filter(v => v > 0.001))
     return { x: p1.x + dx * t, y: p1.y + dy * t }
   }
 
-  function drawFib(p1, p2, color = lineColor) {
+  function drawFib(p1, p2) {
     if (!p1 || !p2) return
     const dy = p2.y - p1.y
     ctx.save()
@@ -82,103 +80,81 @@ function renderDrawings(ctx, canvas, chart, drawings, activeTool, preview, isDar
       const y = p1.y + dy * lvl
       const c = FIB_COLORS[i]
       ctx.strokeStyle = c; ctx.lineWidth = 1; ctx.setLineDash([4, 3])
-      ctx.beginPath(); ctx.moveTo(0, y); ctx.lineTo(canvas.width, y); ctx.stroke()
+      ctx.beginPath(); ctx.moveTo(p1.x, y); ctx.lineTo(p2.x > p1.x ? canvas.width : 0, y); ctx.stroke()
       ctx.fillStyle = c; ctx.font = 'bold 9px monospace'
       ctx.fillText(`${(lvl * 100).toFixed(1)}%`, 4, y - 2)
-      const price = chart.priceScale('right').coordinateToPrice(y)
-      if (price != null) {
-        ctx.fillStyle = isDark ? '#9ca3af' : '#6b7280'
-        ctx.font = '9px monospace'
-        ctx.fillText(price.toFixed(2), 44, y - 2)
-      }
+      // price label — use series coordinateToPrice (v4 API)
+      try {
+        const price = priceSeries.coordinateToPrice(y)
+        if (price != null) {
+          ctx.fillStyle = isDark ? '#9ca3af' : '#6b7280'
+          ctx.font = '9px monospace'
+          ctx.fillText(price.toFixed(2), 44, y - 2)
+        }
+      } catch (_) {}
     })
-    // Draw the two anchor vertical lines
-    ctx.setLineDash([2, 4]); ctx.strokeStyle = color + '66'; ctx.lineWidth = 1
-    ctx.beginPath(); ctx.moveTo(p1.x, 0); ctx.lineTo(p1.x, canvas.height); ctx.stroke()
-    ctx.beginPath(); ctx.moveTo(p2.x, 0); ctx.lineTo(p2.x, canvas.height); ctx.stroke()
     ctx.restore()
   }
 
+  // ── Committed drawings ──
   for (const d of drawings) {
     if (d.type === 'horizontal') {
-      const p = chartToPixel(chart, d.time, d.price)
+      const p = c2p(d.time, d.price)
       if (!p) continue
-      drawLine({ x: 0, y: p.y }, { x: canvas.width, y: p.y }, d.color, [], 1.5)
+      drawLine({ x: 0, y: p.y }, { x: canvas.width, y: p.y }, d.color)
       ctx.save(); ctx.fillStyle = d.color; ctx.font = 'bold 9px monospace'
-      ctx.fillText(d.price.toFixed(2), canvas.width - 52, p.y - 3)
-      ctx.restore()
+      ctx.fillText(d.price.toFixed(2), canvas.width - 54, p.y - 3); ctx.restore()
     } else if (d.type === 'vertical') {
-      const p = chartToPixel(chart, d.time, 0)
+      const p = c2p(d.time, d.price)
       if (!p) continue
-      drawLine({ x: p.x, y: 0 }, { x: p.x, y: canvas.height }, d.color, [4, 3], 1.5)
-      ctx.save(); ctx.fillStyle = d.color; ctx.font = 'bold 9px monospace'
-      ctx.save(); ctx.translate(p.x + 4, 20); ctx.rotate(0)
-      ctx.fillText(d.time, 0, 0); ctx.restore()
-      ctx.restore()
+      drawLine({ x: p.x, y: 0 }, { x: p.x, y: canvas.height }, d.color, [4, 3])
+      ctx.save(); ctx.fillStyle = d.color; ctx.font = '9px monospace'
+      ctx.fillText(d.time, p.x + 4, 14); ctx.restore()
     } else if (d.type === 'trendline') {
-      const p1 = chartToPixel(chart, d.t1, d.p1)
-      const p2 = chartToPixel(chart, d.t2, d.p2)
-      drawLine(p1, p2, d.color, [], 1.5)
-      // Small dot endpoints
-      if (p1) { ctx.save(); ctx.fillStyle = d.color; ctx.beginPath(); ctx.arc(p1.x, p1.y, 3, 0, Math.PI*2); ctx.fill(); ctx.restore() }
-      if (p2) { ctx.save(); ctx.fillStyle = d.color; ctx.beginPath(); ctx.arc(p2.x, p2.y, 3, 0, Math.PI*2); ctx.fill(); ctx.restore() }
+      const p1 = c2p(d.t1, d.p1), p2 = c2p(d.t2, d.p2)
+      drawLine(p1, p2, d.color); dot(p1, d.color); dot(p2, d.color)
     } else if (d.type === 'ray') {
-      const p1 = chartToPixel(chart, d.t1, d.p1)
-      const p2 = chartToPixel(chart, d.t2, d.p2)
-      if (p1 && p2) {
-        const ext = extendRay(p1, p2, canvas.width, canvas.height)
-        drawLine(p1, ext, d.color, [], 1.5)
-        if (p1) { ctx.save(); ctx.fillStyle = d.color; ctx.beginPath(); ctx.arc(p1.x, p1.y, 3, 0, Math.PI*2); ctx.fill(); ctx.restore() }
-      }
+      const p1 = c2p(d.t1, d.p1), p2 = c2p(d.t2, d.p2)
+      if (p1 && p2) { drawLine(p1, extendRay(p1, p2), d.color); dot(p1, d.color) }
     } else if (d.type === 'fib') {
-      const p1 = chartToPixel(chart, d.t1, d.p1)
-      const p2 = chartToPixel(chart, d.t2, d.p2)
-      drawFib(p1, p2, d.color)
+      drawFib(c2p(d.t1, d.p1), c2p(d.t2, d.p2))
     } else if (d.type === 'path') {
-      if (d.points.length < 2) continue
+      const pts = d.points.map(pt => c2p(pt.time, pt.price)).filter(Boolean)
+      if (pts.length < 2) continue
       ctx.save(); ctx.strokeStyle = d.color; ctx.lineWidth = 1.5; ctx.setLineDash([])
-      ctx.beginPath()
-      const pts = d.points.map(pt => chartToPixel(chart, pt.time, pt.price)).filter(Boolean)
-      if (pts.length < 2) { ctx.restore(); continue }
-      ctx.moveTo(pts[0].x, pts[0].y)
+      ctx.beginPath(); ctx.moveTo(pts[0].x, pts[0].y)
       for (let i = 1; i < pts.length; i++) ctx.lineTo(pts[i].x, pts[i].y)
-      ctx.stroke()
-      pts.forEach(pt => { ctx.fillStyle = d.color; ctx.beginPath(); ctx.arc(pt.x, pt.y, 2.5, 0, Math.PI*2); ctx.fill() })
-      ctx.restore()
+      ctx.stroke(); ctx.restore()
+      pts.forEach(p => dot(p, d.color, 2.5))
     }
   }
 
-  // Preview (in-progress drawing)
-  if (preview) {
-    const { tool, start, end, points } = preview
-    if (tool === 'horizontal' && start) {
-      const p = chartToPixel(chart, start.time, start.price)
-      if (p) drawLine({ x: 0, y: p.y }, { x: canvas.width, y: p.y }, '#60a5fa', [4, 3])
-    } else if (tool === 'vertical' && start) {
-      const p = chartToPixel(chart, start.time, 0)
-      if (p) drawLine({ x: p.x, y: 0 }, { x: p.x, y: canvas.height }, '#60a5fa', [4, 3])
-    } else if ((tool === 'trendline' || tool === 'ray' || tool === 'fib') && start && end) {
-      const p1 = chartToPixel(chart, start.time, start.price)
-      const p2 = chartToPixel(chart, end.time, end.price)
-      if (tool === 'fib') drawFib(p1, p2, '#60a5fa')
-      else if (tool === 'ray' && p1 && p2) {
-        const ext = extendRay(p1, p2, canvas.width, canvas.height)
-        drawLine(p1, ext, '#60a5fa', [3, 3])
-      } else drawLine(p1, p2, '#60a5fa', [3, 3])
-    } else if (tool === 'path' && points?.length) {
-      const pts = points.map(pt => chartToPixel(chart, pt.time, pt.price)).filter(Boolean)
-      if (end) {
-        const cur = chartToPixel(chart, end.time, end.price)
-        if (cur) pts.push(cur)
-      }
-      if (pts.length >= 2) {
-        ctx.save(); ctx.strokeStyle = '#60a5fa'; ctx.lineWidth = 1.5; ctx.setLineDash([3, 3])
-        ctx.beginPath(); ctx.moveTo(pts[0].x, pts[0].y)
-        for (let i = 1; i < pts.length; i++) ctx.lineTo(pts[i].x, pts[i].y)
-        ctx.stroke()
-        pts.forEach(pt => { ctx.fillStyle = '#60a5fa'; ctx.beginPath(); ctx.arc(pt.x, pt.y, 2.5, 0, Math.PI*2); ctx.fill() })
-        ctx.restore()
-      }
+  // ── Live preview ──
+  if (!preview) return
+  const { tool, start, end, points } = preview
+  const PRE = '#f59e0b' // amber preview color
+
+  if (tool === 'horizontal' && start) {
+    // horizontal: use raw pixel y from mouse, not chart conversion
+    drawLine({ x: 0, y: start.y }, { x: canvas.width, y: start.y }, PRE, [4, 3])
+  } else if (tool === 'vertical' && start) {
+    drawLine({ x: start.x, y: 0 }, { x: start.x, y: canvas.height }, PRE, [4, 3])
+  } else if ((tool === 'trendline' || tool === 'ray') && start && end) {
+    const p1 = { x: start.x, y: start.y }, p2 = { x: end.x, y: end.y }
+    if (tool === 'ray') drawLine(p1, extendRay(p1, p2), PRE, [3, 3])
+    else drawLine(p1, p2, PRE, [3, 3])
+    dot(p1, PRE)
+  } else if (tool === 'fib' && start && end) {
+    drawFib({ x: start.x, y: start.y }, { x: end.x, y: end.y })
+  } else if (tool === 'path' && points?.length) {
+    const pts = points.map(pt => c2p(pt.time, pt.price)).filter(Boolean)
+    if (end) pts.push({ x: end.x, y: end.y })
+    if (pts.length >= 2) {
+      ctx.save(); ctx.strokeStyle = PRE; ctx.lineWidth = 1.5; ctx.setLineDash([3, 3])
+      ctx.beginPath(); ctx.moveTo(pts[0].x, pts[0].y)
+      for (let i = 1; i < pts.length; i++) ctx.lineTo(pts[i].x, pts[i].y)
+      ctx.stroke(); ctx.restore()
+      pts.forEach(p => dot(p, PRE, 2.5))
     }
   }
 }
@@ -852,9 +828,10 @@ export default function StockChart() {
 
   // Drawing tools
   const canvasRef      = useRef(null)
-  const drawingsRef    = useRef([])   // persisted drawings [{type,color,...}]
-  const drawPreviewRef = useRef(null) // in-progress drawing state
-  const rafRef         = useRef(null) // requestAnimationFrame handle
+  const priceSeriesRef = useRef(null)  // set after chart build — needed for coordinate conversion
+  const drawingsRef    = useRef([])
+  const drawPreviewRef = useRef(null)
+  const rafRef         = useRef(null)
 
   const [chartData,      setChartData]      = useState([])
   const [loading,        setLoading]        = useState(true)
@@ -1014,6 +991,7 @@ export default function StockChart() {
         priceSeries.setData(chartData.map(d => ({ time: d.time, value: d.close })))
       }
       seriesRef.current.price = priceSeries
+      priceSeriesRef.current  = priceSeries
 
       // MA overlay
       if (activeIndicators.includes('MA')) {
@@ -1378,7 +1356,8 @@ export default function StockChart() {
   useEffect(() => {
     const chart = chartsRef.current.main
     const canvas = canvasRef.current
-    if (!chart || !canvas || !mainRef.current) return
+    const ps = priceSeriesRef.current
+    if (!chart || !canvas || !ps || !mainRef.current) return
 
     function syncSize() {
       const w = mainRef.current?.clientWidth  || 0
@@ -1392,7 +1371,7 @@ export default function StockChart() {
     function repaint() {
       syncSize()
       const ctx = canvas.getContext('2d')
-      renderDrawings(ctx, canvas, chart, drawingsRef.current, activeTool, drawPreviewRef.current, isDark)
+      renderDrawings(ctx, canvas, chart, ps, drawingsRef.current, drawPreviewRef.current, isDark)
     }
 
     function scheduleRepaint() {
@@ -1413,49 +1392,60 @@ export default function StockChart() {
     }
   }, [chartBuiltVer, isDark, activeTool, drawVersion]) // eslint-disable-line react-hooks/exhaustive-deps
 
-  // Canvas mouse handlers for drawing
+  // Drawing mouse handlers — re-registers whenever chartBuiltVer changes (new chart instance)
   const activeToolRef = useRef(activeTool)
   useEffect(() => { activeToolRef.current = activeTool }, [activeTool])
 
   useEffect(() => {
-    const canvas = canvasRef.current
-    const getChart = () => chartsRef.current.main
-    if (!canvas) return
+    // Attach to mainRef so events fire regardless of canvas pointer-events setting
+    const container = mainRef.current
+    if (!container) return
 
     const DRAW_COLORS = ['#3b82f6','#10b981','#f59e0b','#ef4444','#a78bfa','#f472b6']
     let colorIdx = 0
     const nextColor = () => DRAW_COLORS[colorIdx++ % DRAW_COLORS.length]
 
+    function getCtx() { return chartsRef.current.main }
+    function getPs()  { return priceSeriesRef.current }
+
+    function repaintNow() {
+      const chart = getCtx(), ps = getPs(), canvas = canvasRef.current
+      if (!chart || !ps || !canvas) return
+      // sync size
+      canvas.width  = container.clientWidth
+      canvas.height = container.clientHeight
+      const ctx = canvas.getContext('2d')
+      renderDrawings(ctx, canvas, chart, ps, drawingsRef.current, drawPreviewRef.current, isDark)
+    }
+
     function scheduleRepaint() {
-      const chart = getChart()
-      if (!chart || !canvasRef.current) return
       if (rafRef.current) cancelAnimationFrame(rafRef.current)
-      rafRef.current = requestAnimationFrame(() => {
-        const ctx = canvasRef.current?.getContext('2d')
-        if (ctx && chart) renderDrawings(ctx, canvasRef.current, chart, drawingsRef.current, activeToolRef.current, drawPreviewRef.current, isDark)
-      })
+      rafRef.current = requestAnimationFrame(repaintNow)
+    }
+
+    function getPoint(e) {
+      const chart = getCtx(), ps = getPs()
+      if (!chart || !ps) return null
+      return pixelToChart(chart, ps, container, e)
     }
 
     function onMouseDown(e) {
       const tool = activeToolRef.current
       if (!tool) return
-      e.stopPropagation()
-      const chart = getChart()
-      if (!chart) return
-      const pt = pixelToChart(chart, canvas, e)
-      if (!pt || pt.time == null || pt.price == null) return
+      e.preventDefault()
+      const pt = getPoint(e)
+      if (!pt) return
 
       if (tool === 'horizontal') {
+        if (pt.price == null) return
         drawingsRef.current.push({ type: 'horizontal', time: pt.time, price: pt.price, color: nextColor() })
         setDrawVersion(v => v + 1)
-        scheduleRepaint()
       } else if (tool === 'vertical') {
+        if (pt.time == null) return
         drawingsRef.current.push({ type: 'vertical', time: pt.time, price: pt.price, color: nextColor() })
         setDrawVersion(v => v + 1)
-        scheduleRepaint()
       } else if (tool === 'trendline' || tool === 'ray' || tool === 'fib') {
         drawPreviewRef.current = { tool, start: pt, end: pt, color: nextColor() }
-        scheduleRepaint()
       } else if (tool === 'path') {
         if (!drawPreviewRef.current) {
           drawPreviewRef.current = { tool, points: [{ time: pt.time, price: pt.price }], end: pt, color: nextColor() }
@@ -1463,37 +1453,46 @@ export default function StockChart() {
           drawPreviewRef.current.points.push({ time: pt.time, price: pt.price })
           drawPreviewRef.current.end = pt
         }
-        scheduleRepaint()
       }
+      scheduleRepaint()
     }
 
     function onMouseMove(e) {
-      if (!drawPreviewRef.current) return
-      const chart = getChart()
-      if (!chart) return
-      const pt = pixelToChart(chart, canvas, e)
+      const tool = activeToolRef.current
+      if (!tool) return
+      const pt = getPoint(e)
       if (!pt) return
-      drawPreviewRef.current.end = pt
-      scheduleRepaint()
+      if (drawPreviewRef.current) {
+        drawPreviewRef.current.end = pt
+        scheduleRepaint()
+      } else if (tool === 'horizontal' || tool === 'vertical') {
+        // show live crosshair preview even before mousedown
+        drawPreviewRef.current = { tool, start: pt, end: pt, color: '#f59e0b' }
+        scheduleRepaint()
+      }
     }
 
     function onMouseUp(e) {
       const tool = activeToolRef.current
       const preview = drawPreviewRef.current
       if (!preview || !tool) return
-      if (tool === 'path') return // path commits on double-click
-      const chart = getChart()
-      if (!chart) return
-      const pt = pixelToChart(chart, canvas, e)
-      if (!pt || pt.time == null || pt.price == null) return
+      if (tool === 'path') return
+      if (tool === 'horizontal' || tool === 'vertical') {
+        // already committed on mousedown
+        drawPreviewRef.current = null
+        scheduleRepaint()
+        return
+      }
+      const pt = getPoint(e)
+      if (!pt) return
 
       if (tool === 'trendline' || tool === 'ray' || tool === 'fib') {
-        // Only commit if user actually moved (not just a click)
-        if (preview.start && (Math.abs(pt.x - (chartToPixel(chart, preview.start.time, preview.start.price)?.x ?? pt.x)) > 5)) {
+        const moved = Math.abs(pt.x - preview.start.x) > 4 || Math.abs(pt.y - preview.start.y) > 4
+        if (moved) {
           drawingsRef.current.push({
             type: tool, color: preview.color,
             t1: preview.start.time, p1: preview.start.price,
-            t2: pt.time, p2: pt.price,
+            t2: pt.time,            p2: pt.price,
           })
           setDrawVersion(v => v + 1)
         }
@@ -1514,28 +1513,36 @@ export default function StockChart() {
     }
 
     function onContextMenu(e) {
-      const tool = activeToolRef.current
-      if (!tool) return
+      if (!activeToolRef.current) return
       e.preventDefault()
-      // Right-click cancels in-progress drawing
       drawPreviewRef.current = null
       scheduleRepaint()
     }
 
-    canvas.addEventListener('mousedown',   onMouseDown)
-    canvas.addEventListener('mousemove',   onMouseMove)
-    canvas.addEventListener('mouseup',     onMouseUp)
-    canvas.addEventListener('dblclick',    onDblClick)
-    canvas.addEventListener('contextmenu', onContextMenu)
+    function onMouseLeave() {
+      const tool = activeToolRef.current
+      if (tool === 'horizontal' || tool === 'vertical') {
+        drawPreviewRef.current = null
+        scheduleRepaint()
+      }
+    }
+
+    container.addEventListener('mousedown',   onMouseDown)
+    container.addEventListener('mousemove',   onMouseMove)
+    container.addEventListener('mouseup',     onMouseUp)
+    container.addEventListener('dblclick',    onDblClick)
+    container.addEventListener('contextmenu', onContextMenu)
+    container.addEventListener('mouseleave',  onMouseLeave)
 
     return () => {
-      canvas.removeEventListener('mousedown',   onMouseDown)
-      canvas.removeEventListener('mousemove',   onMouseMove)
-      canvas.removeEventListener('mouseup',     onMouseUp)
-      canvas.removeEventListener('dblclick',    onDblClick)
-      canvas.removeEventListener('contextmenu', onContextMenu)
+      container.removeEventListener('mousedown',   onMouseDown)
+      container.removeEventListener('mousemove',   onMouseMove)
+      container.removeEventListener('mouseup',     onMouseUp)
+      container.removeEventListener('dblclick',    onDblClick)
+      container.removeEventListener('contextmenu', onContextMenu)
+      container.removeEventListener('mouseleave',  onMouseLeave)
     }
-  }, [isDark]) // eslint-disable-line react-hooks/exhaustive-deps
+  }, [chartBuiltVer, isDark]) // eslint-disable-line react-hooks/exhaustive-deps
 
   const showRSI   = activeIndicators.includes('RSI')
   const showMACD  = activeIndicators.includes('MACD')
@@ -1646,17 +1653,14 @@ export default function StockChart() {
           <div
             ref={mainRef}
             className="w-full shrink-0 relative"
-            style={{ height: `${mainPct}%` }}
+            style={{
+              height: `${mainPct}%`,
+              cursor: activeTool ? 'crosshair' : 'default',
+            }}
           >
             <canvas
               ref={canvasRef}
-              className="absolute inset-0 z-10"
-              style={{
-                pointerEvents: activeTool ? 'auto' : 'none',
-                cursor: activeTool === 'path' ? 'crosshair'
-                      : activeTool ? 'crosshair'
-                      : 'default',
-              }}
+              className="absolute inset-0 z-10 pointer-events-none"
             />
           </div>
 
