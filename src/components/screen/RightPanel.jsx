@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback, useRef } from 'react'
-import { getMarketDates, getDayFull, getIPOs, getMarketNews } from '../../api'
+import { getMarketDates, getDayFull, getIPOs, getMarketNews, getTopMovers } from '../../api'
 import { useScreen } from '../../context/ScreenContext'
 
 // ── Helpers ───────────────────────────────────────────────────────────────────

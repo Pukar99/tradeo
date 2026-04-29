@@ -1,5 +1,5 @@
-import { useState, useContext } from 'react'
-import { ScreenProvider, useScreen } from '../context/ScreenContext'
+import { useState } from 'react'
+import { ScreenProvider } from '../context/ScreenContext'
 import { ComplexTabProvider }        from '../hooks/useComplexTab.jsx'
 import StockChart                    from '../components/screen/StockChart'
 import MarketStatusBadge             from '../components/screen/MarketStatusBadge'
@@ -27,7 +27,6 @@ function ComplexContent({ activeTab }) {
 }
 
 function ScreenInner() {
-  const { selectSymbol } = useScreen()
   const [mode,       setMode]       = useState(() => sessionStorage.getItem('screen_mode')       || 'simple')
   const [complexTab, setComplexTab] = useState(() => sessionStorage.getItem('screen_complexTab') || 'Backtesting')
 
