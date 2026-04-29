@@ -739,8 +739,8 @@ export default function StockChart() {
     const tfDays = { '1W': 7, '1M': 30, '3M': 90, '6M': 180, '1Y': 365, '3Y': 1095, 'ALL': 2000 }
     const days = tfDays[timeframe] ?? 365
     getSMCScan({ symbol: selectedSymbol, days })
-      .then(r => setSmcData(r.data))
-      .catch(() => setSmcData(null))
+      .then(r => { console.log('[SMC]', r.data); setSmcData(r.data) })
+      .catch(e => { console.error('[SMC] fetch failed', e); setSmcData(null) })
   }, [smcEnabled, selectedSymbol, timeframe]) // eslint-disable-line react-hooks/exhaustive-deps
 
   // Build / rebuild charts
@@ -886,10 +886,6 @@ export default function StockChart() {
             })
           }
         })
-        if (markers.length) {
-          markers.sort((a, b) => a.time < b.time ? -1 : 1)
-          priceSeries.setMarkers(markers)
-        }
       }
 
       // Volume histogram
@@ -900,43 +896,61 @@ export default function StockChart() {
         color: d.close >= d.open ? C.up + '44' : C.down + '44',
       })))
 
-      // SMC overlays — Order Blocks as horizontal bands, patterns as markers
+      // SMC overlays — Order Blocks as bands, FVGs as zones, BOS/CHoCH/sweeps/patterns as markers
       if (smcData && smcEnabled) {
-        // Order Blocks — draw as horizontal lines from OB candle to chart end
-        const lastDate = chartData[chartData.length - 1]?.time
+        const smcMarkers = []
+
+        // Order Blocks — solid colored price lines (top + bottom of the zone)
         for (const ob of (smcData.order_blocks || [])) {
-          const obColor = ob.type === 'bullish' ? '#34d39960' : '#f8717160'
+          const isBull = ob.type === 'bullish'
+          const obColor = isBull ? '#34d399' : '#f87171'
           const obTop = Math.max(ob.high, ob.open, ob.close)
           const obBottom = Math.min(ob.low, ob.open, ob.close)
-          // Draw OB zone as two lines (top and bottom of the zone)
           const fromIdx = chartData.findIndex(d => d.time >= ob.date)
           if (fromIdx < 0) continue
-          const obData = chartData.slice(fromIdx).map(d => ({ time: d.time, value: obTop }))
-          if (obData.length) {
-            const sTop = main.addLineSeries({ color: obColor, lineWidth: 1, lineStyle: 2, priceLineVisible: false, crosshairMarkerVisible: false, title: '' })
-            sTop.setData(obData)
-            const sBot = main.addLineSeries({ color: obColor, lineWidth: 1, lineStyle: 2, priceLineVisible: false, crosshairMarkerVisible: false, title: '' })
-            sBot.setData(chartData.slice(fromIdx).map(d => ({ time: d.time, value: obBottom })))
-          }
+          const slice = chartData.slice(fromIdx)
+          if (!slice.length) continue
+          const sTop = main.addLineSeries({
+            color: obColor, lineWidth: 1.5, lineStyle: 2,
+            priceLineVisible: false, crosshairMarkerVisible: false,
+            title: isBull ? 'OB↑' : 'OB↓',
+          })
+          sTop.setData(slice.map(d => ({ time: d.time, value: obTop })))
+          const sBot = main.addLineSeries({
+            color: obColor + '99', lineWidth: 1, lineStyle: 2,
+            priceLineVisible: false, crosshairMarkerVisible: false, title: '',
+          })
+          sBot.setData(slice.map(d => ({ time: d.time, value: obBottom })))
+          // Entry marker at the OB candle
+          smcMarkers.push({
+            time: ob.date, position: isBull ? 'belowBar' : 'aboveBar',
+            color: obColor, shape: 'square',
+            text: isBull ? 'OB↑' : 'OB↓', size: 1,
+          })
         }
 
-        // FVG — draw gap zones
-        for (const gap of (smcData.fvg || []).slice(-8)) {
-          const gapColor = gap.type === 'bullish' ? '#60a5fa30' : '#f4728630'
+        // FVG — dashed lines for gap top and bottom, extending 15 candles
+        for (const gap of (smcData.fvg || []).slice(-10)) {
+          const isBull = gap.type === 'bullish'
+          const gapColor = isBull ? '#60a5fa' : '#f472b6'
           const fromIdx = chartData.findIndex(d => d.time >= gap.date)
           if (fromIdx < 0) continue
-          // Only extend FVG 10 candles forward
-          const gapSlice = chartData.slice(fromIdx, fromIdx + 10)
-          if (gapSlice.length) {
-            const sT = main.addLineSeries({ color: gapColor, lineWidth: 1, lineStyle: 1, priceLineVisible: false, crosshairMarkerVisible: false, title: '' })
-            sT.setData(gapSlice.map(d => ({ time: d.time, value: gap.top })))
-            const sB = main.addLineSeries({ color: gapColor, lineWidth: 1, lineStyle: 1, priceLineVisible: false, crosshairMarkerVisible: false, title: '' })
-            sB.setData(gapSlice.map(d => ({ time: d.time, value: gap.bottom })))
-          }
+          const gapSlice = chartData.slice(fromIdx, fromIdx + 15)
+          if (!gapSlice.length) continue
+          const sT = main.addLineSeries({
+            color: gapColor, lineWidth: 1, lineStyle: 1,
+            priceLineVisible: false, crosshairMarkerVisible: false,
+            title: isBull ? 'FVG↑' : 'FVG↓',
+          })
+          sT.setData(gapSlice.map(d => ({ time: d.time, value: gap.top })))
+          const sB = main.addLineSeries({
+            color: gapColor + '88', lineWidth: 1, lineStyle: 1,
+            priceLineVisible: false, crosshairMarkerVisible: false, title: '',
+          })
+          sB.setData(gapSlice.map(d => ({ time: d.time, value: gap.bottom })))
         }
 
-        // BOS + CHoCH + patterns as markers on the price series
-        const smcMarkers = []
+        // BOS markers
         for (const b of (smcData.bos || [])) {
           smcMarkers.push({
             time: b.date, position: b.type === 'bullish' ? 'belowBar' : 'aboveBar',
@@ -945,40 +959,42 @@ export default function StockChart() {
             text: 'BOS', size: 1,
           })
         }
+
+        // CHoCH markers
         for (const ch of (smcData.choch || [])) {
           smcMarkers.push({
             time: ch.date, position: ch.type === 'bullish' ? 'belowBar' : 'aboveBar',
-            color: '#f59e0b',
-            shape: 'circle',
-            text: 'CHoCH', size: 1,
-          })
-        }
-        for (const sw of (smcData.sweeps || [])) {
-          smcMarkers.push({
-            time: sw.date, position: sw.type === 'buy_side' ? 'belowBar' : 'aboveBar',
-            color: '#a78bfa',
-            shape: 'square',
-            text: sw.type === 'buy_side' ? 'BuySw' : 'SelSw', size: 1,
-          })
-        }
-        for (const p of (smcData.patterns || []).slice(-10)) {
-          const isBullish = p.type.includes('bullish') || p.type === 'hammer' || p.type === 'inside_bar'
-          const label = p.type.replaceAll('_', ' ').replace('bullish ', '').replace('bearish ', '')
-          smcMarkers.push({
-            time: p.date, position: isBullish ? 'belowBar' : 'aboveBar',
-            color: isBullish ? '#22c55e' : '#ef4444',
-            shape: 'circle',
-            text: label.slice(0, 6),
-            size: 0,
+            color: '#f59e0b', shape: 'circle',
+            text: 'ChCh', size: 1,
           })
         }
 
-        if (smcMarkers.length) {
-          // Merge with existing position markers if any
-          const existingMarkers = markers || []
-          const allMarkers = [...existingMarkers, ...smcMarkers].sort((a, b) => a.time < b.time ? -1 : 1)
-          priceSeries.setMarkers(allMarkers)
+        // Liquidity sweep markers
+        for (const sw of (smcData.sweeps || [])) {
+          smcMarkers.push({
+            time: sw.date, position: sw.type === 'buy_side' ? 'belowBar' : 'aboveBar',
+            color: '#a78bfa', shape: 'square',
+            text: sw.type === 'buy_side' ? 'BSw' : 'SSw', size: 1,
+          })
         }
+
+        // Candlestick pattern markers
+        for (const p of (smcData.patterns || []).slice(-15)) {
+          const isBullish = p.type.includes('bullish') || p.type === 'hammer' || p.type === 'inside_bar'
+          const label = p.type.replaceAll('_', ' ').replace('bullish ', '').replace('bearish ', '').slice(0, 5)
+          smcMarkers.push({
+            time: p.date, position: isBullish ? 'belowBar' : 'aboveBar',
+            color: isBullish ? '#22c55e' : '#ef4444',
+            shape: 'circle', text: label, size: 0,
+          })
+        }
+
+        // Merge all markers (position + SMC) and set once
+        const allMarkers = [...markers, ...smcMarkers].sort((a, b) => a.time < b.time ? -1 : 1)
+        if (allMarkers.length) priceSeries.setMarkers(allMarkers)
+      } else if (markers.length) {
+        // No SMC but there are position markers — set them
+        priceSeries.setMarkers(markers)
       }
 
       // Crosshair events — debounce movers fetch by 80ms
@@ -1186,6 +1202,26 @@ export default function StockChart() {
               <ChartHUDPrice latestClose={latestClose} chartData={chartData} />
             )}
           </div>
+
+          {/* SMC info badge — shows structure counts when enabled */}
+          {smcEnabled && smcData && (
+            <div className="absolute top-2 right-3 z-20 pointer-events-none">
+              <div className="flex items-center gap-1.5 bg-purple-500/10 border border-purple-400/30 rounded-lg px-2 py-1">
+                <span className="text-[8px] font-bold text-purple-400 uppercase tracking-widest">SMC</span>
+                <span className="text-[8px] text-gray-400">OB:{smcData.order_blocks?.length ?? 0}</span>
+                <span className="text-[8px] text-gray-400">FVG:{smcData.fvg?.length ?? 0}</span>
+                <span className="text-[8px] text-gray-400">BOS:{smcData.bos?.length ?? 0}</span>
+                <span className="text-[8px] text-gray-400">PAT:{smcData.patterns?.length ?? 0}</span>
+              </div>
+            </div>
+          )}
+          {smcEnabled && !smcData && !isIndex() && (
+            <div className="absolute top-2 right-3 z-20 pointer-events-none">
+              <div className="bg-purple-500/10 border border-purple-400/30 rounded-lg px-2 py-1">
+                <span className="text-[8px] text-purple-400">SMC loading…</span>
+              </div>
+            </div>
+          )}
 
           {/* Position badge */}
           <PositionBadge positions={activePositions} latestClose={latestClose} />
