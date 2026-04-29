@@ -961,15 +961,15 @@ function LogsPage() {
   const fetchData = useCallback(async () => {
     try {
       const today = new Date().toISOString().slice(0, 10)
-      // Fire all 3 in parallel: trades, journals, market journals list
-      const [tradesRes, journalsRes, mjRes] = await Promise.all([
+      // Use allSettled so a missing market_journal table doesn't kill trades/journals
+      const [tradesRes, journalsRes, mjRes] = await Promise.allSettled([
         getTradeLog(),
         getTradeJournal(),
         getMarketJournals(),
       ])
-      setTrades(tradesRes.data)
-      setJournals(journalsRes.data)
-      setMarketJournals(mjRes.data || [])
+      if (tradesRes.status  === 'fulfilled') setTrades(tradesRes.value.data)
+      if (journalsRes.status === 'fulfilled') setJournals(journalsRes.value.data)
+      if (mjRes.status      === 'fulfilled') setMarketJournals(mjRes.value.data || [])
 
       // Auto-create today's market journal entry in background (idempotent upsert)
       autoCreateMarketJournal(today)
