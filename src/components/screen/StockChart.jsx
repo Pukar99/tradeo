@@ -6,65 +6,16 @@ import { getIndexChart, getStockChart, getTopMovers, getMarketSymbols, getSMCSca
 // ── Drawing Tools ─────────────────────────────────────────────────────────────
 
 const DRAW_TOOLS = [
-  { id: 'trendline',   label: 'Trend',  title: 'Trendline',       icon: '╱'  },
-  { id: 'horizontal',  label: 'H-Line', title: 'Horizontal Line', icon: '―'  },
-  { id: 'vertical',    label: 'V-Line', title: 'Vertical Line',   icon: '|'  },
-  { id: 'ray',         label: 'Ray',    title: 'Ray (extends →)', icon: '→'  },
-  { id: 'fib',         label: 'Fib',    title: 'Fibonacci Retracement', icon: 'ψ' },
-  { id: 'path',        label: 'Path',   title: 'Path (multi-point)', icon: '⌇' },
+  { id: 'trendline',  label: 'Trend', title: 'Trendline'            },
+  { id: 'horizontal', label: 'H',     title: 'Horizontal Line'      },
+  { id: 'vertical',   label: 'V',     title: 'Vertical Line'        },
+  { id: 'ray',        label: 'Ray',   title: 'Ray (extends right)'  },
+  { id: 'fib',        label: 'Fib',   title: 'Fibonacci Retracement'},
+  { id: 'path',       label: 'Path',  title: 'Path (multi-point)'   },
 ]
 
 const FIB_LEVELS = [0, 0.236, 0.382, 0.5, 0.618, 0.786, 1]
 const FIB_COLORS = ['#f87171','#fb923c','#facc15','#4ade80','#60a5fa','#a78bfa','#f472b6']
-
-function DrawingToolbar({ activeTool, setActiveTool, onClear, drawCount }) {
-  const [collapsed, setCollapsed] = useState(false)
-  return (
-    <div className="absolute left-3 top-1/2 -translate-y-1/2 z-30 flex flex-col gap-1 select-none"
-      style={{ userSelect: 'none' }}>
-      {/* Handle / toggle */}
-      <div
-        onClick={() => setCollapsed(p => !p)}
-        className="flex items-center justify-center w-7 h-5 rounded cursor-pointer bg-gray-900/80 border border-gray-700 hover:bg-gray-800 text-gray-400 text-[9px]"
-        title={collapsed ? 'Expand drawing toolbar' : 'Collapse'}
-      >{collapsed ? '▶' : '◀'}</div>
-
-      {!collapsed && (
-        <div className="flex flex-col gap-0.5 bg-gray-900/90 border border-gray-700 rounded-xl p-1 shadow-2xl backdrop-blur-sm">
-          {DRAW_TOOLS.map(t => (
-            <button
-              key={t.id}
-              title={t.title}
-              onClick={() => setActiveTool(p => p === t.id ? null : t.id)}
-              className={`flex flex-col items-center justify-center w-9 h-9 rounded-lg text-center transition-all ${
-                activeTool === t.id
-                  ? 'bg-blue-600 text-white shadow-inner'
-                  : 'text-gray-400 hover:bg-gray-700 hover:text-white'
-              }`}
-            >
-              <span className="text-[14px] font-bold leading-none">{t.icon}</span>
-              <span className="text-[7px] mt-0.5 leading-none">{t.label}</span>
-            </button>
-          ))}
-
-          {/* Divider */}
-          <div className="h-px bg-gray-700 my-0.5" />
-
-          {/* Clear all */}
-          <button
-            title="Clear all drawings"
-            onClick={onClear}
-            disabled={drawCount === 0}
-            className="flex flex-col items-center justify-center w-9 h-9 rounded-lg text-center transition-all text-gray-500 hover:bg-red-900/60 hover:text-red-400 disabled:opacity-30 disabled:cursor-not-allowed"
-          >
-            <span className="text-[13px] leading-none">✕</span>
-            <span className="text-[7px] mt-0.5 leading-none">Clear</span>
-          </button>
-        </div>
-      )}
-    </div>
-  )
-}
 
 // Convert chart logical coords → canvas pixel coords
 function chartToPixel(chart, time, price) {
@@ -508,12 +459,12 @@ function ChartSymbolSearch() {
 const TIMEFRAMES = ['1W', '1M', '3M', '6M', '1Y', '3Y', 'ALL']
 const INDICATORS = ['MA', 'EMA', 'BB', 'VWAP', 'RSI', 'MACD', 'ATR', 'STOCH', 'ST']
 
-function ChartHUDControls() {
+function ChartHUDControls({ activeTool, setActiveTool, onClearDrawings, drawCount }) {
   const { chartType, setChartType, timeframe, setTimeframe, activeIndicators: _ai, toggleIndicator, smcEnabled, setSmcEnabled } = useScreen() || {}
   const activeIndicators = Array.isArray(_ai) ? _ai : []
 
   return (
-    <div className="flex items-center gap-1.5 flex-wrap">
+    <div className="flex items-center gap-1.5 flex-wrap min-w-0">
       {/* Chart type */}
       <div className="flex items-center bg-gray-100 dark:bg-gray-800 rounded-md p-0.5">
         {[['candlestick','Candle'], ['line','Line']].map(([type, label]) => (
@@ -542,7 +493,7 @@ function ChartHUDControls() {
         ))}
       </div>
 
-      {/* Indicators */}
+      {/* Indicators + SMC */}
       <div className="flex items-center gap-0.5">
         {INDICATORS.map(ind => (
           <button key={ind} onClick={() => toggleIndicator(ind)}
@@ -562,6 +513,34 @@ function ChartHUDControls() {
           }`}>
           SMC
         </button>
+      </div>
+
+      {/* Divider */}
+      <div className="w-px h-4 bg-gray-200 dark:bg-gray-700 shrink-0" />
+
+      {/* Drawing tools — inline after SMC */}
+      <div className="flex items-center gap-0.5">
+        {DRAW_TOOLS.map(t => (
+          <button key={t.id}
+            title={t.title}
+            onClick={() => setActiveTool(p => p === t.id ? null : t.id)}
+            className={`px-1.5 py-0.5 rounded text-[9px] font-semibold border transition-colors ${
+              activeTool === t.id
+                ? 'bg-amber-500 border-amber-500 text-white'
+                : 'border-gray-200 dark:border-gray-700 text-gray-500 dark:text-gray-400 hover:border-amber-400 hover:text-amber-500'
+            }`}>
+            {t.label}
+          </button>
+        ))}
+        {drawCount > 0 && (
+          <button
+            title="Clear all drawings"
+            onClick={onClearDrawings}
+            className="px-1.5 py-0.5 rounded text-[9px] font-semibold border border-red-300 dark:border-red-800 text-red-400 hover:bg-red-50 dark:hover:bg-red-950 transition-colors ml-0.5"
+          >
+            ✕{drawCount}
+          </button>
+        )}
       </div>
     </div>
   )
@@ -1584,10 +1563,20 @@ export default function StockChart() {
     <div className="flex flex-col w-full h-full bg-white dark:bg-gray-950 overflow-hidden">
 
       {/* ── HUD top bar ── */}
-      <div className="shrink-0 z-30 flex items-center gap-2 px-3 py-1 bg-white dark:bg-gray-900 border-b border-gray-100 dark:border-gray-800">
+      <div className="shrink-0 z-30 flex items-center gap-2 px-3 py-1 bg-white dark:bg-gray-900 border-b border-gray-100 dark:border-gray-800 overflow-x-auto">
         <ChartSymbolSearch />
         <div className="w-px h-4 bg-gray-200 dark:bg-gray-700 shrink-0" />
-        <ChartHUDControls />
+        <ChartHUDControls
+          activeTool={activeTool}
+          setActiveTool={setActiveTool}
+          drawCount={drawingsRef.current.length}
+          onClearDrawings={() => {
+            drawingsRef.current = []
+            drawPreviewRef.current = null
+            setActiveTool(null)
+            setDrawVersion(v => v + 1)
+          }}
+        />
       </div>
 
       {/* ── Overlays (absolute inside the chart area below) ── */}
@@ -1640,31 +1629,18 @@ export default function StockChart() {
             </div>
           )}
 
-          {/* Active drawing tool hint */}
+          {/* Active drawing tool hint — bottom-center */}
           {activeTool && (
-            <div className="absolute bottom-10 left-1/2 -translate-x-1/2 z-30 pointer-events-none">
-              <span className="text-[9px] text-white bg-blue-600/90 px-2.5 py-1 rounded-full shadow">
-                {activeTool === 'horizontal' ? 'Click to place horizontal line'
-                : activeTool === 'vertical'  ? 'Click to place vertical line'
-                : activeTool === 'path'      ? 'Click to add points · Double-click to finish · Right-click to cancel'
-                : activeTool === 'fib'       ? 'Click & drag to set Fibonacci range'
+            <div className="absolute bottom-8 left-1/2 -translate-x-1/2 z-30 pointer-events-none">
+              <span className="text-[9px] text-white bg-amber-600/90 px-2.5 py-1 rounded-full shadow whitespace-nowrap">
+                {activeTool === 'horizontal' ? 'Click anywhere to place horizontal line'
+                : activeTool === 'vertical'  ? 'Click anywhere to place vertical line'
+                : activeTool === 'path'      ? 'Click points · Double-click to finish · Right-click to cancel'
+                : activeTool === 'fib'       ? 'Click & drag to set Fibonacci range · Right-click to cancel'
                 : 'Click & drag · Right-click to cancel'}
               </span>
             </div>
           )}
-
-          {/* ── Drawing toolbar (floating, left-center) ── */}
-          <DrawingToolbar
-            activeTool={activeTool}
-            setActiveTool={setActiveTool}
-            drawCount={drawingsRef.current.length}
-            onClear={() => {
-              drawingsRef.current = []
-              drawPreviewRef.current = null
-              setActiveTool(null)
-              setDrawVersion(v => v + 1)
-            }}
-          />
 
           {/* Main price chart + drawing canvas overlay */}
           <div
