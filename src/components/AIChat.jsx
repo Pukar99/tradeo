@@ -43,9 +43,12 @@ const ACTION_META = {
   DELETE_GOAL:        { icon: '🗑️', label: 'Goal Removed',              color: 'border-gray-400 bg-gray-50 dark:bg-gray-700/50' },
   UNDO:               { icon: '↩️', label: 'Action Undone',             color: 'border-indigo-400 bg-indigo-50 dark:bg-indigo-900/30' },
   TOGGLE_THEME:       { icon: '🌙', label: 'Theme Changed',             color: 'border-gray-400 bg-gray-50 dark:bg-gray-700/50' },
-  SHOW_TRADES:        { icon: '📋', label: 'Your Trades',               color: 'border-green-400 bg-green-50 dark:bg-green-900/20' },
-  SHOW_GOALS:         { icon: '🏆', label: 'Your Goals',                color: 'border-teal-400 bg-teal-50 dark:bg-teal-900/20' },
-  SHOW_JOURNAL:       { icon: '📝', label: 'Your Journal',              color: 'border-amber-400 bg-amber-50 dark:bg-amber-900/20' },
+  SHOW_TRADES:          { icon: '📋', label: 'Your Trades',          color: 'border-green-400 bg-green-50 dark:bg-green-900/20' },
+  SHOW_GOALS:           { icon: '🏆', label: 'Your Goals',           color: 'border-teal-400 bg-teal-50 dark:bg-teal-900/20' },
+  SHOW_JOURNAL:         { icon: '📝', label: 'Your Journal',         color: 'border-amber-400 bg-amber-50 dark:bg-amber-900/20' },
+  SET_DISCIPLINE_SCORE: { icon: '📊', label: 'Discipline Logged',    color: 'border-blue-400 bg-blue-50 dark:bg-blue-900/20' },
+  SHOW_RISK_SUMMARY:    { icon: '⚠️', label: 'Risk Summary',         color: 'border-orange-400 bg-orange-50 dark:bg-orange-900/20' },
+  WEEKLY_SUMMARY:       { icon: '📅', label: 'Weekly Summary',       color: 'border-indigo-400 bg-indigo-50 dark:bg-indigo-900/20' },
 }
 
 // ── Standard action card (trade, watchlist, goal, journal, etc.) ─────────────
