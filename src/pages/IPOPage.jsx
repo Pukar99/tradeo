@@ -354,7 +354,8 @@ function EditAccountModal({ account, dpList, onClose, onUpdated }) {
       .finally(() => setLoadingBanks(false))
   }
 
-  useEffect(() => { fetchBanks() }, []) // eslint-disable-line react-hooks/exhaustive-deps
+  // Only auto-fetch if account has no bank set up yet; otherwise show saved data and wait for Refresh
+  useEffect(() => { if (!account.bank_id) fetchBanks() }, []) // eslint-disable-line react-hooks/exhaustive-deps
 
   const handleSave = async () => {
     if (savePin && !pin.trim() && !account.auto_apply)
@@ -884,8 +885,9 @@ function IPOPage() {
   const [appliedMap,    setAppliedMap]    = useState({})
   const [actionError,   setActionError]   = useState(null)
   const [quickApplying,    setQuickApplying]    = useState(null)   // companyShareId being quick-applied
-  const [togglingAutoApply, setTogglingAutoApply] = useState(false)
-  const [runningAutoApply,  setRunningAutoApply]  = useState(false)
+  const [togglingAutoApply,  setTogglingAutoApply]  = useState(false)
+  const [runningAutoApply,   setRunningAutoApply]   = useState(false)
+  const [autoApplyResults,   setAutoApplyResults]   = useState(null)  // null | array
 
   // Results search + Holdings search + sort
   const [resultSearch,    setResultSearch]    = useState('')
@@ -897,13 +899,20 @@ function IPOPage() {
   const bulkApplyInFlight = useRef(false)
   const [sidebarOpen,     setSidebarOpen]   = useState(false)
 
+  const [initError, setInitError] = useState(null)
+  const [initLoading, setInitLoading] = useState(true)
+
   useEffect(() => {
-    getMeroshareDpList().then(r => setDpList(r.data || [])).catch(() => {})
-    getMeroshareAccounts().then(r => {
-      const list = r.data || []
-      setAccounts(list)
-      if (list.length > 0) setSelectedAcc(list[0].id)
-    }).catch(() => {})
+    Promise.all([
+      getMeroshareDpList().then(r => setDpList(r.data || [])).catch(() => {}),
+      getMeroshareAccounts().then(r => {
+        const list = r.data || []
+        setAccounts(list)
+        if (list.length > 0) setSelectedAcc(list[0].id)
+      }),
+    ])
+      .catch(() => setInitError('Could not load accounts. Check your connection and refresh.'))
+      .finally(() => setInitLoading(false))
   }, [])
 
   const loadData = useCallback(async (accId, tab, force = false) => {
@@ -1054,14 +1063,19 @@ function IPOPage() {
   }
 
   const handleRunAutoApply = async () => {
-    setRunningAutoApply(true); setActionError(null)
+    setRunningAutoApply(true); setAutoApplyResults(null); setActionError(null)
     try {
-      await runMeroshareAutoApply()
-      setActionError(null)
+      const res = await runMeroshareAutoApply()
+      setAutoApplyResults(res.data.results || [])
+      // Refresh IPO list so applied state updates
+      if (selectedAcc) loadData(selectedAcc, 'ipos', true)
     } catch (err) {
-      setActionError(err.response?.data?.error || 'Failed to trigger auto-apply')
+      if (err.response?.status === 409)
+        setActionError('Auto-apply is already running — please wait')
+      else
+        setActionError(err.response?.data?.error || 'Failed to trigger auto-apply')
     } finally {
-      setTimeout(() => setRunningAutoApply(false), 3000)  // brief "Running…" state
+      setRunningAutoApply(false)
     }
   }
 
@@ -1083,6 +1097,21 @@ function IPOPage() {
   }, [handleApplied]) // eslint-disable-line react-hooks/exhaustive-deps
 
   if (!user) return null
+
+  if (initLoading) return (
+    <div className="px-3 sm:px-6 pt-10 max-w-6xl mx-auto space-y-2">
+      {[1,2,3].map(i => <div key={i} className="h-20 bg-gray-100 dark:bg-gray-800 rounded-2xl animate-pulse" />)}
+    </div>
+  )
+
+  if (initError) return (
+    <div className="px-3 sm:px-6 pt-10 max-w-6xl mx-auto">
+      <div className="flex items-center gap-3 border-l-2 border-red-500 bg-red-50 dark:bg-red-900/20 rounded-r-2xl px-5 py-4">
+        <p className="text-[12px] text-red-600 dark:text-red-400 flex-1">{initError}</p>
+        <button onClick={() => window.location.reload()} className="text-[11px] font-semibold text-red-600 dark:text-red-400 underline flex-shrink-0">Reload</button>
+      </div>
+    </div>
+  )
 
   const activeAccount  = accounts.find(a => a.id === selectedAcc)
   const hasAccounts    = accounts.length > 0
@@ -1306,6 +1335,31 @@ function IPOPage() {
                     </button>
                   )}
                 </div>
+
+                {/* Auto-apply run results */}
+                {autoApplyResults && (
+                  <div className="mt-3 pt-3 border-t border-gray-100 dark:border-gray-800">
+                    <div className="flex items-center justify-between mb-2">
+                      <p className="text-[9px] font-semibold text-gray-400 uppercase tracking-widest">Run Results</p>
+                      <button onClick={() => setAutoApplyResults(null)} className="text-gray-300 dark:text-gray-600 hover:text-gray-500 text-sm leading-none">×</button>
+                    </div>
+                    {autoApplyResults.length === 0 ? (
+                      <p className="text-[10px] text-gray-400">No auto-apply accounts found.</p>
+                    ) : (
+                      <div className="space-y-1">
+                        {autoApplyResults.map((r, i) => (
+                          <div key={i} className="flex items-center gap-2">
+                            <span className={`text-[10px] font-bold flex-shrink-0 ${r.status === 'success' ? 'text-emerald-500' : r.status === 'error' ? 'text-red-500' : 'text-gray-400'}`}>
+                              {r.status === 'success' ? '✓' : r.status === 'error' ? '✗' : '—'}
+                            </span>
+                            <span className="text-[10px] font-semibold text-gray-700 dark:text-gray-300 flex-shrink-0">{r.label}</span>
+                            <span className="text-[10px] text-gray-400 truncate">{r.message}</span>
+                          </div>
+                        ))}
+                      </div>
+                    )}
+                  </div>
+                )}
               </div>
             )}
 
@@ -1456,7 +1510,7 @@ function IPOPage() {
                               // 1-click apply — PIN saved, no modal needed
                               <div className="flex flex-col items-end gap-1">
                                 <button onClick={() => handleQuickApply(ipo, activeAccount)} disabled={isQuickBusy || !!quickApplying}
-                                  title="Apply instantly using saved PIN"
+                                  title={quickApplying && !isQuickBusy ? 'Another apply in progress…' : 'Apply instantly using saved PIN'}
                                   className="px-4 py-1.5 rounded-xl text-[11px] font-semibold bg-blue-600 text-white hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-1.5 transition-colors">
                                   {isQuickBusy ? <><span className="w-2.5 h-2.5 border-2 border-white/40 border-t-white rounded-full animate-spin" /> Applying…</> : '⚡ 1-Click Apply'}
                                 </button>
