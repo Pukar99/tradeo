@@ -1367,9 +1367,23 @@ function IPOPage() {
                     const oneClickReady = !hasMultipleAcc && hasSavedPin && !noBankSetup && !appliedHere
 
                     return (
-                      <div key={i} className={`bg-white dark:bg-gray-900 rounded-2xl border p-4 transition-all duration-150 hover:-translate-y-px hover:shadow-sm ${
-                        appliedHere ? 'border-l-2 border-l-emerald-500 border-emerald-200 dark:border-emerald-800/50' : 'border-gray-100 dark:border-gray-800'
+                      <div key={i} className={`bg-white dark:bg-gray-900 rounded-2xl border overflow-hidden transition-all duration-150 hover:-translate-y-px hover:shadow-sm ${
+                        appliedHere ? 'border-emerald-200 dark:border-emerald-800/50' : 'border-gray-100 dark:border-gray-800'
                       }`}>
+                        {/* Applied banner — shown when this account has applied */}
+                        {appliedHere && (
+                          <div className="flex items-center gap-2 px-4 py-2 bg-emerald-50 dark:bg-emerald-900/20 border-b border-emerald-100 dark:border-emerald-800/40">
+                            <svg className="w-3.5 h-3.5 text-emerald-500 flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M5 13l4 4L19 7" />
+                            </svg>
+                            <p className="text-[11px] font-semibold text-emerald-700 dark:text-emerald-400">
+                              Application submitted for {activeAccount?.label}
+                              {hasMultipleAcc && appliedAll ? ' · All accounts applied' : hasMultipleAcc && thisApplied ? ` · ${thisApplied.size}/${accounts.length} accounts` : ''}
+                            </p>
+                            <button onClick={() => setApplyIPO(ipo)} className="ml-auto text-[9px] font-semibold text-emerald-600 dark:text-emerald-400 hover:underline flex-shrink-0">Edit →</button>
+                          </div>
+                        )}
+                        <div className="p-4">
                         <div className="flex flex-wrap items-start justify-between gap-3">
                           <div className="flex-1 min-w-0">
                             <div className="flex items-center gap-2 flex-wrap mb-1.5">
@@ -1377,12 +1391,6 @@ function IPOPage() {
                               <span className="text-[9px] font-semibold px-1.5 py-0.5 rounded bg-blue-50 dark:bg-blue-900/20 text-blue-600 border border-blue-100 dark:border-blue-800/50">
                                 {ipo.shareTypeName}
                               </span>
-                              {appliedHere && (
-                                <span className="text-[9px] font-semibold px-1.5 py-0.5 rounded bg-emerald-50 dark:bg-emerald-900/20 text-emerald-600 border border-emerald-100 dark:border-emerald-800/50">✓ Applied</span>
-                              )}
-                              {appliedAll && (
-                                <span className="text-[9px] font-semibold px-1.5 py-0.5 rounded bg-emerald-100 dark:bg-emerald-900/30 text-emerald-700 border border-emerald-200 dark:border-emerald-800/50">✓ All Applied</span>
-                              )}
                             </div>
                             <div className="flex flex-wrap items-center gap-3">
                               <span className="text-[10px] text-gray-400">Scrip: <span className="font-semibold text-gray-700 dark:text-gray-300 font-mono">{ipo.scrip}</span></span>
@@ -1427,12 +1435,8 @@ function IPOPage() {
                                 className="px-3 py-1.5 rounded-xl text-[10px] font-semibold bg-amber-50 dark:bg-amber-900/20 text-amber-600 border border-amber-200 dark:border-amber-800/50 hover:bg-amber-100 transition-colors">
                                 Setup ASBA →
                               </button>
-                            ) : appliedHere ? (
-                              <button onClick={() => setApplyIPO(ipo)} title="Edit application"
-                                className="px-4 py-1.5 rounded-xl text-[11px] font-semibold bg-gray-100 dark:bg-gray-800 text-gray-600 dark:text-gray-300 hover:bg-gray-200 dark:hover:bg-gray-700 transition-colors">
-                                Edit →
-                              </button>
-                            ) : oneClickReady ? (
+                            ) : appliedHere ? null
+                            : oneClickReady ? (
                               // 1-click apply — PIN saved, no modal needed
                               <div className="flex flex-col items-end gap-1">
                                 <button onClick={() => handleQuickApply(ipo, activeAccount)} disabled={isQuickBusy || !!quickApplying}
@@ -1449,6 +1453,7 @@ function IPOPage() {
                               </button>
                             )}
                           </div>
+                        </div>
                         </div>
                       </div>
                     )
