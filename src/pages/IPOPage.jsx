@@ -9,12 +9,21 @@ import {
 
 const fmt = (n) => n != null ? Number(n).toLocaleString() : '—'
 
-// Days remaining from a date string like "2024-05-12 00:00:00"
+// Days remaining from Meroshare date — handles "2024-05-12 00:00:00" and "May 5, 2026 00:00:00"
 function daysLeft(dateStr) {
   if (!dateStr) return null
-  const close = new Date(dateStr.split(' ')[0])
-  const today  = new Date(); today.setHours(0,0,0,0)
+  const close = new Date(dateStr)
+  if (isNaN(close.getTime())) return null
+  const today = new Date(); today.setHours(0, 0, 0, 0)
   return Math.ceil((close - today) / 86400000)
+}
+
+// Format Meroshare date to "Apr 29, 2026" regardless of input format
+function fmtIpoDate(dateStr) {
+  if (!dateStr) return ''
+  const d = new Date(dateStr)
+  if (isNaN(d.getTime())) return dateStr.split(' ')[0]
+  return d.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })
 }
 
 function Row({ label, value }) {
@@ -1298,12 +1307,12 @@ function IPOPage() {
                               {ipo.subGroup?.trim() && <span className="text-[10px] text-gray-400">{ipo.subGroup}</span>}
                               {ipo.issueOpenDate && (
                                 <span className="text-[10px] text-gray-400">
-                                  Open: <span className="font-semibold text-gray-700 dark:text-gray-300 font-mono">{ipo.issueOpenDate.split(' ').slice(0,3).join(' ')}</span>
+                                  Open: <span className="font-semibold text-gray-700 dark:text-gray-300 font-mono">{fmtIpoDate(ipo.issueOpenDate)}</span>
                                 </span>
                               )}
                               {ipo.issueCloseDate && (
                                 <span className="text-[10px] text-gray-400">
-                                  Close: <span className="font-semibold text-gray-700 dark:text-gray-300 font-mono">{ipo.issueCloseDate.split(' ').slice(0,3).join(' ')}</span>
+                                  Close: <span className="font-semibold text-gray-700 dark:text-gray-300 font-mono">{fmtIpoDate(ipo.issueCloseDate)}</span>
                                 </span>
                               )}
                               {days != null && (
