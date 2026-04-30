@@ -47,6 +47,7 @@ function AddAccountModal({ dpList, onClose, onAdded }) {
   const [bankName,      setBankName]     = useState('')
   const [accountNumber, setAccountNumber]= useState('')
   const [accountBranchId, setAccountBranchId] = useState('')
+  const [accountTypeId, setAccountTypeId] = useState(1)
   const [kitta,         setKitta]        = useState(10)
   const [crnNumber,     setCrnNumber]    = useState('')
   const [autoApply,     setAutoApply]    = useState(false)
@@ -74,10 +75,11 @@ function AddAccountModal({ dpList, onClose, onAdded }) {
         setBanks(bankList)
         if (bankList.length > 0) {
           const first = bankList[0]
-          setBankId(String(first.id))
-          setBankName(first.bankBranchName || first.name || '')
+          setBankId(String(first.bankId))
+          setBankName(first.displayName || first.bankName || '')
           setAccountNumber(first.accountNumber || '')
-          setAccountBranchId(first.branchCode || String(first.id))
+          setAccountBranchId(String(first.accountBranchId || first.bankId))
+          setAccountTypeId(first.accountTypeId || 1)
         }
         setStep(2)
       }
@@ -102,6 +104,7 @@ function AddAccountModal({ dpList, onClose, onAdded }) {
       const res = await updateMeroshareAccount(tempId, {
         bank_id: bankId, bank_name: bankName,
         account_branch_id: accountBranchId, account_number: accountNumber,
+        account_type_id: accountTypeId,
         crn_number: crnNumber, default_kitta: kitta,
         auto_apply: autoApply,
         transaction_pin: autoApply ? pin : undefined,
@@ -220,20 +223,29 @@ function AddAccountModal({ dpList, onClose, onAdded }) {
                 </div>
               ) : (
                 <div className="space-y-2">
-                  {banks.map(b => {
-                    const id = String(b.id)
+                  {banks.map((b, i) => {
+                    const key = `${b.bankId}-${b.accountBranchId}-${i}`
+                    const selKey = `${bankId}-${accountBranchId}`
+                    const thisKey = `${b.bankId}-${b.accountBranchId}`
+                    const selected = selKey === thisKey
                     return (
-                      <label key={id} className={`flex items-center gap-3 px-3.5 py-3 rounded-xl border cursor-pointer transition-all ${
-                        bankId === id ? 'border-blue-500 bg-blue-50 dark:bg-blue-900/20' : 'border-gray-200 dark:border-gray-700 hover:bg-gray-50 dark:hover:bg-gray-800'
+                      <label key={key} className={`flex items-center gap-3 px-3.5 py-3 rounded-xl border cursor-pointer transition-all ${
+                        selected ? 'border-blue-500 bg-blue-50 dark:bg-blue-900/20' : 'border-gray-200 dark:border-gray-700 hover:bg-gray-50 dark:hover:bg-gray-800'
                       }`}>
-                        <input type="radio" name="bank" value={id} checked={bankId === id}
-                          onChange={() => { setBankId(id); setBankName(b.bankBranchName || b.name || ''); setAccountNumber(b.accountNumber || ''); setAccountBranchId(b.branchCode || id) }}
+                        <input type="radio" name="bank" value={thisKey} checked={selected}
+                          onChange={() => {
+                            setBankId(String(b.bankId))
+                            setBankName(b.displayName || b.bankName || '')
+                            setAccountNumber(b.accountNumber || '')
+                            setAccountBranchId(String(b.accountBranchId))
+                            setAccountTypeId(b.accountTypeId || 1)
+                          }}
                           className="accent-blue-600 flex-shrink-0" />
                         <div>
-                          <p className="text-[11px] font-semibold text-gray-900 dark:text-white">{b.bankBranchName || b.name}</p>
+                          <p className="text-[11px] font-semibold text-gray-900 dark:text-white">{b.displayName || b.bankName}</p>
                           <p className="text-[9px] text-gray-400 mt-0.5 font-mono">{b.accountNumber || '—'}</p>
                         </div>
-                        {bankId === id && <svg className="w-4 h-4 text-blue-500 ml-auto flex-shrink-0" fill="currentColor" viewBox="0 0 20 20"><path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clipRule="evenodd" /></svg>}
+                        {selected && <svg className="w-4 h-4 text-blue-500 ml-auto flex-shrink-0" fill="currentColor" viewBox="0 0 20 20"><path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clipRule="evenodd" /></svg>}
                       </label>
                     )
                   })}
@@ -261,7 +273,7 @@ function AddAccountModal({ dpList, onClose, onAdded }) {
                 <button onClick={() => { setStep(1); setError(null) }} className="flex-1 py-2.5 rounded-xl border border-gray-200 dark:border-gray-700 text-[11px] font-semibold text-gray-600 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-800">
                   ← Back
                 </button>
-                <button onClick={handleAsbaNext} disabled={banks.length > 0 && (!bankId || !accountNumber)}
+                <button onClick={handleAsbaNext} disabled={banks.length > 0 && (!bankId || !accountBranchId)}
                   className="flex-1 py-2.5 rounded-xl bg-blue-600 text-white text-[11px] font-semibold hover:bg-blue-700 disabled:opacity-50">
                   Next →
                 </button>
@@ -344,6 +356,7 @@ function EditAccountModal({ account, onClose, onUpdated }) {
   const [bankName,      setBankName]     = useState(account.bank_name || '')
   const [accountNumber, setAccountNumber]= useState(account.account_number || '')
   const [accountBranchId, setAccountBranchId] = useState(String(account.account_branch_id || ''))
+  const [accountTypeId, setAccountTypeId] = useState(account.account_type_id || 1)
   const [kitta,         setKitta]        = useState(account.default_kitta || 10)
   const [crnNumber,     setCrnNumber]    = useState(account.crn_number || '')
   const [autoApply,     setAutoApply]    = useState(account.auto_apply || false)
@@ -359,18 +372,18 @@ function EditAccountModal({ account, onClose, onUpdated }) {
       .then(r => {
         const list = r.data?.banks || []
         setBanks(list)
-        // Pre-select first bank only if none already selected
-        setBankId(prev => {
-          if (prev) return prev
-          const first = list[0]
-          if (first) {
-            setBankName(first.name || '')
-            setAccountNumber(first.accountNumber || '')
-            setAccountBranchId(String(first.id))
-            return String(first.id)
-          }
-          return prev
-        })
+        // Pre-select matching bank (by accountBranchId) or first if none set
+        const existing = account.account_branch_id
+          ? list.find(b => String(b.accountBranchId) === String(account.account_branch_id))
+          : null
+        const first = existing || list[0]
+        if (first && !account.bank_id) {
+          setBankId(String(first.bankId))
+          setBankName(first.displayName || first.bankName || '')
+          setAccountNumber(first.accountNumber || '')
+          setAccountBranchId(String(first.accountBranchId))
+          setAccountTypeId(first.accountTypeId || 1)
+        }
       })
       .catch(() => {})
       .finally(() => setLoadingBanks(false))
@@ -393,6 +406,7 @@ function EditAccountModal({ account, onClose, onUpdated }) {
         payload.bank_name         = bankName
         payload.account_branch_id = accountBranchId
         payload.account_number    = accountNumber
+        payload.account_type_id   = accountTypeId
       }
       const res = await updateMeroshareAccount(account.id, payload)
       onUpdated(res.data)
@@ -509,17 +523,25 @@ function EditAccountModal({ account, onClose, onUpdated }) {
                 </div>
               ) : (
                 <div className="space-y-2">
-                  {banks.map(b => {
-                    const id = String(b.id)
+                  {banks.map((b, i) => {
+                    const thisKey = `${b.bankId}-${b.accountBranchId}`
+                    const selKey  = `${bankId}-${accountBranchId}`
+                    const selected = selKey === thisKey
                     return (
-                      <label key={id} className={`flex items-center gap-3 px-3.5 py-3 rounded-xl border cursor-pointer transition-all ${
-                        bankId === id ? 'border-blue-500 bg-blue-50 dark:bg-blue-900/20' : 'border-gray-200 dark:border-gray-700 hover:bg-gray-50 dark:hover:bg-gray-800'
+                      <label key={`${thisKey}-${i}`} className={`flex items-center gap-3 px-3.5 py-3 rounded-xl border cursor-pointer transition-all ${
+                        selected ? 'border-blue-500 bg-blue-50 dark:bg-blue-900/20' : 'border-gray-200 dark:border-gray-700 hover:bg-gray-50 dark:hover:bg-gray-800'
                       }`}>
-                        <input type="radio" name="editbank" value={id} checked={bankId === id}
-                          onChange={() => { setBankId(id); setBankName(b.bankBranchName || b.name || ''); setAccountNumber(b.accountNumber || ''); setAccountBranchId(b.branchCode || id) }}
+                        <input type="radio" name="editbank" value={thisKey} checked={selected}
+                          onChange={() => {
+                            setBankId(String(b.bankId))
+                            setBankName(b.displayName || b.bankName || '')
+                            setAccountNumber(b.accountNumber || '')
+                            setAccountBranchId(String(b.accountBranchId))
+                            setAccountTypeId(b.accountTypeId || 1)
+                          }}
                           className="accent-blue-600 flex-shrink-0" />
                         <div>
-                          <p className="text-[11px] font-semibold text-gray-900 dark:text-white">{b.bankBranchName || b.name}</p>
+                          <p className="text-[11px] font-semibold text-gray-900 dark:text-white">{b.displayName || b.bankName}</p>
                           <p className="text-[9px] text-gray-400 mt-0.5 font-mono">{b.accountNumber || '—'}</p>
                         </div>
                       </label>
@@ -602,6 +624,7 @@ function ApplyModal({ ipo, accounts, activeAccountId, onClose }) {
         bank_id:           selectedAccount.bank_id,
         account_branch_id: selectedAccount.account_branch_id,
         account_number:    selectedAccount.account_number,
+        account_type_id:   selectedAccount.account_type_id || 1,
         crn_number:        crnNumber.trim(),
         transaction_pin:   pin.trim(),
       })
