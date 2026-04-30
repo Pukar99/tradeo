@@ -284,8 +284,7 @@ function EditAccountModal({ account, onClose, onUpdated }) {
   const [saving,          setSaving]         = useState(false)
   const [error,           setError]          = useState(null)
 
-  useEffect(() => {
-    if (tab !== 'bank' || banks.length > 0) return
+  const fetchBanks = () => {
     setLoadingBanks(true)
     getMeroshareBanks(account.id)
       .then(r => {
@@ -303,6 +302,11 @@ function EditAccountModal({ account, onClose, onUpdated }) {
       })
       .catch(() => {})
       .finally(() => setLoadingBanks(false))
+  }
+
+  useEffect(() => {
+    if (tab !== 'bank') return
+    fetchBanks()
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [tab])
 
@@ -385,9 +389,15 @@ function EditAccountModal({ account, onClose, onUpdated }) {
                 <input type="checkbox" checked={autoApply} onChange={e => setAutoApply(e.target.checked)} className="accent-emerald-600 w-4 h-4 flex-shrink-0" />
                 <div>
                   <p className="text-[11px] font-semibold text-gray-900 dark:text-white">Auto-apply</p>
-                  <p className="text-[9px] text-gray-400 mt-0.5">Apply for all open IPOs automatically every day</p>
+                  <p className="text-[9px] text-gray-400 mt-0.5">Apply for all open IPOs automatically every day at 11 AM</p>
                 </div>
               </label>
+              {!autoApply && account.auto_apply && account.encrypted_pin && (
+                <div className="flex items-start gap-2 bg-amber-50 dark:bg-amber-900/20 border border-amber-200 dark:border-amber-800/50 rounded-xl px-3 py-2">
+                  <span className="text-amber-500 text-sm flex-shrink-0">⚠</span>
+                  <p className="text-[10px] text-amber-700 dark:text-amber-400">Disabling auto-apply will delete your saved PIN. You will need to re-enter it if you re-enable.</p>
+                </div>
+              )}
               {autoApply && (
                 <div>
                   <label className="block text-[9px] font-semibold text-gray-400 uppercase tracking-widest mb-1.5">
@@ -395,7 +405,7 @@ function EditAccountModal({ account, onClose, onUpdated }) {
                   </label>
                   <div className="relative">
                     <input type={showPin ? 'text' : 'password'} placeholder={account.auto_apply ? '••••••••' : 'Enter PIN'}
-                      value={pin} onChange={e => setPin(e.target.value)} maxLength={10}
+                      value={pin} onChange={e => setPin(e.target.value)} maxLength={10} autoComplete="off"
                       className="w-full bg-gray-50 dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-xl px-3 py-2.5 pr-14 text-[13px] text-gray-900 dark:text-white outline-none focus:border-blue-500 tracking-widest" />
                     <button type="button" onClick={() => setShowPin(s => !s)} className="absolute right-3 top-1/2 -translate-y-1/2 text-[10px] text-gray-400 hover:text-gray-600 font-semibold">{showPin ? 'Hide' : 'Show'}</button>
                   </div>
@@ -406,13 +416,22 @@ function EditAccountModal({ account, onClose, onUpdated }) {
 
           {tab === 'bank' && (
             <>
-              <p className="text-[11px] text-gray-500 dark:text-gray-400">ASBA bank account linked in Meroshare. Required for IPO applications.</p>
+              <div className="flex items-center justify-between">
+                <p className="text-[11px] text-gray-500 dark:text-gray-400">ASBA bank linked in Meroshare. Required for IPO applications.</p>
+                <button onClick={fetchBanks} disabled={loadingBanks}
+                  className="text-[9px] font-semibold text-blue-500 hover:text-blue-700 disabled:opacity-40 flex items-center gap-1">
+                  <svg className={`w-3 h-3 ${loadingBanks ? 'animate-spin' : ''}`} fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
+                  </svg>
+                  Refresh
+                </button>
+              </div>
               {loadingBanks ? (
                 <div className="space-y-2">{[1,2].map(i => <div key={i} className="h-14 bg-gray-100 dark:bg-gray-800 rounded-xl animate-pulse" />)}</div>
               ) : banks.length === 0 ? (
                 <div className="bg-amber-50 dark:bg-amber-900/20 border border-amber-200 dark:border-amber-800/50 rounded-xl px-4 py-4 text-center">
                   <p className="text-[11px] font-semibold text-amber-700 dark:text-amber-400">No ASBA bank found</p>
-                  <p className="text-[10px] text-amber-600 dark:text-amber-400 mt-1">Please link a bank in Meroshare first.</p>
+                  <p className="text-[10px] text-amber-600 dark:text-amber-400 mt-1">Please link a bank in Meroshare first, then tap Refresh.</p>
                 </div>
               ) : (
                 <div className="space-y-2">
@@ -467,24 +486,28 @@ function ApplyModal({ ipo, accounts, activeAccountId, onClose, onApplied }) {
   const [declared,   setDeclared]   = useState(false)
   const [pin,        setPin]        = useState('')
   const [showPin,    setShowPin]    = useState(false)
-  const [applying,   setApplying]   = useState(false)
-  const [error,      setError]      = useState(null)
-  const [result,     setResult]     = useState(null)
+  const [applying,        setApplying]       = useState(false)
+  const [error,           setError]          = useState(null)
+  const [result,          setResult]         = useState(null)
+  const [disclaimerError, setDisclaimerError] = useState(false)
 
   const selectedAccount = accounts.find(a => a.id === accountId)
   const hasBank         = !!(selectedAccount?.bank_id && selectedAccount?.account_number)
   const alreadyApplied  = ipo.action === 'edit' || ipo.statusName === 'EDIT_APPROVE'
   const amount          = sharePrice && kitta ? sharePrice * kitta : null
 
-  useEffect(() => {
+  const fetchDisclaimer = () => {
     if (!accountId) return
+    setDisclaimerError(false)
     getMeroshareDisclaimer(accountId, ipo.companyShareId)
       .then(r => {
         const d = r.data
         setSharePrice(d.sharePrice ? Number(d.sharePrice) : null)
         setMinKitta(d.minKitta || 10); setMaxKitta(d.maxKitta || null); setMultipleOf(d.multipleOf || 10)
-      }).catch(() => {})
-  }, [accountId, ipo.companyShareId])
+      }).catch(() => setDisclaimerError(true))
+  }
+
+  useEffect(() => { fetchDisclaimer() }, [accountId, ipo.companyShareId]) // eslint-disable-line react-hooks/exhaustive-deps
 
   useEffect(() => {
     if (!selectedAccount) return
@@ -570,6 +593,13 @@ function ApplyModal({ ipo, accounts, activeAccountId, onClose, onApplied }) {
                 <p className="text-[9px] font-semibold text-gray-400 uppercase tracking-widest mb-1">ASBA Details</p>
                 <Row label="Bank" value={selectedAccount.bank_name} />
                 <Row label="Account" value={selectedAccount.account_number ? `****${selectedAccount.account_number.slice(-4)}` : '—'} />
+              </div>
+            )}
+
+            {disclaimerError && (
+              <div className="flex items-center justify-between bg-amber-50 dark:bg-amber-900/20 border border-amber-200 dark:border-amber-800/50 rounded-xl px-3 py-2">
+                <p className="text-[10px] text-amber-700 dark:text-amber-400">Could not load IPO details (share price, limits).</p>
+                <button onClick={fetchDisclaimer} className="text-[10px] font-semibold text-amber-700 dark:text-amber-300 underline ml-2 flex-shrink-0">Retry</button>
               </div>
             )}
 
