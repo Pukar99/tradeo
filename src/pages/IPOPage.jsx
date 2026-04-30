@@ -716,12 +716,15 @@ function BulkApplyModal({ ipo, accounts, inFlightRef, onClose, onApplied }) {
   const skippedAccounts = accounts.filter(a => !a.bank_id || !a.account_branch_id)
   const needsPin        = readyAccounts.filter(a => !a.auto_apply)
 
+  const defaultKitta = readyAccounts.length > 0
+    ? Math.min(...readyAccounts.map(a => a.default_kitta || 10))
+    : 10
+
   const [pins,     setPins]     = useState({})
-  const [kitta,    setKitta]    = useState(10)
+  const [kitta,    setKitta]    = useState(defaultKitta)
   const [applying, setApplying] = useState(false)
   const [results,  setResults]  = useState(null)
   const [error,    setError]    = useState(null)
-  const abortRef = useRef(null)
 
   useEffect(() => {
     const handler = (e) => { if (e.key === 'Escape' && !applying) handleClose() }
@@ -730,7 +733,6 @@ function BulkApplyModal({ ipo, accounts, inFlightRef, onClose, onApplied }) {
   }) // eslint-disable-line react-hooks/exhaustive-deps
 
   useEffect(() => () => {
-    if (abortRef.current) { abortRef.current.abort(); abortRef.current = null }
     if (inFlightRef) inFlightRef.current = false
   }, [inFlightRef])
 
@@ -738,19 +740,17 @@ function BulkApplyModal({ ipo, accounts, inFlightRef, onClose, onApplied }) {
   const canApply    = readyAccounts.length > 0 && pinsMissing.length === 0
 
   const handleApply = async () => {
-    if (!canApply) return
+    if (!canApply || applying) return
     if (inFlightRef) inFlightRef.current = true
     setApplying(true); setError(null)
-    abortRef.current = new AbortController()
     try {
       const res = await applyMeroshareIPOBulk({ company_share_id: ipo.companyShareId, applied_kitta: kitta, transaction_pins: pins })
       setResults(res.data.results || [])
       onApplied?.(ipo.companyShareId)
     } catch (err) {
-      if (err.name !== 'CanceledError' && err.code !== 'ERR_CANCELED')
-        setError(err.response?.data?.error || 'Bulk apply failed')
+      setError(err.response?.data?.error || 'Bulk apply failed')
     } finally {
-      setApplying(false); abortRef.current = null
+      setApplying(false)
       if (inFlightRef) inFlightRef.current = false
     }
   }
@@ -792,7 +792,7 @@ function BulkApplyModal({ ipo, accounts, inFlightRef, onClose, onApplied }) {
             <div>
               <FieldLabel>Kitta per Account</FieldLabel>
               <input type="number" min={10} step={10} value={kitta} onChange={e => setKitta(parseInt(e.target.value) || 10)} className={inputCls + ' text-[14px] font-bold font-mono'} />
-              <p className="text-[9px] text-gray-400 mt-1">Applied per account. Overrides each account's default.</p>
+              <p className="text-[9px] text-gray-400 mt-1">Applied to all accounts. Default is the lowest among your accounts ({defaultKitta}).</p>
             </div>
 
             <div className="space-y-2">
@@ -1009,17 +1009,39 @@ function IPOPage() {
   }, [selectedAcc])
 
   const handleApplied = useCallback((companyShareId, accountId) => {
+    // Update appliedMap — tracks applied state across all accounts
     setAppliedMap(m => {
       const s = new Set(m[companyShareId] || [])
       if (accountId) s.add(accountId)
       else accounts.forEach(a => s.add(a.id))
       return { ...m, [companyShareId]: s }
     })
-    if (accountId) delete tabCache.current[`${accountId}:ipos`]
-    else accounts.forEach(a => { delete tabCache.current[`${a.id}:ipos`] })
+    // Patch the ipos list in-place so cache and live state agree
+    setIpos(list => list.map(ipo =>
+      String(ipo.companyShareId) === String(companyShareId)
+        ? { ...ipo, action: 'edit', statusName: 'EDIT_APPROVE' }
+        : ipo
+    ))
+    // Also patch tabCache so a re-select doesn't revert to stale state
+    accounts.forEach(a => {
+      const key = `${a.id}:ipos`
+      if (tabCache.current[key]) {
+        tabCache.current[key] = tabCache.current[key].map(ipo =>
+          String(ipo.companyShareId) === String(companyShareId)
+            ? { ...ipo, action: 'edit', statusName: 'EDIT_APPROVE' }
+            : ipo
+        )
+      }
+    })
   }, [accounts])
 
-  const handleAccountUpdated = (updated) => setAccounts(list => list.map(a => a.id === updated.id ? updated : a))
+  const handleAccountUpdated = (updated) => {
+    setAccounts(list => list.map(a => a.id === updated.id ? updated : a))
+    // Clear cached tab data so stale defaults (kitta, crn) aren't shown
+    Object.keys(tabCache.current).forEach(k => {
+      if (k.startsWith(`${updated.id}:`)) delete tabCache.current[k]
+    })
+  }
 
   const handleToggleAutoApply = async (account, enable) => {
     setTogglingAutoApply(true); setActionError(null)
