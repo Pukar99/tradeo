@@ -4,7 +4,7 @@ export const BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:5000'
 
 export const API = axios.create({
   baseURL: BASE_URL,
-  timeout: 15000, // 15s max — prevents hanging on dead Supabase
+  timeout: 60000, // 60s — Render free tier cold-starts can take 30–50s
 })
 
 // ── Request counter + 300ms dedup (dev-mode diagnostics) ─────────────────────
@@ -66,6 +66,9 @@ API.interceptors.response.use(
     return Promise.reject(error)
   }
 )
+
+// Wake Render free-tier instance on app load (fire-and-forget)
+axios.get(`${BASE_URL}/`, { timeout: 60000 }).catch(() => {})
 
 // Auth
 export const loginUser = (data) => API.post('/api/auth/login', data)
