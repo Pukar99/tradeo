@@ -11,7 +11,6 @@ import {
   getAdminPending
 } from '../api'
 
-const ADMIN_USER_ID = 1
 
 const formatDate = (dateStr) => {
   if (!dateStr) return ''
@@ -182,7 +181,7 @@ function ResearchPage() {
 
   const [fetchError, setFetchError] = useState(null)
   const [actionErr, setActionErr] = useState(null)
-  const isAdmin = user?.id === ADMIN_USER_ID
+  const isAdmin = eligibility?.isAdmin === true
 
   const fetchData = useCallback(async () => {
     try {
@@ -193,18 +192,20 @@ function ResearchPage() {
       ])
       if (postsRes.status === 'fulfilled') setPosts(postsRes.value.data)
       else throw postsRes.reason
-      if (eligRes.status === 'fulfilled') setEligibility(eligRes.value.data)
-
-      if (isAdmin) {
-        const pendingRes = await getAdminPending()
-        setPendingPosts(pendingRes.data)
+      if (eligRes.status === 'fulfilled') {
+        const elig = eligRes.value.data
+        setEligibility(elig)
+        if (elig?.isAdmin) {
+          const pendingRes = await getAdminPending()
+          setPendingPosts(pendingRes.data)
+        }
       }
     } catch (err) {
       setFetchError(err.response?.data?.error || 'Failed to load research posts')
     } finally {
       setLoading(false)
     }
-  }, [isAdmin])
+  }, [])
 
   useEffect(() => { fetchData() }, [fetchData])
 
