@@ -41,6 +41,7 @@ function AddAccountModal({ dpList, onClose, onAdded }) {
   const [step,          setStep]         = useState(1)
   const [creds,         setCreds]        = useState({ label: '', dp_id: '', username: '', password: '' })
   const [showPass,      setShowPass]     = useState(false)
+  const [tempId,        setTempId]       = useState(null)  // DB row id from step 1
   const [banks,         setBanks]        = useState([])
   const [bankId,        setBankId]       = useState('')
   const [bankName,      setBankName]     = useState('')
@@ -56,9 +57,10 @@ function AddAccountModal({ dpList, onClose, onAdded }) {
   const setCred = (k, v) => setCreds(f => ({ ...f, [k]: v }))
 
   const STEPS = ['Credentials', 'ASBA Bank', 'Auto-apply']
-  const visStep = step <= 2 ? 1 : step === 3 ? 2 : 3  // map internal steps to visible step index
+  // step 1=creds, 2=asba, 3=auto-apply — maps directly to visible step
+  const visStep = step
 
-  // Step 1: verify credentials + fetch banks
+  // Step 1: verify credentials → backend logs in, saves bare account, returns banks
   const handleVerify = async (e) => {
     e.preventDefault()
     if (!creds.label.trim() || !creds.dp_id || !creds.username.trim() || !creds.password)
@@ -67,14 +69,15 @@ function AddAccountModal({ dpList, onClose, onAdded }) {
     try {
       const res = await addMeroshareAccount({ ...creds })
       if (res.data.step === 'asba_setup') {
+        setTempId(res.data.account_id)  // partial row already saved
         const bankList = res.data.banks || []
         setBanks(bankList)
         if (bankList.length > 0) {
           const first = bankList[0]
           setBankId(String(first.id))
-          setBankName(first.name || '')
+          setBankName(first.bankBranchName || first.name || '')
           setAccountNumber(first.accountNumber || '')
-          setAccountBranchId(String(first.id))
+          setAccountBranchId(first.branchCode || String(first.id))
         }
         setStep(2)
       }
@@ -91,19 +94,19 @@ function AddAccountModal({ dpList, onClose, onAdded }) {
     setError(null); setStep(3)
   }
 
-  // Step 3: save everything
+  // Step 3: save ASBA + auto-apply settings via PUT (no re-login)
   const handleSave = async () => {
     if (autoApply && !pin.trim()) return setError('Transaction PIN is required for auto-apply')
     setBusy(true); setError(null)
     try {
-      const res = await addMeroshareAccount({
-        ...creds,
+      const res = await updateMeroshareAccount(tempId, {
         bank_id: bankId, bank_name: bankName,
         account_branch_id: accountBranchId, account_number: accountNumber,
         crn_number: crnNumber, default_kitta: kitta,
-        auto_apply: autoApply, transaction_pin: autoApply ? pin : undefined,
+        auto_apply: autoApply,
+        transaction_pin: autoApply ? pin : undefined,
       })
-      onAdded(res.data.account)
+      onAdded(res.data)
       onClose()
     } catch (err) {
       setError(err.response?.data?.error || 'Failed to save account')
@@ -224,11 +227,11 @@ function AddAccountModal({ dpList, onClose, onAdded }) {
                         bankId === id ? 'border-blue-500 bg-blue-50 dark:bg-blue-900/20' : 'border-gray-200 dark:border-gray-700 hover:bg-gray-50 dark:hover:bg-gray-800'
                       }`}>
                         <input type="radio" name="bank" value={id} checked={bankId === id}
-                          onChange={() => { setBankId(id); setBankName(b.name || ''); setAccountNumber(b.accountNumber || ''); setAccountBranchId(id) }}
+                          onChange={() => { setBankId(id); setBankName(b.bankBranchName || b.name || ''); setAccountNumber(b.accountNumber || ''); setAccountBranchId(b.branchCode || id) }}
                           className="accent-blue-600 flex-shrink-0" />
                         <div>
-                          <p className="text-[11px] font-semibold text-gray-900 dark:text-white">{b.name}</p>
-                          <p className="text-[9px] text-gray-400 mt-0.5 font-mono">{b.accountNumber}</p>
+                          <p className="text-[11px] font-semibold text-gray-900 dark:text-white">{b.bankBranchName || b.name}</p>
+                          <p className="text-[9px] text-gray-400 mt-0.5 font-mono">{b.accountNumber || '—'}</p>
                         </div>
                         {bankId === id && <svg className="w-4 h-4 text-blue-500 ml-auto flex-shrink-0" fill="currentColor" viewBox="0 0 20 20"><path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clipRule="evenodd" /></svg>}
                       </label>
@@ -350,27 +353,32 @@ function EditAccountModal({ account, onClose, onUpdated }) {
   const [error,         setError]        = useState(null)
 
   useEffect(() => {
-    if (tab === 'bank' && banks.length === 0) {
-      setLoadingBanks(true)
-      getMeroshareBanks(account.id)
-        .then(r => {
-          const list = r.data?.banks || []
-          setBanks(list)
-          if (!bankId && list.length > 0) {
-            const first = list[0]
-            setBankId(String(first.id))
+    if (tab !== 'bank' || banks.length > 0) return
+    setLoadingBanks(true)
+    getMeroshareBanks(account.id)
+      .then(r => {
+        const list = r.data?.banks || []
+        setBanks(list)
+        // Pre-select first bank only if none already selected
+        setBankId(prev => {
+          if (prev) return prev
+          const first = list[0]
+          if (first) {
             setBankName(first.name || '')
             setAccountNumber(first.accountNumber || '')
             setAccountBranchId(String(first.id))
+            return String(first.id)
           }
+          return prev
         })
-        .catch(() => {})
-        .finally(() => setLoadingBanks(false))
-    }
+      })
+      .catch(() => {})
+      .finally(() => setLoadingBanks(false))
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [tab])
 
   const handleSave = async () => {
-    if (autoApply && !pin.trim() && !account.encrypted_pin && !account.auto_apply)
+    if (autoApply && !pin.trim() && !account.encrypted_pin)
       return setError('PIN required to enable auto-apply')
     setSaving(true); setError(null)
     try {
@@ -508,11 +516,11 @@ function EditAccountModal({ account, onClose, onUpdated }) {
                         bankId === id ? 'border-blue-500 bg-blue-50 dark:bg-blue-900/20' : 'border-gray-200 dark:border-gray-700 hover:bg-gray-50 dark:hover:bg-gray-800'
                       }`}>
                         <input type="radio" name="editbank" value={id} checked={bankId === id}
-                          onChange={() => { setBankId(id); setBankName(b.name || ''); setAccountNumber(b.accountNumber || ''); setAccountBranchId(id) }}
+                          onChange={() => { setBankId(id); setBankName(b.bankBranchName || b.name || ''); setAccountNumber(b.accountNumber || ''); setAccountBranchId(b.branchCode || id) }}
                           className="accent-blue-600 flex-shrink-0" />
                         <div>
-                          <p className="text-[11px] font-semibold text-gray-900 dark:text-white">{b.name}</p>
-                          <p className="text-[9px] text-gray-400 mt-0.5 font-mono">{b.accountNumber}</p>
+                          <p className="text-[11px] font-semibold text-gray-900 dark:text-white">{b.bankBranchName || b.name}</p>
+                          <p className="text-[9px] text-gray-400 mt-0.5 font-mono">{b.accountNumber || '—'}</p>
                         </div>
                       </label>
                     )
@@ -545,6 +553,9 @@ function ApplyModal({ ipo, accounts, activeAccountId, onClose }) {
   const initAcc      = accounts.find(a => a.id === activeAccountId) || accounts[0]
   const [accountId,  setAccountId]  = useState(initAcc?.id || '')
   const [sharePrice, setSharePrice] = useState(null)
+  const [minKitta,   setMinKitta]   = useState(10)
+  const [maxKitta,   setMaxKitta]   = useState(null)
+  const [multipleOf, setMultipleOf] = useState(10)
   const [kitta,      setKitta]      = useState(initAcc?.default_kitta || 10)
   const [crnNumber,  setCrnNumber]  = useState(initAcc?.crn_number || '')
   const [declared,   setDeclared]   = useState(false)
@@ -563,9 +574,11 @@ function ApplyModal({ ipo, accounts, activeAccountId, onClose }) {
     if (!accountId) return
     getMeroshareDisclaimer(accountId, ipo.companyShareId)
       .then(res => {
-        const d = res.data.disclaimer
-        const price = d?.sharePrice ?? d?.minPrice ?? d?.issuePrice ?? d?.faceValue ?? null
-        setSharePrice(price ? Number(price) : null)
+        const d = res.data
+        setSharePrice(d.sharePrice ? Number(d.sharePrice) : null)
+        setMinKitta(d.minKitta   || 10)
+        setMaxKitta(d.maxKitta   || null)
+        setMultipleOf(d.multipleOf || 10)
       })
       .catch(() => {})
   }, [accountId, ipo.companyShareId])
@@ -676,8 +689,15 @@ function ApplyModal({ ipo, accounts, activeAccountId, onClose }) {
               <div className="grid grid-cols-2 gap-3">
                 <div>
                   <label className="block text-[9px] font-semibold text-gray-400 uppercase tracking-widest mb-1.5">Applied Kitta</label>
-                  <input type="number" min={10} step={10} value={kitta}
-                    onChange={e => setKitta(Math.max(10, parseInt(e.target.value) || 10))}
+                  <input type="number"
+                    min={minKitta} max={maxKitta || undefined} step={multipleOf}
+                    value={kitta}
+                    onChange={e => {
+                      const v = parseInt(e.target.value) || minKitta
+                      const snapped = Math.round(v / multipleOf) * multipleOf
+                      const clamped = Math.max(minKitta, maxKitta ? Math.min(snapped, maxKitta) : snapped)
+                      setKitta(clamped)
+                    }}
                     className="w-full bg-gray-50 dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-xl px-3 py-2.5 text-[14px] font-bold text-gray-900 dark:text-white outline-none focus:border-blue-500"
                   />
                 </div>
@@ -689,7 +709,9 @@ function ApplyModal({ ipo, accounts, activeAccountId, onClose }) {
                 </div>
               </div>
               {sharePrice && (
-                <p className="text-[9px] text-gray-400 -mt-2">Share price: Rs. {Number(sharePrice).toLocaleString()} · Min 10 kitta</p>
+                <p className="text-[9px] text-gray-400 -mt-2">
+                  Rs.{Number(sharePrice).toLocaleString()}/share · Min {minKitta}{maxKitta ? ` · Max ${maxKitta}` : ''} · Multiple of {multipleOf}
+                </p>
               )}
 
               {/* CRN */}

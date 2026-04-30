@@ -219,6 +219,9 @@ export const getMerosharePortfolio   = (accountId)     => API.get('/api/meroshar
 export const cancelMeroshareIPO      = (data)          => API.post('/api/meroshare/cancel', data)
 export const getMeroshareToken       = (accountId) => API.get('/api/meroshare/token', { params: accountId ? { account_id: accountId } : {} })
 export const getMeroshareAllotment   = (accountId, applicantFormId) => API.get('/api/meroshare/allotment', { params: { account_id: accountId, applicant_form_id: applicantFormId } })
+export const getMeroshareBanks       = (accountId)     => API.get('/api/meroshare/banks', { params: accountId ? { account_id: accountId } : {} })
+export const getMeroshareDisclaimer  = (accountId, companyShareId) => API.get('/api/meroshare/disclaimer', { params: { account_id: accountId, company_share_id: companyShareId } })
+export const updateMeroshareAccount  = (id, data)      => API.put(`/api/meroshare/accounts/${id}`, data)
 
 // Market Journal
 export const getMarketJournals      = ()         => API.get('/api/market-journal')
