@@ -875,6 +875,7 @@ function IPOPage() {
   const [allotmentMap,  setAllotmentMap]  = useState({})
   const [checkingId,    setCheckingId]    = useState(null)
   const [appliedMap,    setAppliedMap]    = useState({})
+  const [actionError,   setActionError]   = useState(null)  // inline error for delete/cancel
 
   // Results search + Holdings search + sort
   const [resultSearch,    setResultSearch]    = useState('')
@@ -884,6 +885,7 @@ function IPOPage() {
 
   const tabCache          = useRef({})
   const bulkApplyInFlight = useRef(false)
+  const [sidebarOpen,     setSidebarOpen]   = useState(false)
 
   useEffect(() => {
     getMeroshareDpList().then(r => setDpList(r.data || [])).catch(() => {})
@@ -950,11 +952,12 @@ function IPOPage() {
 
   const handleSelectAccount = (id) => {
     setSelectedAcc(id); setIpos([]); setResults([]); setPortfolio([])
-    setAllotmentMap({}); setError(null)
+    setAllotmentMap({}); setError(null); setActionError(null)
+    setSidebarOpen(false)
   }
 
   const handleDeleteAccount = async (id) => {
-    setDeleting(id)
+    setDeleting(id); setActionError(null)
     try {
       await deleteMeroshareAccount(id)
       Object.keys(tabCache.current).forEach(k => { if (k.startsWith(`${id}:`)) delete tabCache.current[k] })
@@ -962,17 +965,17 @@ function IPOPage() {
       setAccounts(updated)
       if (selectedAcc === id) setSelectedAcc(updated[0]?.id || null)
     } catch (err) {
-      alert(err.response?.data?.error || 'Failed to remove account')
+      setActionError(err.response?.data?.error || 'Failed to remove account')
     } finally { setDeleting(null) }
   }
 
   const handleCancelIPO = async (applicationId) => {
-    setCancelingId(applicationId)
+    setCancelingId(applicationId); setActionError(null)
     try {
       await cancelMeroshareIPO({ account_id: selectedAcc, application_id: applicationId })
       setResults(r => r.filter(x => (x.applicantFormId || x.id) !== applicationId))
     } catch (err) {
-      alert(err.response?.data?.error || 'Failed to cancel')
+      setActionError(err.response?.data?.error || 'Failed to cancel application')
     } finally { setCancelingId(null) }
   }
 
@@ -1037,9 +1040,19 @@ function IPOPage() {
 
       {/* Page header */}
       <div className="flex flex-wrap items-center justify-between gap-3 mb-5">
-        <div>
-          <h1 className="text-[18px] font-bold text-gray-900 dark:text-white tracking-tight">Meroshare IPO</h1>
-          <p className="text-[11px] text-gray-400 mt-0.5">Manage applications across all your family accounts</p>
+        <div className="flex items-center gap-3">
+          {/* Mobile: toggle sidebar drawer */}
+          {hasAccounts && (
+            <button onClick={() => setSidebarOpen(s => !s)} title="Accounts"
+              className="sm:hidden flex items-center gap-1.5 px-2.5 py-2 rounded-xl border border-gray-200 dark:border-gray-700 text-gray-600 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-800 transition-colors text-[11px] font-semibold">
+              <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 6h16M4 12h16M4 18h16" /></svg>
+              {activeAccount?.label || 'Accounts'}
+            </button>
+          )}
+          <div>
+            <h1 className="text-[18px] font-bold text-gray-900 dark:text-white tracking-tight">Meroshare IPO</h1>
+            <p className="text-[11px] text-gray-400 mt-0.5">Manage applications across all your family accounts</p>
+          </div>
         </div>
         <button onClick={() => setShowAddModal(true)} title="Add Meroshare account"
           className="flex items-center gap-1.5 px-3.5 py-2 rounded-xl bg-blue-600 text-white text-[11px] font-semibold hover:bg-blue-700 transition-colors focus-visible:ring-2 focus-visible:ring-blue-500/40">
@@ -1047,6 +1060,11 @@ function IPOPage() {
           Add Account
         </button>
       </div>
+
+      {/* Mobile sidebar drawer backdrop */}
+      {sidebarOpen && (
+        <div className="fixed inset-0 z-40 bg-black/40 sm:hidden" onClick={() => setSidebarOpen(false)} />
+      )}
 
       {/* Empty state */}
       {!hasAccounts && (
@@ -1084,8 +1102,22 @@ function IPOPage() {
         <div className="flex gap-5 items-start">
 
           {/* ── Sidebar ── */}
-          <div className="w-52 flex-shrink-0 space-y-1.5">
-            <p className="text-[9px] font-semibold uppercase tracking-widest text-gray-400 px-1 mb-2">Accounts</p>
+          {/* On mobile: fixed drawer from left. On sm+: static column. */}
+          <div className={`
+            fixed sm:static inset-y-0 left-0 z-50 sm:z-auto
+            w-64 sm:w-52 flex-shrink-0
+            bg-white dark:bg-gray-950 sm:bg-transparent dark:sm:bg-transparent
+            border-r sm:border-0 border-gray-100 dark:border-gray-800
+            pt-16 sm:pt-0 px-4 sm:px-0
+            overflow-y-auto sm:overflow-visible
+            transition-transform duration-200 ease-out
+            ${sidebarOpen ? 'translate-x-0' : '-translate-x-full sm:translate-x-0'}
+            space-y-1.5
+          `}>
+            <div className="flex items-center justify-between px-1 mb-2">
+              <p className="text-[9px] font-semibold uppercase tracking-widest text-gray-400">Accounts</p>
+              <button onClick={() => setSidebarOpen(false)} className="sm:hidden text-gray-400 hover:text-gray-600 text-lg leading-none p-1">×</button>
+            </div>
             {accounts.map(a => {
               const noBankSetup = !a.bank_id || !a.account_number
               const isSelected  = selectedAcc === a.id
@@ -1204,6 +1236,13 @@ function IPOPage() {
                 </svg>
               </button>
             </div>
+
+            {actionError && (
+              <div className="mb-4 flex items-center gap-2 border-l-2 border-red-500 bg-red-50 dark:bg-red-900/20 rounded-r-xl px-4 py-3">
+                <span className="text-[11px] text-red-500 flex-1">{actionError}</span>
+                <button onClick={() => setActionError(null)} className="text-red-400 hover:text-red-600 text-lg leading-none">×</button>
+              </div>
+            )}
 
             {error && !loading && (
               <div className="mb-4 flex items-center gap-2 border-l-2 border-red-500 bg-red-50 dark:bg-red-900/20 rounded-r-xl px-4 py-3">
