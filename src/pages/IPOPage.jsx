@@ -65,6 +65,25 @@ function FieldLabel({ children }) {
 // ── Input ─────────────────────────────────────────────────────────────────────
 const inputCls = "w-full bg-gray-50 dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-xl px-3 py-2.5 text-[12px] text-gray-900 dark:text-white outline-none focus-visible:ring-2 focus-visible:ring-blue-500/30 focus:border-blue-500 transition-colors"
 
+// ── Password / PIN input with Show/Hide toggle ────────────────────────────────
+function PasswordInput({ value, onChange, placeholder = '••••••••', mono = false, maxLength, autoComplete = 'new-password' }) {
+  const [show, setShow] = useState(false)
+  return (
+    <div className="relative">
+      <input type={show ? 'text' : 'password'} value={value} onChange={onChange}
+        placeholder={placeholder} maxLength={maxLength} autoComplete={autoComplete}
+        className={inputCls + ' pr-14' + (mono ? ' font-mono tracking-widest' : '')} />
+      <button type="button" onClick={() => setShow(s => !s)}
+        className="absolute right-3 top-1/2 -translate-y-1/2 text-[10px] text-gray-400 hover:text-gray-600 font-semibold">
+        {show ? 'Hide' : 'Show'}
+      </button>
+    </div>
+  )
+}
+
+// ── Whether a Meroshare IPO object has been applied to ────────────────────────
+const isApplied = (ipo) => ipo.action === 'edit' || ipo.statusName === 'EDIT_APPROVE'
+
 // ── Error Box ─────────────────────────────────────────────────────────────────
 function ErrorBox({ children }) {
   return (
@@ -87,7 +106,6 @@ function AddAccountModal({ dpList, onClose, onAdded }) {
   const [dpId,            setDpId]           = useState('')
   const [username,        setUsername]       = useState('')
   const [password,        setPassword]       = useState('')
-  const [showPass,        setShowPass]       = useState(false)
   const [tempId,          setTempId]         = useState(null)
   const [banks,           setBanks]          = useState([])
   const [bankId,          setBankId]         = useState('')
@@ -100,7 +118,6 @@ function AddAccountModal({ dpList, onClose, onAdded }) {
   const [kitta,           setKitta]          = useState(10)
   const [savePin,         setSavePin]        = useState(false)
   const [pin,             setPin]            = useState('')
-  const [showPin,         setShowPin]        = useState(false)
   const [busy,            setBusy]           = useState(false)
   const [error,           setError]          = useState(null)
 
@@ -195,10 +212,7 @@ function AddAccountModal({ dpList, onClose, onAdded }) {
                 <input type="text" placeholder="Your Meroshare username" value={username} onChange={e => setUsername(e.target.value)} autoComplete="off" className={inputCls} />
               </div>
               <div><FieldLabel>Password</FieldLabel>
-                <div className="relative">
-                  <input type={showPass ? 'text' : 'password'} placeholder="••••••••" value={password} onChange={e => setPassword(e.target.value)} autoComplete="new-password" className={inputCls + ' pr-14'} />
-                  <button type="button" onClick={() => setShowPass(s => !s)} className="absolute right-3 top-1/2 -translate-y-1/2 text-[10px] text-gray-400 hover:text-gray-600 font-semibold">{showPass ? 'Hide' : 'Show'}</button>
-                </div>
+                <PasswordInput value={password} onChange={e => setPassword(e.target.value)} />
               </div>
               <div className="flex items-start gap-2 bg-blue-50 dark:bg-blue-900/20 border border-blue-100 dark:border-blue-800/50 rounded-xl px-3 py-2">
                 <svg className="w-3.5 h-3.5 text-blue-500 flex-shrink-0 mt-0.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
@@ -271,11 +285,7 @@ function AddAccountModal({ dpList, onClose, onAdded }) {
                 {savePin && (
                   <div className="px-4 pb-3 pt-1 border-t border-gray-100 dark:border-gray-800">
                     <FieldLabel>Transaction PIN</FieldLabel>
-                    <div className="relative">
-                      <input type={showPin ? 'text' : 'password'} placeholder="Your Meroshare PIN" value={pin} onChange={e => setPin(e.target.value)} maxLength={10}
-                        className={inputCls + ' pr-14 font-mono tracking-widest'} />
-                      <button type="button" onClick={() => setShowPin(s => !s)} className="absolute right-3 top-1/2 -translate-y-1/2 text-[10px] text-gray-400 hover:text-gray-600 font-semibold">{showPin ? 'Hide' : 'Show'}</button>
-                    </div>
+                    <PasswordInput value={pin} onChange={e => setPin(e.target.value)} placeholder="Your Meroshare PIN" mono maxLength={10} autoComplete="off" />
                   </div>
                 )}
               </div>
@@ -300,8 +310,6 @@ function EditAccountModal({ account, dpList, onClose, onUpdated }) {
   const [dpId,            setDpId]           = useState(String(account.dp_id || ''))
   const [username,        setUsername]       = useState(account.username || '')
   const [password,        setPassword]       = useState('')
-  const [showPass,        setShowPass]       = useState(false)
-
   const [banks,           setBanks]          = useState([])
   const [loadingBanks,    setLoadingBanks]   = useState(false)
   const [bankError,       setBankError]      = useState(null)
@@ -316,7 +324,6 @@ function EditAccountModal({ account, dpList, onClose, onUpdated }) {
   const [kitta,           setKitta]          = useState(account.default_kitta || 10)
   const [savePin,         setSavePin]        = useState(account.auto_apply || false)
   const [pin,             setPin]            = useState('')
-  const [showPin,         setShowPin]        = useState(false)
   const [saving,          setSaving]         = useState(false)
   const [error,           setError]          = useState(null)
 
@@ -405,10 +412,7 @@ function EditAccountModal({ account, dpList, onClose, onUpdated }) {
                 <input type="text" value={username} onChange={e => setUsername(e.target.value)} autoComplete="off" className={inputCls} />
               </div>
               <div><FieldLabel>Password <span className="font-normal normal-case text-gray-400">(leave blank to keep existing)</span></FieldLabel>
-                <div className="relative">
-                  <input type={showPass ? 'text' : 'password'} placeholder="New password" value={password} onChange={e => setPassword(e.target.value)} autoComplete="new-password" className={inputCls + ' pr-14'} />
-                  <button type="button" onClick={() => setShowPass(s => !s)} className="absolute right-3 top-1/2 -translate-y-1/2 text-[10px] text-gray-400 hover:text-gray-600 font-semibold">{showPass ? 'Hide' : 'Show'}</button>
-                </div>
+                <PasswordInput value={password} onChange={e => setPassword(e.target.value)} placeholder="New password" />
               </div>
             </div>
           </div>
@@ -487,11 +491,7 @@ function EditAccountModal({ account, dpList, onClose, onUpdated }) {
                 {savePin && (
                   <div className="px-4 pb-3 pt-1 border-t border-gray-100 dark:border-gray-800">
                     <FieldLabel>Transaction PIN <span className="font-normal normal-case">{account.auto_apply ? '(blank = keep existing)' : ''}</span></FieldLabel>
-                    <div className="relative">
-                      <input type={showPin ? 'text' : 'password'} placeholder={account.auto_apply ? '••••••••' : 'Enter PIN'} value={pin} onChange={e => setPin(e.target.value)} maxLength={10} autoComplete="off"
-                        className={inputCls + ' pr-14 font-mono tracking-widest'} />
-                      <button type="button" onClick={() => setShowPin(s => !s)} className="absolute right-3 top-1/2 -translate-y-1/2 text-[10px] text-gray-400 hover:text-gray-600 font-semibold">{showPin ? 'Hide' : 'Show'}</button>
-                    </div>
+                    <PasswordInput value={pin} onChange={e => setPin(e.target.value)} placeholder={account.auto_apply ? '••••••••' : 'Enter PIN'} mono maxLength={10} autoComplete="off" />
                   </div>
                 )}
               </div>
@@ -525,7 +525,6 @@ function ApplyModal({ ipo, accounts, activeAccountId, onClose, onApplied }) {
   const [crnNumber,  setCrnNumber]  = useState(initAcc?.crn_number || '')
   const [declared,   setDeclared]   = useState(false)
   const [pin,        setPin]        = useState('')
-  const [showPin,    setShowPin]    = useState(false)
   const [applying,        setApplying]       = useState(false)
   const [error,           setError]          = useState(null)
   const [result,          setResult]         = useState(null)
@@ -534,7 +533,7 @@ function ApplyModal({ ipo, accounts, activeAccountId, onClose, onApplied }) {
   const selectedAccount = accounts.find(a => a.id === accountId)
   const hasBank         = !!(selectedAccount?.bank_id && selectedAccount?.account_number)
   const hasSavedPin     = !!selectedAccount?.auto_apply   // auto_apply = saved PIN present
-  const alreadyApplied  = ipo.action === 'edit' || ipo.statusName === 'EDIT_APPROVE'
+  const alreadyApplied  = isApplied(ipo)
   const amount          = sharePrice && kitta ? sharePrice * kitta : null
   // 1-click: PIN saved and declaration accepted, no PIN input needed
   const canSubmit       = hasBank && declared && (hasSavedPin || pin.trim())
@@ -686,12 +685,7 @@ function ApplyModal({ ipo, accounts, activeAccountId, onClose, onApplied }) {
             {/* PIN field — only shown if no saved PIN */}
             {!hasSavedPin && (
               <div><FieldLabel>Transaction PIN</FieldLabel>
-                <div className="relative">
-                  <input type={showPin ? 'text' : 'password'} placeholder="Your Meroshare PIN"
-                    value={pin} onChange={e => setPin(e.target.value)} maxLength={10}
-                    className={inputCls + ' pr-14 font-mono tracking-widest'} />
-                  <button type="button" onClick={() => setShowPin(s => !s)} className="absolute right-3 top-1/2 -translate-y-1/2 text-[10px] text-gray-400 hover:text-gray-600 font-semibold">{showPin ? 'Hide' : 'Show'}</button>
-                </div>
+                <PasswordInput value={pin} onChange={e => setPin(e.target.value)} placeholder="Your Meroshare PIN" mono maxLength={10} autoComplete="off" />
                 <p className="text-[9px] text-gray-400 mt-1">Save PIN in account edit to skip this step next time.</p>
               </div>
             )}
@@ -930,7 +924,7 @@ function IPOPage() {
         tabCache.current[key] = data; setIpos(data)
         const applied = {}
         data.forEach(ipo => {
-          if (ipo.action === 'edit' || ipo.statusName === 'EDIT_APPROVE')
+          if (isApplied(ipo))
             applied[ipo.companyShareId] = (applied[ipo.companyShareId] || new Set()).add(accId)
         })
         setAppliedMap(m => ({ ...m, ...applied }))
@@ -958,7 +952,7 @@ function IPOPage() {
     if (!ipos.length || !selectedAcc) return
     const patch = {}
     ipos.forEach(ipo => {
-      if (ipo.action === 'edit' || ipo.statusName === 'EDIT_APPROVE') {
+      if (isApplied(ipo)) {
         if (!patch[ipo.companyShareId]) patch[ipo.companyShareId] = new Set()
         patch[ipo.companyShareId].add(selectedAcc)
       }
