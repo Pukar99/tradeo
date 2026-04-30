@@ -79,9 +79,13 @@ function Spinner({ size = 3 }) {
 }
 
 // ── Add Account Modal ─────────────────────────────────────────────────────────
+// Phase 1: enter creds → verify → get banks. Phase 2: pick bank + configure all at once.
 function AddAccountModal({ dpList, onClose, onAdded }) {
-  const [step,            setStep]           = useState(1)
-  const [creds,           setCreds]          = useState({ label: '', dp_id: '', username: '', password: '' })
+  const [phase,           setPhase]          = useState('creds')   // 'creds' | 'setup'
+  const [label,           setLabel]          = useState('')
+  const [dpId,            setDpId]           = useState('')
+  const [username,        setUsername]       = useState('')
+  const [password,        setPassword]       = useState('')
   const [showPass,        setShowPass]       = useState(false)
   const [tempId,          setTempId]         = useState(null)
   const [banks,           setBanks]          = useState([])
@@ -91,14 +95,13 @@ function AddAccountModal({ dpList, onClose, onAdded }) {
   const [accountNumber,   setAccountNumber]  = useState('')
   const [accountBranchId, setAccountBranchId] = useState('')
   const [accountTypeId,   setAccountTypeId]  = useState(1)
-  const [kitta,           setKitta]          = useState(10)
   const [crnNumber,       setCrnNumber]      = useState('')
-  const [autoApply,       setAutoApply]      = useState(false)
+  const [kitta,           setKitta]          = useState(10)
+  const [savePin,         setSavePin]        = useState(false)
   const [pin,             setPin]            = useState('')
   const [showPin,         setShowPin]        = useState(false)
   const [busy,            setBusy]           = useState(false)
   const [error,           setError]          = useState(null)
-  const setCred = (k, v) => setCreds(f => ({ ...f, [k]: v }))
 
   useEffect(() => {
     const handler = (e) => { if (e.key === 'Escape' && !busy) handleClose() }
@@ -107,19 +110,18 @@ function AddAccountModal({ dpList, onClose, onAdded }) {
   }) // eslint-disable-line react-hooks/exhaustive-deps
 
   const handleClose = async () => {
-    if (tempId && step > 1) await deleteMeroshareAccount(tempId).catch(() => {})
+    if (tempId) await deleteMeroshareAccount(tempId).catch(() => {})
     onClose()
   }
 
-  const STEPS = ['Credentials', 'ASBA Bank', 'Auto-apply']
-
+  // Phase 1: verify credentials, get bank list
   const handleVerify = async (e) => {
     e.preventDefault()
-    if (!creds.label.trim() || !creds.dp_id || !creds.username.trim() || !creds.password)
+    if (!label.trim() || !dpId || !username.trim() || !password)
       return setError('All fields are required')
     setBusy(true); setError(null)
     try {
-      const res = await addMeroshareAccount({ ...creds })
+      const res = await addMeroshareAccount({ label: label.trim(), dp_id: dpId, username: username.trim(), password })
       if (res.data.step === 'asba_setup') {
         setTempId(res.data.account_id)
         const list = res.data.banks || []
@@ -130,29 +132,28 @@ function AddAccountModal({ dpList, onClose, onAdded }) {
           setBankAccountId(f.bankAccountId || null); setAccountNumber(f.accountNumber || '')
           setAccountBranchId(String(f.accountBranchId)); setAccountTypeId(f.accountTypeId || 1)
         }
-        setStep(2)
+        setPhase('setup')
       }
     } catch (err) {
       setError(err.response?.data?.error || 'Failed to connect. Check your credentials.')
     } finally { setBusy(false) }
   }
 
-  const handleAsbaNext = () => {
-    if (!bankId || !accountBranchId) return setError('Please select your ASBA bank account')
-    setError(null); setStep(3)
-  }
-
+  // Phase 2: save everything (bank + kitta + optional PIN)
   const handleSave = async () => {
-    if (autoApply && !pin.trim()) return setError('Transaction PIN is required for auto-apply')
+    if (!bankId || !accountBranchId) return setError('Select your ASBA bank account')
+    if (savePin && !pin.trim()) return setError('Enter your transaction PIN to save it')
     setBusy(true); setError(null)
     try {
       const res = await updateMeroshareAccount(tempId, {
         bank_id: bankId, bank_name: bankName, bank_account_id: bankAccountId,
         account_branch_id: accountBranchId, account_number: accountNumber,
         account_type_id: accountTypeId, crn_number: crnNumber,
-        default_kitta: kitta, auto_apply: autoApply,
-        transaction_pin: autoApply ? pin : undefined,
+        default_kitta: kitta,
+        auto_apply: savePin,
+        transaction_pin: savePin ? pin.trim() : undefined,
       })
+      setTempId(null)  // committed — don't delete on close
       onAdded(res.data); onClose()
     } catch (err) {
       setError(err.response?.data?.error || 'Failed to save account')
@@ -164,57 +165,37 @@ function AddAccountModal({ dpList, onClose, onAdded }) {
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-md">
       <div className="bg-white dark:bg-gray-900 rounded-2xl border border-gray-200 dark:border-gray-700 w-full max-w-md shadow-2xl max-h-[90vh] flex flex-col animate-scale-in">
 
-        {/* Header */}
         <div className="px-5 py-4 border-b border-gray-100 dark:border-gray-800 flex items-center justify-between flex-shrink-0">
           <div>
-            <p className="text-[14px] font-bold text-gray-900 dark:text-white">Connect Meroshare Account</p>
+            <p className="text-[14px] font-bold text-gray-900 dark:text-white">
+              {phase === 'creds' ? 'Connect Meroshare Account' : 'Finish Account Setup'}
+            </p>
             <p className="text-[10px] text-gray-400 mt-0.5">
-              {step === 1 ? 'Enter your Meroshare credentials' : step === 2 ? 'Select your ASBA bank account' : 'Configure auto-apply settings'}
+              {phase === 'creds' ? 'Enter your Meroshare login credentials' : 'Select bank and configure apply settings'}
             </p>
           </div>
-          {!busy && (
-            <button onClick={handleClose} title="Close" className="w-7 h-7 flex items-center justify-center rounded-lg text-gray-400 hover:text-gray-600 hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors text-lg leading-none">×</button>
-          )}
-        </div>
-
-        {/* Step pills */}
-        <div className="px-5 pt-4 flex items-center gap-0 flex-shrink-0">
-          {STEPS.map((label, i) => {
-            const idx = i + 1; const done = step > idx; const active = step === idx
-            return (
-              <div key={i} className="flex items-center flex-1">
-                <div className="flex items-center gap-1.5 flex-shrink-0">
-                  <div className={`w-6 h-6 rounded-full flex items-center justify-center text-[9px] font-bold transition-all duration-200 ${
-                    done ? 'bg-emerald-500 text-white' : active ? 'bg-blue-600 text-white ring-4 ring-blue-100 dark:ring-blue-900/40' : 'bg-gray-100 dark:bg-gray-800 text-gray-400'
-                  }`}>{done ? '✓' : idx}</div>
-                  <span className={`text-[9px] font-semibold ${active ? 'text-gray-900 dark:text-white' : done ? 'text-emerald-600' : 'text-gray-400'}`}>{label}</span>
-                </div>
-                {i < 2 && <div className={`flex-1 h-px mx-2 transition-colors ${done ? 'bg-emerald-400' : 'bg-gray-100 dark:bg-gray-800'}`} />}
-              </div>
-            )
-          })}
+          {!busy && <button onClick={handleClose} title="Close" className="w-7 h-7 flex items-center justify-center rounded-lg text-gray-400 hover:text-gray-600 hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors text-lg leading-none">×</button>}
         </div>
 
         <div className="overflow-y-auto flex-1">
-          {/* Step 1 */}
-          {step === 1 && (
+          {/* ── Phase 1: Credentials ── */}
+          {phase === 'creds' && (
             <form onSubmit={handleVerify} className="p-5 space-y-3">
-              <div><FieldLabel>Label</FieldLabel>
-                <input type="text" placeholder="e.g. Self, Dad, Mom" value={creds.label} onChange={e => setCred('label', e.target.value)} className={inputCls} />
+              <div><FieldLabel>Account Label</FieldLabel>
+                <input type="text" placeholder="e.g. Self, Dad, Mom" value={label} onChange={e => setLabel(e.target.value)} className={inputCls} />
               </div>
               <div><FieldLabel>Broker / DP</FieldLabel>
-                <select value={creds.dp_id} onChange={e => setCred('dp_id', e.target.value)} className={inputCls}>
+                <select value={dpId} onChange={e => setDpId(e.target.value)} className={inputCls}>
                   <option value="">Select your broker / DP…</option>
                   {dpList.map(dp => <option key={dp.id} value={dp.id}>{dp.name}</option>)}
                 </select>
               </div>
               <div><FieldLabel>Meroshare Username</FieldLabel>
-                <input type="text" placeholder="Your Meroshare username" value={creds.username} onChange={e => setCred('username', e.target.value)} autoComplete="off" className={inputCls} />
+                <input type="text" placeholder="Your Meroshare username" value={username} onChange={e => setUsername(e.target.value)} autoComplete="off" className={inputCls} />
               </div>
               <div><FieldLabel>Password</FieldLabel>
                 <div className="relative">
-                  <input type={showPass ? 'text' : 'password'} placeholder="••••••••" value={creds.password} onChange={e => setCred('password', e.target.value)} autoComplete="new-password"
-                    className={inputCls + ' pr-14'} />
+                  <input type={showPass ? 'text' : 'password'} placeholder="••••••••" value={password} onChange={e => setPassword(e.target.value)} autoComplete="new-password" className={inputCls + ' pr-14'} />
                   <button type="button" onClick={() => setShowPass(s => !s)} className="absolute right-3 top-1/2 -translate-y-1/2 text-[10px] text-gray-400 hover:text-gray-600 font-semibold">{showPass ? 'Hide' : 'Show'}</button>
                 </div>
               </div>
@@ -225,88 +206,84 @@ function AddAccountModal({ dpList, onClose, onAdded }) {
                 <p className="text-[9px] text-blue-600 dark:text-blue-300 leading-relaxed">Credentials are AES-256 encrypted. Never stored in plaintext.</p>
               </div>
               {error && <ErrorBox>{error}</ErrorBox>}
-              <button type="submit" disabled={busy} className="w-full py-2.5 rounded-xl bg-blue-600 text-white text-[12px] font-semibold hover:bg-blue-700 disabled:opacity-60 flex items-center justify-center gap-2 transition-colors focus-visible:ring-2 focus-visible:ring-blue-500/40">
-                {busy && <Spinner />}{busy ? 'Verifying…' : 'Verify & Continue →'}
+              <button type="submit" disabled={busy} className="w-full py-2.5 rounded-xl bg-blue-600 text-white text-[12px] font-semibold hover:bg-blue-700 disabled:opacity-60 flex items-center justify-center gap-2 transition-colors">
+                {busy && <Spinner />}{busy ? 'Verifying credentials…' : 'Verify & Continue →'}
               </button>
             </form>
           )}
 
-          {/* Step 2 */}
-          {step === 2 && (
-            <div className="p-5 space-y-3">
-              <p className="text-[11px] text-gray-500 dark:text-gray-400">Select the ASBA bank account linked to your Meroshare profile.</p>
-              {banks.length === 0 ? (
-                <div className="bg-amber-50 dark:bg-amber-900/20 border border-amber-200 dark:border-amber-800/50 rounded-xl px-4 py-4 text-center">
-                  <p className="text-[11px] font-semibold text-amber-700 dark:text-amber-400">No ASBA bank found</p>
-                  <p className="text-[10px] text-amber-600 dark:text-amber-400 mt-1">Link a bank in Meroshare first, then try again.</p>
-                </div>
-              ) : (
-                <div className="space-y-2">
-                  {banks.map((b, i) => {
-                    const key = `${b.bankId}-${b.accountBranchId}`, sel = `${bankId}-${accountBranchId}`
-                    return (
-                      <label key={`${key}-${i}`} className={`flex items-center gap-3 px-3.5 py-3 rounded-xl border cursor-pointer transition-all ${
-                        sel === key ? 'border-blue-500 bg-blue-50 dark:bg-blue-900/20' : 'border-gray-200 dark:border-gray-700 hover:bg-gray-50 dark:hover:bg-gray-800'
-                      }`}>
-                        <input type="radio" name="bank" checked={sel === key} onChange={() => {
-                          setBankId(String(b.bankId)); setBankName(b.displayName || b.bankName || '')
-                          setBankAccountId(b.bankAccountId || null); setAccountNumber(b.accountNumber || '')
-                          setAccountBranchId(String(b.accountBranchId)); setAccountTypeId(b.accountTypeId || 1)
-                        }} className="accent-blue-600 flex-shrink-0" />
-                        <div>
-                          <p className="text-[11px] font-semibold text-gray-900 dark:text-white">{b.displayName || b.bankName}</p>
-                          <p className="text-[9px] text-gray-400 mt-0.5 font-mono">{b.accountNumber || '—'}</p>
-                        </div>
-                      </label>
-                    )
-                  })}
-                </div>
-              )}
-              <div><FieldLabel>CRN Number <span className="font-normal normal-case">(from passbook — leave blank if unsure)</span></FieldLabel>
-                <input type="text" placeholder="e.g. 123456789" value={crnNumber} onChange={e => setCrnNumber(e.target.value)} className={inputCls} />
-              </div>
-              {error && <ErrorBox>{error}</ErrorBox>}
-              <div className="flex gap-2">
-                <button onClick={() => { setStep(1); setError(null) }} disabled={busy} className="flex-1 py-2.5 rounded-xl border border-gray-200 dark:border-gray-700 text-[11px] font-semibold text-gray-600 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-800 disabled:opacity-40 transition-colors">← Back</button>
-                <button onClick={handleAsbaNext} disabled={busy} className="flex-1 py-2.5 rounded-xl bg-blue-600 text-white text-[11px] font-semibold hover:bg-blue-700 disabled:opacity-60 transition-colors">Continue →</button>
-              </div>
-            </div>
-          )}
-
-          {/* Step 3 */}
-          {step === 3 && (
+          {/* ── Phase 2: Bank + Config ── */}
+          {phase === 'setup' && (
             <div className="p-5 space-y-4">
-              <div className="bg-gray-50 dark:bg-gray-800 rounded-xl p-3 space-y-1">
-                <Row label="Bank" value={bankName} />
-                <Row label="Account No." value={accountNumber} />
-                <Row label="CRN" value={crnNumber || '—'} />
-              </div>
-              <div><FieldLabel>Default Kitta</FieldLabel>
-                <input type="number" min={10} step={10} value={kitta} onChange={e => setKitta(parseInt(e.target.value) || 10)} className={inputCls} />
-              </div>
-              <label className={`flex items-center gap-3 px-4 py-3 rounded-xl border cursor-pointer transition-all ${autoApply ? 'border-emerald-500 bg-emerald-50 dark:bg-emerald-900/20' : 'border-gray-200 dark:border-gray-700 hover:bg-gray-50 dark:hover:bg-gray-800'}`}>
-                <input type="checkbox" checked={autoApply} onChange={e => setAutoApply(e.target.checked)} className="accent-emerald-600 w-4 h-4 flex-shrink-0" />
-                <div>
-                  <p className="text-[11px] font-semibold text-gray-900 dark:text-white">Enable Auto-apply</p>
-                  <p className="text-[9px] text-gray-400 mt-0.5">Apply for all open IPOs daily at 11 AM automatically</p>
-                </div>
-              </label>
-              {autoApply && (
-                <div><FieldLabel>Transaction PIN</FieldLabel>
-                  <div className="relative">
-                    <input type={showPin ? 'text' : 'password'} placeholder="Your Meroshare PIN" value={pin} onChange={e => setPin(e.target.value)} maxLength={10}
-                      className={inputCls + ' pr-14 font-mono tracking-widest'} />
-                    <button type="button" onClick={() => setShowPin(s => !s)} className="absolute right-3 top-1/2 -translate-y-1/2 text-[10px] text-gray-400 hover:text-gray-600 font-semibold">{showPin ? 'Hide' : 'Show'}</button>
+              {/* ASBA Bank */}
+              <div>
+                <FieldLabel>ASBA Bank Account</FieldLabel>
+                <p className="text-[10px] text-gray-400 mb-2">Banks linked to your Meroshare profile. Select one for IPO applications.</p>
+                {banks.length === 0 ? (
+                  <div className="bg-amber-50 dark:bg-amber-900/20 border border-amber-200 dark:border-amber-800/50 rounded-xl px-4 py-4 text-center">
+                    <p className="text-[11px] font-semibold text-amber-700 dark:text-amber-400">No ASBA bank found</p>
+                    <p className="text-[10px] text-amber-600 dark:text-amber-400 mt-1">Link a bank in Meroshare first, then add this account again.</p>
                   </div>
-                </div>
-              )}
-              {error && <ErrorBox>{error}</ErrorBox>}
-              <div className="flex gap-2">
-                <button onClick={() => { setStep(2); setError(null) }} disabled={busy} className="flex-1 py-2.5 rounded-xl border border-gray-200 dark:border-gray-700 text-[11px] font-semibold text-gray-600 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-800 disabled:opacity-40 transition-colors">← Back</button>
-                <button onClick={handleSave} disabled={busy} className="flex-1 py-2.5 rounded-xl bg-emerald-600 text-white text-[11px] font-semibold hover:bg-emerald-700 disabled:opacity-60 flex items-center justify-center gap-2 transition-colors">
-                  {busy && <Spinner />}{busy ? 'Saving…' : 'Save Account'}
-                </button>
+                ) : (
+                  <div className="space-y-2">
+                    {banks.map((b, i) => {
+                      const key = `${b.bankId}-${b.accountBranchId}`, sel = `${bankId}-${accountBranchId}`
+                      return (
+                        <label key={`${key}-${i}`} className={`flex items-center gap-3 px-3.5 py-3 rounded-xl border cursor-pointer transition-all ${
+                          sel === key ? 'border-blue-500 bg-blue-50 dark:bg-blue-900/20' : 'border-gray-200 dark:border-gray-700 hover:bg-gray-50 dark:hover:bg-gray-800'
+                        }`}>
+                          <input type="radio" name="bank" checked={sel === key} onChange={() => {
+                            setBankId(String(b.bankId)); setBankName(b.displayName || b.bankName || '')
+                            setBankAccountId(b.bankAccountId || null); setAccountNumber(b.accountNumber || '')
+                            setAccountBranchId(String(b.accountBranchId)); setAccountTypeId(b.accountTypeId || 1)
+                          }} className="accent-blue-600 flex-shrink-0" />
+                          <div>
+                            <p className="text-[11px] font-semibold text-gray-900 dark:text-white">{b.displayName || b.bankName}</p>
+                            <p className="text-[9px] text-gray-400 mt-0.5 font-mono">{b.accountNumber || '—'}</p>
+                          </div>
+                        </label>
+                      )
+                    })}
+                  </div>
+                )}
               </div>
+
+              {/* CRN + Kitta */}
+              <div className="grid grid-cols-2 gap-3">
+                <div><FieldLabel>CRN Number</FieldLabel>
+                  <input type="text" placeholder="From passbook" value={crnNumber} onChange={e => setCrnNumber(e.target.value)} className={inputCls} />
+                </div>
+                <div><FieldLabel>Default Kitta</FieldLabel>
+                  <input type="number" min={10} step={10} value={kitta} onChange={e => setKitta(parseInt(e.target.value) || 10)} className={inputCls} />
+                </div>
+              </div>
+
+              {/* Save PIN for 1-click apply */}
+              <div className="border border-gray-200 dark:border-gray-700 rounded-xl overflow-hidden">
+                <label className={`flex items-center gap-3 px-4 py-3 cursor-pointer transition-all ${savePin ? 'bg-emerald-50 dark:bg-emerald-900/20' : 'hover:bg-gray-50 dark:hover:bg-gray-800'}`}>
+                  <input type="checkbox" checked={savePin} onChange={e => setSavePin(e.target.checked)} className="accent-emerald-600 w-4 h-4 flex-shrink-0" />
+                  <div>
+                    <p className="text-[11px] font-semibold text-gray-900 dark:text-white">Save PIN for 1-click apply</p>
+                    <p className="text-[9px] text-gray-400 mt-0.5">Apply without entering PIN every time. Also enables auto-apply at 11 AM.</p>
+                  </div>
+                </label>
+                {savePin && (
+                  <div className="px-4 pb-3 pt-1 border-t border-gray-100 dark:border-gray-800">
+                    <FieldLabel>Transaction PIN</FieldLabel>
+                    <div className="relative">
+                      <input type={showPin ? 'text' : 'password'} placeholder="Your Meroshare PIN" value={pin} onChange={e => setPin(e.target.value)} maxLength={10}
+                        className={inputCls + ' pr-14 font-mono tracking-widest'} />
+                      <button type="button" onClick={() => setShowPin(s => !s)} className="absolute right-3 top-1/2 -translate-y-1/2 text-[10px] text-gray-400 hover:text-gray-600 font-semibold">{showPin ? 'Hide' : 'Show'}</button>
+                    </div>
+                  </div>
+                )}
+              </div>
+
+              {error && <ErrorBox>{error}</ErrorBox>}
+
+              <button onClick={handleSave} disabled={busy || banks.length === 0} className="w-full py-2.5 rounded-xl bg-emerald-600 text-white text-[12px] font-semibold hover:bg-emerald-700 disabled:opacity-60 flex items-center justify-center gap-2 transition-colors">
+                {busy && <Spinner />}{busy ? 'Saving…' : 'Save Account'}
+              </button>
             </div>
           )}
         </div>
@@ -316,68 +293,73 @@ function AddAccountModal({ dpList, onClose, onAdded }) {
 }
 
 // ── Edit Account Modal ────────────────────────────────────────────────────────
-function EditAccountModal({ account, onClose, onUpdated }) {
-  const [tab,             setTab]            = useState(account.bank_id ? 'settings' : 'bank')
+// Single scrollable form — all fields editable. Bank section loads from Meroshare.
+function EditAccountModal({ account, dpList, onClose, onUpdated }) {
+  const [label,           setLabel]          = useState(account.label || '')
+  const [dpId,            setDpId]           = useState(String(account.dp_id || ''))
+  const [username,        setUsername]       = useState(account.username || '')
+  const [password,        setPassword]       = useState('')
+  const [showPass,        setShowPass]       = useState(false)
+
   const [banks,           setBanks]          = useState([])
   const [loadingBanks,    setLoadingBanks]   = useState(false)
+  const [bankError,       setBankError]      = useState(null)
   const [bankId,          setBankId]         = useState(String(account.bank_id || ''))
   const [bankName,        setBankName]       = useState(account.bank_name || '')
   const [bankAccountId,   setBankAccountId]  = useState(account.bank_account_id || null)
   const [accountNumber,   setAccountNumber]  = useState(account.account_number || '')
   const [accountBranchId, setAccountBranchId] = useState(String(account.account_branch_id || ''))
   const [accountTypeId,   setAccountTypeId]  = useState(account.account_type_id || 1)
+
   const [crnNumber,       setCrnNumber]      = useState(account.crn_number || '')
   const [kitta,           setKitta]          = useState(account.default_kitta || 10)
-  const [autoApply,       setAutoApply]      = useState(account.auto_apply || false)
+  const [savePin,         setSavePin]        = useState(account.auto_apply || false)
   const [pin,             setPin]            = useState('')
   const [showPin,         setShowPin]        = useState(false)
   const [saving,          setSaving]         = useState(false)
   const [error,           setError]          = useState(null)
-  const [bankError,       setBankError]      = useState(null)
 
   useEffect(() => {
-    const handler = (e) => { if (e.key === 'Escape') onClose() }
+    const handler = (e) => { if (e.key === 'Escape' && !saving) onClose() }
     window.addEventListener('keydown', handler)
     return () => window.removeEventListener('keydown', handler)
-  }, [onClose])
+  }, [onClose, saving])
 
   const fetchBanks = () => {
-    setLoadingBanks(true)
-    setBankError(null)
+    setLoadingBanks(true); setBankError(null)
     getMeroshareBanks(account.id)
       .then(r => {
         const list = r.data?.banks || []
         setBanks(list)
+        // Pre-select existing bank if still in list, otherwise first
         const existing = account.account_branch_id
           ? list.find(b => String(b.accountBranchId) === String(account.account_branch_id))
           : null
-        const first = existing || list[0]
-        if (first && !account.bank_id) {
-          setBankId(String(first.bankId)); setBankName(first.displayName || first.bankName || '')
-          setBankAccountId(first.bankAccountId || null); setAccountNumber(first.accountNumber || '')
-          setAccountBranchId(String(first.accountBranchId)); setAccountTypeId(first.accountTypeId || 1)
+        const pick = existing || list[0]
+        if (pick) {
+          setBankId(String(pick.bankId)); setBankName(pick.displayName || pick.bankName || '')
+          setBankAccountId(pick.bankAccountId || null); setAccountNumber(pick.accountNumber || '')
+          setAccountBranchId(String(pick.accountBranchId)); setAccountTypeId(pick.accountTypeId || 1)
         }
       })
-      .catch(err => {
-        const msg = err.response?.data?.error || err.message || 'Failed to load banks'
-        setBankError(msg)
-      })
+      .catch(err => setBankError(err.response?.data?.error || err.message || 'Failed to load banks'))
       .finally(() => setLoadingBanks(false))
   }
 
-  useEffect(() => {
-    if (tab !== 'bank') return
-    fetchBanks()
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [tab])
+  useEffect(() => { fetchBanks() }, []) // eslint-disable-line react-hooks/exhaustive-deps
 
   const handleSave = async () => {
-    if (autoApply && !pin.trim() && !account.encrypted_pin)
-      return setError('PIN required to enable auto-apply')
+    if (savePin && !pin.trim() && !account.auto_apply)
+      return setError('Enter your transaction PIN to save it')
     setSaving(true); setError(null)
     try {
-      const payload = { auto_apply: autoApply, default_kitta: kitta, crn_number: crnNumber }
-      if (pin.trim()) payload.transaction_pin = pin.trim()
+      const payload = {
+        label: label.trim(), dp_id: dpId, username: username.trim(),
+        crn_number: crnNumber, default_kitta: kitta,
+        auto_apply: savePin,
+        transaction_pin: savePin && pin.trim() ? pin.trim() : undefined,
+      }
+      if (password.trim()) payload.password = password.trim()
       if (bankId) {
         payload.bank_id = bankId; payload.bank_name = bankName
         payload.bank_account_id = bankAccountId; payload.account_branch_id = accountBranchId
@@ -391,136 +373,133 @@ function EditAccountModal({ account, onClose, onUpdated }) {
     }
   }
 
-  const hasBankSetup = !!(account.bank_id && account.account_number)
-
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-md">
-      <div className="bg-white dark:bg-gray-900 rounded-2xl border border-gray-200 dark:border-gray-700 w-full max-w-sm shadow-2xl max-h-[90vh] flex flex-col animate-scale-in">
+      <div className="bg-white dark:bg-gray-900 rounded-2xl border border-gray-200 dark:border-gray-700 w-full max-w-md shadow-2xl max-h-[90vh] flex flex-col animate-scale-in">
 
         <div className="px-5 py-4 border-b border-gray-100 dark:border-gray-800 flex items-center justify-between flex-shrink-0">
           <div>
-            <p className="text-[14px] font-bold text-gray-900 dark:text-white">Account Settings</p>
-            <p className="text-[10px] text-gray-400 mt-0.5">{account.label} · {account.dp_name}</p>
+            <p className="text-[14px] font-bold text-gray-900 dark:text-white">Edit Account</p>
+            <p className="text-[10px] text-gray-400 mt-0.5">All fields are editable</p>
           </div>
-          <button onClick={onClose} title="Close" className="w-7 h-7 flex items-center justify-center rounded-lg text-gray-400 hover:text-gray-600 hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors text-lg">×</button>
-        </div>
-
-        <div className="flex gap-1 px-5 pt-3 pb-0 flex-shrink-0">
-          {['settings', 'bank'].map(t => (
-            <button key={t} onClick={() => setTab(t)} className={`px-3 py-1.5 rounded-lg text-[10px] font-semibold transition-all flex items-center gap-1.5 ${
-              tab === t ? 'bg-gray-900 dark:bg-white text-white dark:text-gray-900' : 'text-gray-500 hover:bg-gray-100 dark:hover:bg-gray-800'
-            }`}>
-              {t === 'settings' ? 'Settings' : 'ASBA Bank'}
-              {t === 'bank' && !hasBankSetup && <span className="w-1.5 h-1.5 rounded-full bg-amber-400 flex-shrink-0" />}
-            </button>
-          ))}
+          <button onClick={onClose} disabled={saving} title="Close" className="w-7 h-7 flex items-center justify-center rounded-lg text-gray-400 hover:text-gray-600 hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors text-lg">×</button>
         </div>
 
         <div className="overflow-y-auto flex-1 p-5 space-y-4">
-          {tab === 'settings' && (
-            <>
-              {!hasBankSetup && (
-                <div className="flex items-center gap-2 bg-amber-50 dark:bg-amber-900/20 border border-amber-200 dark:border-amber-800/50 rounded-xl px-3 py-2.5">
-                  <span className="text-amber-500 text-sm flex-shrink-0">⚠</span>
-                  <div>
-                    <p className="text-[10px] font-semibold text-amber-700 dark:text-amber-400">ASBA bank not set up</p>
-                    <button onClick={() => setTab('bank')} className="text-[10px] text-amber-600 dark:text-amber-300 underline">Set up bank →</button>
-                  </div>
-                </div>
-              )}
-              {hasBankSetup && (
-                <div className="bg-gray-50 dark:bg-gray-800 rounded-xl p-3 space-y-1">
-                  <Row label="Bank" value={account.bank_name || '—'} />
-                  <Row label="Account No." value={account.account_number || '—'} />
-                  <Row label="CRN" value={crnNumber || '—'} />
-                </div>
-              )}
-              <div><FieldLabel>CRN Number</FieldLabel>
-                <input type="text" placeholder="CRN from bank passbook" value={crnNumber} onChange={e => setCrnNumber(e.target.value)} className={inputCls} />
-              </div>
-              <div><FieldLabel>Default Kitta</FieldLabel>
-                <input type="number" min={10} step={10} value={kitta} onChange={e => setKitta(parseInt(e.target.value) || 10)} className={inputCls} />
-              </div>
-              <label className={`flex items-center gap-3 px-4 py-3 rounded-xl border cursor-pointer transition-all ${autoApply ? 'border-emerald-500 bg-emerald-50 dark:bg-emerald-900/20' : 'border-gray-200 dark:border-gray-700 hover:bg-gray-50 dark:hover:bg-gray-800'}`}>
-                <input type="checkbox" checked={autoApply} onChange={e => setAutoApply(e.target.checked)} className="accent-emerald-600 w-4 h-4 flex-shrink-0" />
-                <div>
-                  <p className="text-[11px] font-semibold text-gray-900 dark:text-white">Auto-apply</p>
-                  <p className="text-[9px] text-gray-400 mt-0.5">Apply for all open IPOs daily at 11 AM</p>
-                </div>
-              </label>
-              {!autoApply && account.auto_apply && account.encrypted_pin && (
-                <div className="flex items-start gap-2 bg-amber-50 dark:bg-amber-900/20 border border-amber-200 dark:border-amber-800/50 rounded-xl px-3 py-2">
-                  <span className="text-amber-500 text-sm flex-shrink-0">⚠</span>
-                  <p className="text-[10px] text-amber-700 dark:text-amber-400">Disabling auto-apply will delete your saved PIN.</p>
-                </div>
-              )}
-              {autoApply && (
-                <div>
-                  <FieldLabel>Transaction PIN {account.auto_apply ? <span className="font-normal normal-case">(blank = keep existing)</span> : ''}</FieldLabel>
-                  <div className="relative">
-                    <input type={showPin ? 'text' : 'password'} placeholder={account.auto_apply ? '••••••••' : 'Enter PIN'}
-                      value={pin} onChange={e => setPin(e.target.value)} maxLength={10} autoComplete="off"
-                      className={inputCls + ' pr-14 font-mono tracking-widest'} />
-                    <button type="button" onClick={() => setShowPin(s => !s)} className="absolute right-3 top-1/2 -translate-y-1/2 text-[10px] text-gray-400 hover:text-gray-600 font-semibold">{showPin ? 'Hide' : 'Show'}</button>
-                  </div>
-                </div>
-              )}
-            </>
-          )}
 
-          {tab === 'bank' && (
-            <>
-              <div className="flex items-center justify-between">
-                <p className="text-[11px] text-gray-500 dark:text-gray-400">ASBA bank linked in Meroshare.</p>
-                <button onClick={fetchBanks} disabled={loadingBanks} title="Refresh bank list"
-                  className="text-[9px] font-semibold text-blue-500 hover:text-blue-700 disabled:opacity-40 flex items-center gap-1 transition-colors">
-                  <svg className={`w-3 h-3 ${loadingBanks ? 'animate-spin' : ''}`} fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
-                  </svg>
-                  Refresh
-                </button>
+          {/* ── Login Details ── */}
+          <div>
+            <p className="text-[9px] font-semibold uppercase tracking-widest text-gray-400 mb-2.5">Login Details</p>
+            <div className="space-y-3">
+              <div><FieldLabel>Label</FieldLabel>
+                <input type="text" value={label} onChange={e => setLabel(e.target.value)} className={inputCls} />
               </div>
-              {loadingBanks ? (
-                <div className="space-y-2">{[1,2].map(i => <div key={i} className="h-14 bg-gray-100 dark:bg-gray-800 rounded-xl animate-pulse" />)}</div>
-              ) : bankError ? (
-                <div className="bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800/50 rounded-xl px-4 py-4 text-center">
-                  <p className="text-[11px] font-semibold text-red-700 dark:text-red-400">Could not load banks</p>
-                  <p className="text-[10px] text-red-600 dark:text-red-400 mt-1 break-words">{bankError}</p>
-                  <button onClick={fetchBanks} className="mt-2 text-[10px] font-semibold text-red-600 dark:text-red-400 underline">Try again</button>
+              <div><FieldLabel>Broker / DP</FieldLabel>
+                <select value={dpId} onChange={e => setDpId(e.target.value)} className={inputCls}>
+                  <option value="">Select broker / DP…</option>
+                  {(dpList || []).map(dp => <option key={dp.id} value={dp.id}>{dp.name}</option>)}
+                </select>
+              </div>
+              <div><FieldLabel>Meroshare Username</FieldLabel>
+                <input type="text" value={username} onChange={e => setUsername(e.target.value)} autoComplete="off" className={inputCls} />
+              </div>
+              <div><FieldLabel>Password <span className="font-normal normal-case text-gray-400">(leave blank to keep existing)</span></FieldLabel>
+                <div className="relative">
+                  <input type={showPass ? 'text' : 'password'} placeholder="New password" value={password} onChange={e => setPassword(e.target.value)} autoComplete="new-password" className={inputCls + ' pr-14'} />
+                  <button type="button" onClick={() => setShowPass(s => !s)} className="absolute right-3 top-1/2 -translate-y-1/2 text-[10px] text-gray-400 hover:text-gray-600 font-semibold">{showPass ? 'Hide' : 'Show'}</button>
                 </div>
-              ) : banks.length === 0 ? (
-                <div className="bg-amber-50 dark:bg-amber-900/20 border border-amber-200 dark:border-amber-800/50 rounded-xl px-4 py-4 text-center">
-                  <p className="text-[11px] font-semibold text-amber-700 dark:text-amber-400">No ASBA bank found</p>
-                  <p className="text-[10px] text-amber-600 dark:text-amber-400 mt-1">Link a bank in Meroshare first, then tap Refresh.</p>
+              </div>
+            </div>
+          </div>
+
+          {/* ── ASBA Bank ── */}
+          <div>
+            <div className="flex items-center justify-between mb-2.5">
+              <p className="text-[9px] font-semibold uppercase tracking-widest text-gray-400">ASBA Bank</p>
+              <button onClick={fetchBanks} disabled={loadingBanks} className="text-[9px] font-semibold text-blue-500 hover:text-blue-700 disabled:opacity-40 flex items-center gap-1 transition-colors">
+                <svg className={`w-3 h-3 ${loadingBanks ? 'animate-spin' : ''}`} fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
+                </svg>
+                Refresh
+              </button>
+            </div>
+            {loadingBanks ? (
+              <div className="space-y-2">{[1,2].map(i => <div key={i} className="h-12 bg-gray-100 dark:bg-gray-800 rounded-xl animate-pulse" />)}</div>
+            ) : bankError ? (
+              <div className="bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800/50 rounded-xl px-4 py-3 text-center">
+                <p className="text-[11px] font-semibold text-red-700 dark:text-red-400">Could not load banks</p>
+                <p className="text-[10px] text-red-500 mt-1 break-words">{bankError}</p>
+                <button onClick={fetchBanks} className="mt-1.5 text-[10px] font-semibold text-red-600 underline">Try again</button>
+              </div>
+            ) : banks.length === 0 ? (
+              <div className="bg-amber-50 dark:bg-amber-900/20 border border-amber-200 dark:border-amber-800/50 rounded-xl px-4 py-3 text-center">
+                <p className="text-[11px] font-semibold text-amber-700 dark:text-amber-400">No ASBA bank found</p>
+                <p className="text-[10px] text-amber-600 mt-1">Link a bank in Meroshare first, then tap Refresh.</p>
+              </div>
+            ) : (
+              <div className="space-y-2">
+                {banks.map((b, i) => {
+                  const key = `${b.bankId}-${b.accountBranchId}`, sel = `${bankId}-${accountBranchId}`
+                  return (
+                    <label key={`${key}-${i}`} className={`flex items-center gap-3 px-3.5 py-2.5 rounded-xl border cursor-pointer transition-all ${
+                      sel === key ? 'border-blue-500 bg-blue-50 dark:bg-blue-900/20' : 'border-gray-200 dark:border-gray-700 hover:bg-gray-50 dark:hover:bg-gray-800'
+                    }`}>
+                      <input type="radio" name="editbank" checked={sel === key} onChange={() => {
+                        setBankId(String(b.bankId)); setBankName(b.displayName || b.bankName || '')
+                        setBankAccountId(b.bankAccountId || null); setAccountNumber(b.accountNumber || '')
+                        setAccountBranchId(String(b.accountBranchId)); setAccountTypeId(b.accountTypeId || 1)
+                      }} className="accent-blue-600 flex-shrink-0" />
+                      <div>
+                        <p className="text-[11px] font-semibold text-gray-900 dark:text-white">{b.displayName || b.bankName}</p>
+                        <p className="text-[9px] text-gray-400 mt-0.5 font-mono">{b.accountNumber || '—'}</p>
+                      </div>
+                    </label>
+                  )
+                })}
+              </div>
+            )}
+          </div>
+
+          {/* ── Apply Settings ── */}
+          <div>
+            <p className="text-[9px] font-semibold uppercase tracking-widest text-gray-400 mb-2.5">Apply Settings</p>
+            <div className="space-y-3">
+              <div className="grid grid-cols-2 gap-3">
+                <div><FieldLabel>CRN Number</FieldLabel>
+                  <input type="text" placeholder="From passbook" value={crnNumber} onChange={e => setCrnNumber(e.target.value)} className={inputCls} />
                 </div>
-              ) : (
-                <div className="space-y-2">
-                  {banks.map((b, i) => {
-                    const key = `${b.bankId}-${b.accountBranchId}`, sel = `${bankId}-${accountBranchId}`
-                    return (
-                      <label key={`${key}-${i}`} className={`flex items-center gap-3 px-3.5 py-3 rounded-xl border cursor-pointer transition-all ${
-                        sel === key ? 'border-blue-500 bg-blue-50 dark:bg-blue-900/20' : 'border-gray-200 dark:border-gray-700 hover:bg-gray-50 dark:hover:bg-gray-800'
-                      }`}>
-                        <input type="radio" name="editbank" checked={sel === key} onChange={() => {
-                          setBankId(String(b.bankId)); setBankName(b.displayName || b.bankName || '')
-                          setBankAccountId(b.bankAccountId || null); setAccountNumber(b.accountNumber || '')
-                          setAccountBranchId(String(b.accountBranchId)); setAccountTypeId(b.accountTypeId || 1)
-                        }} className="accent-blue-600 flex-shrink-0" />
-                        <div>
-                          <p className="text-[11px] font-semibold text-gray-900 dark:text-white">{b.displayName || b.bankName}</p>
-                          <p className="text-[9px] text-gray-400 mt-0.5 font-mono">{b.accountNumber || '—'}</p>
-                        </div>
-                      </label>
-                    )
-                  })}
+                <div><FieldLabel>Default Kitta</FieldLabel>
+                  <input type="number" min={10} step={10} value={kitta} onChange={e => setKitta(parseInt(e.target.value) || 10)} className={inputCls} />
                 </div>
-              )}
-            </>
-          )}
+              </div>
+
+              <div className="border border-gray-200 dark:border-gray-700 rounded-xl overflow-hidden">
+                <label className={`flex items-center gap-3 px-4 py-3 cursor-pointer transition-all ${savePin ? 'bg-emerald-50 dark:bg-emerald-900/20' : 'hover:bg-gray-50 dark:hover:bg-gray-800'}`}>
+                  <input type="checkbox" checked={savePin} onChange={e => setSavePin(e.target.checked)} className="accent-emerald-600 w-4 h-4 flex-shrink-0" />
+                  <div>
+                    <p className="text-[11px] font-semibold text-gray-900 dark:text-white">Save PIN for 1-click apply</p>
+                    <p className="text-[9px] text-gray-400 mt-0.5">
+                      {account.auto_apply ? 'PIN saved · enter new PIN to change it' : 'Apply without entering PIN every time'}
+                    </p>
+                  </div>
+                </label>
+                {savePin && (
+                  <div className="px-4 pb-3 pt-1 border-t border-gray-100 dark:border-gray-800">
+                    <FieldLabel>Transaction PIN <span className="font-normal normal-case">{account.auto_apply ? '(blank = keep existing)' : ''}</span></FieldLabel>
+                    <div className="relative">
+                      <input type={showPin ? 'text' : 'password'} placeholder={account.auto_apply ? '••••••••' : 'Enter PIN'} value={pin} onChange={e => setPin(e.target.value)} maxLength={10} autoComplete="off"
+                        className={inputCls + ' pr-14 font-mono tracking-widest'} />
+                      <button type="button" onClick={() => setShowPin(s => !s)} className="absolute right-3 top-1/2 -translate-y-1/2 text-[10px] text-gray-400 hover:text-gray-600 font-semibold">{showPin ? 'Hide' : 'Show'}</button>
+                    </div>
+                  </div>
+                )}
+              </div>
+            </div>
+          </div>
 
           {error && <ErrorBox>{error}</ErrorBox>}
 
-          <div className="flex gap-2">
+          <div className="flex gap-2 pt-1">
             <button onClick={onClose} disabled={saving} className="flex-1 py-2.5 rounded-xl border border-gray-200 dark:border-gray-700 text-[11px] font-semibold text-gray-600 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-800 disabled:opacity-40 transition-colors">Cancel</button>
             <button onClick={handleSave} disabled={saving} className="flex-1 py-2.5 rounded-xl bg-blue-600 text-white text-[11px] font-semibold hover:bg-blue-700 disabled:opacity-60 flex items-center justify-center gap-2 transition-colors">
               {saving && <Spinner />}{saving ? 'Saving…' : 'Save Changes'}
@@ -533,9 +512,10 @@ function EditAccountModal({ account, onClose, onUpdated }) {
 }
 
 // ── Apply Modal ───────────────────────────────────────────────────────────────
+// If account has saved PIN, shows 1-click apply. Otherwise shows PIN field.
 function ApplyModal({ ipo, accounts, activeAccountId, onClose, onApplied }) {
-  const initAcc     = accounts.find(a => a.id === activeAccountId) || accounts[0]
-  const [accountId, setAccountId] = useState(initAcc?.id || '')
+  const initAcc      = accounts.find(a => a.id === activeAccountId) || accounts[0]
+  const [accountId,  setAccountId]  = useState(initAcc?.id || '')
   const [sharePrice, setSharePrice] = useState(null)
   const [minKitta,   setMinKitta]   = useState(10)
   const [maxKitta,   setMaxKitta]   = useState(null)
@@ -552,8 +532,11 @@ function ApplyModal({ ipo, accounts, activeAccountId, onClose, onApplied }) {
 
   const selectedAccount = accounts.find(a => a.id === accountId)
   const hasBank         = !!(selectedAccount?.bank_id && selectedAccount?.account_number)
+  const hasSavedPin     = !!selectedAccount?.auto_apply   // auto_apply = saved PIN present
   const alreadyApplied  = ipo.action === 'edit' || ipo.statusName === 'EDIT_APPROVE'
   const amount          = sharePrice && kitta ? sharePrice * kitta : null
+  // 1-click: PIN saved and declaration accepted, no PIN input needed
+  const canSubmit       = hasBank && declared && (hasSavedPin || pin.trim())
 
   useEffect(() => {
     const handler = (e) => { if (e.key === 'Escape' && !applying) onClose() }
@@ -578,26 +561,27 @@ function ApplyModal({ ipo, accounts, activeAccountId, onClose, onApplied }) {
     if (!selectedAccount) return
     setKitta(selectedAccount.default_kitta || 10)
     setCrnNumber(selectedAccount.crn_number || '')
+    setPin('')
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [accountId])
 
   const handleApply = async () => {
-    if (!hasBank) { setError('No ASBA bank set up. Open account settings and set up your bank first.'); return }
+    if (!hasBank) { setError('No ASBA bank set up. Open account settings first.'); return }
     if (!declared) { setError('Please accept the declaration'); return }
-    if (!pin.trim()) { setError('Transaction PIN is required'); return }
+    if (!hasSavedPin && !pin.trim()) { setError('Transaction PIN is required'); return }
     setApplying(true); setError(null)
     try {
       const res = await applyMeroshareIPO({
         account_id: accountId, company_share_id: ipo.companyShareId, applied_kitta: kitta,
-        bank_id: selectedAccount.bank_id, account_branch_id: selectedAccount.account_branch_id,
-        account_number: selectedAccount.account_number, account_type_id: selectedAccount.account_type_id || 1,
-        crn_number: crnNumber.trim(), transaction_pin: pin.trim(),
+        crn_number: crnNumber.trim(),
+        // Only send pin if user typed one — backend uses stored PIN when omitted
+        ...(pin.trim() ? { transaction_pin: pin.trim() } : {}),
       })
       setPin('')
       setResult({ success: true, message: res.data.message || 'Applied successfully' })
       onApplied?.(ipo.companyShareId, accountId)
     } catch (err) {
-      setError(err.response?.data?.error || 'Application failed. Check your PIN and try again.')
+      setError(err.response?.data?.error || 'Application failed. Check PIN and try again.')
     } finally { setApplying(false) }
   }
 
@@ -626,6 +610,7 @@ function ApplyModal({ ipo, accounts, activeAccountId, onClose, onApplied }) {
           </div>
         ) : (
           <div className="overflow-y-auto flex-1 p-5 space-y-4">
+            {/* Account selector — only shown when multiple accounts */}
             {accounts.length > 1 && (
               <div>
                 <p className="text-[9px] font-semibold text-gray-400 uppercase tracking-widest mb-2">Apply With</p>
@@ -639,7 +624,7 @@ function ApplyModal({ ipo, accounts, activeAccountId, onClose, onApplied }) {
                         <p className="text-[11px] font-semibold text-gray-900 dark:text-white">{a.label}</p>
                         <p className="text-[9px] text-gray-400 truncate font-mono">{a.bank_name || a.dp_name}{a.account_number ? ` · ****${a.account_number.slice(-4)}` : ''}</p>
                       </div>
-                      {a.auto_apply && <span className="text-[8px] font-bold px-1.5 py-0.5 rounded bg-emerald-100 dark:bg-emerald-900/30 text-emerald-600 flex-shrink-0">AUTO</span>}
+                      {a.auto_apply && <span className="text-[8px] font-bold px-1.5 py-0.5 rounded bg-emerald-100 dark:bg-emerald-900/30 text-emerald-600 flex-shrink-0">PIN SAVED</span>}
                     </label>
                   ))}
                 </div>
@@ -648,13 +633,16 @@ function ApplyModal({ ipo, accounts, activeAccountId, onClose, onApplied }) {
 
             {selectedAccount && !hasBank && (
               <div className="border-l-2 border-amber-400 bg-amber-50 dark:bg-amber-900/20 rounded-r-xl px-3 py-2 text-[10px] text-amber-700 dark:text-amber-400 font-semibold">
-                No ASBA bank linked. Set up bank in account settings.
+                No ASBA bank linked. Open account edit and set up bank first.
               </div>
             )}
 
             {selectedAccount && hasBank && (
               <div className="bg-gray-50 dark:bg-gray-800 rounded-xl px-4 py-3 space-y-1">
-                <p className="text-[9px] font-semibold text-gray-400 uppercase tracking-widest mb-1">ASBA Details</p>
+                <div className="flex items-center justify-between mb-1">
+                  <p className="text-[9px] font-semibold text-gray-400 uppercase tracking-widest">ASBA Details</p>
+                  {hasSavedPin && <span className="text-[8px] font-bold px-1.5 py-0.5 rounded bg-emerald-100 dark:bg-emerald-900/30 text-emerald-600">PIN SAVED · 1-click apply</span>}
+                </div>
                 <Row label="Bank" value={selectedAccount.bank_name} />
                 <Row label="Account" value={selectedAccount.account_number ? `****${selectedAccount.account_number.slice(-4)}` : '—'} />
               </div>
@@ -694,21 +682,25 @@ function ApplyModal({ ipo, accounts, activeAccountId, onClose, onApplied }) {
               <p className="text-[10px] text-gray-600 dark:text-gray-400 leading-relaxed">I declare that the information provided is true and I agree to the terms of this IPO application.</p>
             </label>
 
-            <div><FieldLabel>Transaction PIN</FieldLabel>
-              <div className="relative">
-                <input type={showPin ? 'text' : 'password'} placeholder="Your Meroshare PIN"
-                  value={pin} onChange={e => setPin(e.target.value)} maxLength={10}
-                  className={inputCls + ' pr-14 font-mono tracking-widest'} />
-                <button type="button" onClick={() => setShowPin(s => !s)} className="absolute right-3 top-1/2 -translate-y-1/2 text-[10px] text-gray-400 hover:text-gray-600 font-semibold">{showPin ? 'Hide' : 'Show'}</button>
+            {/* PIN field — only shown if no saved PIN */}
+            {!hasSavedPin && (
+              <div><FieldLabel>Transaction PIN</FieldLabel>
+                <div className="relative">
+                  <input type={showPin ? 'text' : 'password'} placeholder="Your Meroshare PIN"
+                    value={pin} onChange={e => setPin(e.target.value)} maxLength={10}
+                    className={inputCls + ' pr-14 font-mono tracking-widest'} />
+                  <button type="button" onClick={() => setShowPin(s => !s)} className="absolute right-3 top-1/2 -translate-y-1/2 text-[10px] text-gray-400 hover:text-gray-600 font-semibold">{showPin ? 'Hide' : 'Show'}</button>
+                </div>
+                <p className="text-[9px] text-gray-400 mt-1">Save PIN in account edit to skip this step next time.</p>
               </div>
-            </div>
+            )}
 
             {error && <ErrorBox>{error}</ErrorBox>}
 
-            <button onClick={handleApply} disabled={applying || !declared || !pin.trim()} title="Submit IPO application"
+            <button onClick={handleApply} disabled={applying || !canSubmit} title="Submit IPO application"
               className="w-full py-3 rounded-xl bg-blue-600 text-white text-[12px] font-semibold hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2 transition-all focus-visible:ring-2 focus-visible:ring-blue-500/40">
               {applying && <Spinner size={3.5} />}
-              {applying ? 'Submitting…' : alreadyApplied ? 'Update Application' : 'Submit Application'}
+              {applying ? 'Submitting…' : alreadyApplied ? 'Update Application' : hasSavedPin ? '1-Click Apply' : 'Submit Application'}
             </button>
           </div>
         )}
@@ -895,7 +887,8 @@ function IPOPage() {
   const [allotmentMap,  setAllotmentMap]  = useState({})
   const [checkingId,    setCheckingId]    = useState(null)
   const [appliedMap,    setAppliedMap]    = useState({})
-  const [actionError,   setActionError]   = useState(null)  // inline error for delete/cancel
+  const [actionError,   setActionError]   = useState(null)
+  const [quickApplying, setQuickApplying] = useState(null)   // companyShareId being quick-applied
 
   // Results search + Holdings search + sort
   const [resultSearch,    setResultSearch]    = useState('')
@@ -1024,6 +1017,23 @@ function IPOPage() {
   }, [accounts])
 
   const handleAccountUpdated = (updated) => setAccounts(list => list.map(a => a.id === updated.id ? updated : a))
+
+  // 1-click apply — only works when account has saved PIN and bank is set up
+  const handleQuickApply = useCallback(async (ipo, account) => {
+    const id = ipo.companyShareId
+    setQuickApplying(id); setActionError(null)
+    try {
+      await applyMeroshareIPO({
+        account_id: account.id, company_share_id: id,
+        applied_kitta: account.default_kitta || 10,
+        crn_number: account.crn_number || '',
+      })
+      handleApplied(id, account.id)
+      delete tabCache.current[`${account.id}:ipos`]
+    } catch (err) {
+      setActionError(err.response?.data?.error || 'Quick apply failed — open Apply to retry')
+    } finally { setQuickApplying(null) }
+  }, [handleApplied]) // eslint-disable-line react-hooks/exhaustive-deps
 
   if (!user) return null
 
@@ -1288,12 +1298,16 @@ function IPOPage() {
               ) : (
                 <div className="space-y-3">
                   {ipos.map((ipo, i) => {
-                    const noBankSetup = !activeAccount?.bank_id || !activeAccount?.account_number
-                    const thisApplied = appliedMap[ipo.companyShareId]
-                    const appliedHere = thisApplied?.has(selectedAcc)
-                    const appliedAll  = hasMultipleAcc && accounts.every(a => thisApplied?.has(a.id))
-                    const days        = daysLeft(ipo.issueCloseDate)
-                    const urgent      = days != null && days <= 3
+                    const noBankSetup   = !activeAccount?.bank_id || !activeAccount?.account_number
+                    const hasSavedPin   = !!activeAccount?.auto_apply
+                    const thisApplied   = appliedMap[ipo.companyShareId]
+                    const appliedHere   = thisApplied?.has(selectedAcc)
+                    const appliedAll    = hasMultipleAcc && accounts.every(a => thisApplied?.has(a.id))
+                    const days          = daysLeft(ipo.issueCloseDate)
+                    const urgent        = days != null && days <= 3
+                    const isQuickBusy   = quickApplying === ipo.companyShareId
+                    // Single account with saved PIN — show 1-click button
+                    const oneClickReady = !hasMultipleAcc && hasSavedPin && !noBankSetup && !appliedHere
 
                     return (
                       <div key={i} className={`bg-white dark:bg-gray-900 rounded-2xl border p-4 transition-all duration-150 hover:-translate-y-px hover:shadow-sm ${
@@ -1335,6 +1349,7 @@ function IPOPage() {
                           </div>
 
                           <div className="flex flex-col items-end gap-2 flex-shrink-0">
+                            {/* Multi-account: Apply All button */}
                             {hasMultipleAcc && !noBankSetup && (() => {
                               const readyAccs     = accounts.filter(a => a.bank_id && a.account_branch_id)
                               const unappliedAccs = readyAccs.filter(a => !thisApplied?.has(a.id))
@@ -1349,19 +1364,31 @@ function IPOPage() {
                                 </button>
                               )
                             })()}
+                            {/* Single account apply area */}
                             {noBankSetup ? (
                               <button onClick={() => setEditAccount(activeAccount)} title="Set up ASBA bank"
                                 className="px-3 py-1.5 rounded-xl text-[10px] font-semibold bg-amber-50 dark:bg-amber-900/20 text-amber-600 border border-amber-200 dark:border-amber-800/50 hover:bg-amber-100 transition-colors">
                                 Setup ASBA →
                               </button>
+                            ) : appliedHere ? (
+                              <button onClick={() => setApplyIPO(ipo)} title="Edit application"
+                                className="px-4 py-1.5 rounded-xl text-[11px] font-semibold bg-gray-100 dark:bg-gray-800 text-gray-600 dark:text-gray-300 hover:bg-gray-200 dark:hover:bg-gray-700 transition-colors">
+                                Edit →
+                              </button>
+                            ) : oneClickReady ? (
+                              // 1-click apply — PIN saved, no modal needed
+                              <div className="flex flex-col items-end gap-1">
+                                <button onClick={() => handleQuickApply(ipo, activeAccount)} disabled={isQuickBusy || !!quickApplying}
+                                  title="Apply instantly using saved PIN"
+                                  className="px-4 py-1.5 rounded-xl text-[11px] font-semibold bg-blue-600 text-white hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-1.5 transition-colors">
+                                  {isQuickBusy ? <><span className="w-2.5 h-2.5 border-2 border-white/40 border-t-white rounded-full animate-spin" /> Applying…</> : '⚡ 1-Click Apply'}
+                                </button>
+                                <button onClick={() => setApplyIPO(ipo)} className="text-[9px] text-gray-400 hover:text-gray-600 transition-colors">change kitta →</button>
+                              </div>
                             ) : (
-                              <button onClick={() => setApplyIPO(ipo)} title={appliedHere ? 'Edit application' : 'Apply for IPO'}
-                                className={`px-4 py-1.5 rounded-xl text-[11px] font-semibold transition-colors focus-visible:ring-2 focus-visible:ring-blue-500/40 ${
-                                  appliedHere
-                                    ? 'bg-gray-100 dark:bg-gray-800 text-gray-600 dark:text-gray-300 hover:bg-gray-200 dark:hover:bg-gray-700'
-                                    : 'bg-blue-600 text-white hover:bg-blue-700'
-                                }`}>
-                                {appliedHere ? 'Edit →' : 'Apply →'}
+                              <button onClick={() => setApplyIPO(ipo)} title="Apply for IPO"
+                                className="px-4 py-1.5 rounded-xl text-[11px] font-semibold bg-blue-600 text-white hover:bg-blue-700 transition-colors focus-visible:ring-2 focus-visible:ring-blue-500/40">
+                                Apply →
                               </button>
                             )}
                           </div>
@@ -1547,7 +1574,7 @@ function IPOPage() {
           onAdded={acc => { setAccounts(a => [...a, acc]); setSelectedAcc(acc.id); setShowAddModal(false) }} />
       )}
       {editAccount && (
-        <EditAccountModal account={editAccount}
+        <EditAccountModal account={editAccount} dpList={dpList}
           onClose={() => setEditAccount(null)}
           onUpdated={updated => { handleAccountUpdated(updated); setEditAccount(null) }} />
       )}
