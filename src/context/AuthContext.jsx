@@ -29,7 +29,7 @@ function safeParseUser() {
 }
 
 export function AuthProvider({ children }) {
-  const [user, setUser] = useState(safeParseUser)
+    const [user, setUser] = useState(safeParseUser)
 
   const login = (userData, token) => {
     localStorage.setItem('token', token)
