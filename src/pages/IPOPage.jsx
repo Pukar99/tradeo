@@ -931,12 +931,17 @@ function IPOPage() {
         const res  = await getMeroshareIPOs(accId)
         const data = Array.isArray(res.data.ipos) ? res.data.ipos : []
         tabCache.current[key] = data; setIpos(data)
-        const applied = {}
-        data.forEach(ipo => {
-          if (isApplied(ipo))
-            applied[ipo.companyShareId] = (applied[ipo.companyShareId] || new Set()).add(accId)
+        setAppliedMap(m => {
+          const next = { ...m }
+          data.forEach(ipo => {
+            if (isApplied(ipo)) {
+              const s = new Set(next[ipo.companyShareId] || [])
+              s.add(accId)
+              next[ipo.companyShareId] = s
+            }
+          })
+          return next
         })
-        setAppliedMap(m => ({ ...m, ...applied }))
       } else if (tab === 'results') {
         const res  = await getMeroshareResults(accId)
         const data = Array.isArray(res.data.results) ? res.data.results : []
@@ -959,14 +964,17 @@ function IPOPage() {
 
   useEffect(() => {
     if (!ipos.length || !selectedAcc) return
-    const patch = {}
-    ipos.forEach(ipo => {
-      if (isApplied(ipo)) {
-        if (!patch[ipo.companyShareId]) patch[ipo.companyShareId] = new Set()
-        patch[ipo.companyShareId].add(selectedAcc)
-      }
+    setAppliedMap(m => {
+      const next = { ...m }
+      let changed = false
+      ipos.forEach(ipo => {
+        if (isApplied(ipo)) {
+          const s = new Set(next[ipo.companyShareId] || [])
+          if (!s.has(selectedAcc)) { s.add(selectedAcc); next[ipo.companyShareId] = s; changed = true }
+        }
+      })
+      return changed ? next : m
     })
-    if (Object.keys(patch).length > 0) setAppliedMap(m => ({ ...m, ...patch }))
   }, [ipos, selectedAcc])
 
   const handleSelectAccount = (id) => {
