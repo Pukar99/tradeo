@@ -2,7 +2,7 @@ import { useState, useEffect, useRef } from 'react'
 import { useAuth } from '../context/AuthContext'
 import { useTheme } from '../context/ThemeContext'
 import { useLanguage } from '../context/LanguageContext'
-import { sendAgentMessage, getChatSuggestions, BASE_URL } from '../api'
+import { sendAgentMessage, getChatSuggestions, BASE_URL, saveChatSession, listChatSessions, loadChatSession, deleteChatSession } from '../api'
 import { dispatchChatAction, DEBRIEF_EVENT } from '../utils/chatEvents'
 import { useNavigate } from 'react-router-dom'
 
@@ -821,6 +821,13 @@ function AIChat({ isFullPage = false, onClose }) {
   const [journalDraft, setJournalDraft] = useState(null)   // { symbol, trade, ltp, pnl, suggestedContent }
   const [disciplineNudge, setDisciplineNudge] = useState(null) // score number
 
+  // ── Chat session persistence ─────────────────────────────────────────────────
+  const [currentSessionId, setCurrentSessionId] = useState(null)
+  const [sessions, setSessions] = useState([])
+  const [showHistory, setShowHistory] = useState(false)
+  const [sessionsLoading, setSessionsLoading] = useState(false)
+  const saveTimeoutRef = useRef(null)
+
   const messagesEndRef = useRef(null)
   const inputRef = useRef(null)
   const abortCtrlRef = useRef(null)
@@ -865,6 +872,30 @@ function AIChat({ isFullPage = false, onClose }) {
       sessionStorage.setItem('chat_messages', JSON.stringify(toSave))
     } catch { /* storage full or private mode — fail silently */ }
   }, [messages])
+
+  // Auto-save session to Supabase 3s after any message change (debounced)
+  useEffect(() => {
+    const completed = messages.filter(m => !m.streaming && m.content)
+    if (!user || completed.length === 0) return
+    clearTimeout(saveTimeoutRef.current)
+    saveTimeoutRef.current = setTimeout(async () => {
+      try {
+        const payload = {
+          messages: completed.slice(-50).map(m => ({
+            role: m.role, content: m.content,
+            actionType: m.actionType || null,
+            time: m.time || null,
+          })),
+          ...(currentSessionId ? { session_id: currentSessionId } : {}),
+        }
+        const res = await saveChatSession(payload)
+        if (!currentSessionId && res.data?.id) {
+          setCurrentSessionId(res.data.id)
+        }
+      } catch { /* fail silently — session save is non-critical */ }
+    }, 3000)
+    return () => clearTimeout(saveTimeoutRef.current)
+  }, [messages]) // eslint-disable-line react-hooks/exhaustive-deps
 
   useEffect(() => {
     if (user) {
@@ -1189,6 +1220,59 @@ function AIChat({ isFullPage = false, onClose }) {
 
   const formatTime = (date) => new Date(date).toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' })
 
+  // ── Session management ───────────────────────────────────────────────────────
+  const handleOpenHistory = async () => {
+    setShowHistory(h => !h)
+    if (!showHistory) {
+      setSessionsLoading(true)
+      try {
+        const res = await listChatSessions()
+        setSessions(res.data || [])
+      } catch { /* fail silently */ }
+      finally { setSessionsLoading(false) }
+    }
+  }
+
+  const handleLoadSession = async (id) => {
+    try {
+      const res = await loadChatSession(id)
+      const loaded = res.data?.messages || []
+      setMessages(loaded.map(m => ({ ...m, id: Math.random(), time: m.time ? new Date(m.time) : new Date() })))
+      setCurrentSessionId(id)
+      setLastAction(null)
+      setJournalDraft(null)
+      setDisciplineNudge(null)
+      setActiveForm(null)
+      setShowHistory(false)
+      sessionStorage.removeItem('chat_lastAction')
+    } catch { /* fail silently */ }
+  }
+
+  const handleDeleteSession = async (e, id) => {
+    e.stopPropagation()
+    try {
+      await deleteChatSession(id)
+      setSessions(prev => prev.filter(s => s.id !== id))
+      if (currentSessionId === id) {
+        setCurrentSessionId(null)
+        setMessages([])
+        sessionStorage.removeItem('chat_messages')
+      }
+    } catch { /* fail silently */ }
+  }
+
+  const handleNewChat = () => {
+    setMessages([])
+    setCurrentSessionId(null)
+    setLastAction(null)
+    setJournalDraft(null)
+    setDisciplineNudge(null)
+    setActiveForm(null)
+    setShowHistory(false)
+    sessionStorage.removeItem('chat_messages')
+    sessionStorage.removeItem('chat_lastAction')
+  }
+
   // Disambiguation pick — user clicked an entry card
   const handleDisambiguationPick = (entry, result) => {
     const { original_action, exit_price, sl, tp, exit_quantity } = result
@@ -1308,12 +1392,25 @@ function AIChat({ isFullPage = false, onClose }) {
           </div>
         </div>
         <div className="flex items-center gap-1">
+          {/* History / sessions button */}
+          {user && (
+            <button
+              onClick={handleOpenHistory}
+              className={`text-gray-400 hover:text-gray-600 dark:hover:text-gray-300 w-6 h-6 rounded-lg hover:bg-black/5 dark:hover:bg-white/5 flex items-center justify-center transition-colors ${showHistory ? 'bg-black/5 dark:bg-white/5' : ''}`}
+              title="Chat history"
+            >
+              <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
+              </svg>
+            </button>
+          )}
           {messages.length > 0 && (
             <button
-              onClick={() => { setMessages([]); setActiveForm(null); setJournalDraft(null); setDisciplineNudge(null); setLastAction(null); sessionStorage.removeItem('chat_messages') }}
+              onClick={handleNewChat}
               className="text-gray-400 hover:text-gray-600 dark:hover:text-gray-300 text-[10px] px-2 py-1 rounded-lg hover:bg-black/5 dark:hover:bg-white/5 transition-colors"
+              title="New chat"
             >
-              {t('chat.clear')}
+              + New
             </button>
           )}
           {!isFullPage && (
@@ -1329,6 +1426,45 @@ function AIChat({ isFullPage = false, onClose }) {
           )}
         </div>
       </div>
+
+      {/* ── Session history panel ── */}
+      {showHistory && (
+        <div className={`border-b shrink-0 max-h-48 overflow-y-auto ${
+          isFloat ? 'bg-white/20 dark:bg-black/20 border-white/15 dark:border-white/6' : 'bg-gray-50 dark:bg-gray-900 border-gray-100 dark:border-gray-800'
+        }`}>
+          <div className="px-3 py-2">
+            <p className="text-[10px] font-semibold text-gray-400 uppercase tracking-wider mb-1.5">Recent Chats</p>
+            {sessionsLoading && <p className="text-[10px] text-gray-400 py-1">Loading...</p>}
+            {!sessionsLoading && sessions.length === 0 && (
+              <p className="text-[10px] text-gray-400 py-1">No saved sessions yet. Start chatting!</p>
+            )}
+            {sessions.map(s => (
+              <div
+                key={s.id}
+                onClick={() => handleLoadSession(s.id)}
+                className={`flex items-center justify-between gap-2 px-2 py-1.5 rounded-lg cursor-pointer mb-0.5 group transition-colors ${
+                  s.id === currentSessionId
+                    ? 'bg-green-500/10 border border-green-500/20'
+                    : 'hover:bg-black/5 dark:hover:bg-white/5'
+                }`}
+              >
+                <div className="min-w-0">
+                  <p className="text-[11px] font-medium text-gray-700 dark:text-gray-200 truncate">{s.title}</p>
+                  <p className="text-[9px] text-gray-400">{new Date(s.updated_at).toLocaleDateString()}</p>
+                </div>
+                <button
+                  onClick={e => handleDeleteSession(e, s.id)}
+                  className="opacity-0 group-hover:opacity-100 text-gray-400 hover:text-red-400 transition-all shrink-0 p-0.5"
+                >
+                  <svg className="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+                  </svg>
+                </button>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
 
       {/* ── Quick action chips ── */}
       {user && (

@@ -135,6 +135,12 @@ export const sendAgentMessage = (data) => API.post('/api/chat/agent', data)
 export const getChatSuggestions = () => API.get('/api/chat/suggestions')
 export const getTraderProfile = () => API.get('/api/chat/trader-profile')
 
+// Chat sessions
+export const saveChatSession    = (data)       => API.post('/api/chat/sessions', data)
+export const listChatSessions   = ()           => API.get('/api/chat/sessions')
+export const loadChatSession    = (id)         => API.get(`/api/chat/sessions/${id}`)
+export const deleteChatSession  = (id)         => API.delete(`/api/chat/sessions/${id}`)
+
 // Market — new DB-backed endpoints
 export const getMarketSymbols  = ()             => API.get('/api/market/symbols')
 export const getIndexChart     = (params)       => API.get('/api/market/index-chart', { params })
