@@ -333,6 +333,7 @@ function EditAccountModal({ account, onClose, onUpdated }) {
   const [showPin,         setShowPin]        = useState(false)
   const [saving,          setSaving]         = useState(false)
   const [error,           setError]          = useState(null)
+  const [bankError,       setBankError]      = useState(null)
 
   useEffect(() => {
     const handler = (e) => { if (e.key === 'Escape') onClose() }
@@ -342,6 +343,7 @@ function EditAccountModal({ account, onClose, onUpdated }) {
 
   const fetchBanks = () => {
     setLoadingBanks(true)
+    setBankError(null)
     getMeroshareBanks(account.id)
       .then(r => {
         const list = r.data?.banks || []
@@ -356,7 +358,10 @@ function EditAccountModal({ account, onClose, onUpdated }) {
           setAccountBranchId(String(first.accountBranchId)); setAccountTypeId(first.accountTypeId || 1)
         }
       })
-      .catch(() => {})
+      .catch(err => {
+        const msg = err.response?.data?.error || err.message || 'Failed to load banks'
+        setBankError(msg)
+      })
       .finally(() => setLoadingBanks(false))
   }
 
@@ -477,6 +482,12 @@ function EditAccountModal({ account, onClose, onUpdated }) {
               </div>
               {loadingBanks ? (
                 <div className="space-y-2">{[1,2].map(i => <div key={i} className="h-14 bg-gray-100 dark:bg-gray-800 rounded-xl animate-pulse" />)}</div>
+              ) : bankError ? (
+                <div className="bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800/50 rounded-xl px-4 py-4 text-center">
+                  <p className="text-[11px] font-semibold text-red-700 dark:text-red-400">Could not load banks</p>
+                  <p className="text-[10px] text-red-600 dark:text-red-400 mt-1 break-words">{bankError}</p>
+                  <button onClick={fetchBanks} className="mt-2 text-[10px] font-semibold text-red-600 dark:text-red-400 underline">Try again</button>
+                </div>
               ) : banks.length === 0 ? (
                 <div className="bg-amber-50 dark:bg-amber-900/20 border border-amber-200 dark:border-amber-800/50 rounded-xl px-4 py-4 text-center">
                   <p className="text-[11px] font-semibold text-amber-700 dark:text-amber-400">No ASBA bank found</p>
