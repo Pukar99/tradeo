@@ -43,11 +43,12 @@ function AddAccountModal({ dpList, onClose, onAdded }) {
   const [showPass,      setShowPass]     = useState(false)
   const [tempId,        setTempId]       = useState(null)  // DB row id from step 1
   const [banks,         setBanks]        = useState([])
-  const [bankId,        setBankId]       = useState('')
-  const [bankName,      setBankName]     = useState('')
-  const [accountNumber, setAccountNumber]= useState('')
+  const [bankId,          setBankId]          = useState('')
+  const [bankName,        setBankName]        = useState('')
+  const [bankAccountId,   setBankAccountId]   = useState(null)
+  const [accountNumber,   setAccountNumber]   = useState('')
   const [accountBranchId, setAccountBranchId] = useState('')
-  const [accountTypeId, setAccountTypeId] = useState(1)
+  const [accountTypeId,   setAccountTypeId]   = useState(1)
   const [kitta,         setKitta]        = useState(10)
   const [crnNumber,     setCrnNumber]    = useState('')
   const [autoApply,     setAutoApply]    = useState(false)
@@ -77,8 +78,9 @@ function AddAccountModal({ dpList, onClose, onAdded }) {
           const first = bankList[0]
           setBankId(String(first.bankId))
           setBankName(first.displayName || first.bankName || '')
+          setBankAccountId(first.bankAccountId || null)
           setAccountNumber(first.accountNumber || '')
-          setAccountBranchId(String(first.accountBranchId || first.bankId))
+          setAccountBranchId(String(first.accountBranchId))
           setAccountTypeId(first.accountTypeId || 1)
         }
         setStep(2)
@@ -103,6 +105,7 @@ function AddAccountModal({ dpList, onClose, onAdded }) {
     try {
       const res = await updateMeroshareAccount(tempId, {
         bank_id: bankId, bank_name: bankName,
+        bank_account_id: bankAccountId,
         account_branch_id: accountBranchId, account_number: accountNumber,
         account_type_id: accountTypeId,
         crn_number: crnNumber, default_kitta: kitta,
@@ -236,6 +239,7 @@ function AddAccountModal({ dpList, onClose, onAdded }) {
                           onChange={() => {
                             setBankId(String(b.bankId))
                             setBankName(b.displayName || b.bankName || '')
+                            setBankAccountId(b.bankAccountId || null)
                             setAccountNumber(b.accountNumber || '')
                             setAccountBranchId(String(b.accountBranchId))
                             setAccountTypeId(b.accountTypeId || 1)
@@ -352,11 +356,12 @@ function EditAccountModal({ account, onClose, onUpdated }) {
   const [tab,           setTab]          = useState(account.bank_id ? 'settings' : 'bank')
   const [banks,         setBanks]        = useState([])
   const [loadingBanks,  setLoadingBanks] = useState(false)
-  const [bankId,        setBankId]       = useState(String(account.bank_id || ''))
-  const [bankName,      setBankName]     = useState(account.bank_name || '')
-  const [accountNumber, setAccountNumber]= useState(account.account_number || '')
+  const [bankId,          setBankId]          = useState(String(account.bank_id || ''))
+  const [bankName,        setBankName]        = useState(account.bank_name || '')
+  const [bankAccountId,   setBankAccountId]   = useState(account.bank_account_id || null)
+  const [accountNumber,   setAccountNumber]   = useState(account.account_number || '')
   const [accountBranchId, setAccountBranchId] = useState(String(account.account_branch_id || ''))
-  const [accountTypeId, setAccountTypeId] = useState(account.account_type_id || 1)
+  const [accountTypeId,   setAccountTypeId]   = useState(account.account_type_id || 1)
   const [kitta,         setKitta]        = useState(account.default_kitta || 10)
   const [crnNumber,     setCrnNumber]    = useState(account.crn_number || '')
   const [autoApply,     setAutoApply]    = useState(account.auto_apply || false)
@@ -380,6 +385,7 @@ function EditAccountModal({ account, onClose, onUpdated }) {
         if (first && !account.bank_id) {
           setBankId(String(first.bankId))
           setBankName(first.displayName || first.bankName || '')
+          setBankAccountId(first.bankAccountId || null)
           setAccountNumber(first.accountNumber || '')
           setAccountBranchId(String(first.accountBranchId))
           setAccountTypeId(first.accountTypeId || 1)
@@ -404,6 +410,7 @@ function EditAccountModal({ account, onClose, onUpdated }) {
       if (bankId) {
         payload.bank_id           = bankId
         payload.bank_name         = bankName
+        payload.bank_account_id   = bankAccountId
         payload.account_branch_id = accountBranchId
         payload.account_number    = accountNumber
         payload.account_type_id   = accountTypeId
@@ -535,6 +542,7 @@ function EditAccountModal({ account, onClose, onUpdated }) {
                           onChange={() => {
                             setBankId(String(b.bankId))
                             setBankName(b.displayName || b.bankName || '')
+                            setBankAccountId(b.bankAccountId || null)
                             setAccountNumber(b.accountNumber || '')
                             setAccountBranchId(String(b.accountBranchId))
                             setAccountTypeId(b.accountTypeId || 1)
