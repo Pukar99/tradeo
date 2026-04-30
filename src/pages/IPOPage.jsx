@@ -40,6 +40,14 @@ function AddAccountModal({ dpList, onClose, onAdded }) {
   const [error,           setError]          = useState(null)
   const setCred = (k, v) => setCreds(f => ({ ...f, [k]: v }))
 
+  // Cleanup orphan account row if user closes mid-wizard (after step 1 created the DB row)
+  const handleClose = async () => {
+    if (tempId && step > 1) {
+      await deleteMeroshareAccount(tempId).catch(() => {})
+    }
+    onClose()
+  }
+
   const STEPS = ['Credentials', 'ASBA Bank', 'Auto-apply']
 
   const handleVerify = async (e) => {
@@ -100,7 +108,7 @@ function AddAccountModal({ dpList, onClose, onAdded }) {
               {step === 1 ? 'Enter your Meroshare credentials' : step === 2 ? 'Select your ASBA bank account' : 'Configure auto-apply'}
             </p>
           </div>
-          {!busy && <button onClick={onClose} className="text-gray-400 hover:text-gray-600 text-xl w-7 h-7 flex items-center justify-center">×</button>}
+          {!busy && <button onClick={handleClose} className="text-gray-400 hover:text-gray-600 text-xl w-7 h-7 flex items-center justify-center">×</button>}
         </div>
 
         {/* Step indicator */}
@@ -497,6 +505,7 @@ function ApplyModal({ ipo, accounts, activeAccountId, onClose, onApplied }) {
         account_number: selectedAccount.account_number, account_type_id: selectedAccount.account_type_id || 1,
         crn_number: crnNumber.trim(), transaction_pin: pin.trim(),
       })
+      setPin('')  // clear PIN from memory immediately after use
       setResult({ success: true, message: res.data.message || 'Applied successfully' })
       onApplied?.(ipo.companyShareId, accountId)
     } catch (err) {
@@ -621,17 +630,32 @@ function ApplyModal({ ipo, accounts, activeAccountId, onClose, onApplied }) {
 
 // ── Bulk Apply Modal ──────────────────────────────────────────────────────────
 // Collects per-account PINs (for accounts without stored PIN) then applies to all
-function BulkApplyModal({ ipo, accounts, onClose, onApplied }) {
-  // Per-account PIN input (only for accounts without auto-apply PIN)
-  const needsPin = accounts.filter(a => a.bank_id && a.account_branch_id && !a.auto_apply)
+function BulkApplyModal({ ipo, accounts, inFlightRef, onClose, onApplied }) {
+  const readyAccounts   = accounts.filter(a => a.bank_id && a.account_branch_id)
+  const skippedAccounts = accounts.filter(a => !a.bank_id || !a.account_branch_id)
+  const needsPin        = readyAccounts.filter(a => !a.auto_apply)
+
   const [pins,    setPins]    = useState({})
   const [kitta,   setKitta]   = useState(10)
   const [applying, setApplying] = useState(false)
   const [results, setResults] = useState(null)
   const [error,   setError]   = useState(null)
+  const abortRef = useRef(null)
+
+  // Abort in-flight request on unmount
+  useEffect(() => () => {
+    if (abortRef.current) { abortRef.current.abort(); abortRef.current = null }
+    if (inFlightRef) inFlightRef.current = false
+  }, [inFlightRef])
+
+  const pinsMissing = needsPin.filter(a => !pins[a.id]?.trim())
+  const canApply    = readyAccounts.length > 0 && pinsMissing.length === 0
 
   const handleApply = async () => {
+    if (!canApply) return
+    if (inFlightRef) inFlightRef.current = true
     setApplying(true); setError(null)
+    abortRef.current = new AbortController()
     try {
       const res = await applyMeroshareIPOBulk({
         company_share_id: ipo.companyShareId,
@@ -641,12 +665,20 @@ function BulkApplyModal({ ipo, accounts, onClose, onApplied }) {
       setResults(res.data.results || [])
       onApplied?.(ipo.companyShareId)
     } catch (err) {
-      setError(err.response?.data?.error || 'Bulk apply failed')
-    } finally { setApplying(false) }
+      if (err.name !== 'CanceledError' && err.code !== 'ERR_CANCELED') {
+        setError(err.response?.data?.error || 'Bulk apply failed')
+      }
+    } finally {
+      setApplying(false)
+      abortRef.current = null
+      if (inFlightRef) inFlightRef.current = false
+    }
   }
 
-  const readyAccounts  = accounts.filter(a => a.bank_id && a.account_branch_id)
-  const skippedAccounts = accounts.filter(a => !a.bank_id || !a.account_branch_id)
+  const handleClose = () => {
+    if (applying) return  // block close while in flight — user must wait or see results
+    onClose()
+  }
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50 backdrop-blur-sm">
@@ -658,7 +690,7 @@ function BulkApplyModal({ ipo, accounts, onClose, onApplied }) {
             </p>
             <p className="text-[10px] text-gray-400 mt-0.5">{ipo.companyName} · {ipo.scrip}</p>
           </div>
-          <button onClick={onClose} className="text-gray-400 hover:text-gray-600 text-xl w-7 h-7 flex items-center justify-center">×</button>
+          {!applying && <button onClick={handleClose} className="text-gray-400 hover:text-gray-600 text-xl w-7 h-7 flex items-center justify-center">×</button>}
         </div>
 
         {results ? (
@@ -694,7 +726,9 @@ function BulkApplyModal({ ipo, accounts, onClose, onApplied }) {
             <div className="space-y-2">
               <p className="text-[9px] font-semibold text-gray-400 uppercase tracking-widest">{readyAccounts.length} Account{readyAccounts.length !== 1 ? 's' : ''} Ready</p>
               {readyAccounts.map(a => (
-                <div key={a.id} className="flex items-center gap-3 px-3.5 py-2.5 rounded-xl border border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-800">
+                <div key={a.id} className={`flex items-center gap-3 px-3.5 py-2.5 rounded-xl border bg-gray-50 dark:bg-gray-800 ${
+                  !a.auto_apply && !pins[a.id]?.trim() ? 'border-amber-300 dark:border-amber-700' : 'border-gray-200 dark:border-gray-700'
+                }`}>
                   <div className="w-6 h-6 rounded-lg bg-gray-200 dark:bg-gray-700 flex items-center justify-center text-[10px] font-bold text-gray-600 dark:text-gray-300 flex-shrink-0">
                     {a.label.charAt(0)}
                   </div>
@@ -707,7 +741,7 @@ function BulkApplyModal({ ipo, accounts, onClose, onApplied }) {
                   </div>
                   {/* PIN input for accounts without stored PIN */}
                   {!a.auto_apply && (
-                    <input type="password" placeholder="PIN" maxLength={10}
+                    <input type="password" placeholder="PIN" maxLength={10} autoComplete="off"
                       value={pins[a.id] || ''} onChange={e => setPins(p => ({ ...p, [a.id]: e.target.value }))}
                       className="w-24 bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-700 rounded-lg px-2 py-1.5 text-[11px] text-gray-900 dark:text-white outline-none focus:border-blue-500 tracking-widest text-center" />
                   )}
@@ -718,20 +752,25 @@ function BulkApplyModal({ ipo, accounts, onClose, onApplied }) {
                   {skippedAccounts.map(a => a.label).join(', ')} {skippedAccounts.length === 1 ? 'has' : 'have'} no bank set up and will be skipped.
                 </p>
               )}
+              {pinsMissing.length > 0 && !applying && (
+                <p className="text-[9px] text-amber-600 dark:text-amber-400 font-semibold">
+                  Enter PIN for: {pinsMissing.map(a => a.label).join(', ')}
+                </p>
+              )}
             </div>
 
             {error && <p className="text-[11px] text-red-500 bg-red-50 dark:bg-red-900/20 px-3 py-2 rounded-xl border border-red-100 dark:border-red-800/50">{error}</p>}
 
             <div className="bg-amber-50 dark:bg-amber-900/20 border border-amber-100 dark:border-amber-800/50 rounded-xl px-3 py-2">
-              <p className="text-[9px] text-amber-700 dark:text-amber-400 font-semibold">Takes 4–9 seconds per account to avoid detection. Please wait.</p>
+              <p className="text-[9px] text-amber-700 dark:text-amber-400 font-semibold">Takes 4–9 seconds per account to avoid detection. Do not close this window.</p>
             </div>
 
             <div className="flex gap-2">
-              <button onClick={onClose} disabled={applying} className="flex-1 py-2.5 rounded-xl border border-gray-200 dark:border-gray-700 text-[11px] font-semibold text-gray-600 dark:text-gray-300 hover:bg-gray-50 disabled:opacity-40">Cancel</button>
-              <button onClick={handleApply} disabled={applying || readyAccounts.length === 0}
+              <button onClick={handleClose} disabled={applying} className="flex-1 py-2.5 rounded-xl border border-gray-200 dark:border-gray-700 text-[11px] font-semibold text-gray-600 dark:text-gray-300 hover:bg-gray-50 disabled:opacity-40">Cancel</button>
+              <button onClick={handleApply} disabled={applying || !canApply}
                 className="flex-1 py-2.5 rounded-xl bg-emerald-600 text-white text-[11px] font-semibold hover:bg-emerald-700 disabled:opacity-50 flex items-center justify-center gap-2">
                 {applying && <span className="w-3 h-3 border-2 border-white/40 border-t-white rounded-full animate-spin" />}
-                {applying ? 'Applying…' : `Apply for ${readyAccounts.length} Account${readyAccounts.length !== 1 ? 's' : ''}`}
+                {applying ? 'Applying… Please wait' : `Apply for ${readyAccounts.length} Account${readyAccounts.length !== 1 ? 's' : ''}`}
               </button>
             </div>
           </div>
@@ -765,7 +804,8 @@ function IPOPage() {
   // Track which IPOs have been applied per account (companyShareId → Set<accountId>)
   const [appliedMap,    setAppliedMap]    = useState({})
 
-  const tabCache = useRef({})
+  const tabCache           = useRef({})
+  const bulkApplyInFlight  = useRef(false)  // prevents parallel bulk apply across IPOs
 
   useEffect(() => {
     getMeroshareDpList().then(r => setDpList(r.data || [])).catch(() => {})
@@ -821,6 +861,19 @@ function IPOPage() {
   useEffect(() => {
     if (selectedAcc) loadData(selectedAcc, activeTab)
   }, [selectedAcc, activeTab, loadData])
+
+  // Re-seed appliedMap from whatever ipos are displayed (covers cache-hit path too)
+  useEffect(() => {
+    if (!ipos.length || !selectedAcc) return
+    const patch = {}
+    ipos.forEach(ipo => {
+      if (ipo.action === 'edit' || ipo.statusName === 'EDIT_APPROVE') {
+        if (!patch[ipo.companyShareId]) patch[ipo.companyShareId] = new Set()
+        patch[ipo.companyShareId].add(selectedAcc)
+      }
+    })
+    if (Object.keys(patch).length > 0) setAppliedMap(m => ({ ...m, ...patch }))
+  }, [ipos, selectedAcc])
 
   const handleSelectAccount = (id) => {
     setSelectedAcc(id)
@@ -1113,16 +1166,23 @@ function IPOPage() {
 
                             <div className="flex items-center gap-2 flex-shrink-0">
                               {/* Bulk apply button — only when multiple accounts exist */}
-                              {hasMultipleAcc && !noBankSetup && (
-                                <button onClick={() => setBulkApplyIPO(ipo)}
-                                  className={`px-3.5 py-2 rounded-xl text-[10px] font-semibold transition-colors border ${
-                                    appliedAll
-                                      ? 'bg-emerald-50 dark:bg-emerald-900/20 text-emerald-600 border-emerald-200 dark:border-emerald-800/50 hover:bg-emerald-100'
-                                      : 'bg-emerald-600 text-white border-emerald-600 hover:bg-emerald-700'
-                                  }`}>
-                                  {appliedAll ? '✓ All Applied' : `Apply All (${accounts.length})`}
-                                </button>
-                              )}
+                              {hasMultipleAcc && !noBankSetup && (() => {
+                                const readyAccs      = accounts.filter(a => a.bank_id && a.account_branch_id)
+                                const unappliedAccs  = readyAccs.filter(a => !thisApplied?.has(a.id))
+                                if (unappliedAccs.length === 0) return (
+                                  <span className="px-3.5 py-2 rounded-xl text-[10px] font-semibold bg-emerald-50 dark:bg-emerald-900/20 text-emerald-600 border border-emerald-200 dark:border-emerald-800/50">
+                                    ✓ All Applied
+                                  </span>
+                                )
+                                return (
+                                  <button
+                                    onClick={() => { if (!bulkApplyInFlight.current) setBulkApplyIPO(ipo) }}
+                                    disabled={bulkApplyInFlight.current}
+                                    className="px-3.5 py-2 rounded-xl text-[10px] font-semibold bg-emerald-600 text-white border border-emerald-600 hover:bg-emerald-700 disabled:opacity-50 transition-colors">
+                                    Apply Remaining ({unappliedAccs.length})
+                                  </button>
+                                )
+                              })()}
                               {/* Single apply */}
                               {noBankSetup ? (
                                 <button onClick={() => setEditAccount(activeAccount)}
@@ -1305,6 +1365,7 @@ function IPOPage() {
       )}
       {bulkApplyIPO && (
         <BulkApplyModal ipo={bulkApplyIPO} accounts={accounts}
+          inFlightRef={bulkApplyInFlight}
           onClose={() => setBulkApplyIPO(null)}
           onApplied={(csid) => { handleApplied(csid, null); setBulkApplyIPO(null) }} />
       )}
