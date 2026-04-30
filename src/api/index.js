@@ -231,6 +231,8 @@ export const getMeroshareAllotment   = (accountId, applicantFormId) => API.get('
 export const getMeroshareBanks       = (accountId)     => API.get('/api/meroshare/banks', { params: accountId ? { account_id: accountId } : {} })
 export const getMeroshareDisclaimer  = (accountId, companyShareId) => API.get('/api/meroshare/disclaimer', { params: { account_id: accountId, company_share_id: companyShareId } })
 export const updateMeroshareAccount  = (id, data)      => API.put(`/api/meroshare/accounts/${id}`, data)
+export const toggleMeroshareAutoApply = (accountId, enabled) => API.post('/api/meroshare/auto-apply/toggle', { account_id: accountId, enabled })
+export const runMeroshareAutoApply   = ()              => API.post('/api/meroshare/auto-apply/run')
 
 // Market Journal
 export const getMarketJournals      = ()         => API.get('/api/market-journal')

@@ -5,6 +5,7 @@ import {
   getMeroshareIPOs, getMeroshareResults, applyMeroshareIPO, applyMeroshareIPOBulk,
   getMerosharePortfolio, cancelMeroshareIPO, getMeroshareAllotment,
   getMeroshareBanks, getMeroshareDisclaimer, updateMeroshareAccount,
+  toggleMeroshareAutoApply, runMeroshareAutoApply,
 } from '../api'
 
 const fmt = (n) => n != null ? Number(n).toLocaleString() : '—'
@@ -888,7 +889,9 @@ function IPOPage() {
   const [checkingId,    setCheckingId]    = useState(null)
   const [appliedMap,    setAppliedMap]    = useState({})
   const [actionError,   setActionError]   = useState(null)
-  const [quickApplying, setQuickApplying] = useState(null)   // companyShareId being quick-applied
+  const [quickApplying,    setQuickApplying]    = useState(null)   // companyShareId being quick-applied
+  const [togglingAutoApply, setTogglingAutoApply] = useState(false)
+  const [runningAutoApply,  setRunningAutoApply]  = useState(false)
 
   // Results search + Holdings search + sort
   const [resultSearch,    setResultSearch]    = useState('')
@@ -1017,6 +1020,34 @@ function IPOPage() {
   }, [accounts])
 
   const handleAccountUpdated = (updated) => setAccounts(list => list.map(a => a.id === updated.id ? updated : a))
+
+  const handleToggleAutoApply = async (account, enable) => {
+    setTogglingAutoApply(true); setActionError(null)
+    try {
+      await toggleMeroshareAutoApply(account.id, enable)
+      setAccounts(list => list.map(a => a.id === account.id
+        ? { ...a, auto_apply: enable, ...(enable ? {} : { encrypted_pin: null }) }
+        : a
+      ))
+    } catch (err) {
+      const msg = err.response?.data?.error || 'Failed to update auto-apply'
+      setActionError(msg)
+      // If no PIN saved, open edit modal
+      if (err.response?.status === 400 && msg.includes('No PIN')) setEditAccount(account)
+    } finally { setTogglingAutoApply(false) }
+  }
+
+  const handleRunAutoApply = async () => {
+    setRunningAutoApply(true); setActionError(null)
+    try {
+      await runMeroshareAutoApply()
+      setActionError(null)
+    } catch (err) {
+      setActionError(err.response?.data?.error || 'Failed to trigger auto-apply')
+    } finally {
+      setTimeout(() => setRunningAutoApply(false), 3000)  // brief "Running…" state
+    }
+  }
 
   // 1-click apply — only works when account has saved PIN and bank is set up
   const handleQuickApply = useCallback(async (ipo, account) => {
@@ -1199,39 +1230,65 @@ function IPOPage() {
 
             {/* Account header bar */}
             {activeAccount && (
-              <div className="bg-white dark:bg-gray-900 rounded-2xl border border-gray-100 dark:border-gray-800 px-4 py-3 mb-4 flex items-center justify-between">
-                <div className="flex items-center gap-3">
-                  <div className="w-8 h-8 rounded-xl bg-gray-900 dark:bg-white flex items-center justify-center text-white dark:text-gray-900 text-[12px] font-bold flex-shrink-0">
-                    {activeAccount.label.charAt(0).toUpperCase()}
-                  </div>
-                  <div>
-                    <div className="flex items-center gap-2 flex-wrap">
-                      <p className="text-[13px] font-bold text-gray-900 dark:text-white">{activeAccount.label}</p>
-                      {activeAccount.auto_apply && (
-                        <span className="text-[8px] font-bold px-1.5 py-0.5 rounded bg-emerald-100 dark:bg-emerald-900/30 text-emerald-600">AUTO-APPLY ON</span>
-                      )}
-                      {(!activeAccount.bank_id || !activeAccount.account_number) && (
-                        <button onClick={() => setEditAccount(activeAccount)}
-                          className="text-[9px] font-semibold text-amber-600 bg-amber-50 dark:bg-amber-900/20 border border-amber-200 dark:border-amber-800/50 px-2 py-0.5 rounded hover:bg-amber-100 transition-colors">
-                          ⚠ Setup ASBA →
-                        </button>
-                      )}
+              <div className="bg-white dark:bg-gray-900 rounded-2xl border border-gray-100 dark:border-gray-800 px-4 py-3 mb-4">
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-3">
+                    <div className="w-8 h-8 rounded-xl bg-gray-900 dark:bg-white flex items-center justify-center text-white dark:text-gray-900 text-[12px] font-bold flex-shrink-0">
+                      {activeAccount.label.charAt(0).toUpperCase()}
                     </div>
-                    <p className="text-[10px] text-gray-400 font-mono">{activeAccount.username} · {activeAccount.dp_name}</p>
+                    <div>
+                      <div className="flex items-center gap-2 flex-wrap">
+                        <p className="text-[13px] font-bold text-gray-900 dark:text-white">{activeAccount.label}</p>
+                        {(!activeAccount.bank_id || !activeAccount.account_number) && (
+                          <button onClick={() => setEditAccount(activeAccount)}
+                            className="text-[9px] font-semibold text-amber-600 bg-amber-50 dark:bg-amber-900/20 border border-amber-200 dark:border-amber-800/50 px-2 py-0.5 rounded hover:bg-amber-100 transition-colors">
+                            ⚠ Setup ASBA →
+                          </button>
+                        )}
+                      </div>
+                      <p className="text-[10px] text-gray-400 font-mono">{activeAccount.username} · {activeAccount.dp_name}</p>
+                    </div>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <button onClick={() => setEditAccount(activeAccount)} title="Account settings"
+                      className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg text-gray-500 hover:text-gray-700 hover:bg-gray-100 dark:hover:bg-gray-800 transition-all text-[10px] font-semibold">
+                      <svg className="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z" />
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
+                      </svg>
+                      Settings
+                    </button>
+                    <span className="flex items-center gap-1 text-[10px] text-emerald-500 font-semibold">
+                      <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse" />Connected
+                    </span>
                   </div>
                 </div>
-                <div className="flex items-center gap-2">
-                  <button onClick={() => setEditAccount(activeAccount)} title="Account settings"
-                    className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg text-gray-500 hover:text-gray-700 hover:bg-gray-100 dark:hover:bg-gray-800 transition-all text-[10px] font-semibold">
-                    <svg className="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z" />
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
-                    </svg>
-                    Settings
-                  </button>
-                  <span className="flex items-center gap-1 text-[10px] text-emerald-500 font-semibold">
-                    <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse" />Connected
-                  </span>
+
+                {/* Auto-apply toggle row */}
+                <div className="mt-3 pt-3 border-t border-gray-100 dark:border-gray-800 flex flex-wrap items-center justify-between gap-2">
+                  <div className="flex items-center gap-3">
+                    <label className="flex items-center gap-2.5 cursor-pointer select-none" title={activeAccount.auto_apply ? 'Click to disable auto-apply' : 'Click to enable auto-apply at 11 AM daily'}>
+                      <div onClick={() => !togglingAutoApply && handleToggleAutoApply(activeAccount, !activeAccount.auto_apply)}
+                        className={`relative w-9 h-5 rounded-full transition-colors duration-200 flex-shrink-0 ${togglingAutoApply ? 'opacity-50 cursor-wait' : 'cursor-pointer'} ${activeAccount.auto_apply ? 'bg-emerald-500' : 'bg-gray-300 dark:bg-gray-600'}`}>
+                        <span className={`absolute top-0.5 left-0.5 w-4 h-4 rounded-full bg-white shadow transition-transform duration-200 ${activeAccount.auto_apply ? 'translate-x-4' : 'translate-x-0'}`} />
+                      </div>
+                      <div>
+                        <p className={`text-[11px] font-semibold ${activeAccount.auto_apply ? 'text-emerald-600 dark:text-emerald-400' : 'text-gray-500 dark:text-gray-400'}`}>
+                          Auto-apply {activeAccount.auto_apply ? 'ON' : 'OFF'}
+                        </p>
+                        <p className="text-[9px] text-gray-400">Applies at 11:05 AM on weekdays</p>
+                      </div>
+                    </label>
+                  </div>
+                  {activeAccount.auto_apply && (
+                    <button onClick={handleRunAutoApply} disabled={runningAutoApply || togglingAutoApply}
+                      title="Run auto-apply now for all enabled accounts"
+                      className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-[10px] font-semibold bg-emerald-50 dark:bg-emerald-900/20 text-emerald-700 dark:text-emerald-400 border border-emerald-200 dark:border-emerald-800/50 hover:bg-emerald-100 dark:hover:bg-emerald-900/40 disabled:opacity-50 disabled:cursor-wait transition-colors">
+                      {runningAutoApply
+                        ? <><span className="w-2.5 h-2.5 border-2 border-emerald-400/40 border-t-emerald-500 rounded-full animate-spin" />Running…</>
+                        : <>▶ Run Now</>}
+                    </button>
+                  )}
                 </div>
               </div>
             )}
