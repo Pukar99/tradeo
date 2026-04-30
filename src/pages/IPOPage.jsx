@@ -92,7 +92,7 @@ function AddAccountModal({ dpList, onClose, onAdded }) {
 
   // Step 2: proceed to auto-apply
   const handleAsbaNext = () => {
-    if (!bankId || !accountNumber) return setError('Please select your ASBA bank account')
+    if (!bankId || !accountBranchId) return setError('Please select your ASBA bank account')
     setError(null); setStep(3)
   }
 
