@@ -983,7 +983,8 @@ function LogsPage() {
         .catch(() => {})
 
       // Fetch LTP for NEPSE open/partial trades only
-      const openNepse     = tradesRes.data.filter(t => (t.status === 'OPEN' || t.status === 'PARTIAL') && t.market !== 'forex')
+      const allTrades     = tradesRes.status === 'fulfilled' ? (tradesRes.value.data || []) : []
+      const openNepse     = allTrades.filter(t => (t.status === 'OPEN' || t.status === 'PARTIAL') && t.market !== 'forex')
       const uniqueSymbols = [...new Set(openNepse.map(t => t.symbol))]
       if (uniqueSymbols.length > 0) {
         try {
