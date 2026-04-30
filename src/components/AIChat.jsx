@@ -823,6 +823,7 @@ function AIChat({ isFullPage = false, onClose }) {
 
   // ── Chat session persistence ─────────────────────────────────────────────────
   const [currentSessionId, setCurrentSessionId] = useState(null)
+  const currentSessionIdRef = useRef(null)
   const [sessions, setSessions] = useState([])
   const [showHistory, setShowHistory] = useState(false)
   const [sessionsLoading, setSessionsLoading] = useState(false)
@@ -873,6 +874,9 @@ function AIChat({ isFullPage = false, onClose }) {
     } catch { /* storage full or private mode — fail silently */ }
   }, [messages])
 
+  // Keep session ID ref in sync so the save timeout always reads current value
+  useEffect(() => { currentSessionIdRef.current = currentSessionId }, [currentSessionId])
+
   // Auto-save session to Supabase 3s after any message change (debounced)
   useEffect(() => {
     const completed = messages.filter(m => !m.streaming && m.content)
@@ -880,16 +884,17 @@ function AIChat({ isFullPage = false, onClose }) {
     clearTimeout(saveTimeoutRef.current)
     saveTimeoutRef.current = setTimeout(async () => {
       try {
+        const sid = currentSessionIdRef.current
         const payload = {
           messages: completed.slice(-50).map(m => ({
             role: m.role, content: m.content,
             actionType: m.actionType || null,
             time: m.time || null,
           })),
-          ...(currentSessionId ? { session_id: currentSessionId } : {}),
+          ...(sid ? { session_id: sid } : {}),
         }
         const res = await saveChatSession(payload)
-        if (!currentSessionId && res.data?.id) {
+        if (!sid && res.data?.id) {
           setCurrentSessionId(res.data.id)
         }
       } catch { /* fail silently — session save is non-critical */ }
@@ -1222,8 +1227,9 @@ function AIChat({ isFullPage = false, onClose }) {
 
   // ── Session management ───────────────────────────────────────────────────────
   const handleOpenHistory = async () => {
-    setShowHistory(h => !h)
-    if (!showHistory) {
+    const opening = !showHistory
+    setShowHistory(opening)
+    if (opening) {
       setSessionsLoading(true)
       try {
         const res = await listChatSessions()
