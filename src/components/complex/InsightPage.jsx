@@ -435,22 +435,30 @@ function CompanyList({ sectorIndex, label, year, month, onClose }) {
 
   useEffect(() => {
     if (!sectorIndex || !year || !month) {
-      setLoading(false) // guard: nothing to load, don't leave spinner stuck
+      setLoading(false)
       return
     }
     let cancelled = false
     setLoading(true); setStocks(null); setError(null)
-    getSectorMonthStocks({ sector_index: sectorIndex, year, month })
-      .then(r => {
-        if (!cancelled) setStocks(r.data?.stocks || [])
-      })
-      .catch(() => {
-        if (!cancelled) setError('Failed to load stocks for this sector')
-      })
-      .finally(() => {
-        if (!cancelled) setLoading(false)
-      })
-    return () => { cancelled = true }
+
+    // setTimeout(0) ensures React StrictMode's synchronous cleanup cancels the first
+    // invocation's timer BEFORE it fires. Only the second (real) mount actually fetches,
+    // avoiding the Axios dedup interceptor's forever-pending promise issue.
+    const timer = setTimeout(() => {
+      if (cancelled) return
+      getSectorMonthStocks({ sector_index: sectorIndex, year, month })
+        .then(r => {
+          if (!cancelled) setStocks(r.data?.stocks || [])
+        })
+        .catch(() => {
+          if (!cancelled) setError('Failed to load stocks for this sector')
+        })
+        .finally(() => {
+          if (!cancelled) setLoading(false)
+        })
+    }, 0)
+
+    return () => { cancelled = true; clearTimeout(timer) }
   }, [sectorIndex, year, month])
 
   const maxAbs   = stocks?.length ? Math.max(...stocks.map(s => Math.abs(s.return_pct ?? 0)), 0.1) : 1
@@ -470,8 +478,10 @@ function CompanyList({ sectorIndex, label, year, month, onClose }) {
         </div>
       )}
       {error && <div className="px-3 py-3 text-[10px] text-red-400">{error}</div>}
-      {!loading && !error && stocks?.length === 0 && (
-        <div className="px-3 py-3 text-[10px] text-gray-400">No stock data for this period.</div>
+      {!loading && !error && stocks !== null && stocks.length === 0 && (
+        <div className="px-3 py-3 text-[10px] text-gray-400">
+          No stock data for this period. This sector may have no trading activity in the selected month.
+        </div>
       )}
       {!loading && !error && stocks?.length > 0 && (
         <div className="max-h-52 overflow-y-auto">
