@@ -449,18 +449,27 @@ function SectorBar({ name, ret, maxAbs }) {
 // ─── Company list for a sector×month ─────────────────────────────────────────
 function CompanyList({ sectorIndex, year, month, onClose }) {
   const [stocks,  setStocks]  = useState(null)
-  const [loading, setLoading] = useState(true)
+  const [loading, setLoading] = useState(false) // false until a real fetch starts
   const [error,   setError]   = useState(null)
 
   useEffect(() => {
-    if (!sectorIndex || !year || !month) return
-    const ctrl = new AbortController()
+    if (!sectorIndex || !year || !month) {
+      setLoading(false) // guard: nothing to load, don't leave spinner stuck
+      return
+    }
+    let cancelled = false
     setLoading(true); setStocks(null); setError(null)
     getSectorMonthStocks({ sector_index: sectorIndex, year, month })
-      .then(r => { if (!ctrl.signal.aborted) setStocks(r.data.stocks || []) })
-      .catch(() => { if (!ctrl.signal.aborted) setError('Failed to load stocks') })
-      .finally(() => { if (!ctrl.signal.aborted) setLoading(false) })
-    return () => ctrl.abort()
+      .then(r => {
+        if (!cancelled) setStocks(r.data?.stocks || [])
+      })
+      .catch(() => {
+        if (!cancelled) setError('Failed to load stocks for this sector')
+      })
+      .finally(() => {
+        if (!cancelled) setLoading(false)
+      })
+    return () => { cancelled = true }
   }, [sectorIndex, year, month])
 
   const maxAbs = stocks?.length ? Math.max(...stocks.map(s => Math.abs(s.return_pct ?? 0)), 0.1) : 1
@@ -783,7 +792,11 @@ function DetailPanel({ cell, onClose, onNavigate, dark, allYears, indexId }) {
                   return (
                     <div key={s.index_id}>
                       <button
-                        onClick={() => setActiveSectorIndex(isActive ? null : s.name)}
+                        onClick={() => {
+                          // Guard: only set active if we have a valid sector name to query
+                          if (!s.name) return
+                          setActiveSectorIndex(isActive ? null : s.name)
+                        }}
                         className={`w-full text-left rounded px-1.5 py-1 transition-colors ${
                           isActive
                             ? 'bg-blue-50 dark:bg-blue-950/30 ring-1 ring-blue-200 dark:ring-blue-800'
@@ -791,7 +804,7 @@ function DetailPanel({ cell, onClose, onNavigate, dark, allYears, indexId }) {
                       >
                         <SectorBar name={s.name} ret={s.return_pct} maxAbs={maxAbs} />
                       </button>
-                      {isActive && (
+                      {isActive && s.name && (
                         <CompanyList
                           sectorIndex={s.name}
                           year={cell.year}
