@@ -9,7 +9,7 @@ export const API = axios.create({
 
 // ── Request counter + 300ms dedup (dev-mode diagnostics) ─────────────────────
 const _reqLog = { count: 0, endpoints: {} }
-const _inFlight = new Map()  // key → timestamp of last fire
+const _inFlight = new Map()  // key → { ts: timestamp, promise, resolve, reject }
 const DEDUP_MS = 300
 
 if (import.meta.env.DEV) {
@@ -31,14 +31,21 @@ API.interceptors.request.use((config) => {
     config.headers.Authorization = `Bearer ${token}`
   }
 
-  // Dedup identical GET requests fired within DEDUP_MS of each other
+  // Dedup identical GET requests fired within DEDUP_MS of each other.
+  // Stores the in-flight promise so all callers get the same result — no forever-pending promises.
   if (config.method === 'get') {
     const key = config.url + JSON.stringify(config.params || '')
-    const last = _inFlight.get(key)
-    if (last && Date.now() - last < DEDUP_MS) {
-      return Promise.reject(Object.assign(new axios.Cancel('dedup'), { _dedup: true }))
+    const entry = _inFlight.get(key)
+    if (entry && Date.now() - entry.ts < DEDUP_MS) {
+      // Return a new promise that mirrors the original request's outcome
+      config._dedupPromise = entry.shared
+      return Promise.reject(Object.assign(new axios.Cancel('dedup'), { _dedup: true, _sharedPromise: entry.shared }))
     }
-    _inFlight.set(key, Date.now())
+    // Register this request; build a shared promise other callers can hook into
+    let resolve, reject
+    const shared = new Promise((res, rej) => { resolve = res; reject = rej })
+    _inFlight.set(key, { ts: Date.now(), shared, resolve, reject })
+    config._inFlightKey = key
   }
 
   if (import.meta.env.DEV) {
@@ -50,11 +57,28 @@ API.interceptors.request.use((config) => {
   return config
 })
 
-// Auto-logout on 401; silently swallow dedup cancellations
+// Auto-logout on 401; dedup cancellations resolve/reject via the shared in-flight promise
 API.interceptors.response.use(
-  (response) => response,
+  (response) => {
+    // Resolve the shared promise so any dedup'd callers also get the result
+    const key = response.config?._inFlightKey
+    if (key) {
+      const entry = _inFlight.get(key)
+      if (entry) { entry.resolve(response); _inFlight.delete(key) }
+    }
+    return response
+  },
   (error) => {
-    if (error._dedup) return new Promise(() => {})  // swallow — caller gets a pending promise
+    if (error._dedup) {
+      // Return the shared promise — dedup'd caller gets same resolution/rejection as primary
+      return error._sharedPromise
+    }
+    // Primary request failed — reject the shared promise too
+    const key = error.config?._inFlightKey
+    if (key) {
+      const entry = _inFlight.get(key)
+      if (entry) { entry.reject(error); _inFlight.delete(key) }
+    }
     if (error.response?.status === 401) {
       localStorage.removeItem('token')
       localStorage.removeItem('user')
