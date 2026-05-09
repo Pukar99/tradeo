@@ -5,28 +5,13 @@ import { getMonthlyReturns, getMonthDetail, getSectorMonth, getSectorMonthStocks
 import { apiError } from '../../utils/format'
 
 // ─── Constants ────────────────────────────────────────────────────────────────
-const MONTHS_EN   = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec']
+const MONTHS_EN   = MONTHS_EN_SHARED  // ['Jan'..'Dec'] from shared constants
 const MONTHS_FULL = ['January','February','March','April','May','June','July','August','September','October','November','December']
 const MONTHS_NP   = ['Pou','Mag','Fal','Cha','Bai','Jes','Ash','Shr','Bha','Asw','Kar','Man']
-const RECENT_N    = 5
+const RECENT_N    = _RECENT_N         // 5 — from shared constants
 
-// Available indices for the selector (index_id matches INDEX_MAP in dailyScraper.js)
-const INDEX_OPTIONS = [
-  { id: 12, label: 'NEPSE',                    short: 'NEPSE'    },
-  { id: 1,  label: 'Commercial Bank',          short: 'Bank'     },
-  { id: 2,  label: 'Development Bank',         short: 'DevBank'  },
-  { id: 3,  label: 'Finance',                  short: 'Finance'  },
-  { id: 4,  label: 'Hotels & Tourism',         short: 'Hotel'    },
-  { id: 5,  label: 'Hydro Power',              short: 'Hydro'    },
-  { id: 6,  label: 'Life Insurance',           short: 'Life'     },
-  { id: 8,  label: 'Manufacturing',            short: 'Mfg'      },
-  { id: 9,  label: 'Microfinance',             short: 'MFI'      },
-  { id: 10, label: 'Mutual Fund',              short: 'MF'       },
-  { id: 11, label: 'Non-Life Insurance',       short: 'Non-Life' },
-  { id: 13, label: 'Others',                   short: 'Others'   },
-  { id: 14, label: 'Trading',                  short: 'Trading'  },
-  { id: 15, label: 'Investment',               short: 'Invest'   },
-]
+// Shared: index_id ↔ label/sector_index mapping — single source of truth
+import { INDEX_OPTIONS, RECENT_N as _RECENT_N, MONTHS as MONTHS_EN_SHARED } from '../../utils/constants'
 
 // ─── Colour helpers ───────────────────────────────────────────────────────────
 function cellBg(val, dark) {
@@ -447,7 +432,7 @@ function SectorBar({ name, ret, maxAbs }) {
 }
 
 // ─── Company list for a sector×month ─────────────────────────────────────────
-function CompanyList({ sectorIndex, year, month, onClose }) {
+function CompanyList({ sectorIndex, label, year, month, onClose }) {
   const [stocks,  setStocks]  = useState(null)
   const [loading, setLoading] = useState(false) // false until a real fetch starts
   const [error,   setError]   = useState(null)
@@ -472,8 +457,9 @@ function CompanyList({ sectorIndex, year, month, onClose }) {
     return () => { cancelled = true }
   }, [sectorIndex, year, month])
 
-  const maxAbs = stocks?.length ? Math.max(...stocks.map(s => Math.abs(s.return_pct ?? 0)), 0.1) : 1
-  const shortName = sectorIndex.replace(' Sub-Index','').replace(' Index','')
+  const maxAbs   = stocks?.length ? Math.max(...stocks.map(s => Math.abs(s.return_pct ?? 0)), 0.1) : 1
+  // Use friendly label if provided, otherwise strip suffix from DB key
+  const shortName = label || (sectorIndex?.replace(' Sub-Index','').replace(' Index','') ?? '')
 
   return (
     <div className="border-t border-gray-100 dark:border-gray-800">
@@ -802,11 +788,13 @@ function DetailPanel({ cell, onClose, onNavigate, dark, allYears, indexId }) {
                             ? 'bg-blue-50 dark:bg-blue-950/30 ring-1 ring-blue-200 dark:ring-blue-800'
                             : 'hover:bg-gray-50 dark:hover:bg-gray-800/40'}`}
                       >
-                        <SectorBar name={s.name} ret={s.return_pct} maxAbs={maxAbs} />
+                        {/* s.label = friendly name from backend e.g. "Commercial Bank"; s.name = sector_index key */}
+                      <SectorBar name={s.label || s.name} ret={s.return_pct} maxAbs={maxAbs} />
                       </button>
                       {isActive && s.name && (
                         <CompanyList
                           sectorIndex={s.name}
+                          label={s.label}
                           year={cell.year}
                           month={cell.month}
                           onClose={() => setActiveSectorIndex(null)}
