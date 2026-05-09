@@ -225,7 +225,8 @@ function EditWatchItemForm({ item, onClose, onSaved }) {
 export default function LeftPanel() {
   const { selectedSymbol, selectSymbol, isIndex } = useScreen()
   const [positions, setPositions] = useState([])
-  const [watchlist, setWatchlist] = useState([])
+  const [watchlist,     setWatchlist]     = useState([])
+  const [pendingDelete, setPendingDelete] = useState(null) // watchlist item id awaiting confirm
   const [tab,       setTab]       = useState('portfolio')
   const [watchErr,  setWatchErr]  = useState(null)
 
@@ -378,21 +379,47 @@ export default function LeftPanel() {
           <div className="flex-1 overflow-y-auto min-h-0 px-2 space-y-1">
             {watchlist.length === 0 ? (
               <p className="text-center text-[9px] text-gray-400 py-4">No watchlist stocks</p>
-            ) : watchlist.map(w => (
+            ) : watchlist.map(w => {
+              // Inline delete confirmation row
+              if (pendingDelete === w.id) return (
+                <div key={w.id} className="rounded-xl border border-red-200 dark:border-red-800 bg-red-50 dark:bg-red-900/15 px-2 py-2">
+                  <p className="text-[9px] font-semibold text-red-600 dark:text-red-400 mb-1.5 text-center">
+                    Remove <span translate="no">{w.symbol}</span> from watchlist?
+                  </p>
+                  <div className="flex gap-1">
+                    <button
+                      className="flex-1 py-1 text-[9px] font-bold bg-red-600 text-white rounded-lg hover:bg-red-700 transition-colors"
+                      onClick={async () => {
+                        try {
+                          await removeFromWatchlist(w.id)
+                          setWatchlist(prev => prev.filter(x => x.id !== w.id))
+                          setWatchErr(null)
+                        } catch {
+                          setWatchErr('Failed to remove — please try again')
+                        } finally {
+                          setPendingDelete(null)
+                        }
+                      }}
+                    >
+                      Remove
+                    </button>
+                    <button
+                      className="flex-1 py-1 text-[9px] font-semibold border border-gray-200 dark:border-gray-700 rounded-lg text-gray-500 hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors"
+                      onClick={() => setPendingDelete(null)}
+                    >
+                      Cancel
+                    </button>
+                  </div>
+                </div>
+              )
+
+              return (
               <div key={w.id}
                 onClick={() => selectSymbol(w.symbol)}
                 onContextMenu={onContextMenu([
                   { label: 'Edit', icon: '✏️', action: () => setEditWatchItem(w) },
                   { separator: true },
-                  { label: 'Delete', icon: '🗑️', danger: true, action: async () => {
-                    try {
-                      await removeFromWatchlist(w.id)
-                      setWatchlist(prev => prev.filter(x => x.id !== w.id))
-                      setWatchErr(null)
-                    } catch {
-                      setWatchErr('Failed to remove from watchlist')
-                    }
-                  }},
+                  { label: 'Delete', icon: '🗑️', danger: true, action: () => setPendingDelete(w.id) },
                 ])}
                 className={`cursor-pointer rounded-xl px-2 py-2 transition-all border ${
                   selectedSymbol === w.symbol
@@ -415,7 +442,8 @@ export default function LeftPanel() {
                 )}
                 {w.notes && <p className="text-[7px] text-gray-400 mt-0.5 truncate">{w.notes}</p>}
               </div>
-            ))}
+              ) // end return (normal row)
+            })}
           </div>
         )}
       </div>

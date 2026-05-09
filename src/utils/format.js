@@ -52,6 +52,25 @@ export const safeFloat = (v, fallback = 0) => {
 }
 
 /**
+ * Sanitize a backend API error for display in the UI.
+ * Strips internal details (SQL, stack traces, column names) and
+ * returns a clean, user-friendly string.
+ * Pass a fallback string for when extraction fails.
+ */
+export const apiError = (err, fallback = 'Something went wrong. Please try again.') => {
+  const msg = err?.response?.data?.message
+           || err?.response?.data?.error
+           || err?.message
+           || ''
+  if (!msg || typeof msg !== 'string') return fallback
+  // Block known internal leak patterns
+  const leak = /supabase|pgrst|sql|column|relation|syntax error|stack|at Object\.|\.js:\d/i
+  if (leak.test(msg)) return fallback
+  // Truncate very long messages
+  return msg.length > 200 ? msg.slice(0, 200) + '…' : msg
+}
+
+/**
  * Safe URL — returns the URL only if it uses http/https protocol.
  * Prevents javascript: and data: injection in anchor hrefs.
  */

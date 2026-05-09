@@ -53,8 +53,10 @@ export function ScreenProvider({ children }) {
       setPinnedDate(null)
       setPinnedMovers(null)
       setActivePositions(state.positions?.length > 0 ? state.positions : null)
-      // Clear the navigation state so back-navigation doesn't re-trigger
-      window.history.replaceState({}, '')
+      // Surgically remove only the symbol/positions keys we consumed — preserves
+      // any other navigation state other features might have set
+      const { symbol: _s, positions: _p, ...rest } = state
+      window.history.replaceState(Object.keys(rest).length ? rest : null, '')
     }
   }, []) // eslint-disable-line react-hooks/exhaustive-deps
 

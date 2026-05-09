@@ -8,6 +8,7 @@ import RightPanel                    from '../components/screen/RightPanel'
 import BacktestPage                  from '../components/backtest/BacktestPage'
 import InsightPage                   from '../components/complex/InsightPage'
 import BreakdownPage                 from '../components/complex/BreakdownPage'
+import ErrorBoundary                 from '../components/ErrorBoundary'
 
 const COMPLEX_TABS = [
   { id: 'Backtesting', label: 'Backtesting', short: 'BT'    },
@@ -16,9 +17,21 @@ const COMPLEX_TABS = [
 ]
 
 function ComplexContent({ activeTab }) {
-  if (activeTab === 'Backtesting') return <BacktestPage />
-  if (activeTab === 'Insight')     return <InsightPage />
-  if (activeTab === 'Breakdown')   return <BreakdownPage />
+  if (activeTab === 'Backtesting') return (
+    <ErrorBoundary label="Backtesting">
+      <BacktestPage />
+    </ErrorBoundary>
+  )
+  if (activeTab === 'Insight') return (
+    <ErrorBoundary label="Insight">
+      <InsightPage />
+    </ErrorBoundary>
+  )
+  if (activeTab === 'Breakdown') return (
+    <ErrorBoundary label="Breakdown">
+      <BreakdownPage />
+    </ErrorBoundary>
+  )
   return (
     <div className="flex-1 flex items-center justify-center text-[12px] text-gray-400">
       {activeTab} — coming soon
@@ -221,7 +234,9 @@ function ScreenInner() {
 
             {/* Chart — full width on mobile, flex-1 on desktop */}
             <div className="flex-1 min-h-0 overflow-hidden">
-              <StockChart />
+              <ErrorBoundary label="Chart">
+                <StockChart />
+              </ErrorBoundary>
             </div>
 
             {/* Right panel — tablet+ (md+) */}

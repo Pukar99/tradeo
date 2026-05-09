@@ -191,6 +191,12 @@ function calcEMA(data, period) {
   return out
 }
 
+// ── Shared indicator math helpers ────────────────────────────────────────────
+// Wilder's smoothing: used by RSI, ATR, Supertrend
+const wilderSmooth = (prev, curr, period) => (prev * (period - 1) + curr) / period
+// True Range: used by ATR, Supertrend
+const trueRange = (h, l, pc) => Math.max(h - l, Math.abs(h - pc), Math.abs(l - pc))
+
 function calcRSI(data, period = 14) {
   if (data.length < period + 1) return []
   const out = []
@@ -203,8 +209,8 @@ function calcRSI(data, period = 14) {
   for (let i = period; i < data.length; i++) {
     if (i > period) {
       const d = data[i].close - data[i - 1].close
-      ag = (ag * (period - 1) + Math.max(d, 0)) / period
-      al = (al * (period - 1) + Math.max(-d, 0)) / period
+      ag = wilderSmooth(ag, Math.max(d,  0), period)
+      al = wilderSmooth(al, Math.max(-d, 0), period)
     }
     const rs = al === 0 ? 100 : ag / al
     out.push({ time: data[i].time, value: +(100 - 100 / (1 + rs)).toFixed(2) })
@@ -261,14 +267,12 @@ function calcVWAP(data) {
 function calcATR(data, period = 14) {
   if (data.length < period + 1) return []
   const trs = []
-  for (let i = 1; i < data.length; i++) {
-    const h = data[i].high, l = data[i].low, pc = data[i - 1].close
-    trs.push(Math.max(h - l, Math.abs(h - pc), Math.abs(l - pc)))
-  }
+  for (let i = 1; i < data.length; i++)
+    trs.push(trueRange(data[i].high, data[i].low, data[i - 1].close))
   let atr = trs.slice(0, period).reduce((s, v) => s + v, 0) / period
   const out = [{ time: data[period].time, value: +atr.toFixed(2) }]
   for (let i = period; i < trs.length; i++) {
-    atr = (atr * (period - 1) + trs[i]) / period
+    atr = wilderSmooth(atr, trs[i], period)
     out.push({ time: data[i + 1].time, value: +atr.toFixed(2) })
   }
   return out
@@ -303,10 +307,8 @@ function calcStochastic(data, kPeriod = 14, dPeriod = 3) {
 // ── Supertrend (10, 3) ──────────────────────────────────────────────────────
 function calcSupertrend(data, period = 10, mult = 3) {
   const atrVals = []
-  for (let i = 1; i < data.length; i++) {
-    const h = data[i].high, l = data[i].low, pc = data[i - 1].close
-    atrVals.push(Math.max(h - l, Math.abs(h - pc), Math.abs(l - pc)))
-  }
+  for (let i = 1; i < data.length; i++)
+    atrVals.push(trueRange(data[i].high, data[i].low, data[i - 1].close))
   if (atrVals.length < period) return { up: [], down: [] }
 
   const result = []
@@ -319,7 +321,7 @@ function calcSupertrend(data, period = 10, mult = 3) {
   result.push({ time: data[period].time, value: +supertrend.toFixed(2), isUp })
 
   for (let i = period + 1; i < data.length; i++) {
-    atr = (atr * (period - 1) + atrVals[i - 1]) / period
+    atr = wilderSmooth(atr, atrVals[i - 1], period)
     const hl2 = (data[i].high + data[i].low) / 2
     let newUpper = hl2 + mult * atr
     let newLower = hl2 - mult * atr
@@ -910,12 +912,41 @@ export default function StockChart() {
   const pendingHover   = useRef(null)
   const pinnedDateRef  = useRef(pinnedDate)
 
-  // Drawing tools
-  const canvasRef      = useRef(null)
-  const priceSeriesRef = useRef(null)  // set after chart build — needed for coordinate conversion
-  const drawingsRef    = useRef([])
-  const drawPreviewRef = useRef(null)
-  const rafRef         = useRef(null)
+  // Drawing tools — persisted to localStorage keyed by symbol:timeframe
+  const drawKey = isIndex?.()
+    ? `chart_drawings:idx:${selectedIndexId}:${timeframe}`
+    : `chart_drawings:${selectedSymbol}:${timeframe}`
+
+  // Save drawings to localStorage (called after every add/clear)
+  const saveDrawings = useCallback((drawings) => {
+    try {
+      if (drawings.length === 0) {
+        localStorage.removeItem(drawKey)
+      } else {
+        localStorage.setItem(drawKey, JSON.stringify(drawings))
+      }
+    } catch { /* storage full or private mode */ }
+  }, [drawKey])
+
+  // Load saved drawings when symbol/timeframe changes
+  useEffect(() => {
+    try {
+      const saved = localStorage.getItem(drawKey)
+      drawingsRef.current = saved ? JSON.parse(saved) : []
+    } catch {
+      drawingsRef.current = []
+    }
+    setDrawVersion(v => v + 1) // repaint canvas with restored drawings
+  }, [drawKey]) // eslint-disable-line react-hooks/exhaustive-deps
+
+  const canvasRef       = useRef(null)
+  const priceSeriesRef  = useRef(null)  // set after chart build — needed for coordinate conversion
+  const drawingsRef     = useRef([])
+  const drawPreviewRef  = useRef(null)
+  const rafRef          = useRef(null)
+  // Always-fresh ref so drawing handlers (inside effects) can call saveDrawings without stale closure
+  const saveDrawingsRef = useRef(saveDrawings)
+  useEffect(() => { saveDrawingsRef.current = saveDrawings }, [saveDrawings])
 
   const [chartData,      setChartData]      = useState([])
   const [loading,        setLoading]        = useState(true)
@@ -1045,7 +1076,7 @@ export default function StockChart() {
         _smcCache.set(smcKey, { data: r.data, ts: Date.now() })
         setSmcData(r.data)
       })
-      .catch(e => { console.error('[SMC] fetch failed', e); setSmcData(null) })
+      .catch(() => { setSmcData(null) })
   }, [smcEnabled, selectedSymbol, timeframe]) // eslint-disable-line react-hooks/exhaustive-deps
 
   // Build / rebuild charts
@@ -1602,10 +1633,12 @@ export default function StockChart() {
       if (tool === 'horizontal') {
         if (pt.price == null) return
         drawingsRef.current.push({ type: 'horizontal', time: pt.time, price: pt.price, color: nextColor() })
+        saveDrawingsRef.current(drawingsRef.current)
         setDrawVersion(v => v + 1)
       } else if (tool === 'vertical') {
         if (pt.time == null) return
         drawingsRef.current.push({ type: 'vertical', time: pt.time, price: pt.price, color: nextColor() })
+        saveDrawingsRef.current(drawingsRef.current)
         setDrawVersion(v => v + 1)
       } else if (tool === 'trendline' || tool === 'ray' || tool === 'fib') {
         drawPreviewRef.current = { tool, start: pt, end: pt, color: nextColor() }
@@ -1657,6 +1690,7 @@ export default function StockChart() {
             t1: preview.start.time, p1: preview.start.price,
             t2: pt.time,            p2: pt.price,
           })
+          saveDrawingsRef.current(drawingsRef.current)
           setDrawVersion(v => v + 1)
         }
         drawPreviewRef.current = null
@@ -1669,6 +1703,7 @@ export default function StockChart() {
       const preview = drawPreviewRef.current
       if (tool === 'path' && preview?.points?.length >= 2) {
         drawingsRef.current.push({ type: 'path', color: preview.color, points: preview.points })
+        saveDrawingsRef.current(drawingsRef.current)
         setDrawVersion(v => v + 1)
         drawPreviewRef.current = null
         scheduleRepaint()
@@ -1752,6 +1787,7 @@ export default function StockChart() {
           onClearDrawings={() => {
             drawingsRef.current = []
             drawPreviewRef.current = null
+            saveDrawingsRef.current([]) // remove from localStorage
             setActiveTool(null)
             setDrawVersion(v => v + 1)
           }}

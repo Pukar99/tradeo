@@ -2,6 +2,7 @@ import { useState, useCallback, useRef, useEffect, useMemo } from 'react'
 import { createChart, CrosshairMode } from 'lightweight-charts'
 import { useTheme } from '../../context/ThemeContext'
 import { getMonthlyReturns, getMonthDetail, getSectorMonth, getSectorMonthStocks } from '../../api/index'
+import { apiError } from '../../utils/format'
 
 // ─── Constants ────────────────────────────────────────────────────────────────
 const MONTHS_EN   = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec']
@@ -586,8 +587,7 @@ function DetailPanel({ cell, onClose, onNavigate, dark, allYears, indexId }) {
       })
       .catch(err => {
         if (ctrl.signal.aborted) return
-        const msg = err.response?.data?.message || err.response?.data?.error || 'Failed to load data'
-        setDataError(msg)
+        setDataError(apiError(err, 'Failed to load data'))
       })
       .finally(() => { if (!ctrl.signal.aborted) setLoading(false) })
     return () => ctrl.abort()
@@ -887,7 +887,7 @@ export default function InsightPage() {
         setSelected({ year: yr, month: mo, value: val })
       }
     } catch (err) {
-      setError(err.response?.data?.message || err.response?.data?.error || 'Failed to load data.')
+      setError(apiError(err, 'Failed to load data. Please try again.'))
     } finally {
       setLoading(false)
     }
@@ -952,7 +952,8 @@ export default function InsightPage() {
 
       {/* ── Left Panel — desktop only ─────────────────────────────────────── */}
       <div className="hidden md:flex w-[240px] min-w-[220px] border-r border-gray-100 dark:border-gray-800
-        bg-white dark:bg-gray-900 flex-col shrink-0 overflow-hidden">
+        bg-white dark:bg-gray-900 flex-col shrink-0 overflow-hidden relative">
+        {/* First-load spinner */}
         {loading && !data ? (
           <div className="flex-1 flex items-center justify-center">
             <div className="w-5 h-5 border-2 border-blue-500 border-t-transparent rounded-full animate-spin" />
@@ -966,6 +967,17 @@ export default function InsightPage() {
             </div>
           </div>
         ) : (
+          <>
+          {/* Subtle re-fetch overlay — shows old data beneath, signals update in progress */}
+          {loading && data && (
+            <div className="absolute inset-0 z-10 flex items-start justify-center pt-6 pointer-events-none">
+              <div className="flex items-center gap-1.5 bg-white/80 dark:bg-gray-900/80 backdrop-blur-sm
+                              px-2.5 py-1 rounded-full border border-gray-200 dark:border-gray-700 shadow-sm">
+                <div className="w-3 h-3 border-[1.5px] border-blue-500 border-t-transparent rounded-full animate-spin" />
+                <span className="text-[9px] text-gray-500 dark:text-gray-400 font-medium">Updating…</span>
+              </div>
+            </div>
+          )}
           <LeftInsightPanel
             data={data}
             years={years}
@@ -982,6 +994,7 @@ export default function InsightPage() {
             selectedIndexId={selectedIndexId}
             setSelectedIndexId={(id) => { setSelectedIndexId(id) }}
           />
+          </> // end fragment (stale-data + overlay case)
         )}
       </div>
 

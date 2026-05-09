@@ -1,6 +1,7 @@
-import { useState, useEffect, useRef, useCallback, useMemo } from 'react'
+import { useState, useEffect, useRef, useCallback, useMemo, memo } from 'react'
 import { useTheme } from '../../context/ThemeContext'
 import { BASE_URL } from '../../api'
+import { apiError } from '../../utils/format'
 
 const getToken = () => localStorage.getItem('token')
 const API = `${BASE_URL}/api`
@@ -873,6 +874,26 @@ function SectorIndexChart({ sector, cycle, dark }) {
   )
 }
 
+// Memoized index selector — avoids re-evaluating 28 buttons on every state change
+const IndexSelector = memo(function IndexSelector({ options, activeId, onSelect }) {
+  return (
+    <div className="flex items-center gap-1 flex-wrap">
+      {options.map(opt => (
+        <button key={opt.id}
+          onClick={() => onSelect(opt.id)}
+          className={`px-2 py-0.5 rounded text-[9px] font-semibold transition-colors ${
+            opt.id === activeId
+              ? 'bg-gray-900 dark:bg-white text-white dark:text-gray-900'
+              : 'text-gray-500 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-gray-800'
+          }`}
+        >
+          {opt.short}
+        </button>
+      ))}
+    </div>
+  )
+})
+
 // ─────────────────────────────────────────────────────────────────────────────
 // MAIN PAGE
 // ─────────────────────────────────────────────────────────────────────────────
@@ -943,7 +964,7 @@ export default function BreakdownPage() {
       setSectorLoading({})
       setView('overview')
     } catch (e) {
-      setDetectError(e.message || 'Failed to detect cycles')
+      setDetectError(apiError(e, 'Failed to detect cycles'))
     }
     setDetecting(false)
   }, [])
@@ -975,7 +996,7 @@ export default function BreakdownPage() {
       if (!resp.ok) throw new Error(data.error || `HTTP ${resp.status}`)
       setAnalysis(data)
     } catch (e) {
-      setAnalyzeError(e.message || 'Failed to run analysis')
+      setAnalyzeError(apiError(e, 'Failed to run analysis'))
     }
     setAnalyzing(false)
   }, [])
@@ -1050,7 +1071,7 @@ export default function BreakdownPage() {
       if (!resp.ok) throw new Error(data.error || `HTTP ${resp.status}`)
       if (!ctrl.signal.aborted) setStockCandles(data.candles || [])
     } catch (e) {
-      if (!ctrl.signal.aborted) { setStockError(e.message || 'Failed to load stock chart'); setStockCandles([]) }
+      if (!ctrl.signal.aborted) { setStockError(apiError(e, 'Failed to load stock chart')); setStockCandles([]) }
     }
     if (!ctrl.signal.aborted) setStockLoading(false)
   }, [activeCycle])
@@ -1119,25 +1140,16 @@ export default function BreakdownPage() {
       {/* ── TOPBAR ── */}
       <div className="shrink-0 flex items-center gap-2 px-3 py-2 border-b border-gray-100 dark:border-gray-800 flex-wrap">
 
-        {/* Index selector */}
-        <div className="flex items-center gap-1 flex-wrap">
-          {INDEX_OPTIONS.map(opt => (
-            <button key={opt.id}
-              onClick={() => {
-                if (opt.id === indexId) return
-                setIndexId(opt.id)
-                detectCycles(threshold, opt.id)
-              }}
-              className={`px-2 py-0.5 rounded text-[9px] font-semibold transition-colors ${
-                indexId === opt.id
-                  ? 'bg-gray-900 dark:bg-white text-white dark:text-gray-900'
-                  : 'text-gray-500 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-gray-800'
-              }`}
-            >
-              {opt.short}
-            </button>
-          ))}
-        </div>
+        {/* Index selector — memoized to avoid re-rendering all 28 buttons */}
+        <IndexSelector
+          options={INDEX_OPTIONS}
+          activeId={indexId}
+          onSelect={useCallback(id => {
+            if (id === indexId) return
+            setIndexId(id)
+            detectCycles(threshold, id)
+          }, [indexId, threshold, detectCycles])}
+        />
 
         <div className="w-px h-4 bg-gray-200 dark:bg-gray-700 shrink-0" />
 

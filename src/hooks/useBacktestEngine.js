@@ -65,8 +65,10 @@ export function useBacktestEngine({
       const tp      = pos.tp ? parseFloat(pos.tp) : null
       const settled = pos.settled || pos.settlement_date?.slice(0, 10) <= candle.date
 
-      // ── SL check ─────────────────────────────────────────────────────────────
-      if (sl !== null && candle.low <= sl) {
+      // ── SL check — strict < so touching SL price exactly doesn't trigger ──────
+      // SL takes priority over TP: if both levels are hit on the same candle,
+      // SL is processed first and the position is closed — TP check is skipped.
+      if (sl !== null && candle.low < sl) {
         if (!settled) {
           // Pre-settlement SL breach — prompt user
           pauseInternal()
