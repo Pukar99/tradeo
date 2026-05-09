@@ -2,6 +2,7 @@ import { useState, useEffect, useRef, useCallback, useMemo, memo } from 'react'
 import { useTheme } from '../../context/ThemeContext'
 import { BASE_URL } from '../../api'
 import { apiError } from '../../utils/format'
+import { INDEX_OPTIONS, MONTHS, SECTOR_IDS } from '../../utils/constants'
 
 const getToken = () => localStorage.getItem('token')
 const API = `${BASE_URL}/api`
@@ -12,12 +13,6 @@ const buildUrl = (path, params) => {
   Object.entries(params).forEach(([k, v]) => { if (v != null) url.searchParams.set(k, v) })
   return url.toString()
 }
-
-// ─────────────────────────────────────────────────────────────────────────────
-// CONSTANTS
-// ─────────────────────────────────────────────────────────────────────────────
-// Shared: single source of truth for index_id ↔ label mapping
-import { INDEX_OPTIONS, MONTHS, SECTOR_IDS } from '../../utils/constants'
 
 // ─────────────────────────────────────────────────────────────────────────────
 // COLOUR HELPERS

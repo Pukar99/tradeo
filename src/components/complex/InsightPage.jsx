@@ -3,15 +3,11 @@ import { createChart, CrosshairMode } from 'lightweight-charts'
 import { useTheme } from '../../context/ThemeContext'
 import { getMonthlyReturns, getMonthDetail, getSectorMonth, getSectorMonthStocks } from '../../api/index'
 import { apiError } from '../../utils/format'
+import { INDEX_OPTIONS, RECENT_N, MONTHS as MONTHS_EN } from '../../utils/constants'
 
 // ─── Constants ────────────────────────────────────────────────────────────────
-const MONTHS_EN   = MONTHS_EN_SHARED  // ['Jan'..'Dec'] from shared constants
 const MONTHS_FULL = ['January','February','March','April','May','June','July','August','September','October','November','December']
 const MONTHS_NP   = ['Pou','Mag','Fal','Cha','Bai','Jes','Ash','Shr','Bha','Asw','Kar','Man']
-const RECENT_N    = _RECENT_N         // 5 — from shared constants
-
-// Shared: index_id ↔ label/sector_index mapping — single source of truth
-import { INDEX_OPTIONS, RECENT_N as _RECENT_N, MONTHS as MONTHS_EN_SHARED } from '../../utils/constants'
 
 // ─── Colour helpers ───────────────────────────────────────────────────────────
 function cellBg(val, dark) {
