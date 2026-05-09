@@ -124,8 +124,11 @@ export function useBacktestEngine({
               reason:     'SL_HIT',
             })
             closePositionLocal(pos.id, res.data)
-          } catch {}
-            continue
+            continue // position closed — skip TP check for this pos
+          } catch (err) {
+            console.error('[Engine] AUTO SL exit failed for', pos.id, err?.message)
+            // don't continue — fall through so TP check is also skipped (SL already hit)
+          }
         }
 
         if (sess.sl_mode === 'MANUAL') {

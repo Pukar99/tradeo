@@ -3,6 +3,15 @@ import { useTheme } from '../../context/ThemeContext'
 import { useScreen } from '../../context/ScreenContext'
 import { getIndexChart, getStockChart, getTopMovers, getMarketSymbols, getSMCScan, triggerBackfill } from '../../api'
 
+// ── Module-level caches (survive re-renders, shared across StockChart instances) ─
+const _chartCache   = new Map()  // `sym:tf` or `idx:id:tf` → { data, latest, ts }
+const _smcCache     = new Map()  // `sym:days` → { data, ts }
+let   _symbolsData  = null       // getMarketSymbols result
+let   _symbolsTs    = 0
+const CHART_TTL     = 5  * 60_000  // 5 min — NEPSE data is daily, 5 min is fresh enough
+const SMC_TTL       = 10 * 60_000  // 10 min
+const SYMBOLS_TTL   = 60 * 60_000  // 1 hour — symbol list rarely changes
+
 // ── Drawing Tools ─────────────────────────────────────────────────────────────
 
 const DRAW_TOOLS = [
@@ -345,8 +354,17 @@ function ChartSymbolSearch() {
   const mouseDownInList = useRef(false)
 
   useEffect(() => {
+    // Serve from module-level cache — avoids re-fetching on every component mount
+    if (_symbolsData && Date.now() - _symbolsTs < SYMBOLS_TTL) {
+      setSymbols(_symbolsData); return
+    }
     getMarketSymbols()
-      .then(r => { if (r.data?.stocks?.length) { setSymbols(r.data); setLoadErr(null) } })
+      .then(r => {
+        if (r.data?.stocks?.length) {
+          _symbolsData = r.data; _symbolsTs = Date.now()
+          setSymbols(r.data); setLoadErr(null)
+        }
+      })
       .catch(() => setLoadErr('Symbols unavailable'))
   }, [])
 
@@ -377,9 +395,9 @@ function ChartSymbolSearch() {
   }, [cursor])
 
   return (
-    <div className="relative w-full max-w-[220px]">
+    <div className="relative w-[88px] sm:w-full sm:max-w-[200px] shrink-0">
       <div
-        className="flex items-center gap-1.5 bg-gray-50 dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg px-2 py-1 cursor-pointer"
+        className="flex items-center gap-1 bg-gray-50 dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg px-1.5 py-1 cursor-pointer"
         onClick={() => { setOpen(true); setTimeout(() => inputRef.current?.focus(), 40) }}
       >
         <svg className="w-3 h-3 text-gray-400 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor">
@@ -395,12 +413,12 @@ function ChartSymbolSearch() {
           onKeyDown={handleKey}
           placeholder={selectedSymbol}
           autoComplete="off"
-          className="bg-transparent text-[11px] font-semibold text-gray-700 dark:text-gray-200 placeholder-gray-500 dark:placeholder-gray-400 outline-none w-full"
+          className="bg-transparent text-[10px] font-bold text-gray-700 dark:text-gray-200 placeholder-gray-600 dark:placeholder-gray-300 outline-none w-full min-w-0"
         />
       </div>
 
       {open && filtered.length > 0 && (
-        <div className="absolute top-full mt-1 left-0 right-0 z-50 bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-700 rounded-xl shadow-xl max-h-60 overflow-y-auto">
+        <div className="absolute top-full mt-1 left-0 z-50 min-w-[220px] bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-700 rounded-xl shadow-xl max-h-60 overflow-y-auto">
           <ul ref={listRef}>
             {filtered.map((item, i) => (
               <li key={item.label}
@@ -422,7 +440,7 @@ function ChartSymbolSearch() {
       )}
 
       {open && filtered.length === 0 && query.length > 0 && (
-        <div className="absolute top-full mt-1 left-0 right-0 z-50 bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-700 rounded-xl shadow-lg px-3 py-2 text-[10px] text-gray-400">
+        <div className="absolute top-full mt-1 left-0 z-50 min-w-[200px] bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-700 rounded-xl shadow-lg px-3 py-2 text-[10px] text-gray-400">
           {loadErr || `No results for "${query}"`}
         </div>
       )}
@@ -435,88 +453,154 @@ function ChartSymbolSearch() {
 const TIMEFRAMES = ['1W', '1M', '3M', '6M', '1Y', '3Y', 'ALL']
 const INDICATORS = ['MA', 'EMA', 'BB', 'VWAP', 'RSI', 'MACD', 'ATR', 'STOCH', 'ST']
 
-function ChartHUDControls({ activeTool, setActiveTool, onClearDrawings, drawCount }) {
-  const { chartType, setChartType, timeframe, setTimeframe, activeIndicators: _ai, toggleIndicator, smcEnabled, setSmcEnabled } = useScreen() || {}
+// ── Indicator + Drawing Tools dropdown (desktop & mobile) ──────────────────────
+function ChartIndicatorDropdown({ activeTool, setActiveTool, onClearDrawings, drawCount }) {
+  const { activeIndicators: _ai, toggleIndicator, smcEnabled, setSmcEnabled } = useScreen() || {}
   const activeIndicators = Array.isArray(_ai) ? _ai : []
+  const [open, setOpen] = useState(false)
+  const wrapRef = useRef(null)
+
+  // Close on outside click
+  useEffect(() => {
+    if (!open) return
+    const fn = (e) => { if (wrapRef.current && !wrapRef.current.contains(e.target)) setOpen(false) }
+    document.addEventListener('mousedown', fn)
+    return () => document.removeEventListener('mousedown', fn)
+  }, [open])
+
+  const totalActive = activeIndicators.length + (smcEnabled ? 1 : 0) + (activeTool ? 1 : 0)
 
   return (
-    <div className="flex items-center gap-1.5 flex-wrap min-w-0">
+    <div ref={wrapRef} className="relative shrink-0">
+
+      {/* Trigger */}
+      <button
+        onClick={() => setOpen(p => !p)}
+        className={`flex items-center gap-1 px-2 py-1 rounded-lg text-[9px] font-semibold border transition-all ${
+          open || totalActive > 0
+            ? 'bg-blue-500 border-blue-500 text-white shadow-sm'
+            : 'bg-gray-50 dark:bg-gray-800 border-gray-200 dark:border-gray-700 text-gray-500 dark:text-gray-400 hover:border-blue-300 dark:hover:border-blue-600 hover:text-blue-500'
+        }`}
+      >
+        {/* Sliders icon */}
+        <svg className="w-3 h-3" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth={1.8} strokeLinecap="round">
+          <line x1="2" y1="4" x2="14" y2="4" />
+          <line x1="2" y1="8" x2="14" y2="8" />
+          <line x1="2" y1="12" x2="14" y2="12" />
+          <circle cx="6" cy="4" r="1.5" fill="currentColor" stroke="none" />
+          <circle cx="10" cy="8" r="1.5" fill="currentColor" stroke="none" />
+          <circle cx="5" cy="12" r="1.5" fill="currentColor" stroke="none" />
+        </svg>
+        {totalActive > 0 && (
+          <span className="min-w-[14px] h-[14px] flex items-center justify-center rounded-full bg-white/25 text-[8px] font-bold leading-none px-0.5">
+            {totalActive}
+          </span>
+        )}
+      </button>
+
+      {/* Dropdown panel */}
+      {open && (
+        <div className="absolute top-full right-0 mt-1.5 z-50 w-[270px]
+                        bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-700
+                        rounded-2xl shadow-2xl overflow-hidden">
+
+          {/* Indicators section */}
+          <div className="px-3 pt-3 pb-2.5">
+            <p className="text-[8px] font-bold text-gray-400 dark:text-gray-500 uppercase tracking-widest mb-2">
+              Indicators
+            </p>
+            <div className="flex flex-wrap gap-1">
+              {INDICATORS.map(ind => {
+                const on = activeIndicators.includes(ind)
+                return (
+                  <button key={ind} onClick={() => toggleIndicator(ind)}
+                    className={`px-2 py-0.5 rounded-md text-[9px] font-semibold border transition-all ${
+                      on
+                        ? 'bg-blue-500 border-blue-500 text-white shadow-sm'
+                        : 'border-gray-200 dark:border-gray-700 text-gray-500 dark:text-gray-400 hover:border-blue-300 hover:text-blue-500 dark:hover:border-blue-600 dark:hover:text-blue-400'
+                    }`}>
+                    {ind}
+                  </button>
+                )
+              })}
+              {/* SMC — purple accent */}
+              <button onClick={() => setSmcEnabled(p => !p)}
+                className={`px-2 py-0.5 rounded-md text-[9px] font-semibold border transition-all ${
+                  smcEnabled
+                    ? 'bg-purple-500 border-purple-500 text-white shadow-sm'
+                    : 'border-gray-200 dark:border-gray-700 text-gray-500 dark:text-gray-400 hover:border-purple-400 hover:text-purple-500'
+                }`}>
+                SMC
+              </button>
+            </div>
+          </div>
+
+          {/* Divider */}
+          <div className="h-px bg-gray-100 dark:bg-gray-800 mx-3" />
+
+          {/* Drawing tools section */}
+          <div className="px-3 pt-2.5 pb-3">
+            <p className="text-[8px] font-bold text-gray-400 dark:text-gray-500 uppercase tracking-widest mb-2">
+              Drawing Tools
+            </p>
+            <div className="flex flex-wrap gap-1">
+              {DRAW_TOOLS.map(t => (
+                <button key={t.id} title={t.title}
+                  onClick={() => setActiveTool(p => p === t.id ? null : t.id)}
+                  className={`px-2 py-0.5 rounded-md text-[9px] font-semibold border transition-all ${
+                    activeTool === t.id
+                      ? 'bg-amber-500 border-amber-500 text-white shadow-sm'
+                      : 'border-gray-200 dark:border-gray-700 text-gray-500 dark:text-gray-400 hover:border-amber-400 hover:text-amber-500'
+                  }`}>
+                  {t.label}
+                </button>
+              ))}
+              {drawCount > 0 && (
+                <button onClick={() => { onClearDrawings(); setOpen(false) }}
+                  className="px-2 py-0.5 rounded-md text-[9px] font-semibold border border-red-200 dark:border-red-900 text-red-400 hover:bg-red-50 dark:hover:bg-red-950/40 transition-all">
+                  ✕ Clear {drawCount}
+                </button>
+              )}
+            </div>
+          </div>
+        </div>
+      )}
+    </div>
+  )
+}
+
+// Essential controls: chart type + timeframes only
+function ChartHUDControls() {
+  const { chartType, setChartType, timeframe, setTimeframe } = useScreen() || {}
+
+  return (
+    <div className="flex items-center gap-1 min-w-0" style={{ whiteSpace: 'nowrap' }}>
       {/* Chart type */}
-      <div className="flex items-center bg-gray-100 dark:bg-gray-800 rounded-md p-0.5">
-        {[['candlestick','Candle'], ['line','Line']].map(([type, label]) => (
-          <button key={type} onClick={() => setChartType(type)}
-            className={`px-2 py-0.5 rounded text-[9px] font-semibold transition-colors ${
+      <div className="flex items-center bg-gray-100 dark:bg-gray-800 rounded-md p-0.5 shrink-0">
+        {[['candlestick', '🕯'], ['line', '📈']].map(([type, icon]) => (
+          <button key={type} onClick={() => setChartType(type)} title={type}
+            className={`px-1.5 py-0.5 rounded text-[10px] transition-colors ${
               chartType === type
-                ? 'bg-white dark:bg-gray-700 text-gray-900 dark:text-white shadow-sm'
-                : 'text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-300'
+                ? 'bg-white dark:bg-gray-700 shadow-sm'
+                : 'text-gray-400 dark:text-gray-500 hover:text-gray-700 dark:hover:text-gray-300'
             }`}>
-            {label}
+            {icon}
           </button>
         ))}
       </div>
 
       {/* Timeframes */}
-      <div className="flex items-center bg-gray-100 dark:bg-gray-800 rounded-md p-0.5">
+      <div className="flex items-center bg-gray-100 dark:bg-gray-800 rounded-md p-0.5 shrink-0">
         {TIMEFRAMES.map(tf => (
           <button key={tf} onClick={() => setTimeframe(tf)}
-            className={`px-1.5 py-0.5 rounded text-[9px] font-semibold transition-colors ${
+            className={`px-1.5 py-0.5 rounded text-[9px] font-bold transition-colors ${
               timeframe === tf
                 ? 'bg-white dark:bg-gray-700 text-gray-900 dark:text-white shadow-sm'
-                : 'text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-300'
+                : 'text-gray-400 dark:text-gray-500 hover:text-gray-700 dark:hover:text-gray-300'
             }`}>
             {tf}
           </button>
         ))}
-      </div>
-
-      {/* Indicators + SMC */}
-      <div className="flex items-center gap-0.5">
-        {INDICATORS.map(ind => (
-          <button key={ind} onClick={() => toggleIndicator(ind)}
-            className={`px-1.5 py-0.5 rounded text-[9px] font-semibold border transition-colors ${
-              activeIndicators.includes(ind)
-                ? 'bg-blue-500 border-blue-500 text-white'
-                : 'border-gray-200 dark:border-gray-700 text-gray-500 dark:text-gray-400 hover:border-blue-300 hover:text-blue-500'
-            }`}>
-            {ind}
-          </button>
-        ))}
-        <button onClick={() => setSmcEnabled(p => !p)}
-          className={`px-1.5 py-0.5 rounded text-[9px] font-semibold border transition-colors ml-1 ${
-            smcEnabled
-              ? 'bg-purple-500 border-purple-500 text-white'
-              : 'border-gray-200 dark:border-gray-700 text-gray-500 dark:text-gray-400 hover:border-purple-300 hover:text-purple-500'
-          }`}>
-          SMC
-        </button>
-      </div>
-
-      {/* Divider */}
-      <div className="w-px h-4 bg-gray-200 dark:bg-gray-700 shrink-0" />
-
-      {/* Drawing tools — inline after SMC */}
-      <div className="flex items-center gap-0.5">
-        {DRAW_TOOLS.map(t => (
-          <button key={t.id}
-            title={t.title}
-            onClick={() => setActiveTool(p => p === t.id ? null : t.id)}
-            className={`px-1.5 py-0.5 rounded text-[9px] font-semibold border transition-colors ${
-              activeTool === t.id
-                ? 'bg-amber-500 border-amber-500 text-white'
-                : 'border-gray-200 dark:border-gray-700 text-gray-500 dark:text-gray-400 hover:border-amber-400 hover:text-amber-500'
-            }`}>
-            {t.label}
-          </button>
-        ))}
-        {drawCount > 0 && (
-          <button
-            title="Clear all drawings"
-            onClick={onClearDrawings}
-            className="px-1.5 py-0.5 rounded text-[9px] font-semibold border border-red-300 dark:border-red-800 text-red-400 hover:bg-red-50 dark:hover:bg-red-950 transition-colors ml-0.5"
-          >
-            ✕{drawCount}
-          </button>
-        )}
       </div>
     </div>
   )
@@ -869,9 +953,24 @@ export default function StockChart() {
     } catch { return null }
   }, [])
 
-  // Fetch chart data
+  // Fetch chart data — with client-side cache to avoid redundant server hits
   useEffect(() => {
-    setLoading(true); setError(null); setTooltip(null); setOverlayData(null)
+    setError(null); setTooltip(null); setOverlayData(null)
+
+    const cacheKey = isIndex()
+      ? `idx:${selectedIndexId}:${timeframe}`
+      : `${selectedSymbol}:${timeframe}`
+
+    // Serve from cache immediately if fresh — eliminates loading flash on timeframe/symbol switching
+    const cached = _chartCache.get(cacheKey)
+    if (cached && Date.now() - cached.ts < CHART_TTL) {
+      setChartData(cached.data)
+      setLatestClose(cached.latest)
+      setLoading(false)
+      return
+    }
+
+    setLoading(true)
 
     const req = isIndex()
       ? getIndexChart({ index_id: selectedIndexId, timeframe })
@@ -879,8 +978,10 @@ export default function StockChart() {
 
     req.then(async r => {
       const data = r.data.data || []
+      const latest = data.length > 0 ? data[data.length - 1].close : null
+      _chartCache.set(cacheKey, { data, latest, ts: Date.now() })
       setChartData(data)
-      setLatestClose(data.length > 0 ? data[data.length - 1].close : null)
+      setLatestClose(latest)
       setLoading(false)
 
       // Gap detection: if latest candle is older than expected, trigger backfill
@@ -889,11 +990,9 @@ export default function StockChart() {
         const nowNPT = new Date(Date.now() + (5 * 60 + 45) * 60 * 1000)
         const hNPT = nowNPT.getUTCHours()
         const mNPT = nowNPT.getUTCMinutes()
-        // Market data available after 3:10 PM NPT
         const afterClose = hNPT > 15 || (hNPT === 15 && mNPT >= 10)
-        if (!afterClose) return // market still open — no gap expected
+        if (!afterClose) return
 
-        // Find last trading day (skip weekends: Sat=6, Sun=0 from 2026-04-01)
         const expected = (() => {
           const d = new Date(nowNPT)
           for (let i = 0; i < 7; i++) {
@@ -906,19 +1005,21 @@ export default function StockChart() {
         })()
 
         if (latestCandle < expected) {
-          console.log(`[CHART] Gap detected: latest=${latestCandle}, expected=${expected} — triggering backfill`)
           try {
-            const wasIndex = isIndex() // capture before any await
+            const wasIndex = isIndex()
             const bf = await triggerBackfill(expected)
             if (bf.data?.filled) {
               const reloaded = wasIndex
                 ? await getIndexChart({ index_id: selectedIndexId, timeframe })
                 : await getStockChart({ symbol: selectedSymbol, timeframe })
               const fresh = reloaded.data.data || []
+              const freshLatest = fresh.length > 0 ? fresh[fresh.length - 1].close : null
+              // Update cache with fresh data after backfill
+              _chartCache.set(cacheKey, { data: fresh, latest: freshLatest, ts: Date.now() })
               setChartData(fresh)
-              setLatestClose(fresh.length > 0 ? fresh[fresh.length - 1].close : null)
+              setLatestClose(freshLatest)
             }
-          } catch { /* backfill is best-effort — chart still shows existing data */ }
+          } catch { /* backfill is best-effort */ }
         }
       }
     }).catch(e => {
@@ -927,13 +1028,23 @@ export default function StockChart() {
     })
   }, [selectedSymbol, selectedIndexId, timeframe]) // eslint-disable-line react-hooks/exhaustive-deps
 
-  // Fetch SMC data when enabled — use same timeframe as chart so dates align
+  // Fetch SMC data — with client-side cache; SMC is expensive to compute server-side
   useEffect(() => {
     if (!smcEnabled || isIndex()) { setSmcData(null); return }
     const tfDays = { '1W': 7, '1M': 30, '3M': 90, '6M': 180, '1Y': 365, '3Y': 1095, 'ALL': 2000 }
-    const days = tfDays[timeframe] ?? 365
+    const days   = tfDays[timeframe] ?? 365
+    const smcKey = `${selectedSymbol}:${days}`
+
+    const cached = _smcCache.get(smcKey)
+    if (cached && Date.now() - cached.ts < SMC_TTL) {
+      setSmcData(cached.data); return
+    }
+
     getSMCScan({ symbol: selectedSymbol, days })
-      .then(r => { console.log('[SMC]', r.data); setSmcData(r.data) })
+      .then(r => {
+        _smcCache.set(smcKey, { data: r.data, ts: Date.now() })
+        setSmcData(r.data)
+      })
       .catch(e => { console.error('[SMC] fetch failed', e); setSmcData(null) })
   }, [smcEnabled, selectedSymbol, timeframe]) // eslint-disable-line react-hooks/exhaustive-deps
 
@@ -1050,35 +1161,81 @@ export default function StockChart() {
 
       if (activePositions?.length) {
         activePositions.forEach((pos, idx) => {
-          const { entry_price, sl, tp, entry_date, position: dir } = pos
+          const { entry_price, sl, tp, entry_date, date: trade_date, position: dir, position_entries, partial_exits } = pos
           const entryColor = ENTRY_COLORS[idx % ENTRY_COLORS.length]
-          const entryStr   = entry_date ? entry_date.slice(0, 10) : null
-          const startIdx   = entryStr ? chartData.findIndex(d => d.time >= entryStr) : 0
-          const fromData   = startIdx >= 0 ? chartData.slice(startIdx) : chartData.slice(-Math.min(chartData.length, 60))
+          // entry_date: set by LogsPage/Portfolio "Go to Chart" mapping
+          // trade_date: raw trade_log row clicked from LeftPanel (has `date` not `entry_date`)
+          const entryStr = (entry_date || trade_date) ? (entry_date || trade_date).slice(0, 10) : null
+          // First candle at or after entry date (used for marker and scroll)
+          const entryCandle = entryStr ? chartData.find(d => d.time >= entryStr) : null
 
           const addPosLine = (price, color, lineStyle, label) => {
-            if (!price || !fromData.length) return
+            if (!price) return
             const s = main.addLineSeries({
               color, lineWidth: 1.5, lineStyle,
               priceLineVisible: false, lastValueVisible: true,
               title: activePositions.length > 1 ? `${label}${idx + 1}` : label,
               crosshairMarkerVisible: false,
             })
-            s.setData(fromData.map(d => ({ time: d.time, value: parseFloat(price) })))
+            const priceVal = parseFloat(price)
+            // Whitespace (no value) before entry date — line is invisible before the entry,
+            // regardless of how far back the chart data extends
+            s.setData(chartData.map(d =>
+              entryStr && d.time < entryStr
+                ? { time: d.time }                   // gap: no line drawn
+                : { time: d.time, value: priceVal }  // line visible from entry onwards
+            ))
           }
 
           addPosLine(entry_price, entryColor, 0, 'Entry')
           addPosLine(sl, idx === 0 ? '#f87171' : '#fca5a5', 2, 'SL')
           addPosLine(tp, idx === 0 ? '#34d399' : '#6ee7b7', 2, 'TP')
 
-          if (fromData.length) {
+          // Entry marker at the exact entry candle
+          if (entryCandle) {
             markers.push({
-              time:     fromData[0].time,
+              time:     entryCandle.time,
               position: dir === 'SHORT' ? 'aboveBar' : 'belowBar',
               color:    entryColor,
               shape:    dir === 'SHORT' ? 'arrowDown' : 'arrowUp',
               text:     activePositions.length > 1 ? `E${idx + 1}` : '',
               size:     2,
+            })
+          }
+
+          // ADD markers — one per subsequent position_entry (skip first which is the BUY)
+          if (Array.isArray(position_entries) && position_entries.length > 1) {
+            position_entries.slice(1).forEach(pe => {
+              const peDate = pe.date ? pe.date.slice(0, 10) : null
+              if (!peDate) return
+              const peCandle = chartData.find(d => d.time >= peDate)
+              if (!peCandle) return
+              markers.push({
+                time:     peCandle.time,
+                position: dir === 'SHORT' ? 'aboveBar' : 'belowBar',
+                color:    entryColor,
+                shape:    'circle',
+                text:     '+',
+                size:     1,
+              })
+            })
+          }
+
+          // SELL markers — one per partial exit
+          if (Array.isArray(partial_exits) && partial_exits.length) {
+            partial_exits.forEach(pe => {
+              const peDate = (pe.date || '').slice(0, 10)
+              if (!peDate) return
+              const peCandle = chartData.find(d => d.time >= peDate)
+              if (!peCandle) return
+              markers.push({
+                time:     peCandle.time,
+                position: dir === 'SHORT' ? 'belowBar' : 'aboveBar',
+                color:    '#f59e0b',
+                shape:    'circle',
+                text:     '−',
+                size:     1,
+              })
             })
           }
         })
@@ -1092,46 +1249,38 @@ export default function StockChart() {
         color: d.close >= d.open ? C.up + '44' : C.down + '44',
       })))
 
-      // SMC overlays — Order Blocks as bands, FVGs as zones, BOS/CHoCH/sweeps/patterns as markers
+      // SMC overlays — Order Blocks as bands, FVGs as zones, BOS/CHoCH/sweeps as markers
       if (smcData && smcEnabled) {
         const smcMarkers = []
 
-        // Order Blocks — solid colored price lines (top + bottom of the zone)
-        for (const ob of (smcData.order_blocks || [])) {
+        // Order Blocks — last 6 only, dashed zone lines (high/low of OB candle)
+        for (const ob of (smcData.order_blocks || []).slice(-6)) {
           const isBull = ob.type === 'bullish'
           const obColor = isBull ? '#34d399' : '#f87171'
-          const obTop = Math.max(ob.high, ob.open, ob.close)
-          const obBottom = Math.min(ob.low, ob.open, ob.close)
           const fromIdx = chartData.findIndex(d => d.time >= ob.date)
           if (fromIdx < 0) continue
           const slice = chartData.slice(fromIdx)
           if (!slice.length) continue
           const sTop = main.addLineSeries({
-            color: obColor, lineWidth: 1.5, lineStyle: 2,
+            color: obColor, lineWidth: 1, lineStyle: 2,
             priceLineVisible: false, crosshairMarkerVisible: false,
             title: isBull ? 'OB↑' : 'OB↓',
           })
-          sTop.setData(slice.map(d => ({ time: d.time, value: obTop })))
+          sTop.setData(slice.map(d => ({ time: d.time, value: ob.high })))
           const sBot = main.addLineSeries({
-            color: obColor + '99', lineWidth: 1, lineStyle: 2,
+            color: obColor + '66', lineWidth: 1, lineStyle: 2,
             priceLineVisible: false, crosshairMarkerVisible: false, title: '',
           })
-          sBot.setData(slice.map(d => ({ time: d.time, value: obBottom })))
-          // Entry marker at the OB candle
-          smcMarkers.push({
-            time: ob.date, position: isBull ? 'belowBar' : 'aboveBar',
-            color: obColor, shape: 'square',
-            text: isBull ? 'OB↑' : 'OB↓', size: 1,
-          })
+          sBot.setData(slice.map(d => ({ time: d.time, value: ob.low })))
         }
 
-        // FVG — dashed lines for gap top and bottom, extending 15 candles
-        for (const gap of (smcData.fvg || []).slice(-10)) {
+        // FVG — last 5, extend to end of chart so unfilled gaps stay visible
+        for (const gap of (smcData.fvg || []).slice(-5)) {
           const isBull = gap.type === 'bullish'
           const gapColor = isBull ? '#60a5fa' : '#f472b6'
           const fromIdx = chartData.findIndex(d => d.time >= gap.date)
           if (fromIdx < 0) continue
-          const gapSlice = chartData.slice(fromIdx, fromIdx + 15)
+          const gapSlice = chartData.slice(fromIdx)
           if (!gapSlice.length) continue
           const sT = main.addLineSeries({
             color: gapColor, lineWidth: 1, lineStyle: 1,
@@ -1140,50 +1289,39 @@ export default function StockChart() {
           })
           sT.setData(gapSlice.map(d => ({ time: d.time, value: gap.top })))
           const sB = main.addLineSeries({
-            color: gapColor + '88', lineWidth: 1, lineStyle: 1,
+            color: gapColor + '66', lineWidth: 1, lineStyle: 1,
             priceLineVisible: false, crosshairMarkerVisible: false, title: '',
           })
           sB.setData(gapSlice.map(d => ({ time: d.time, value: gap.bottom })))
         }
 
-        // BOS markers
+        // BOS — arrows only, no text to avoid label clutter
         for (const b of (smcData.bos || [])) {
           smcMarkers.push({
             time: b.date, position: b.type === 'bullish' ? 'belowBar' : 'aboveBar',
             color: b.type === 'bullish' ? '#34d399' : '#f87171',
             shape: b.type === 'bullish' ? 'arrowUp' : 'arrowDown',
-            text: 'BOS', size: 1,
+            size: 1,
           })
         }
 
-        // CHoCH markers
+        // CHoCH — amber circles with label (rare + important, 5 max from backend)
         for (const ch of (smcData.choch || [])) {
           smcMarkers.push({
             time: ch.date, position: ch.type === 'bullish' ? 'belowBar' : 'aboveBar',
-            color: '#f59e0b', shape: 'circle',
-            text: 'ChCh', size: 1,
+            color: '#f59e0b', shape: 'circle', text: 'CH', size: 1,
           })
         }
 
-        // Liquidity sweep markers
-        for (const sw of (smcData.sweeps || [])) {
+        // Sweeps — last 5, no text
+        for (const sw of (smcData.sweeps || []).slice(-5)) {
           smcMarkers.push({
             time: sw.date, position: sw.type === 'buy_side' ? 'belowBar' : 'aboveBar',
-            color: '#a78bfa', shape: 'square',
-            text: sw.type === 'buy_side' ? 'BSw' : 'SSw', size: 1,
+            color: '#a78bfa', shape: 'square', size: 1,
           })
         }
 
-        // Candlestick pattern markers
-        for (const p of (smcData.patterns || []).slice(-15)) {
-          const isBullish = p.type.includes('bullish') || p.type === 'hammer' || p.type === 'inside_bar'
-          const label = p.type.replaceAll('_', ' ').replace('bullish ', '').replace('bearish ', '').slice(0, 5)
-          smcMarkers.push({
-            time: p.date, position: isBullish ? 'belowBar' : 'aboveBar',
-            color: isBullish ? '#22c55e' : '#ef4444',
-            shape: 'circle', text: label, size: 0,
-          })
-        }
+        // Patterns are tracked in the badge but not rendered on chart (too many, creates noise)
 
         // Merge all markers (position + SMC) and set once
         const allMarkers = [...markers, ...smcMarkers].sort((a, b) => a.time < b.time ? -1 : 1)
@@ -1300,6 +1438,31 @@ export default function StockChart() {
       }
 
       main.timeScale().fitContent()
+
+      // If positions are loaded, scroll to show from the earliest entry date so
+      // position lines span most of the chart instead of a sliver on the right edge
+      if (activePositions?.length) {
+        const allEntryDates = []
+        activePositions.forEach(p => {
+          const ed = p.entry_date || p.date   // handle both nav paths
+          if (ed) allEntryDates.push(ed.slice(0, 10))
+          if (Array.isArray(p.position_entries)) {
+            p.position_entries.forEach(pe => { if (pe.date) allEntryDates.push(pe.date.slice(0, 10)) })
+          }
+        })
+        const earliest = allEntryDates.filter(Boolean).sort()[0]
+        if (earliest) {
+          const entryIdx = chartData.findIndex(d => d.time >= earliest)
+          if (entryIdx > 0) {
+            const viewStart = Math.max(0, entryIdx - 20)
+            // Use logical range (bar indices) — more reliable than date strings
+            main.timeScale().setVisibleLogicalRange({
+              from: viewStart,
+              to:   chartData.length + 3,
+            })
+          }
+        }
+      }
 
       // Resize both width AND height
       const ro = new ResizeObserver(() => {
@@ -1570,10 +1733,19 @@ export default function StockChart() {
     <div className="flex flex-col w-full h-full bg-white dark:bg-gray-950 overflow-hidden">
 
       {/* ── HUD top bar ── */}
-      <div className="shrink-0 z-30 flex items-center gap-2 px-3 py-1 bg-white dark:bg-gray-900 border-b border-gray-100 dark:border-gray-800 overflow-x-auto">
+      {/* ChartSymbolSearch MUST be outside the overflow-x-auto wrapper —
+          overflow-x:auto forces overflow-y:auto (CSS spec), which clips the
+          absolutely-positioned dropdown even at z-50. */}
+      <div className="shrink-0 z-30 flex items-center gap-1.5 px-2 py-1
+                      bg-white dark:bg-gray-900 border-b border-gray-100 dark:border-gray-800">
         <ChartSymbolSearch />
         <div className="w-px h-4 bg-gray-200 dark:bg-gray-700 shrink-0" />
-        <ChartHUDControls
+        {/* Candle type + timeframes — horizontally scrollable if needed */}
+        <div className="flex-1 overflow-x-auto min-w-0 scrollbar-none">
+          <ChartHUDControls />
+        </div>
+        {/* Indicator + drawing dropdown — always at far right, never inside overflow */}
+        <ChartIndicatorDropdown
           activeTool={activeTool}
           setActiveTool={setActiveTool}
           drawCount={drawingsRef.current.length}
@@ -1609,6 +1781,9 @@ export default function StockChart() {
                 <span className="text-[8px] text-gray-400">OB:{smcData.order_blocks?.length ?? 0}</span>
                 <span className="text-[8px] text-gray-400">FVG:{smcData.fvg?.length ?? 0}</span>
                 <span className="text-[8px] text-gray-400">BOS:{smcData.bos?.length ?? 0}</span>
+                {(smcData.choch?.length ?? 0) > 0 && (
+                  <span className="text-[8px] text-amber-400">CH:{smcData.choch.length}</span>
+                )}
                 <span className="text-[8px] text-gray-400">PAT:{smcData.patterns?.length ?? 0}</span>
               </div>
             </div>

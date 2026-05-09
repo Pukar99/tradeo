@@ -3,6 +3,8 @@ import { getTradeLog, getWatchlist, removeFromWatchlist, updateWatchlist, addTra
 import { useContextMenu } from '../ContextMenu'
 import { useChatRefresh, dispatchChatAction } from '../../utils/chatEvents'
 import { useScreen } from '../../context/ScreenContext'
+import { useEscapeKey } from '../../hooks/useEscapeKey'
+import { ALERT_PCT_THRESHOLD } from '../../utils/constants'
 
 // ── BUY / SELL Modal ──────────────────────────────────────────────────────────
 
@@ -11,11 +13,7 @@ function TradeModal({ side, symbol, onClose, onSaved }) {
   const [saving, setSaving] = useState(false)
   const [err, setErr]       = useState(null)
 
-  useEffect(() => {
-    const fn = (e) => { if (e.key === 'Escape') onClose() }
-    document.addEventListener('keydown', fn)
-    return () => document.removeEventListener('keydown', fn)
-  }, [onClose])
+  useEscapeKey(onClose)
 
   const isBuy = side === 'BUY'
   const set   = (k, v) => setForm(f => ({ ...f, [k]: v }))
@@ -116,11 +114,7 @@ function CloseConfirm({ position, onClose, onDone }) {
   const [saving, setSaving] = useState(false)
   const [err,    setErr]    = useState(null)
 
-  useEffect(() => {
-    const fn = (e) => { if (e.key === 'Escape') onClose() }
-    document.addEventListener('keydown', fn)
-    return () => document.removeEventListener('keydown', fn)
-  }, [onClose])
+  useEscapeKey(onClose)
 
   const handleClose = async () => {
     setSaving(true); setErr(null)
@@ -130,9 +124,10 @@ function CloseConfirm({ position, onClose, onDone }) {
       dispatchChatAction('CLOSE_TRADE')
       onDone()
       onClose()
+      // setSaving not needed on success — modal closes via onClose()
     } catch (e) {
-      setErr(e.response?.data?.error || 'Failed to close position')
-      setSaving(false)
+      setErr(e.response?.data?.message || e.response?.data?.error || 'Failed to close position')
+      setSaving(false) // only reset on error so user can retry
     }
   }
 
@@ -240,14 +235,20 @@ export default function LeftPanel() {
   const [alertPositions, setAlertPositions] = useState([])
   const [editWatchItem,  setEditWatchItem]  = useState(null)
 
-  const loadData = useCallback(() => {
-    Promise.all([getTradeLog(), getWatchlist()])
-      .then(([tradeRes, watchRes]) => {
-        setPositions((tradeRes.data || []).filter(t => t.status === 'OPEN' || t.status === 'PARTIAL'))
-        setWatchlist((watchRes.data || []).filter(w => w.category === 'active' || w.category === 'pre' || w.category === 'pre-watch'))
-      })
+  const loadTrades = useCallback(() => {
+    getTradeLog()
+      .then(r => setPositions((r.data || []).filter(t => t.status === 'OPEN' || t.status === 'PARTIAL')))
       .catch(() => {})
   }, [])
+
+  const loadWatchlist = useCallback(() => {
+    getWatchlist()
+      .then(r => setWatchlist((r.data || []).filter(w => w.category === 'active' || w.category === 'pre' || w.category === 'pre-watch')))
+      .catch(() => {})
+  }, [])
+
+  // Load both in parallel — used on mount and chat refresh
+  const loadData = useCallback(() => { loadTrades(); loadWatchlist() }, [loadTrades, loadWatchlist])
 
   useEffect(() => { loadData() }, []) // eslint-disable-line react-hooks/exhaustive-deps
   useChatRefresh(['trades', 'watchlist'], loadData)
@@ -273,11 +274,11 @@ export default function LeftPanel() {
           const found = []
           if (p.sl) {
             const slV = parseFloat(p.sl)
-            if (Math.abs((price - slV) / slV * 100) <= 2) found.push({ type: 'SL', label: 'Near SL', threshold: slV })
+            if (Math.abs((price - slV) / slV) <= ALERT_PCT_THRESHOLD) found.push({ type: 'SL', label: 'Near SL', threshold: slV })
           }
           if (p.tp) {
             const tpV = parseFloat(p.tp)
-            if (Math.abs((price - tpV) / tpV * 100) <= 2) found.push({ type: 'TP', label: 'Near TP', threshold: tpV })
+            if (Math.abs((price - tpV) / tpV) <= ALERT_PCT_THRESHOLD) found.push({ type: 'TP', label: 'Near TP', threshold: tpV })
           }
           if (found.length) acc.push({ ...p, _latestPrice: price, _alerts: found })
           return acc
@@ -315,7 +316,7 @@ export default function LeftPanel() {
               </div>
               <button onClick={() => setEditWatchItem(null)} className="w-6 h-6 flex items-center justify-center rounded-full hover:bg-gray-100 dark:hover:bg-gray-800 text-gray-400 text-[16px]">×</button>
             </div>
-            <EditWatchItemForm item={editWatchItem} onClose={() => setEditWatchItem(null)} onSaved={() => { setEditWatchItem(null); loadData() }} />
+            <EditWatchItemForm item={editWatchItem} onClose={() => setEditWatchItem(null)} onSaved={() => { setEditWatchItem(null); loadWatchlist() }} />
           </div>
         </div>
       )}
@@ -490,14 +491,14 @@ export default function LeftPanel() {
           side={tradeModal}
           symbol={selectedSymbol}
           onClose={() => setTradeModal(null)}
-          onSaved={() => loadData()}
+          onSaved={() => loadTrades()}
         />
       )}
       {closeTarget && (
         <CloseConfirm
           position={closeTarget}
           onClose={() => setCloseTarget(null)}
-          onDone={() => loadData()}
+          onDone={() => loadTrades()}
         />
       )}
 

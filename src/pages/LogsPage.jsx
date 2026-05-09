@@ -250,7 +250,8 @@ function AddTradeModal({ onClose, onSave, editTrade, openTrades = [], market = '
   const [form, setForm] = useState({
     date: new Date().toISOString().split('T')[0],
     symbol: '', position: 'LONG', quantity: '',
-    entry_price: '', sl: '', tp: '', notes: '', setup_tag: '', entry_reason: '',
+    entry_price: '', sl: '', sl_pct: '', tp: '', tp_pct: '',
+    notes: '', setup_tag: '', entry_reason: '',
     market, lots: '', pip_value: '',
   })
   const [brokerMsg,         setBrokerMsg]         = useState('')
@@ -261,13 +262,16 @@ function AddTradeModal({ onClose, onSave, editTrade, openTrades = [], market = '
   const [saving,            setSaving]             = useState(false)
   const [saveErr,           setSaveErr]            = useState(null)
   const [showBroker,        setShowBroker]         = useState(false)
+  const [mergeConfirm,      setMergeConfirm]       = useState(false)
 
   useEffect(() => {
     if (editTrade) {
       setForm({
         date: editTrade.date, symbol: editTrade.symbol, position: editTrade.position,
         quantity: editTrade.quantity, entry_price: editTrade.entry_price,
-        sl: editTrade.sl || '', tp: editTrade.tp || '', notes: editTrade.notes || '',
+        sl: editTrade.sl || '', sl_pct: editTrade.sl_pct || '',
+        tp: editTrade.tp || '', tp_pct: editTrade.tp_pct || '',
+        notes: editTrade.notes || '',
         setup_tag: editTrade.setup_tag || '', entry_reason: editTrade.entry_reason || '',
         market: editTrade.market || market, lots: editTrade.lots || '', pip_value: editTrade.pip_value || '',
       })
@@ -303,11 +307,39 @@ function AddTradeModal({ onClose, onSave, editTrade, openTrades = [], market = '
     }
   }
 
+  // Find existing OPEN/PARTIAL position for same symbol+direction
+  const existingPosition = !editTrade && form.symbol.length >= 2
+    ? openTrades.find(t =>
+        t.symbol === form.symbol &&
+        t.position === form.position &&
+        (t.status === 'OPEN' || t.status === 'PARTIAL')
+      )
+    : null
+
+  const newQty    = parseFloat(form.quantity) || 0
+  const newPrice  = parseFloat(form.entry_price) || 0
+  const existQty  = existingPosition ? (parseFloat(existingPosition.remaining_quantity ?? existingPosition.quantity) || 0) : 0
+  const existAvg  = existingPosition ? (parseFloat(existingPosition.entry_price) || 0) : 0
+  const mergedAvg = existQty + newQty > 0
+    ? (existAvg * existQty + newPrice * newQty) / (existQty + newQty)
+    : newPrice
+
   const handleSubmit = async (e) => {
     e.preventDefault()
+    // If existing position found and not yet confirmed → show merge confirm step
+    if (!editTrade && existingPosition && !mergeConfirm) {
+      setMergeConfirm(true)
+      return
+    }
     setSaving(true); setSaveErr(null)
-    try { await onSave(form); onClose() }
-    catch (err) { setSaveErr(err.response?.data?.error || 'Failed to save trade') }
+    try {
+      const payload = existingPosition && mergeConfirm
+        ? { ...form, merge_trade_id: existingPosition.id }
+        : form
+      await onSave(payload)
+      onClose()
+    }
+    catch (err) { setSaveErr(err.response?.data?.message || err.response?.data?.error || 'Failed to save trade') }
     finally { setSaving(false) }
   }
 
@@ -315,14 +347,6 @@ function AddTradeModal({ onClose, onSave, editTrade, openTrades = [], market = '
   const rrColor = rrRatio ? (rrVal >= 2 ? 'text-emerald-500' : rrVal >= 1 ? 'text-amber-500' : 'text-red-400') : ''
   const rrBg    = rrRatio ? (rrVal >= 2 ? 'bg-emerald-50 dark:bg-emerald-900/10 border-emerald-200 dark:border-emerald-800/30' : rrVal >= 1 ? 'bg-amber-50 dark:bg-amber-900/10 border-amber-200 dark:border-amber-800/30' : 'bg-red-50 dark:bg-red-900/10 border-red-200 dark:border-red-800/30') : ''
   const rrLabel = rrRatio ? (rrVal >= 2 ? 'Excellent setup' : rrVal >= 1 ? 'Acceptable setup' : 'Poor setup') : ''
-
-  const duplicates = !editTrade && form.symbol.length >= 2
-    ? openTrades.filter(t => t.symbol === form.symbol && (t.status === 'OPEN' || t.status === 'PARTIAL'))
-    : []
-  const dupTotalQty    = duplicates.reduce((s, t) => s + (parseFloat(t.remaining_quantity ?? t.quantity) || 0), 0)
-  const dupWeightedAvg = dupTotalQty > 0
-    ? duplicates.reduce((s, t) => s + (parseFloat(t.entry_price) || 0) * (parseFloat(t.remaining_quantity ?? t.quantity) || 0), 0) / dupTotalQty
-    : null
 
   return (
     <Modal onClose={onClose} wide>
@@ -448,17 +472,52 @@ function AddTradeModal({ onClose, onSave, editTrade, openTrades = [], market = '
                 onChange={e => setForm(p => ({ ...p, tp: e.target.value }))} placeholder="0.00" className={INPUT} />
             </div>
           </div>
-          {duplicates.length > 0 && (
-            <div className="flex gap-3 px-3.5 py-3 bg-amber-50 dark:bg-amber-900/10 border border-amber-200 dark:border-amber-800/40 rounded-xl">
-              <span className="text-amber-500 text-[14px] flex-shrink-0 mt-0.5">⚠</span>
+          {(form.sl || form.tp) && (
+            <div className="grid grid-cols-2 gap-3">
+              {form.sl && (
+                <div>
+                  <label className={LABEL}>SL applies to <span className="normal-case font-normal text-gray-300">optional</span></label>
+                  <input type="number" step="1" min="1" max="100" value={form.sl_pct}
+                    onChange={e => setForm(p => ({ ...p, sl_pct: e.target.value }))} placeholder="100%" className={INPUT} />
+                  <p className="text-[9px] text-gray-400 mt-1">% of position (e.g. 50 = half)</p>
+                </div>
+              )}
+              {form.tp && (
+                <div>
+                  <label className={LABEL}>TP applies to <span className="normal-case font-normal text-gray-300">optional</span></label>
+                  <input type="number" step="1" min="1" max="100" value={form.tp_pct}
+                    onChange={e => setForm(p => ({ ...p, tp_pct: e.target.value }))} placeholder="100%" className={INPUT} />
+                  <p className="text-[9px] text-gray-400 mt-1">% of position</p>
+                </div>
+              )}
+            </div>
+          )}
+          {existingPosition && !mergeConfirm && (
+            <div className="flex gap-3 px-3.5 py-3 bg-blue-50 dark:bg-blue-900/10 border border-blue-200 dark:border-blue-800/40 rounded-xl">
+              <span className="text-blue-400 text-[14px] flex-shrink-0 mt-0.5">+</span>
               <div className="min-w-0">
-                <p className="text-[11px] font-semibold text-amber-700 dark:text-amber-400">
-                  You already have {duplicates.length} open {form.symbol} position{duplicates.length > 1 ? 's' : ''}
+                <p className="text-[11px] font-semibold text-blue-700 dark:text-blue-300">
+                  Open {form.symbol} {form.position} position exists
                 </p>
-                <p className="text-[10px] text-amber-600 dark:text-amber-500 mt-0.5">
-                  {dupTotalQty} units · Avg entry {isForex ? '$' : 'Rs.'}{dupWeightedAvg?.toFixed(2) ?? '—'} · Adding a separate entry row
+                <p className="text-[10px] text-blue-600 dark:text-blue-400 mt-0.5">
+                  {existQty} units @ avg {isForex ? '$' : 'Rs.'}{existAvg.toFixed(2)} · Submitting will merge into this position
                 </p>
               </div>
+            </div>
+          )}
+          {mergeConfirm && existingPosition && (
+            <div className="px-4 py-3.5 bg-blue-50 dark:bg-blue-900/15 border border-blue-200 dark:border-blue-700/50 rounded-xl space-y-2">
+              <p className="text-[11px] font-bold text-blue-700 dark:text-blue-300">Confirm: Add to position?</p>
+              <p className="text-[11px] text-gray-700 dark:text-gray-300">
+                You have <span className="font-semibold">{existQty} {form.symbol}</span> at avg {isForex ? '$' : 'Rs.'}<span className="font-semibold tabular-nums">{existAvg.toFixed(2)}</span>
+              </p>
+              <p className="text-[11px] text-gray-700 dark:text-gray-300">
+                Adding <span className="font-semibold">{newQty || '?'}</span> @ {isForex ? '$' : 'Rs.'}<span className="font-semibold tabular-nums">{newPrice ? newPrice.toFixed(2) : '?'}</span> → new avg {isForex ? '$' : 'Rs.'}<span className="font-bold text-blue-600 dark:text-blue-400 tabular-nums">{mergedAvg.toFixed(2)}</span>
+              </p>
+              <button type="button" onClick={() => setMergeConfirm(false)}
+                className="text-[10px] text-gray-400 hover:text-gray-600 dark:hover:text-gray-300 underline">
+                Back to form
+              </button>
             </div>
           )}
           {rrRatio && (
@@ -1018,7 +1077,13 @@ function LogsPage() {
       setEditTrade(null)
     } else {
       const res = await addTradeLog(form)
-      setTrades(prev => [res.data, ...prev])
+      if (!res.data?.id) return // guard against malformed response
+      if (res.data.merged) {
+        // Merge: replace existing position in-place so there are no duplicates
+        setTrades(prev => prev.map(t => t.id === res.data.id ? res.data : t))
+      } else {
+        setTrades(prev => [res.data, ...prev])
+      }
     }
   }
 
@@ -1048,6 +1113,7 @@ function LogsPage() {
   }
 
   const handleDelete = (id) => {
+    if (!id || typeof id !== 'string') return
     const trade = trades.find(t => t.id === id)
     setConfirmDelete({ id, symbol: trade?.symbol || '?' })
   }
@@ -1106,6 +1172,7 @@ function LogsPage() {
   const handleImportDone = () => { setShowImport(false); fetchData() }
 
   const handleGoToChart = (trade) => {
+    // With position model: one row per symbol+direction, pass it directly
     const allOpenForSymbol = trades.filter(t => t.symbol === trade.symbol && (t.status === 'OPEN' || t.status === 'PARTIAL'))
     navigate('/screen', {
       state: {
@@ -1115,6 +1182,8 @@ function LogsPage() {
           sl: t.sl ? parseFloat(t.sl) : null, tp: t.tp ? parseFloat(t.tp) : null,
           position: t.position, quantity: t.quantity,
           remaining_quantity: t.remaining_quantity ?? t.quantity, entry_date: t.date,
+          position_entries: t.position_entries || [],
+          partial_exits:    t.partial_exits    || [],
         })),
       }
     })

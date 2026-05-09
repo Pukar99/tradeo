@@ -89,24 +89,25 @@ export default function BacktestReport({ sessionId, onClose }) {
 
   const isPositive = parseFloat(report?.total_pnl) >= 0
 
-  // Compute extra stats
-  const extraStats = report ? (() => {
-    const s        = report.summary
-    const avgWin   = parseFloat(s.avg_win)  || 0
-    const avgLoss  = Math.abs(parseFloat(s.avg_loss) || 0)
-    const wr       = (s.win_rate || 0) / 100
-    // Expectancy = (WR × AvgWin) - (LR × AvgLoss)
-    const expectancy = wr * avgWin - (1 - wr) * avgLoss
-
-    // Avg R:R = AvgWin / AvgLoss (if both valid)
+  // Compute extra stats — guard every field; API may return partial summary
+  const extraStats = report?.summary ? (() => {
+    const s       = report.summary
+    const avgWin  = Math.max(0, parseFloat(s.avg_win)  || 0)
+    // avg_loss comes from backend as negative (e.g. -500); take abs value
+    const avgLoss = Math.abs(parseFloat(s.avg_loss) || 0)
+    // win_rate is a percentage 0-100 from backend; divide to decimal for formula
+    const wr      = Math.min(1, Math.max(0, (parseFloat(s.win_rate) || 0) / 100))
+    // Expectancy = (WinRate × AvgWin) − (LossRate × AvgLoss)
+    const expectancy = (wr * avgWin) - ((1 - wr) * avgLoss)
+    // R:R ratio (only meaningful when both sides are positive)
     const avgRR = avgLoss > 0 ? (avgWin / avgLoss).toFixed(2) : null
 
     // Consecutive win/loss streaks
-    const trades  = report.trades || []
+    const trades = report.trades || []
     let maxWStrk = 0, maxLStrk = 0, curW = 0, curL = 0
     for (const t of trades) {
       if (parseFloat(t.net_pnl) > 0) { curW++; curL = 0; maxWStrk = Math.max(maxWStrk, curW) }
-      else { curL++; curW = 0; maxLStrk = Math.max(maxLStrk, curL) }
+      else                            { curL++; curW = 0; maxLStrk = Math.max(maxLStrk, curL) }
     }
 
     return { expectancy, avgRR, maxWStrk, maxLStrk }

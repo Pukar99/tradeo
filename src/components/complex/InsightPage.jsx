@@ -1,4 +1,4 @@
-import { useState, useCallback, useRef, useEffect } from 'react'
+import { useState, useCallback, useRef, useEffect, useMemo } from 'react'
 import { createChart, CrosshairMode } from 'lightweight-charts'
 import { useTheme } from '../../context/ThemeContext'
 import { getMonthlyReturns, getMonthDetail, getSectorMonth, getSectorMonthStocks } from '../../api/index'
@@ -60,25 +60,29 @@ function fmtPct(v, dp = 1) {
 }
 
 // ─── Weighted stats ───────────────────────────────────────────────────────────
+// Weight by year value (not array index) — robust against API sort order changes.
+// Recent RECENT_N years get 2× weight; older years get 1×.
 function weightedAvg(years) {
+  const maxYear = Math.max(...years.map(y => y.year))
   return Array.from({ length: 12 }, (_, mi) => {
     let sw = 0, sv = 0
-    years.forEach((row, idx) => {
+    years.forEach(row => {
       const v = row.months[mi]
       if (v == null) return
-      const w = idx < RECENT_N ? 2 : 1
+      const w = row.year > maxYear - RECENT_N ? 2 : 1
       sv += v * w; sw += w
     })
     return sw > 0 ? +(sv / sw).toFixed(2) : null
   })
 }
 function weightedWinRate(years) {
+  const maxYear = Math.max(...years.map(y => y.year))
   return Array.from({ length: 12 }, (_, mi) => {
     let pos = 0, tot = 0
-    years.forEach((row, idx) => {
+    years.forEach(row => {
       const v = row.months[mi]
       if (v == null) return
-      const w = idx < RECENT_N ? 2 : 1
+      const w = row.year > maxYear - RECENT_N ? 2 : 1
       if (v > 0) pos += w
       tot += w
     })
@@ -867,6 +871,7 @@ export default function InsightPage() {
   const [selected,        setSelected]        = useState(null)
   const [selectedIndexId, setSelectedIndexId] = useState(12)
   const [yearFilter,      setYearFilter]      = useState('all') // 'all' | '10' | '5'
+  const [mobileLeftOpen,  setMobileLeftOpen]  = useState(false)
 
   const doFetch = useCallback(async (indexId) => {
     setLoading(true); setError(''); setData(null); setSelected(null)
@@ -896,16 +901,16 @@ export default function InsightPage() {
   const curYear    = latestDt.getFullYear()
   const curMon     = latestDt.getMonth() + 1
 
-  // Year range filter
-  const years = allYears.filter(y => {
+  // Year range filter — memoized so weightedAvg doesn't recompute on unrelated state changes
+  const years = useMemo(() => allYears.filter(y => {
     if (yearFilter === '5')  return y.year >= curYear - 4
     if (yearFilter === '10') return y.year >= curYear - 9
     return true
-  })
+  }), [allYears, yearFilter, curYear])
 
-  const recentSet = new Set(allYears.slice(0, RECENT_N).map(y => y.year))
-  const wAvg      = years.length ? weightedAvg(years)     : (data?.month_averages  || [])
-  const wWinRate  = years.length ? weightedWinRate(years) : (data?.month_win_rates || [])
+  const recentSet = useMemo(() => new Set(allYears.slice(0, RECENT_N).map(y => y.year)), [allYears])
+  const wAvg      = useMemo(() => years.length ? weightedAvg(years)     : (data?.month_averages  || []), [years, data])
+  const wWinRate  = useMemo(() => years.length ? weightedWinRate(years) : (data?.month_win_rates || []), [years, data])
 
   const LABELS = useNP ? MONTHS_NP : MONTHS_EN
   const curRow = allYears.find(y => y.year === curYear)
@@ -945,9 +950,9 @@ export default function InsightPage() {
   return (
     <div className="flex flex-1 overflow-hidden min-h-0 bg-white dark:bg-gray-950">
 
-      {/* ── Left Panel ───────────────────────────────────────────────────── */}
-      <div className="w-[240px] min-w-[220px] border-r border-gray-100 dark:border-gray-800
-        bg-white dark:bg-gray-900 flex flex-col shrink-0 overflow-hidden">
+      {/* ── Left Panel — desktop only ─────────────────────────────────────── */}
+      <div className="hidden md:flex w-[240px] min-w-[220px] border-r border-gray-100 dark:border-gray-800
+        bg-white dark:bg-gray-900 flex-col shrink-0 overflow-hidden">
         {loading && !data ? (
           <div className="flex-1 flex items-center justify-center">
             <div className="w-5 h-5 border-2 border-blue-500 border-t-transparent rounded-full animate-spin" />
@@ -987,6 +992,17 @@ export default function InsightPage() {
         <div className="shrink-0 flex items-center justify-between px-3 py-1.5
           border-b border-gray-100 dark:border-gray-800 bg-white dark:bg-gray-950">
           <div className="flex items-center gap-2">
+            {/* Mobile index selector trigger */}
+            <button
+              className="md:hidden flex items-center gap-1 px-2 py-0.5 rounded-lg text-[9px] font-semibold
+                         bg-gray-100 dark:bg-gray-800 text-gray-600 dark:text-gray-300 transition-colors"
+              onClick={() => setMobileLeftOpen(true)}
+            >
+              {INDEX_OPTIONS.find(o => o.id === selectedIndexId)?.label ?? 'Index'}
+              <svg className="w-2.5 h-2.5" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round">
+                <polyline points="6 4 10 8 6 12" />
+              </svg>
+            </button>
             <span className="text-[10px] font-black text-gray-700 dark:text-gray-300 uppercase tracking-widest">
               Monthly Returns
             </span>
@@ -1027,7 +1043,7 @@ export default function InsightPage() {
 
         {/* Scrollable content */}
         <div className="flex-1 min-h-0 overflow-y-auto overflow-x-auto">
-          <div style={{ minWidth: 520 }}>
+          <div style={{ minWidth: 'min(520px, max-content)' }}>
 
             {loading && !data && (
               <div className="flex flex-col items-center justify-center py-20 gap-3">
@@ -1205,15 +1221,63 @@ export default function InsightPage() {
         </div>
       </div>
 
-      {/* ── Right Detail Panel ───────────────────────────────────────────── */}
-      <DetailPanel
-        cell={selected}
-        onClose={() => setSelected(null)}
-        onNavigate={handleNavigate}
-        dark={dark}
-        allYears={allYears}
-        indexId={selectedIndexId}
-      />
+      {/* ── Right Detail Panel — desktop only ───────────────────────────── */}
+      <div className="hidden md:block">
+        <DetailPanel
+          cell={selected}
+          onClose={() => setSelected(null)}
+          onNavigate={handleNavigate}
+          dark={dark}
+          allYears={allYears}
+          indexId={selectedIndexId}
+        />
+      </div>
+
+      {/* Mobile: detail panel as full-screen overlay */}
+      {selected && (
+        <div className="md:hidden fixed inset-0 z-50 bg-white dark:bg-gray-900 flex flex-col">
+          <DetailPanel
+            cell={selected}
+            onClose={() => setSelected(null)}
+            onNavigate={handleNavigate}
+            dark={dark}
+            allYears={allYears}
+            indexId={selectedIndexId}
+          />
+        </div>
+      )}
+
+      {/* Mobile left panel sheet */}
+      {mobileLeftOpen && (
+        <>
+          <div className="md:hidden fixed inset-0 bg-black/40 backdrop-blur-[2px] z-40"
+               onClick={() => setMobileLeftOpen(false)} />
+          <div className="md:hidden fixed bottom-0 left-0 right-0 z-50 flex flex-col
+                          bg-white dark:bg-gray-900 rounded-t-2xl shadow-2xl border-t
+                          border-gray-200 dark:border-gray-800"
+               style={{ height: '70vh', paddingBottom: 'env(safe-area-inset-bottom, 0px)' }}>
+            <div className="shrink-0 flex justify-center pt-2.5 pb-1">
+              <div className="w-10 h-1 rounded-full bg-gray-300 dark:bg-gray-600" />
+            </div>
+            <div className="shrink-0 flex items-center justify-between px-4 pb-2.5 border-b border-gray-100 dark:border-gray-800">
+              <span className="text-[13px] font-bold text-gray-800 dark:text-gray-100">Select Index</span>
+              <button onClick={() => setMobileLeftOpen(false)}
+                className="w-7 h-7 flex items-center justify-center rounded-full bg-gray-100 dark:bg-gray-800 text-gray-500 text-[12px]">
+                ✕
+              </button>
+            </div>
+            <div className="flex-1 overflow-y-auto min-h-0">
+              <LeftInsightPanel
+                data={data} years={years} wAvg={wAvg} wWinRate={wWinRate} dark={dark}
+                curYear={curYear} curRow={curRow} prevRow={prevRow} recentSet={recentSet}
+                useNP={useNP} setUseNP={setUseNP} LABELS={LABELS}
+                selectedIndexId={selectedIndexId}
+                setSelectedIndexId={(id) => { setSelectedIndexId(id); setMobileLeftOpen(false) }}
+              />
+            </div>
+          </div>
+        </>
+      )}
     </div>
   )
 }

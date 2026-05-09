@@ -1,6 +1,11 @@
 import { useState, useEffect, useCallback, useRef } from 'react'
 import { getMarketDates, getDayFull, getIPOs, getMarketNews, getTopMovers } from '../../api'
 import { useScreen } from '../../context/ScreenContext'
+import { useEscapeKey } from '../../hooks/useEscapeKey'
+import { safeUrl } from '../../utils/format'
+
+// Module-level cache for full movers data — avoids re-fetching when modal is reopened
+const _moversFullCache = new Map() // date → { gainers, losers, ... }
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
 
@@ -19,11 +24,7 @@ function ChangeBar({ value }) {
 // ── Explore News Modal ────────────────────────────────────────────────────────
 
 function ExploreModal({ items, onClose }) {
-  useEffect(() => {
-    const fn = (e) => { if (e.key === 'Escape') onClose() }
-    document.addEventListener('keydown', fn)
-    return () => document.removeEventListener('keydown', fn)
-  }, [onClose])
+  useEscapeKey(onClose)
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
@@ -66,8 +67,8 @@ function ExploreModal({ items, onClose }) {
                 )}
                 <div className="flex items-center gap-2 mt-1">
                   {item.date && <span className="text-[8px] text-gray-400">{item.date}</span>}
-                  {item.url && (
-                    <a href={item.url} target="_blank" rel="noopener noreferrer"
+                  {safeUrl(item.url) && (
+                    <a href={safeUrl(item.url)} target="_blank" rel="noopener noreferrer"
                       className="text-[8px] text-blue-500 hover:underline font-medium">
                       Source →
                     </a>
@@ -132,17 +133,18 @@ function AllMoversModal({ date, onClose }) {
   const [data, setData] = useState(null)
   const [err,  setErr]  = useState(null)
 
-  useEffect(() => {
-    const fn = (e) => { if (e.key === 'Escape') onClose() }
-    document.addEventListener('keydown', fn)
-    return () => document.removeEventListener('keydown', fn)
-  }, [onClose])
+  useEscapeKey(onClose)
 
   useEffect(() => {
     if (!date) return
+    // Serve from cache — movers for a past date never change
+    const cached = _moversFullCache.get(date)
+    if (cached) { setData(cached); return }
+    let cancelled = false
     getTopMovers(date)
-      .then(r => setData(r.data))
-      .catch(() => setErr('Failed to load'))
+      .then(r => { if (!cancelled) { _moversFullCache.set(date, r.data); setData(r.data) } })
+      .catch(() => { if (!cancelled) setErr('Failed to load') })
+    return () => { cancelled = true }
   }, [date])
 
   const gainers = data?.gainers || []

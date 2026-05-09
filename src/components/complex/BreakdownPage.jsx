@@ -1,9 +1,16 @@
-import { useState, useEffect, useRef, useCallback } from 'react'
+import { useState, useEffect, useRef, useCallback, useMemo } from 'react'
 import { useTheme } from '../../context/ThemeContext'
 import { BASE_URL } from '../../api'
 
 const getToken = () => localStorage.getItem('token')
 const API = `${BASE_URL}/api`
+
+// Build a URL safely using URLSearchParams — prevents query-param injection
+const buildUrl = (path, params) => {
+  const url = new URL(`${API}${path}`)
+  Object.entries(params).forEach(([k, v]) => { if (v != null) url.searchParams.set(k, v) })
+  return url.toString()
+}
 
 // ─────────────────────────────────────────────────────────────────────────────
 // CONSTANTS
@@ -828,7 +835,7 @@ function SectorIndexChart({ sector, cycle, dark }) {
     setError('')
     const token = getToken()
     fetch(
-      `${API}/breakdown/sector-index-chart?index_name=${encodeURIComponent(sector.index_name)}&peak_date=${cycle.start_date}&trough_date=${cycle.end_date}`,
+      buildUrl('/breakdown/sector-index-chart', { index_name: sector.index_name, peak_date: cycle.start_date, trough_date: cycle.end_date }),
       { headers: { Authorization: `Bearer ${token}` }, signal: ctrl.signal }
     )
       .then(r => r.json())
@@ -903,6 +910,9 @@ export default function BreakdownPage() {
 
   // Main view: 'overview' | 'detail' | 'heatmap'
   const [view, setView] = useState('overview')
+
+  // Mobile cycles drawer
+  const [mobileCycles, setMobileCycles] = useState(false)
 
   // Heatmap year picker
   const currentYear = new Date().getFullYear()
@@ -979,7 +989,7 @@ export default function BreakdownPage() {
     try {
       const token = getToken()
       const resp  = await fetch(
-        `${API}/breakdown/sector-stocks?sector_index=${encodeURIComponent(indexName)}&peak_date=${peakDate}&trough_date=${troughDate}`,
+        buildUrl('/breakdown/sector-stocks', { sector_index: indexName, peak_date: peakDate, trough_date: troughDate }),
         { headers: { Authorization: `Bearer ${token}` }, signal: ctrl.signal }
       )
       const data = await resp.json()
@@ -1021,13 +1031,19 @@ export default function BreakdownPage() {
     setStockLoading(true)
     setStockError('')
     try {
-      const from  = new Date(activeCycle.start_date); from.setDate(from.getDate() - 20)
-      const to    = new Date(activeCycle.end_date);   to.setDate(to.getDate() + 120)
-      const today = new Date().toISOString().slice(0, 10)
-      const toStr = to.toISOString().slice(0, 10) < today ? to.toISOString().slice(0, 10) : today
+      // Use UTC math on date strings to avoid timezone shift (Nepal = UTC+5:45)
+      const addDays = (iso, n) => {
+        const d = new Date(iso + 'T00:00:00Z')
+        d.setUTCDate(d.getUTCDate() + n)
+        return d.toISOString().slice(0, 10)
+      }
+      const fromStr = addDays(activeCycle.start_date, -20)
+      const today   = new Date().toISOString().slice(0, 10)
+      const rawTo   = addDays(activeCycle.end_date, 120)
+      const toStr   = rawTo < today ? rawTo : today
       const token = getToken()
       const resp  = await fetch(
-        `${API}/breakdown/stock-price-range?symbol=${stock.symbol}&from=${from.toISOString().slice(0, 10)}&to=${toStr}`,
+        buildUrl('/breakdown/stock-price-range', { symbol: stock.symbol, from: fromStr, to: toStr }),
         { headers: { Authorization: `Bearer ${token}` }, signal: ctrl.signal }
       )
       const data = await resp.json()
@@ -1050,8 +1066,12 @@ export default function BreakdownPage() {
   }, [selectedStock, loadStockChart])
 
   const toggleSort = useCallback(col => {
-    if (sortBy === col) setSortAsc(a => !a)
-    else { setSortBy(col); setSortAsc(true) }
+    if (sortBy === col) {
+      setSortAsc(a => !a)
+    } else {
+      setSortBy(col)
+      setSortAsc(false) // new column defaults descending (biggest first)
+    }
   }, [sortBy])
 
   // ── Derived values ──────────────────────────────────────────────────────────
@@ -1072,10 +1092,12 @@ export default function BreakdownPage() {
     trading_days:      summary.duration_days,
   } : null
 
-  const sortedSectors = [...sectors].sort((a, b) => {
+  const sortedSectors = useMemo(() => [...sectors].sort((a, b) => {
     const av = a[sortBy] ?? 0, bv = b[sortBy] ?? 0
-    return sortAsc ? av - bv : bv - av
-  })
+    const diff = sortAsc ? av - bv : bv - av
+    // Secondary stable sort by name prevents random order on equal values
+    return diff !== 0 ? diff : (a.index_name ?? '').localeCompare(b.index_name ?? '')
+  }), [sectors, sortBy, sortAsc])
 
   const bearCycles    = cycles.filter(c => c.type === 'bear')
   const bullCycles    = cycles.filter(c => c.type === 'bull')
@@ -1124,6 +1146,8 @@ export default function BreakdownPage() {
           <span className="text-[10px] text-gray-500 dark:text-gray-400">Threshold</span>
           <input type="number" value={threshold} min={5} max={50} step={1}
             onChange={e => setThreshold(parseFloat(e.target.value) || 10)}
+            onKeyDown={e => { if (e.key === 'Enter') detectCycles(threshold, indexId) }}
+            title="Press Enter or click Detect to apply"
             className="w-12 text-[11px] font-semibold text-center border border-gray-200 dark:border-gray-700 rounded px-1.5 py-0.5 dark:bg-gray-900 dark:text-gray-100 focus:outline-none focus:ring-1 focus:ring-gray-400" />
           <span className="text-[10px] text-gray-400">%</span>
           <button
@@ -1136,9 +1160,23 @@ export default function BreakdownPage() {
         </div>
 
         {cycles.length > 0 && (
-          <span className="text-[10px] text-gray-400 shrink-0">
+          <span className="text-[10px] text-gray-400 shrink-0 hidden sm:inline">
             {bearCycles.length} bear · {bullCycles.length} bull on {selectedIndexLabel}
           </span>
+        )}
+
+        {/* Mobile cycles drawer trigger */}
+        {cycles.length > 0 && (
+          <button
+            className="md:hidden flex items-center gap-1 px-2 py-0.5 rounded-lg text-[9px] font-semibold
+                       bg-gray-100 dark:bg-gray-800 text-gray-600 dark:text-gray-300 transition-colors"
+            onClick={() => setMobileCycles(true)}
+          >
+            {activeCycle ? `${activeCycle.type === 'bear' ? '▼' : '▲'} ${activeCycle.start_date?.slice(0,7)}` : `Cycles (${cycles.length})`}
+            <svg className="w-2.5 h-2.5" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round">
+              <polyline points="6 4 10 8 6 12" />
+            </svg>
+          </button>
         )}
 
         {/* View tabs */}
@@ -1169,8 +1207,8 @@ export default function BreakdownPage() {
       {/* ── BODY ── */}
       <div className="flex flex-1 overflow-hidden min-h-0">
 
-        {/* ── LEFT SIDEBAR ── */}
-        <div className="w-[200px] shrink-0 border-r border-gray-100 dark:border-gray-800 flex flex-col overflow-hidden">
+        {/* ── LEFT SIDEBAR — desktop only ── */}
+        <div className="hidden md:flex w-[200px] shrink-0 border-r border-gray-100 dark:border-gray-800 flex-col overflow-hidden">
           {/* Filter tabs */}
           <div className="shrink-0 flex border-b border-gray-100 dark:border-gray-800">
             {[['all','All'], ['bear','Bear'], ['bull','Bull']].map(([v, l]) => (
@@ -1444,11 +1482,11 @@ export default function BreakdownPage() {
                 )}
               </div>
 
-              {/* Sector table + stock panel */}
-              <div className="flex flex-1 overflow-hidden min-h-0">
+              {/* Sector table + stock panel — stack vertically on mobile, side-by-side on desktop */}
+              <div className="flex flex-col md:flex-row flex-1 overflow-hidden min-h-0">
 
                 {/* Sector table */}
-                <div className={`flex flex-col overflow-hidden border-r border-gray-100 dark:border-gray-800 ${activeSector ? 'w-[55%]' : 'flex-1'}`}>
+                <div className={`flex flex-col overflow-hidden border-b md:border-b-0 border-r-0 md:border-r border-gray-100 dark:border-gray-800 ${activeSector ? 'md:w-[55%] h-1/2 md:h-auto' : 'flex-1'}`}>
                   {analyzing ? (
                     <div className="flex items-center justify-center flex-1 text-[11px] text-gray-400">
                       Computing sector returns…
@@ -1502,7 +1540,7 @@ export default function BreakdownPage() {
 
                 {/* Stock panel */}
                 {activeSector && (
-                  <div className="flex flex-col overflow-hidden" style={{ width: '45%' }}>
+                  <div className="flex flex-col overflow-hidden md:w-[45%] w-full h-1/2 md:h-auto">
                     <div className="shrink-0 px-3 py-2 border-b border-gray-100 dark:border-gray-800 flex items-center gap-2">
                       <span className="text-[11px] font-semibold text-gray-700 dark:text-gray-200 truncate">
                         {activeSector.index_name.replace(' Index', '').replace(' Sub-Index', '')}
@@ -1530,12 +1568,81 @@ export default function BreakdownPage() {
 
           {/* No cycle selected yet (detail tab before any selection) */}
           {view === 'detail' && !activeCycle && (
-            <div className="flex-1 flex items-center justify-center text-[12px] text-gray-400">
-              Select a cycle from the left panel or click a zone on the overview chart
+            <div className="flex-1 flex items-center justify-center text-[12px] text-gray-400 text-center px-4">
+              {window.innerWidth < 768
+                ? 'Tap "Cycles" in the toolbar above to select a cycle'
+                : 'Select a cycle from the left panel or click a zone on the overview chart'}
             </div>
           )}
         </div>
       </div>
+
+      {/* Mobile cycles sheet */}
+      {mobileCycles && (
+        <>
+          <div className="md:hidden fixed inset-0 bg-black/40 backdrop-blur-[2px] z-40"
+               onClick={() => setMobileCycles(false)} />
+          <div className="md:hidden fixed bottom-0 left-0 right-0 z-50 flex flex-col
+                          bg-white dark:bg-gray-900 rounded-t-2xl shadow-2xl border-t
+                          border-gray-200 dark:border-gray-800"
+               style={{ height: '72vh', paddingBottom: 'env(safe-area-inset-bottom, 0px)' }}>
+            <div className="shrink-0 flex justify-center pt-2.5 pb-1">
+              <div className="w-10 h-1 rounded-full bg-gray-300 dark:bg-gray-600" />
+            </div>
+            <div className="shrink-0 flex items-center justify-between px-4 pb-2.5 border-b border-gray-100 dark:border-gray-800">
+              <span className="text-[13px] font-bold text-gray-800 dark:text-gray-100">
+                {cycles.length} Cycles · {selectedIndexLabel}
+              </span>
+              <button onClick={() => setMobileCycles(false)}
+                className="w-7 h-7 flex items-center justify-center rounded-full bg-gray-100 dark:bg-gray-800 text-gray-500 text-[12px]">
+                ✕
+              </button>
+            </div>
+            {/* Filter tabs */}
+            <div className="shrink-0 flex border-b border-gray-100 dark:border-gray-800">
+              {[['all','All'], ['bear','Bear'], ['bull','Bull']].map(([v, l]) => (
+                <button key={v} onClick={() => setCycleFilter(v)}
+                  className={`flex-1 py-2 text-[9px] font-semibold transition-colors
+                    ${cycleFilter === v
+                      ? v === 'bear' ? 'text-red-500 border-b-2 border-red-500'
+                      : v === 'bull' ? 'text-emerald-500 border-b-2 border-emerald-500'
+                      : 'text-gray-700 dark:text-gray-200 border-b-2 border-gray-700 dark:border-gray-200'
+                      : 'text-gray-400'}`}
+                >
+                  {l} {v === 'bear' ? bearCycles.length : v === 'bull' ? bullCycles.length : cycles.length}
+                </button>
+              ))}
+            </div>
+            <div className="flex-1 overflow-y-auto min-h-0">
+              {filteredCycles.map((c, i) => {
+                const isBear   = c.type === 'bear'
+                const isActive = activeCycle?.start_date === c.start_date
+                return (
+                  <button key={i} onClick={() => { runAnalysis(c); setView('detail'); setMobileCycles(false) }}
+                    className={`w-full text-left px-4 py-3 border-b border-gray-50 dark:border-gray-800/50 transition-colors
+                      ${isActive
+                        ? isBear ? 'bg-red-50 dark:bg-red-950/30' : 'bg-emerald-50 dark:bg-emerald-950/30'
+                        : 'hover:bg-gray-50 dark:hover:bg-gray-900/40'}`}
+                  >
+                    <div className="flex items-center justify-between mb-0.5">
+                      <span className={`text-[10px] font-bold uppercase tracking-wide ${isBear ? 'text-red-500' : 'text-emerald-500'}`}>
+                        {isBear ? '▼ Bear' : '▲ Bull'}
+                      </span>
+                      <span className={`text-[12px] font-black tabular-nums ${isBear ? 'text-red-500' : 'text-emerald-500'}`}>
+                        {c.pct >= 0 ? '+' : ''}{c.pct?.toFixed(1)}%
+                      </span>
+                    </div>
+                    <div className="text-[10px] text-gray-500 font-mono">
+                      {c.start_date?.slice(0, 7)} → {c.end_date?.slice(0, 7)}
+                    </div>
+                    <div className="text-[9px] text-gray-400">{c.duration_days}d · {c.phase}</div>
+                  </button>
+                )
+              })}
+            </div>
+          </div>
+        </>
+      )}
     </div>
   )
 }

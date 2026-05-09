@@ -83,6 +83,7 @@ export default function BacktestActivePanel({
   const [addErr, setAddErr]             = useState('')
   const [addLoading, setAddLoading]     = useState(false)
   const [confirmEnd, setConfirmEnd]     = useState(false)
+  const [endErr,    setEndErr]          = useState('')
 
   const allPositions  = currentScript?.positions || []
   const openPositions = allPositions.filter(p => p.status === 'OPEN' || p.status === 'PARTIAL')
@@ -124,10 +125,14 @@ export default function BacktestActivePanel({
   }, [session.id, newSymbol, newStartDate, onScriptSwitch])
 
   const handleEndSession = useCallback(async () => {
+    setEndErr('')
     try {
       await btEndSession(session.id)
       onEndSession()
-    } catch {}
+    } catch (err) {
+      setEndErr(err.response?.data?.message || 'Failed to end session. Please try again.')
+      setConfirmEnd(false) // reset so user can retry
+    }
   }, [session.id, onEndSession])
 
   return (
@@ -262,6 +267,9 @@ export default function BacktestActivePanel({
         </div>
 
         {/* End session */}
+        {endErr && (
+          <p className="text-[9px] text-red-500 text-center mb-1">{endErr}</p>
+        )}
         {!confirmEnd ? (
           <button
             onClick={() => setConfirmEnd(true)}

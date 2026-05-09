@@ -35,10 +35,17 @@ export default function BacktestChart({ candles, cursorIndex, positions }) {
   const cursorRef    = useRef(cursorIndex)
   const isDarkRef    = useRef(isDark)
   const positionsRef = useRef(positions)
+  // O(1) crosshair lookup: date string → candle object (rebuilt whenever candles change)
+  const candleMapRef = useRef(new Map())
   candlesRef.current   = candles
   cursorRef.current    = cursorIndex
   isDarkRef.current    = isDark
   positionsRef.current = positions
+  // Keep map in sync — only rebuild when candles array reference changes
+  if (candles !== candlesRef._lastCandles) {
+    candleMapRef.current = new Map(candles.map(c => [c.date, c]))
+    candlesRef._lastCandles = candles
+  }
 
   // OHLCV HUD state (shown top-left)
   const [hud, setHud] = useState(null)
@@ -179,21 +186,19 @@ export default function BacktestChart({ candles, cursorIndex, positions }) {
       candleSerRef.current = candleSer
       volSerRef.current    = volSer
 
-      // Update HUD on crosshair move
+      // O(1) crosshair lookup via pre-built Map; cancelled guard prevents
+      // stale setHud calls after component unmounts (race with loadLC async)
       chart.subscribeCrosshairMove(param => {
-        if (!param || !param.time) return
-        const cdls = candlesRef.current
-        const c    = cdls.find(x => x.date === param.time)
+        if (cancelled || !param?.time) return
+        const c = candleMapRef.current.get(param.time)
         if (c) setHud(c)
       })
 
-      // Detect user pan: if the visible range's right edge is not near the
-      // last bar, the user has scrolled away — stop auto-following
+      // Detect user pan — guard against post-unmount calls
       chart.timeScale().subscribeVisibleLogicalRangeChange(range => {
-        if (!range) return
+        if (cancelled || !range) return
         const totalBars = candlesRef.current.length
-        // "near edge" means right side is within 8 bars of the last painted bar
-        const nearEdge = range.to >= totalBars - 8
+        const nearEdge  = range.to >= totalBars - 8
         userPannedRef.current = !nearEdge
       })
 

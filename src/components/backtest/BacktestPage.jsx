@@ -98,7 +98,15 @@ export default function BacktestPage() {
   }, [])
 
   // ── Full exit (from panel button) ─────────────────────────────────────────────
-  const [exitError, setExitError] = useState('')
+  const [exitError,      setExitError]      = useState('')
+
+  // Auto-dismiss exit error toast after 4 seconds
+  useEffect(() => {
+    if (!exitError) return
+    const t = setTimeout(() => setExitError(''), 4000)
+    return () => clearTimeout(t)
+  }, [exitError])
+  const [mobilePanelOpen, setMobilePanelOpen] = useState(false)
 
   const handleFullExit = useCallback(async (order) => {
     if (!session || !currentCandle) return
@@ -167,36 +175,58 @@ export default function BacktestPage() {
     />
   )
 
+  const SidePanelContent = () => !session ? (
+    <BacktestSetupPanel onSessionStarted={(sess, opts) => {
+      onSessionStarted(sess)
+      if (opts?.speed)   { setSpeedState(opts.speed); engine.setSpeed(opts.speed) }
+      if (opts?.runMode === 'PLAY') { handlePlay() }
+      setMobilePanelOpen(false)
+    }} />
+  ) : (
+    <BacktestActivePanel
+      session={session}
+      currentScript={currentScript}
+      currentCandle={currentCandle}
+      totalCandles={candles.length}
+      onScriptSwitch={handleScriptSwitch}
+      onBuy={() => { setShowBuy(true); setMobilePanelOpen(false) }}
+      onEditSLTP={(order) => { setShowSLTP(order); setMobilePanelOpen(false) }}
+      onExit={handleFullExit}
+      onPartial={(order) => { setShowPartial(order); setMobilePanelOpen(false) }}
+      onEndSession={handleEndSession}
+    />
+  )
+
   // ── Main layout ───────────────────────────────────────────────────────────────
   return (
     <div className="flex flex-1 overflow-hidden min-h-0">
 
-      {/* LEFT PANEL */}
-      <div className="w-[260px] min-w-[240px] border-r border-gray-100 dark:border-gray-800 bg-white dark:bg-gray-900 flex flex-col shrink-0 overflow-hidden">
-        {!session ? (
-          <BacktestSetupPanel onSessionStarted={(sess, opts) => {
-            onSessionStarted(sess)
-            if (opts?.speed)   { setSpeedState(opts.speed); engine.setSpeed(opts.speed) }
-            if (opts?.runMode === 'PLAY') { handlePlay() }
-          }} />
-        ) : (
-          <BacktestActivePanel
-            session={session}
-            currentScript={currentScript}
-            currentCandle={currentCandle}
-            totalCandles={candles.length}
-            onScriptSwitch={handleScriptSwitch}
-            onBuy={() => setShowBuy(true)}
-            onEditSLTP={(order) => setShowSLTP(order)}
-            onExit={handleFullExit}
-            onPartial={(order) => setShowPartial(order)}
-            onEndSession={handleEndSession}
-          />
-        )}
+      {/* LEFT PANEL — desktop only */}
+      <div className="hidden md:flex w-[260px] min-w-[240px] border-r border-gray-100 dark:border-gray-800 bg-white dark:bg-gray-900 flex-col shrink-0 overflow-hidden">
+        <SidePanelContent />
       </div>
 
       {/* CENTER: Chart + Controls */}
       <div className="flex-1 flex flex-col min-h-0 min-w-0">
+
+        {/* Mobile top bar */}
+        <div className="md:hidden shrink-0 flex items-center justify-between px-3 py-2
+                        border-b border-gray-100 dark:border-gray-800 bg-white dark:bg-gray-900">
+          <span className="text-[11px] font-bold text-gray-700 dark:text-gray-200">
+            {session ? session.strategy_name : 'Backtesting'}
+          </span>
+          <button
+            onClick={() => setMobilePanelOpen(true)}
+            className="flex items-center gap-1 px-2.5 py-1 rounded-lg text-[10px] font-semibold
+                       bg-gray-100 dark:bg-gray-800 text-gray-600 dark:text-gray-300
+                       hover:bg-gray-200 dark:hover:bg-gray-700 transition-colors"
+          >
+            {session ? 'Positions' : 'Setup'}
+            <svg className="w-3 h-3" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round">
+              <polyline points="6 4 10 8 6 12" />
+            </svg>
+          </button>
+        </div>
         <div style={{ position: 'relative', flex: 1, minHeight: 0, overflow: 'hidden' }} className="bg-white dark:bg-gray-950">
           {session && candles.length > 0 ? (
             <div style={{ position: 'absolute', inset: 0 }}>
@@ -228,6 +258,34 @@ export default function BacktestPage() {
           />
         )}
       </div>
+
+      {/* Mobile left panel sheet */}
+      {mobilePanelOpen && (
+        <>
+          <div className="md:hidden fixed inset-0 bg-black/40 backdrop-blur-[2px] z-40"
+               onClick={() => setMobilePanelOpen(false)} />
+          <div className="md:hidden fixed bottom-0 left-0 right-0 z-50 flex flex-col
+                          bg-white dark:bg-gray-900 rounded-t-2xl shadow-2xl border-t
+                          border-gray-200 dark:border-gray-800"
+               style={{ height: '72vh', paddingBottom: 'env(safe-area-inset-bottom, 0px)' }}>
+            <div className="shrink-0 flex justify-center pt-2.5 pb-1">
+              <div className="w-10 h-1 rounded-full bg-gray-300 dark:bg-gray-600" />
+            </div>
+            <div className="shrink-0 flex items-center justify-between px-4 pb-2.5 border-b border-gray-100 dark:border-gray-800">
+              <span className="text-[13px] font-bold text-gray-800 dark:text-gray-100">
+                {session ? 'Active Session' : 'Setup Backtest'}
+              </span>
+              <button onClick={() => setMobilePanelOpen(false)}
+                className="w-7 h-7 flex items-center justify-center rounded-full bg-gray-100 dark:bg-gray-800 text-gray-500 text-[12px] transition-colors">
+                ✕
+              </button>
+            </div>
+            <div className="flex-1 overflow-y-auto min-h-0">
+              <SidePanelContent />
+            </div>
+          </div>
+        </>
+      )}
 
       {/* Exit error toast */}
       {exitError && (

@@ -907,11 +907,14 @@ function PortfolioPage() {
   useEffect(() => { if (user?.id) fetchData() }, [user?.id, market])
   useChatRefresh(['trades'], fetchData)
 
-  const handleGoToChart = ({ symbol, entries, id, entry_price, sl, tp, position, remaining_quantity, quantity, date }) => {
-    const positions = entries
-      ? entries.map(tr => ({ id: tr.id, entry_price: parseFloat(tr.entry_price), sl: tr.sl ? parseFloat(tr.sl) : null, tp: tr.tp ? parseFloat(tr.tp) : null, position: tr.position, quantity: tr.quantity, remaining_quantity: tr.remaining_quantity ?? tr.quantity, entry_date: tr.date }))
-      : [{ id, entry_price: parseFloat(entry_price), sl: sl ? parseFloat(sl) : null, tp: tp ? parseFloat(tp) : null, position, quantity, remaining_quantity: remaining_quantity ?? quantity, entry_date: date }]
-    navigate('/screen', { state: { symbol, positions } })
+  const handleGoToChart = ({ symbol, id, entry_price, sl, tp, position, remaining_quantity, quantity, date, position_entries, partial_exits }) => {
+    navigate('/screen', { state: { symbol, positions: [{
+      id, entry_price: parseFloat(entry_price),
+      sl: sl ? parseFloat(sl) : null, tp: tp ? parseFloat(tp) : null,
+      position, quantity, remaining_quantity: remaining_quantity ?? quantity, entry_date: date,
+      position_entries: position_entries || [],
+      partial_exits:    partial_exits    || [],
+    }] } })
   }
 
   const toggleSort = (col) => setSort(prev => prev.col === col ? { col, dir: prev.dir === 'desc' ? 'asc' : 'desc' } : { col, dir: 'desc' })

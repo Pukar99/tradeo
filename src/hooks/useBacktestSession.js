@@ -83,15 +83,18 @@ export function useBacktestSession() {
     setCursorIndex(script.cursor_index || 0)
 
     try {
-      const today = new Date().toISOString().slice(0, 10)
-      const res   = await btGetOHLCV(script.symbol, script.start_date, today)
+      const today      = new Date().toISOString().slice(0, 10)
+      const res        = await btGetOHLCV(script.symbol, script.start_date, today)
       const allCandles = res.data.candles || []
+      if (allCandles.length === 0) {
+        setError(`No chart data found for ${script.symbol}. Check the date range.`)
+      }
       setCandles(allCandles)
-
-      // Attach total_candles to local script object
       setCurrentScriptSynced(prev => ({ ...prev, total_candles: allCandles.length }))
-    } catch {
+    } catch (err) {
+      console.error('[Session] OHLCV fetch failed:', err?.message)
       setCandles([])
+      setError(`Failed to load chart data for ${script.symbol}. Please try again.`)
     }
 
     // Update session's active_script in backend (fire-and-forget)
