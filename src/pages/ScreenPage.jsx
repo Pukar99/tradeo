@@ -1,20 +1,87 @@
 import { useState, useEffect } from 'react'
-import { ScreenProvider } from '../context/ScreenContext'
-import { ComplexTabProvider }        from '../hooks/useComplexTab.jsx'
-import StockChart                    from '../components/screen/StockChart'
-import MarketStatusBadge             from '../components/screen/MarketStatusBadge'
-import LeftPanel                     from '../components/screen/LeftPanel'
-import RightPanel                    from '../components/screen/RightPanel'
-import BacktestPage                  from '../components/backtest/BacktestPage'
-import InsightPage                   from '../components/complex/InsightPage'
-import BreakdownPage                 from '../components/complex/BreakdownPage'
-import ErrorBoundary                 from '../components/ErrorBoundary'
+import { ScreenProvider }       from '../context/ScreenContext'
+import { ComplexTabProvider }   from '../hooks/useComplexTab.jsx'
+import StockChart               from '../components/screen/StockChart'
+import MarketStatusBadge        from '../components/screen/MarketStatusBadge'
+import LeftPanel                from '../components/screen/LeftPanel'
+import RightPanel               from '../components/screen/RightPanel'
+import BacktestPage             from '../components/backtest/BacktestPage'
+import ReplayPage               from '../components/screen/ReplayPage'
+import ErrorBoundary            from '../components/ErrorBoundary'
+
+// ── Tab definitions ──────────────────────────────────────────────────────────
+
+const SIMPLE_TABS = [
+  { id: 'General',     label: 'General',     short: 'Gen'   },
+  { id: 'MultiChart',  label: 'MultiChart',  short: 'Multi' },
+  { id: 'SMC',         label: 'SMC',         short: 'SMC'   },
+  { id: 'PriceAction', label: 'Price Action', short: 'PA'   },
+]
 
 const COMPLEX_TABS = [
-  { id: 'Backtesting', label: 'Backtesting', short: 'BT'    },
-  { id: 'Insight',     label: 'Insight',     short: 'Ins.'  },
-  { id: 'Breakdown',   label: 'Breakdown',   short: 'Break' },
+  { id: 'Backtesting',  label: 'Backtesting',   short: 'BT'    },
+  { id: 'Replay',       label: 'Replay',         short: 'Rep'   },
+  { id: 'StrategyLab',  label: 'Strategy Lab',   short: 'Strat' },
 ]
+
+// ── Coming soon placeholder ──────────────────────────────────────────────────
+
+function ComingSoon({ label }) {
+  return (
+    <div className="flex-1 flex flex-col items-center justify-center gap-2 text-center px-6">
+      <div className="w-10 h-10 rounded-full bg-gray-100 dark:bg-gray-800 flex items-center justify-center">
+        <svg className="w-5 h-5 text-gray-400" viewBox="0 0 24 24" fill="none"
+          stroke="currentColor" strokeWidth={1.8} strokeLinecap="round" strokeLinejoin="round">
+          <circle cx="12" cy="12" r="10" />
+          <path d="M12 8v4l3 3" />
+        </svg>
+      </div>
+      <p className="text-[13px] font-semibold text-gray-600 dark:text-gray-300">{label}</p>
+      <p className="text-[11px] text-gray-400 dark:text-gray-500">Coming soon</p>
+    </div>
+  )
+}
+
+// ── Simple mode content ──────────────────────────────────────────────────────
+
+function SimpleContent({ activeTab, mobilePanel, setMobilePanel }) {
+  if (activeTab === 'MultiChart') return <ComingSoon label="MultiChart — coming soon" />
+  if (activeTab === 'SMC')        return <ComingSoon label="SMC — coming soon" />
+  if (activeTab === 'PriceAction') return <ComingSoon label="Price Action — coming soon" />
+
+  // General — chart + panels layout
+  return (
+    <>
+      <div className="flex-1 flex overflow-hidden min-h-0">
+
+        {/* Left panel — desktop only (lg+) */}
+        <div className="w-[10%] min-w-[120px] max-w-[180px] border-r border-gray-100
+                        dark:border-gray-800 overflow-y-auto hidden lg:flex flex-col shrink-0">
+          <LeftPanel />
+        </div>
+
+        {/* Chart */}
+        <div className="flex-1 min-h-0 overflow-hidden">
+          <ErrorBoundary label="Chart">
+            <StockChart />
+          </ErrorBoundary>
+        </div>
+
+        {/* Right panel — tablet+ (md+) */}
+        <div className="w-[15%] min-w-[160px] max-w-[240px] border-l border-gray-100
+                        dark:border-gray-800 overflow-y-auto hidden md:flex flex-col shrink-0">
+          <RightPanel />
+        </div>
+      </div>
+
+      {/* Mobile bottom nav */}
+      <MobileBottomNav panel={mobilePanel} setPanel={setMobilePanel} />
+      <MobileSheet panel={mobilePanel} onClose={() => setMobilePanel(null)} />
+    </>
+  )
+}
+
+// ── Complex mode content ─────────────────────────────────────────────────────
 
 function ComplexContent({ activeTab }) {
   if (activeTab === 'Backtesting') return (
@@ -22,16 +89,12 @@ function ComplexContent({ activeTab }) {
       <BacktestPage />
     </ErrorBoundary>
   )
-  if (activeTab === 'Insight') return (
-    <ErrorBoundary label="Insight">
-      <InsightPage />
+  if (activeTab === 'Replay') return (
+    <ErrorBoundary label="Replay">
+      <ReplayPage />
     </ErrorBoundary>
   )
-  if (activeTab === 'Breakdown') return (
-    <ErrorBoundary label="Breakdown">
-      <BreakdownPage />
-    </ErrorBoundary>
-  )
+  if (activeTab === 'StrategyLab') return <ComingSoon label="Strategy Lab — automated strategy testing" />
   return (
     <div className="flex-1 flex items-center justify-center text-[12px] text-gray-400">
       {activeTab} — coming soon
@@ -39,7 +102,8 @@ function ComplexContent({ activeTab }) {
   )
 }
 
-// ── Mobile bottom navigation bar ────────────────────────────────────────────────
+// ── Mobile bottom navigation bar ─────────────────────────────────────────────
+
 function MobileBottomNav({ panel, setPanel }) {
   const tabs = [
     {
@@ -105,9 +169,9 @@ function MobileBottomNav({ panel, setPanel }) {
   )
 }
 
-// ── Mobile slide-up sheet ───────────────────────────────────────────────────────
+// ── Mobile slide-up sheet ────────────────────────────────────────────────────
+
 function MobileSheet({ panel, onClose }) {
-  // Prevent body scroll when sheet is open
   useEffect(() => {
     if (!panel) return
     document.body.style.overflow = 'hidden'
@@ -120,25 +184,19 @@ function MobileSheet({ panel, onClose }) {
 
   return (
     <>
-      {/* Backdrop */}
       <div
         className="md:hidden fixed inset-0 bg-black/40 backdrop-blur-[2px] z-40"
         onClick={onClose}
       />
-
-      {/* Sheet */}
       <div
         className="md:hidden fixed bottom-0 left-0 right-0 z-50 flex flex-col
                    bg-white dark:bg-gray-900 rounded-t-2xl shadow-2xl
                    border-t border-gray-200 dark:border-gray-800"
         style={{ height: '68vh', paddingBottom: 'env(safe-area-inset-bottom, 0px)' }}
       >
-        {/* Drag handle */}
         <div className="shrink-0 flex justify-center pt-2.5 pb-1">
           <div className="w-10 h-1 rounded-full bg-gray-300 dark:bg-gray-600" />
         </div>
-
-        {/* Header */}
         <div className="shrink-0 flex items-center justify-between px-4 pb-2.5 border-b border-gray-100 dark:border-gray-800">
           <span className="text-[13px] font-bold text-gray-800 dark:text-gray-100">{title}</span>
           <button
@@ -150,8 +208,6 @@ function MobileSheet({ panel, onClose }) {
             ✕
           </button>
         </div>
-
-        {/* Content */}
         <div className="flex-1 overflow-y-auto min-h-0">
           {panel === 'positions' ? <LeftPanel /> : <RightPanel />}
         </div>
@@ -160,21 +216,46 @@ function MobileSheet({ panel, onClose }) {
   )
 }
 
-// ── Screen inner ────────────────────────────────────────────────────────────────
-function ScreenInner() {
-  const [mode,       setMode]       = useState(() => sessionStorage.getItem('screen_mode')       || 'simple')
-  const [complexTab, setComplexTab] = useState(() => sessionStorage.getItem('screen_complexTab') || 'Backtesting')
-  const [mobilePanel, setMobilePanel] = useState(null) // null | 'positions' | 'market'
+// ── Tab bar strip ────────────────────────────────────────────────────────────
 
-  const handleMode      = (m) => { setMode(m);      sessionStorage.setItem('screen_mode', m) }
+function TabStrip({ tabs, active, onChange }) {
+  return (
+    <div className="flex items-center bg-gray-100 dark:bg-gray-800 rounded-lg p-0.5">
+      {tabs.map(t => (
+        <button key={t.id} onClick={() => onChange(t.id)}
+          className={`px-2.5 py-0.5 rounded-md text-[9px] font-semibold transition-colors ${
+            active === t.id
+              ? 'bg-white dark:bg-gray-700 text-gray-900 dark:text-white shadow-sm'
+              : 'text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-300'
+          }`}>
+          <span className="hidden sm:inline">{t.label}</span>
+          <span className="sm:hidden">{t.short}</span>
+        </button>
+      ))}
+    </div>
+  )
+}
+
+// ── Screen inner ─────────────────────────────────────────────────────────────
+
+function ScreenInner() {
+  const [mode,        setMode]        = useState(() => sessionStorage.getItem('screen_mode')        || 'simple')
+  const [simpleTab,   setSimpleTab]   = useState(() => sessionStorage.getItem('screen_simpleTab')   || 'General')
+  const [complexTab,  setComplexTab]  = useState(() => sessionStorage.getItem('screen_complexTab')  || 'Backtesting')
+  const [mobilePanel, setMobilePanel] = useState(null)
+
+  const handleMode       = (m) => { setMode(m);       sessionStorage.setItem('screen_mode', m) }
+  const handleSimpleTab  = (t) => { setSimpleTab(t);  sessionStorage.setItem('screen_simpleTab', t) }
   const handleComplexTab = (t) => { setComplexTab(t); sessionStorage.setItem('screen_complexTab', t) }
 
-  // Close sheet on Escape
+  // Close mobile sheet on Escape
   useEffect(() => {
     const fn = (e) => { if (e.key === 'Escape') setMobilePanel(null) }
     window.addEventListener('keydown', fn)
     return () => window.removeEventListener('keydown', fn)
   }, [])
+
+  const isSimple = mode === 'simple'
 
   return (
     <div className="flex flex-col h-[calc(100vh-56px)] overflow-hidden bg-white dark:bg-gray-950">
@@ -184,75 +265,32 @@ function ScreenInner() {
         <div className="flex items-center gap-2">
 
           {/* Simple / Complex toggle */}
-          <div className="flex items-center bg-gray-100 dark:bg-gray-800 rounded-lg p-0.5">
-            {['simple', 'complex'].map(m => (
-              <button key={m} onClick={() => handleMode(m)}
-                className={`px-2.5 py-0.5 rounded-md text-[9px] font-semibold capitalize transition-colors ${
-                  mode === m
-                    ? 'bg-white dark:bg-gray-700 text-gray-900 dark:text-white shadow-sm'
-                    : 'text-gray-500 dark:text-gray-400'
-                }`}>
-                {m}
-              </button>
-            ))}
-          </div>
+          <TabStrip
+            tabs={[{ id: 'simple', label: 'Simple', short: 'Sim' }, { id: 'complex', label: 'Complex', short: 'Cpx' }]}
+            active={mode}
+            onChange={handleMode}
+          />
 
-          {/* Complex sub-tabs */}
-          {mode === 'complex' && (
-            <div className="flex items-center bg-gray-100 dark:bg-gray-800 rounded-lg p-0.5">
-              {COMPLEX_TABS.map(t => (
-                <button key={t.id} onClick={() => handleComplexTab(t.id)}
-                  className={`px-2.5 py-0.5 rounded-md text-[9px] font-semibold transition-colors ${
-                    complexTab === t.id
-                      ? 'bg-white dark:bg-gray-700 text-gray-900 dark:text-white shadow-sm'
-                      : 'text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-300'
-                  }`}>
-                  <span className="hidden sm:inline">{t.label}</span>
-                  <span className="sm:hidden">{t.short}</span>
-                </button>
-              ))}
-            </div>
-          )}
+          {/* Sub-tabs */}
+          {isSimple
+            ? <TabStrip tabs={SIMPLE_TABS}  active={simpleTab}  onChange={handleSimpleTab}  />
+            : <TabStrip tabs={COMPLEX_TABS} active={complexTab} onChange={handleComplexTab} />
+          }
         </div>
         <MarketStatusBadge />
       </div>
 
       {/* ── Content ── */}
-      {mode === 'complex' ? (
+      {isSimple ? (
+        <SimpleContent
+          activeTab={simpleTab}
+          mobilePanel={mobilePanel}
+          setMobilePanel={setMobilePanel}
+        />
+      ) : (
         <ComplexTabProvider>
           <ComplexContent activeTab={complexTab} />
         </ComplexTabProvider>
-      ) : (
-        <>
-          <div className="flex-1 flex overflow-hidden min-h-0">
-
-            {/* Left panel — desktop only (lg+) */}
-            <div className="w-[10%] min-w-[120px] max-w-[180px] border-r border-gray-100
-                            dark:border-gray-800 overflow-y-auto hidden lg:flex flex-col shrink-0">
-              <LeftPanel />
-            </div>
-
-            {/* Chart — full width on mobile, flex-1 on desktop */}
-            <div className="flex-1 min-h-0 overflow-hidden">
-              <ErrorBoundary label="Chart">
-                <StockChart />
-              </ErrorBoundary>
-            </div>
-
-            {/* Right panel — tablet+ (md+) */}
-            <div className="w-[15%] min-w-[160px] max-w-[240px] border-l border-gray-100
-                            dark:border-gray-800 overflow-y-auto hidden md:flex flex-col shrink-0">
-              <RightPanel />
-            </div>
-
-          </div>
-
-          {/* Mobile bottom nav — in document flow so chart isn't obscured */}
-          <MobileBottomNav panel={mobilePanel} setPanel={setMobilePanel} />
-
-          {/* Mobile slide-up sheet — portal-style fixed overlay */}
-          <MobileSheet panel={mobilePanel} onClose={() => setMobilePanel(null)} />
-        </>
       )}
     </div>
   )

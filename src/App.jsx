@@ -26,6 +26,8 @@ const ChatPage           = lazy(() => import('./pages/ChatPage'))
 const RiskLabPage        = lazy(() => import('./pages/RiskLabPage'))
 const CalendarPage       = lazy(() => import('./pages/CalendarPage'))
 const IPOPage            = lazy(() => import('./pages/IPOPage'))
+const DataLabPage        = lazy(() => import('./pages/DataLabPage'))
+const ExplorePage        = lazy(() => import('./pages/ExplorePage'))
 
 // Placeholder for pages being built in v2.0
 function ComingSoonPage({ title }) {
@@ -155,8 +157,10 @@ function AppContent() {
           <Route path="/risklab" element={<RiskLabPage />} />
           <Route path="/calendar" element={<CalendarPage />} />
           <Route path="/ipo" element={<IPOPage />} />
-          <Route path="/datalab" element={<ComingSoonPage title="Data Lab" />} />
-          <Route path="/explore" element={<ComingSoonPage title="Explore" />} />
+          <Route path="/explore/ipo" element={<IPOPage />} />
+          <Route path="/datalab" element={<DataLabPage />} />
+          <Route path="/explore" element={<ExplorePage />} />
+          <Route path="/explore/:tab" element={<ExplorePage />} />
           <Route path="/login" element={<LoginPage />} />
           <Route path="/signup" element={<SignupPage />} />
           <Route path="*" element={<NotFoundPage />} />

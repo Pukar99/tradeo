@@ -1,16 +1,12 @@
 import { useEffect, useRef, useState, useCallback } from 'react'
 import { useTheme } from '../../context/ThemeContext'
 import { useScreen } from '../../context/ScreenContext'
-import { getIndexChart, getStockChart, getTopMovers, getMarketSymbols, getSMCScan, triggerBackfill } from '../../api'
+import { getIndexChart, getStockChart, getTopMovers, triggerBackfill } from '../../api'
+import { getMarketSymbols } from '../../utils/globalCache'
 
 // ── Module-level caches (survive re-renders, shared across StockChart instances) ─
 const _chartCache   = new Map()  // `sym:tf` or `idx:id:tf` → { data, latest, ts }
-const _smcCache     = new Map()  // `sym:days` → { data, ts }
-let   _symbolsData  = null       // getMarketSymbols result
-let   _symbolsTs    = 0
-const CHART_TTL     = 5  * 60_000  // 5 min — NEPSE data is daily, 5 min is fresh enough
-const SMC_TTL       = 10 * 60_000  // 10 min
-const SYMBOLS_TTL   = 60 * 60_000  // 1 hour — symbol list rarely changes
+const CHART_TTL     = 5 * 60_000  // 5 min — NEPSE data is daily, 5 min is fresh enough
 
 // ── Drawing Tools ─────────────────────────────────────────────────────────────
 
@@ -51,7 +47,6 @@ function pixelToChart(chart, priceSeries, containerEl, e) {
 function renderDrawings(ctx, canvas, chart, priceSeries, drawings, preview, isDark) {
   ctx.clearRect(0, 0, canvas.width, canvas.height)
 
-  // shorthand: convert price/time → pixel using the passed series
   const c2p = (time, price) => chartToPixel(chart, priceSeries, time, price)
 
   function drawLine(p1, p2, color, dash = [], width = 1.5) {
@@ -73,26 +68,27 @@ function renderDrawings(ctx, canvas, chart, priceSeries, drawings, preview, isDa
     const dx = p2.x - p1.x, dy = p2.y - p1.y
     if (dx === 0 && dy === 0) return p2
     const ts = []
-    if (dx > 0) ts.push((canvas.width - p1.x) / dx)
-    if (dx < 0) ts.push((0 - p1.x) / dx)
+    if (dx > 0) ts.push((canvas.width  - p1.x) / dx)
+    if (dx < 0) ts.push((0            - p1.x) / dx)
     if (dy > 0) ts.push((canvas.height - p1.y) / dy)
-    if (dy < 0) ts.push((0 - p1.y) / dy)
+    if (dy < 0) ts.push((0            - p1.y) / dy)
     const t = Math.min(...ts.filter(v => v > 0.001))
     return { x: p1.x + dx * t, y: p1.y + dy * t }
   }
 
+  // Fib always draws full-width horizontal bands between p1 and p2 price levels
   function drawFib(p1, p2) {
     if (!p1 || !p2) return
     const dy = p2.y - p1.y
     ctx.save()
     FIB_LEVELS.forEach((lvl, i) => {
       const y = p1.y + dy * lvl
+      if (y < -20 || y > canvas.height + 20) return // skip off-screen levels
       const c = FIB_COLORS[i]
       ctx.strokeStyle = c; ctx.lineWidth = 1; ctx.setLineDash([4, 3])
-      ctx.beginPath(); ctx.moveTo(p1.x, y); ctx.lineTo(p2.x > p1.x ? canvas.width : 0, y); ctx.stroke()
+      ctx.beginPath(); ctx.moveTo(0, y); ctx.lineTo(canvas.width, y); ctx.stroke()
       ctx.fillStyle = c; ctx.font = 'bold 9px monospace'
       ctx.fillText(`${(lvl * 100).toFixed(1)}%`, 4, y - 2)
-      // price label — use series coordinateToPrice (v4 API)
       try {
         const price = priceSeries.coordinateToPrice(y)
         if (price != null) {
@@ -112,7 +108,7 @@ function renderDrawings(ctx, canvas, chart, priceSeries, drawings, preview, isDa
       if (!p) continue
       drawLine({ x: 0, y: p.y }, { x: canvas.width, y: p.y }, d.color)
       ctx.save(); ctx.fillStyle = d.color; ctx.font = 'bold 9px monospace'
-      ctx.fillText(d.price.toFixed(2), canvas.width - 54, p.y - 3); ctx.restore()
+      ctx.fillText(Number(d.price).toFixed(2), canvas.width - 54, p.y - 3); ctx.restore()
     } else if (d.type === 'vertical') {
       const p = c2p(d.time, d.price)
       if (!p) continue
@@ -141,10 +137,9 @@ function renderDrawings(ctx, canvas, chart, priceSeries, drawings, preview, isDa
   // ── Live preview ──
   if (!preview) return
   const { tool, start, end, points } = preview
-  const PRE = '#f59e0b' // amber preview color
+  const PRE = '#f59e0b'
 
   if (tool === 'horizontal' && start) {
-    // horizontal: use raw pixel y from mouse, not chart conversion
     drawLine({ x: 0, y: start.y }, { x: canvas.width, y: start.y }, PRE, [4, 3])
   } else if (tool === 'vertical' && start) {
     drawLine({ x: start.x, y: 0 }, { x: start.x, y: canvas.height }, PRE, [4, 3])
@@ -166,6 +161,52 @@ function renderDrawings(ctx, canvas, chart, priceSeries, drawings, preview, isDa
       pts.forEach(p => dot(p, PRE, 2.5))
     }
   }
+}
+
+// Hit-test: is pixel (mx, my) within HIT_RADIUS of a committed drawing?
+// Returns the drawing index or -1.
+const HIT_RADIUS = 6
+function hitTestDrawing(mx, my, drawings, chart, priceSeries) {
+  const c2p = (time, price) => chartToPixel(chart, priceSeries, time, price)
+  for (let i = drawings.length - 1; i >= 0; i--) {
+    const d = drawings[i]
+    if (d.type === 'horizontal') {
+      const p = c2p(d.time, d.price)
+      if (p && Math.abs(my - p.y) <= HIT_RADIUS) return i
+    } else if (d.type === 'vertical') {
+      const p = c2p(d.time, d.price)
+      if (p && Math.abs(mx - p.x) <= HIT_RADIUS) return i
+    } else if (d.type === 'trendline' || d.type === 'ray') {
+      const p1 = c2p(d.t1, d.p1), p2 = c2p(d.t2, d.p2)
+      if (!p1 || !p2) continue
+      const dx = p2.x - p1.x, dy = p2.y - p1.y
+      const len2 = dx * dx + dy * dy
+      if (len2 === 0) continue
+      const t = Math.max(0, Math.min(1, ((mx - p1.x) * dx + (my - p1.y) * dy) / len2))
+      const cx = p1.x + t * dx, cy = p1.y + t * dy
+      if (Math.hypot(mx - cx, my - cy) <= HIT_RADIUS) return i
+    } else if (d.type === 'fib') {
+      const p1 = c2p(d.t1, d.p1), p2 = c2p(d.t2, d.p2)
+      if (!p1 || !p2) continue
+      const dy = p2.y - p1.y
+      for (const lvl of FIB_LEVELS) {
+        const y = p1.y + dy * lvl
+        if (Math.abs(my - y) <= HIT_RADIUS) return i
+      }
+    } else if (d.type === 'path') {
+      const pts = d.points.map(pt => c2p(pt.time, pt.price)).filter(Boolean)
+      for (let j = 1; j < pts.length; j++) {
+        const p1 = pts[j - 1], p2 = pts[j]
+        const dx = p2.x - p1.x, dy = p2.y - p1.y
+        const len2 = dx * dx + dy * dy
+        if (len2 === 0) continue
+        const t = Math.max(0, Math.min(1, ((mx - p1.x) * dx + (my - p1.y) * dy) / len2))
+        const cx = p1.x + t * dx, cy = p1.y + t * dy
+        if (Math.hypot(mx - cx, my - cy) <= HIT_RADIUS) return i
+      }
+    }
+  }
+  return -1
 }
 
 // ── Indicator math ────────────────────────────────────────────────────────────
@@ -251,18 +292,6 @@ function calcBB(data, period = 20, mult = 2) {
   return { upper, lower, mid }
 }
 
-// ── VWAP (Volume-Weighted Average Price) ─────────────────────────────────────
-function calcVWAP(data) {
-  let cumVol = 0, cumTP = 0
-  return data.map(d => {
-    const tp = (d.high + d.low + d.close) / 3
-    const vol = d.volume || d.turnover || 0
-    cumVol += vol
-    cumTP += tp * vol
-    return { time: d.time, value: cumVol > 0 ? +(cumTP / cumVol).toFixed(2) : 0 }
-  }).filter(d => d.value > 0)
-}
-
 // ── ATR (Average True Range, 14) ─────────────────────────────────────────────
 function calcATR(data, period = 14) {
   if (data.length < period + 1) return []
@@ -276,68 +305,6 @@ function calcATR(data, period = 14) {
     out.push({ time: data[i + 1].time, value: +atr.toFixed(2) })
   }
   return out
-}
-
-// ── Stochastic (14, 3, 3) ────────────────────────────────────────────────────
-function calcStochastic(data, kPeriod = 14, dPeriod = 3) {
-  if (data.length < kPeriod) return { k: [], d: [] }
-  const rawK = []
-  for (let i = kPeriod - 1; i < data.length; i++) {
-    const slice = data.slice(i - kPeriod + 1, i + 1)
-    const hh = Math.max(...slice.map(d => d.high))
-    const ll = Math.min(...slice.map(d => d.low))
-    const val = hh === ll ? 50 : ((data[i].close - ll) / (hh - ll)) * 100
-    rawK.push({ time: data[i].time, value: +val.toFixed(2) })
-  }
-  // Smooth K to get %K (SMA of rawK over dPeriod)
-  const kLine = rawK.map((d, i) => {
-    if (i < dPeriod - 1) return null
-    const avg = rawK.slice(i - dPeriod + 1, i + 1).reduce((s, x) => s + x.value, 0) / dPeriod
-    return { time: d.time, value: +avg.toFixed(2) }
-  }).filter(Boolean)
-  // %D = SMA of %K
-  const dLine = kLine.map((d, i) => {
-    if (i < dPeriod - 1) return null
-    const avg = kLine.slice(i - dPeriod + 1, i + 1).reduce((s, x) => s + x.value, 0) / dPeriod
-    return { time: d.time, value: +avg.toFixed(2) }
-  }).filter(Boolean)
-  return { k: kLine, d: dLine }
-}
-
-// ── Supertrend (10, 3) ──────────────────────────────────────────────────────
-function calcSupertrend(data, period = 10, mult = 3) {
-  const atrVals = []
-  for (let i = 1; i < data.length; i++)
-    atrVals.push(trueRange(data[i].high, data[i].low, data[i - 1].close))
-  if (atrVals.length < period) return { up: [], down: [] }
-
-  const result = []
-  let atr = atrVals.slice(0, period).reduce((s, v) => s + v, 0) / period
-  let upperBand = ((data[period].high + data[period].low) / 2) + mult * atr
-  let lowerBand = ((data[period].high + data[period].low) / 2) - mult * atr
-  let supertrend = data[period].close > upperBand ? lowerBand : upperBand
-  let isUp = data[period].close > supertrend
-
-  result.push({ time: data[period].time, value: +supertrend.toFixed(2), isUp })
-
-  for (let i = period + 1; i < data.length; i++) {
-    atr = wilderSmooth(atr, atrVals[i - 1], period)
-    const hl2 = (data[i].high + data[i].low) / 2
-    let newUpper = hl2 + mult * atr
-    let newLower = hl2 - mult * atr
-    newLower = newLower > lowerBand ? newLower : lowerBand
-    newUpper = newUpper < upperBand ? newUpper : upperBand
-    if (data[i].close > upperBand) { supertrend = newLower; isUp = true }
-    else if (data[i].close < lowerBand) { supertrend = newUpper; isUp = false }
-    else { supertrend = isUp ? newLower : newUpper }
-    upperBand = newUpper; lowerBand = newLower
-    result.push({ time: data[i].time, value: +supertrend.toFixed(2), isUp })
-  }
-
-  return {
-    up: result.filter(d => d.isUp).map(d => ({ time: d.time, value: d.value })),
-    down: result.filter(d => !d.isUp).map(d => ({ time: d.time, value: d.value })),
-  }
 }
 
 async function loadLC() { return import('lightweight-charts') }
@@ -356,31 +323,26 @@ function ChartSymbolSearch() {
   const mouseDownInList = useRef(false)
 
   useEffect(() => {
-    // Serve from module-level cache — avoids re-fetching on every component mount
-    if (_symbolsData && Date.now() - _symbolsTs < SYMBOLS_TTL) {
-      setSymbols(_symbolsData); return
-    }
     getMarketSymbols()
-      .then(r => {
-        if (r.data?.stocks?.length) {
-          _symbolsData = r.data; _symbolsTs = Date.now()
-          setSymbols(r.data); setLoadErr(null)
-        }
-      })
+      .then(r => { if (r.data?.stocks?.length) { setSymbols(r.data); setLoadErr(null) } })
       .catch(() => setLoadErr('Symbols unavailable'))
-  }, [])
+  }, []) // uses globalCache — at most 1 DB call/hour across whole app
 
   const allItems = [
-    ...symbols.indexes.map(i => ({ label: i.name, sub: 'Index', indexId: i.index_id })),
-    ...symbols.stocks.map(s => ({ label: s.symbol, sub: 'Stock' })),
+    ...symbols.indexes.map(i => ({ label: i.name, sub: 'Index', indexId: i.index_id, company_name: null })),
+    ...symbols.stocks.map(s => ({ label: s.symbol, sub: 'Stock', company_name: s.company_name || null })),
   ]
 
+  const q = query.toLowerCase()
   const filtered = query.length < 1
     ? allItems.slice(0, 20)
-    : allItems.filter(i => i.label.toLowerCase().includes(query.toLowerCase())).slice(0, 30)
+    : allItems.filter(i =>
+        i.label.toLowerCase().includes(q) ||
+        (i.company_name && i.company_name.toLowerCase().includes(q))
+      ).slice(0, 30)
 
   const handleSelect = useCallback((item) => {
-    selectSymbol(item.label, item.indexId || null)
+    selectSymbol(item.label, item.indexId || null, null, item.company_name || null)
     setQuery(''); setOpen(false); setCursor(-1)
   }, [selectSymbol])
 
@@ -429,8 +391,13 @@ function ChartSymbolSearch() {
                   i === cursor ? 'bg-blue-50 dark:bg-blue-950' : 'hover:bg-gray-50 dark:hover:bg-gray-800'
                 }`}
               >
-                <span className="text-[11px] font-semibold text-gray-800 dark:text-gray-100">{item.label}</span>
-                <span className={`text-[8px] font-medium px-1.5 py-0.5 rounded ${
+                <div className="flex flex-col min-w-0">
+                  <span className="text-[11px] font-semibold text-gray-800 dark:text-gray-100 leading-tight">{item.label}</span>
+                  {item.company_name && (
+                    <span className="text-[8px] text-gray-400 dark:text-gray-500 truncate leading-tight">{item.company_name}</span>
+                  )}
+                </div>
+                <span className={`shrink-0 ml-2 text-[8px] font-medium px-1.5 py-0.5 rounded ${
                   item.sub === 'Index'
                     ? 'bg-blue-100 dark:bg-blue-900 text-blue-600 dark:text-blue-300'
                     : 'bg-gray-100 dark:bg-gray-800 text-gray-500'
@@ -453,11 +420,11 @@ function ChartSymbolSearch() {
 // ── HUD Controls — timeframe, chart type, indicators ──────────────────────────
 
 const TIMEFRAMES = ['1W', '1M', '3M', '6M', '1Y', '3Y', 'ALL']
-const INDICATORS = ['MA', 'EMA', 'BB', 'VWAP', 'RSI', 'MACD', 'ATR', 'STOCH', 'ST']
+const INDICATORS = ['MA', 'EMA', 'BB', 'RSI', 'MACD', 'ATR']
 
 // ── Indicator + Drawing Tools dropdown (desktop & mobile) ──────────────────────
 function ChartIndicatorDropdown({ activeTool, setActiveTool, onClearDrawings, drawCount }) {
-  const { activeIndicators: _ai, toggleIndicator, smcEnabled, setSmcEnabled } = useScreen() || {}
+  const { activeIndicators: _ai, toggleIndicator } = useScreen() || {}
   const activeIndicators = Array.isArray(_ai) ? _ai : []
   const [open, setOpen] = useState(false)
   const wrapRef = useRef(null)
@@ -470,7 +437,7 @@ function ChartIndicatorDropdown({ activeTool, setActiveTool, onClearDrawings, dr
     return () => document.removeEventListener('mousedown', fn)
   }, [open])
 
-  const totalActive = activeIndicators.length + (smcEnabled ? 1 : 0) + (activeTool ? 1 : 0)
+  const totalActive = activeIndicators.length + (activeTool ? 1 : 0)
 
   return (
     <div ref={wrapRef} className="relative shrink-0">
@@ -525,15 +492,6 @@ function ChartIndicatorDropdown({ activeTool, setActiveTool, onClearDrawings, dr
                   </button>
                 )
               })}
-              {/* SMC — purple accent */}
-              <button onClick={() => setSmcEnabled(p => !p)}
-                className={`px-2 py-0.5 rounded-md text-[9px] font-semibold border transition-all ${
-                  smcEnabled
-                    ? 'bg-purple-500 border-purple-500 text-white shadow-sm'
-                    : 'border-gray-200 dark:border-gray-700 text-gray-500 dark:text-gray-400 hover:border-purple-400 hover:text-purple-500'
-                }`}>
-                SMC
-              </button>
             </div>
           </div>
 
@@ -611,7 +569,7 @@ function ChartHUDControls() {
 // ── HUD Price + Symbol ─────────────────────────────────────────────────────────
 
 function ChartHUDPrice({ latestClose, chartData }) {
-  const { selectedSymbol } = useScreen()
+  const { selectedSymbol, selectedCompanyName } = useScreen()
 
   const lastBar = chartData.length > 0 ? chartData[chartData.length - 1] : null
   const change  = lastBar ? (lastBar.diff_pct ?? lastBar.per_change ?? null) : null
@@ -619,19 +577,24 @@ function ChartHUDPrice({ latestClose, chartData }) {
   const close   = latestClose ?? lastBar?.close
 
   return (
-    <div className="flex items-baseline gap-2 pointer-events-none" translate="no">
-      <span className="text-[12px] font-bold text-gray-700 dark:text-gray-300 tracking-wide">{selectedSymbol}</span>
-      {close != null && (
-        <>
-          <span className="text-[20px] font-black text-gray-900 dark:text-white tabular-nums leading-none">
-            {parseFloat(close).toLocaleString('en-NP', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
-          </span>
-          {change != null && (
-            <span className={`text-[11px] font-bold ${isPos ? 'text-emerald-500' : 'text-red-400'}`}>
-              {isPos ? '▲' : '▼'} {Math.abs(parseFloat(change)).toFixed(2)}%
+    <div className="flex flex-col pointer-events-none" translate="no">
+      <div className="flex items-baseline gap-2">
+        <span className="text-[12px] font-bold text-gray-700 dark:text-gray-300 tracking-wide">{selectedSymbol}</span>
+        {close != null && (
+          <>
+            <span className="text-[20px] font-black text-gray-900 dark:text-white tabular-nums leading-none">
+              {parseFloat(close).toLocaleString('en-NP', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
             </span>
-          )}
-        </>
+            {change != null && (
+              <span className={`text-[11px] font-bold ${isPos ? 'text-emerald-500' : 'text-red-400'}`}>
+                {isPos ? '▲' : '▼'} {Math.abs(parseFloat(change)).toFixed(2)}%
+              </span>
+            )}
+          </>
+        )}
+      </div>
+      {selectedCompanyName && (
+        <span className="text-[9px] text-gray-400 dark:text-gray-500 leading-tight mt-0.5">{selectedCompanyName}</span>
       )}
     </div>
   )
@@ -897,7 +860,7 @@ export default function StockChart() {
   const {
     selectedSymbol, selectedIndexId, chartType, timeframe,
     activeIndicators: _activeIndicators, isIndex, onHover, onPin, pinnedDate, clearPin,
-    activePositions, smcEnabled,
+    activePositions,
   } = useScreen() || {}
   const activeIndicators = Array.isArray(_activeIndicators) ? _activeIndicators : []
 
@@ -905,7 +868,6 @@ export default function StockChart() {
   const rsiRef     = useRef(null)
   const macdRef    = useRef(null)
   const atrRef     = useRef(null)
-  const stochRef   = useRef(null)
   const chartsRef  = useRef({})
   const seriesRef  = useRef({})
   const moversCache    = useRef({})
@@ -954,7 +916,6 @@ export default function StockChart() {
   const [tooltip,        setTooltip]        = useState(null)
   const [overlayData,    setOverlayData]    = useState(null)
   const [latestClose,    setLatestClose]    = useState(null)
-  const [smcData,        setSmcData]        = useState(null)
   const [activeTool,     setActiveTool]     = useState(null)
   const [drawVersion,    setDrawVersion]    = useState(0)  // bump to repaint canvas
   const [chartBuiltVer,  setChartBuiltVer]  = useState(0)  // bumps when chart instance is created
@@ -1059,26 +1020,6 @@ export default function StockChart() {
     })
   }, [selectedSymbol, selectedIndexId, timeframe]) // eslint-disable-line react-hooks/exhaustive-deps
 
-  // Fetch SMC data — with client-side cache; SMC is expensive to compute server-side
-  useEffect(() => {
-    if (!smcEnabled || isIndex()) { setSmcData(null); return }
-    const tfDays = { '1W': 7, '1M': 30, '3M': 90, '6M': 180, '1Y': 365, '3Y': 1095, 'ALL': 2000 }
-    const days   = tfDays[timeframe] ?? 365
-    const smcKey = `${selectedSymbol}:${days}`
-
-    const cached = _smcCache.get(smcKey)
-    if (cached && Date.now() - cached.ts < SMC_TTL) {
-      setSmcData(cached.data); return
-    }
-
-    getSMCScan({ symbol: selectedSymbol, days })
-      .then(r => {
-        _smcCache.set(smcKey, { data: r.data, ts: Date.now() })
-        setSmcData(r.data)
-      })
-      .catch(() => { setSmcData(null) })
-  }, [smcEnabled, selectedSymbol, timeframe]) // eslint-disable-line react-hooks/exhaustive-deps
-
   // Build / rebuild charts
   useEffect(() => {
     if (loading || !chartData.length || !mainRef.current) return
@@ -1161,28 +1102,6 @@ export default function StockChart() {
           const sL = main.addLineSeries({ color: '#a78bfa88', lineWidth: 1, priceLineVisible: false, title: 'BB-' })
           const sM = main.addLineSeries({ color: '#a78bfa55', lineWidth: 1, lineStyle: 2, priceLineVisible: false, title: '' })
           sU.setData(upper); sL.setData(lower); sM.setData(mid)
-        }
-      }
-
-      // VWAP overlay
-      if (activeIndicators.includes('VWAP') && !isIndex()) {
-        const vwap = calcVWAP(chartData)
-        if (vwap.length) {
-          const s = main.addLineSeries({ color: '#f59e0bcc', lineWidth: 1.5, lineStyle: 2, priceLineVisible: false, title: 'VWAP' })
-          s.setData(vwap)
-        }
-      }
-
-      // Supertrend overlay
-      if (activeIndicators.includes('ST')) {
-        const { up, down } = calcSupertrend(chartData, 10, 3)
-        if (up.length) {
-          const sUp = main.addLineSeries({ color: '#34d399', lineWidth: 2, priceLineVisible: false, title: 'ST↑', lineStyle: 0 })
-          sUp.setData(up)
-        }
-        if (down.length) {
-          const sDn = main.addLineSeries({ color: '#f87171', lineWidth: 2, priceLineVisible: false, title: 'ST↓', lineStyle: 0 })
-          sDn.setData(down)
         }
       }
 
@@ -1280,89 +1199,10 @@ export default function StockChart() {
         color: d.close >= d.open ? C.up + '44' : C.down + '44',
       })))
 
-      // SMC overlays — Order Blocks as bands, FVGs as zones, BOS/CHoCH/sweeps as markers
-      if (smcData && smcEnabled) {
-        const smcMarkers = []
+      if (markers.length) priceSeries.setMarkers(markers)
 
-        // Order Blocks — last 6 only, dashed zone lines (high/low of OB candle)
-        for (const ob of (smcData.order_blocks || []).slice(-6)) {
-          const isBull = ob.type === 'bullish'
-          const obColor = isBull ? '#34d399' : '#f87171'
-          const fromIdx = chartData.findIndex(d => d.time >= ob.date)
-          if (fromIdx < 0) continue
-          const slice = chartData.slice(fromIdx)
-          if (!slice.length) continue
-          const sTop = main.addLineSeries({
-            color: obColor, lineWidth: 1, lineStyle: 2,
-            priceLineVisible: false, crosshairMarkerVisible: false,
-            title: isBull ? 'OB↑' : 'OB↓',
-          })
-          sTop.setData(slice.map(d => ({ time: d.time, value: ob.high })))
-          const sBot = main.addLineSeries({
-            color: obColor + '66', lineWidth: 1, lineStyle: 2,
-            priceLineVisible: false, crosshairMarkerVisible: false, title: '',
-          })
-          sBot.setData(slice.map(d => ({ time: d.time, value: ob.low })))
-        }
-
-        // FVG — last 5, extend to end of chart so unfilled gaps stay visible
-        for (const gap of (smcData.fvg || []).slice(-5)) {
-          const isBull = gap.type === 'bullish'
-          const gapColor = isBull ? '#60a5fa' : '#f472b6'
-          const fromIdx = chartData.findIndex(d => d.time >= gap.date)
-          if (fromIdx < 0) continue
-          const gapSlice = chartData.slice(fromIdx)
-          if (!gapSlice.length) continue
-          const sT = main.addLineSeries({
-            color: gapColor, lineWidth: 1, lineStyle: 1,
-            priceLineVisible: false, crosshairMarkerVisible: false,
-            title: isBull ? 'FVG↑' : 'FVG↓',
-          })
-          sT.setData(gapSlice.map(d => ({ time: d.time, value: gap.top })))
-          const sB = main.addLineSeries({
-            color: gapColor + '66', lineWidth: 1, lineStyle: 1,
-            priceLineVisible: false, crosshairMarkerVisible: false, title: '',
-          })
-          sB.setData(gapSlice.map(d => ({ time: d.time, value: gap.bottom })))
-        }
-
-        // BOS — arrows only, no text to avoid label clutter
-        for (const b of (smcData.bos || [])) {
-          smcMarkers.push({
-            time: b.date, position: b.type === 'bullish' ? 'belowBar' : 'aboveBar',
-            color: b.type === 'bullish' ? '#34d399' : '#f87171',
-            shape: b.type === 'bullish' ? 'arrowUp' : 'arrowDown',
-            size: 1,
-          })
-        }
-
-        // CHoCH — amber circles with label (rare + important, 5 max from backend)
-        for (const ch of (smcData.choch || [])) {
-          smcMarkers.push({
-            time: ch.date, position: ch.type === 'bullish' ? 'belowBar' : 'aboveBar',
-            color: '#f59e0b', shape: 'circle', text: 'CH', size: 1,
-          })
-        }
-
-        // Sweeps — last 5, no text
-        for (const sw of (smcData.sweeps || []).slice(-5)) {
-          smcMarkers.push({
-            time: sw.date, position: sw.type === 'buy_side' ? 'belowBar' : 'aboveBar',
-            color: '#a78bfa', shape: 'square', size: 1,
-          })
-        }
-
-        // Patterns are tracked in the badge but not rendered on chart (too many, creates noise)
-
-        // Merge all markers (position + SMC) and set once
-        const allMarkers = [...markers, ...smcMarkers].sort((a, b) => a.time < b.time ? -1 : 1)
-        if (allMarkers.length) priceSeries.setMarkers(allMarkers)
-      } else if (markers.length) {
-        // No SMC but there are position markers — set them
-        priceSeries.setMarkers(markers)
-      }
-
-      // Crosshair events — debounce movers fetch by 80ms
+      // Crosshair events — movers fetch only for index charts, not stock charts
+      const indexView = isIndex?.()
       main.subscribeCrosshairMove(param => {
         if (pinnedDateRef.current) return
         if (cancelled) return
@@ -1371,7 +1211,8 @@ export default function StockChart() {
         if (!bar) return
         setTooltip({ ...bar, time: param.time, change: changeMap[param.time] })
 
-        // Debounce: cancel previous pending fetch
+        if (!indexView) return
+        // Debounce movers fetch
         if (pendingHover.current) clearTimeout(pendingHover.current)
         pendingHover.current = setTimeout(async () => {
           if (cancelled || pinnedDateRef.current) return
@@ -1387,10 +1228,12 @@ export default function StockChart() {
         if (!param.time) return
         const bar = param.seriesData?.get(priceSeries)
         if (!bar) return
+        setTooltip({ ...bar, time: param.time, change: changeMap[param.time] })
+
+        if (!indexView) return
         if (pendingHover.current) { clearTimeout(pendingHover.current); pendingHover.current = null }
         const movers = await getMovers(param.time)
         if (cancelled) return
-        setTooltip({ ...bar, time: param.time, change: changeMap[param.time] })
         setOverlayData({ date: param.time, movers, pinned: true })
         onPin(param.time, movers)
       })
@@ -1448,26 +1291,6 @@ export default function StockChart() {
         }
       }
 
-      // Stochastic sub-pane
-      if (activeIndicators.includes('STOCH') && stochRef.current) {
-        const { k, d } = calcStochastic(chartData)
-        if (k.length) {
-          const sc = createChart(stochRef.current, {
-            ...base,
-            width: stochRef.current.clientWidth,
-            height: stochRef.current.clientHeight,
-            rightPriceScale: { ...base.rightPriceScale, scaleMargins: { top: 0.1, bottom: 0.1 } },
-          })
-          chartsRef.current.stoch = sc
-          sc.addLineSeries({ color: '#60a5fa', lineWidth: 1.5, priceLineVisible: false, title: '%K' }).setData(k)
-          sc.addLineSeries({ color: '#f87171', lineWidth: 1.5, priceLineVisible: false, title: '%D' }).setData(d)
-          // 80/20 levels
-          sc.addLineSeries({ color: C.down + '60', lineWidth: 1, lineStyle: 2, priceLineVisible: false }).setData(k.map(p => ({ time: p.time, value: 80 })))
-          sc.addLineSeries({ color: C.up + '60', lineWidth: 1, lineStyle: 2, priceLineVisible: false }).setData(k.map(p => ({ time: p.time, value: 20 })))
-          main.timeScale().subscribeVisibleLogicalRangeChange(r => { if (r) sc.timeScale().setVisibleLogicalRange(r) })
-        }
-      }
-
       main.timeScale().fitContent()
 
       // If positions are loaded, scroll to show from the earliest entry date so
@@ -1521,12 +1344,6 @@ export default function StockChart() {
             height: atrRef.current.clientHeight,
           })
         }
-        if (stochRef.current && chartsRef.current.stoch) {
-          chartsRef.current.stoch.applyOptions({
-            width:  stochRef.current.clientWidth,
-            height: stochRef.current.clientHeight,
-          })
-        }
       })
       if (mainRef.current) ro.observe(mainRef.current)
       roCleanup = () => ro.disconnect()
@@ -1539,7 +1356,7 @@ export default function StockChart() {
       Object.values(chartsRef.current).forEach(c => { try { c.remove() } catch (_) {} })
       chartsRef.current = {}
     }
-  }, [chartData, isDark, chartType, activeIndicators, activePositions, smcData, smcEnabled]) // eslint-disable-line react-hooks/exhaustive-deps
+  }, [chartData, isDark, chartType, activeIndicators, activePositions]) // eslint-disable-line react-hooks/exhaustive-deps
 
   useEffect(() => {
     pinnedDateRef.current = pinnedDate
@@ -1635,11 +1452,14 @@ export default function StockChart() {
         drawingsRef.current.push({ type: 'horizontal', time: pt.time, price: pt.price, color: nextColor() })
         saveDrawingsRef.current(drawingsRef.current)
         setDrawVersion(v => v + 1)
+        // clear preview so hover-preview resets (tool stays active)
+        drawPreviewRef.current = null
       } else if (tool === 'vertical') {
         if (pt.time == null) return
         drawingsRef.current.push({ type: 'vertical', time: pt.time, price: pt.price, color: nextColor() })
         saveDrawingsRef.current(drawingsRef.current)
         setDrawVersion(v => v + 1)
+        drawPreviewRef.current = null
       } else if (tool === 'trendline' || tool === 'ray' || tool === 'fib') {
         drawPreviewRef.current = { tool, start: pt, end: pt, color: nextColor() }
       } else if (tool === 'path') {
@@ -1662,7 +1482,6 @@ export default function StockChart() {
         drawPreviewRef.current.end = pt
         scheduleRepaint()
       } else if (tool === 'horizontal' || tool === 'vertical') {
-        // show live crosshair preview even before mousedown
         drawPreviewRef.current = { tool, start: pt, end: pt, color: '#f59e0b' }
         scheduleRepaint()
       }
@@ -1671,10 +1490,10 @@ export default function StockChart() {
     function onMouseUp(e) {
       const tool = activeToolRef.current
       const preview = drawPreviewRef.current
-      if (!preview || !tool) return
+      if (!tool) return
+      if (!preview) return
       if (tool === 'path') return
       if (tool === 'horizontal' || tool === 'vertical') {
-        // already committed on mousedown
         drawPreviewRef.current = null
         scheduleRepaint()
         return
@@ -1693,6 +1512,7 @@ export default function StockChart() {
           saveDrawingsRef.current(drawingsRef.current)
           setDrawVersion(v => v + 1)
         }
+        // Tool stays active — only clear the in-progress preview
         drawPreviewRef.current = null
         scheduleRepaint()
       }
@@ -1711,10 +1531,29 @@ export default function StockChart() {
     }
 
     function onContextMenu(e) {
-      if (!activeToolRef.current) return
       e.preventDefault()
-      drawPreviewRef.current = null
-      scheduleRepaint()
+      const tool = activeToolRef.current
+
+      if (tool && drawPreviewRef.current) {
+        // Cancel in-progress drawing
+        drawPreviewRef.current = null
+        scheduleRepaint()
+        return
+      }
+
+      // No active tool — right-click on a committed drawing to delete it
+      const rect = container.getBoundingClientRect()
+      const mx = e.clientX - rect.left
+      const my = e.clientY - rect.top
+      const chart = getCtx(), ps = getPs()
+      if (!chart || !ps) return
+      const hitIdx = hitTestDrawing(mx, my, drawingsRef.current, chart, ps)
+      if (hitIdx >= 0) {
+        drawingsRef.current.splice(hitIdx, 1)
+        saveDrawingsRef.current(drawingsRef.current)
+        setDrawVersion(v => v + 1)
+        scheduleRepaint()
+      }
     }
 
     function onMouseLeave() {
@@ -1725,12 +1564,22 @@ export default function StockChart() {
       }
     }
 
+    // Escape key — cancel active tool and any in-progress drawing
+    function onKeyDown(e) {
+      if (e.key === 'Escape' && activeToolRef.current) {
+        drawPreviewRef.current = null
+        setActiveTool(null)
+        scheduleRepaint()
+      }
+    }
+
     container.addEventListener('mousedown',   onMouseDown)
     container.addEventListener('mousemove',   onMouseMove)
     container.addEventListener('mouseup',     onMouseUp)
     container.addEventListener('dblclick',    onDblClick)
     container.addEventListener('contextmenu', onContextMenu)
     container.addEventListener('mouseleave',  onMouseLeave)
+    window.addEventListener('keydown',        onKeyDown)
 
     return () => {
       container.removeEventListener('mousedown',   onMouseDown)
@@ -1739,14 +1588,14 @@ export default function StockChart() {
       container.removeEventListener('dblclick',    onDblClick)
       container.removeEventListener('contextmenu', onContextMenu)
       container.removeEventListener('mouseleave',  onMouseLeave)
+      window.removeEventListener('keydown',        onKeyDown)
     }
   }, [chartBuiltVer, isDark]) // eslint-disable-line react-hooks/exhaustive-deps
 
   const showRSI   = activeIndicators.includes('RSI')
   const showMACD  = activeIndicators.includes('MACD')
   const showATR   = activeIndicators.includes('ATR')
-  const showSTOCH = activeIndicators.includes('STOCH')
-  const indCount  = (showRSI ? 1 : 0) + (showMACD ? 1 : 0) + (showATR ? 1 : 0) + (showSTOCH ? 1 : 0)
+  const indCount  = (showRSI ? 1 : 0) + (showMACD ? 1 : 0) + (showATR ? 1 : 0)
   const mainPct   = indCount === 0 ? 100 : indCount === 1 ? 70 : indCount === 2 ? 55 : indCount === 3 ? 45 : 40
 
   if (error) return (
@@ -1809,37 +1658,14 @@ export default function StockChart() {
             )}
           </div>
 
-          {/* SMC info badge — shows structure counts when enabled */}
-          {smcEnabled && smcData && (
-            <div className="absolute top-2 right-3 z-20 pointer-events-none">
-              <div className="flex items-center gap-1.5 bg-purple-500/10 border border-purple-400/30 rounded-lg px-2 py-1">
-                <span className="text-[8px] font-bold text-purple-400 uppercase tracking-widest">SMC</span>
-                <span className="text-[8px] text-gray-400">OB:{smcData.order_blocks?.length ?? 0}</span>
-                <span className="text-[8px] text-gray-400">FVG:{smcData.fvg?.length ?? 0}</span>
-                <span className="text-[8px] text-gray-400">BOS:{smcData.bos?.length ?? 0}</span>
-                {(smcData.choch?.length ?? 0) > 0 && (
-                  <span className="text-[8px] text-amber-400">CH:{smcData.choch.length}</span>
-                )}
-                <span className="text-[8px] text-gray-400">PAT:{smcData.patterns?.length ?? 0}</span>
-              </div>
-            </div>
-          )}
-          {smcEnabled && !smcData && !isIndex() && (
-            <div className="absolute top-2 right-3 z-20 pointer-events-none">
-              <div className="bg-purple-500/10 border border-purple-400/30 rounded-lg px-2 py-1">
-                <span className="text-[8px] text-purple-400">SMC loading…</span>
-              </div>
-            </div>
-          )}
-
           {/* Position badge */}
           <PositionBadge positions={activePositions} latestClose={latestClose} />
 
           {/* OHLC tooltip */}
           <OHLCTooltip bar={tooltip} change={tooltip?.change} />
 
-          {/* Pinned hint */}
-          {overlayData?.pinned && (
+          {/* Pinned hint — only shown for index charts */}
+          {overlayData?.pinned && isIndex?.() && (
             <div className="absolute bottom-2 left-1/2 -translate-x-1/2 z-10 pointer-events-none">
               <span className="text-[9px] text-gray-400 bg-white/80 dark:bg-gray-900/80 px-2 py-0.5 rounded-full border border-gray-200 dark:border-gray-700">
                 📌 Movers shown in right panel — click to unpin
@@ -1851,11 +1677,11 @@ export default function StockChart() {
           {activeTool && (
             <div className="absolute bottom-8 left-1/2 -translate-x-1/2 z-30 pointer-events-none">
               <span className="text-[9px] text-white bg-amber-600/90 px-2.5 py-1 rounded-full shadow whitespace-nowrap">
-                {activeTool === 'horizontal' ? 'Click anywhere to place horizontal line'
-                : activeTool === 'vertical'  ? 'Click anywhere to place vertical line'
-                : activeTool === 'path'      ? 'Click points · Double-click to finish · Right-click to cancel'
-                : activeTool === 'fib'       ? 'Click & drag to set Fibonacci range · Right-click to cancel'
-                : 'Click & drag · Right-click to cancel'}
+                {activeTool === 'horizontal' ? 'Click to place · Esc to exit · Right-click drawing to delete'
+                : activeTool === 'vertical'  ? 'Click to place · Esc to exit · Right-click drawing to delete'
+                : activeTool === 'path'      ? 'Click points · Double-click to finish · Right-click to cancel · Esc to exit'
+                : activeTool === 'fib'       ? 'Click & drag to set Fibonacci range · Right-click to cancel · Esc to exit'
+                : 'Click & drag · Right-click to cancel · Esc to exit'}
               </span>
             </div>
           )}
@@ -1899,13 +1725,6 @@ export default function StockChart() {
             </div>
           )}
 
-          {showSTOCH && (
-            <div className="w-full shrink-0 border-t border-gray-100 dark:border-gray-800 flex flex-col" style={{ height: `${subPanePct}%` }}>
-              <SubPaneLabel title="STOCH" sub="14 / 3 / 3" color="#60a5fa"
-                legend={[{ color: '#60a5fa', label: '%K' }, { color: '#f87171', label: '%D' }]} />
-              <div ref={stochRef} className="w-full flex-1 min-h-0" />
-            </div>
-          )}
         </div>
       )}
     </div>

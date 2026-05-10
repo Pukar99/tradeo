@@ -79,8 +79,8 @@ function Navbar() {
   // ── Nav links ───────────────────────────────────────────────────────────────
   const NAV_LINKS = [
     { path: '/',          label: t('nav.home')      },
-    { path: '/screen',    label: t('nav.analysis')  },
-    { path: '/logs',      label: t('nav.trader')    },
+    { path: '/screen',    label: 'Screen'           },
+    { path: '/logs',      label: 'Logs'             },
     { path: '/portfolio', label: t('nav.portfolio') },
     { path: '/datalab',   label: 'Data Lab'         },
     { path: '/risklab',   label: t('nav.risklab')   },

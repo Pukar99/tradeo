@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef } from 'react'
-import { getMarketSymbols } from '../../api'
+import { getMarketSymbols } from '../../utils/globalCache'
 import { useScreen } from '../../context/ScreenContext'
 
 export default function SymbolSearch() {
@@ -18,19 +18,21 @@ export default function SymbolSearch() {
     getMarketSymbols()
       .then(r => { setSymbols(r.data); setLoadErr(null) })
       .catch(() => setLoadErr('Failed to load symbols'))
-  }, [])
+  }, []) // globalCache wrapper — at most 1 DB call/hour shared across all components
 
   const allItems = [
-    ...symbols.indexes.map(i => ({ label: i.name, sub: 'Index', indexId: i.index_id })),
-    ...symbols.stocks.map(s => ({ label: s.symbol, sub: 'Stock' })),
+    ...symbols.indexes.map(i => ({ label: i.name, sub: 'Index', indexId: i.index_id, company_name: null })),
+    ...symbols.stocks.map(s => ({ label: s.symbol, sub: 'Stock', company_name: s.company_name || null })),
   ]
 
+  const q = query.toLowerCase()
   const filtered = query.length < 1 ? allItems.slice(0, 20) : allItems.filter(i =>
-    i.label.toLowerCase().includes(query.toLowerCase())
+    i.label.toLowerCase().includes(q) ||
+    (i.company_name && i.company_name.toLowerCase().includes(q))
   ).slice(0, 30)
 
   function handleSelect(item) {
-    selectSymbol(item.label, item.indexId || null)
+    selectSymbol(item.label, item.indexId || null, null, item.company_name || null)
     setQuery('')
     setOpen(false)
     setCursor(-1)
@@ -83,8 +85,13 @@ export default function SymbolSearch() {
                     : 'hover:bg-gray-50 dark:hover:bg-gray-800'
                 }`}
               >
-                <span className="text-[12px] font-semibold text-gray-800 dark:text-gray-100">{item.label}</span>
-                <span className={`text-[9px] font-medium px-1.5 py-0.5 rounded-md ${
+                <div className="flex flex-col min-w-0">
+                  <span className="text-[12px] font-semibold text-gray-800 dark:text-gray-100 leading-tight">{item.label}</span>
+                  {item.company_name && (
+                    <span className="text-[9px] text-gray-400 dark:text-gray-500 truncate leading-tight">{item.company_name}</span>
+                  )}
+                </div>
+                <span className={`shrink-0 ml-2 text-[9px] font-medium px-1.5 py-0.5 rounded-md ${
                   item.sub === 'Index'
                     ? 'bg-blue-100 dark:bg-blue-900 text-blue-600 dark:text-blue-300'
                     : 'bg-gray-100 dark:bg-gray-800 text-gray-500'
