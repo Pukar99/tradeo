@@ -158,10 +158,13 @@ export const uploadAvatar = (formData) => API.post('/api/profile/avatar', formDa
 export const changePassword = (data) => API.put('/api/profile/password', data)
 
 // AI Chat
-export const sendChatMessage = (data) => API.post('/api/chat/message', data)
-export const sendAgentMessage = (data) => API.post('/api/chat/agent', data)
-export const getChatSuggestions = () => API.get('/api/chat/suggestions')
-export const getTraderProfile = () => API.get('/api/chat/trader-profile')
+export const sendChatMessage    = (data)     => API.post('/api/chat/message', data)
+export const sendAgentMessage   = (data)     => API.post('/api/chat/agent', data)
+export const getChatSuggestions = ()         => API.get('/api/chat/suggestions')
+export const getTraderProfile   = ()         => API.get('/api/chat/trader-profile')
+export const transcribeAudio    = (formData) => API.post('/api/chat/transcribe', formData, {
+  headers: { 'Content-Type': 'multipart/form-data' },
+})
 
 // Chat sessions
 export const saveChatSession    = (data)       => API.post('/api/chat/sessions', data)
@@ -208,12 +211,17 @@ export const getMonthDetail         = (params) => API.get('/api/insight/month-de
 export const getSectorMonth         = (params) => API.get('/api/insight/sector-month',    { params })
 
 // Complex Tab — Breakdown
-export const scanBreakdown          = (data)   => API.post('/api/breakdown/scan',         data)
-export const getSectorYear          = (params) => API.get('/api/breakdown/sector-year',   { params })
-export const getSectorHistory       = (params) => API.get('/api/breakdown/sector-history',{ params })
-export const getStockReturns        = (params) => API.get('/api/breakdown/stock-returns', { params })
+export const scanBreakdown          = (data)   => API.post('/api/breakdown/scan',              data)
+export const getSectorYear          = (params, cfg)   => API.get('/api/breakdown/sector-year',        { params, ...cfg })
+export const getSectorHistory       = (params) => API.get('/api/breakdown/sector-history',     { params })
+export const getStockReturns        = (params) => API.get('/api/breakdown/stock-returns',      { params })
 export const getStockMonthDetail    = (params) => API.get('/api/breakdown/stock-month-detail', { params })
-export const getSectorMonthStocks   = (params) => API.get('/api/breakdown/sector-month-stocks', { params })
+export const getSectorMonthStocks   = (params) => API.get('/api/breakdown/sector-month-stocks',{ params })
+export const getMarketCycles        = (params)        => API.get('/api/breakdown/market-cycles',      { params })
+export const runDropAnalysis        = (data)          => API.post('/api/breakdown/drop-analysis',     data)
+export const getSectorStocks        = (params, cfg)   => API.get('/api/breakdown/sector-stocks',      { params, ...cfg })
+export const getSectorIndexChart    = (params, cfg)   => API.get('/api/breakdown/sector-index-chart', { params, ...cfg })
+export const getStockPriceRange     = (params, cfg)   => API.get('/api/breakdown/stock-price-range',  { params, ...cfg })
 
 
 // SMC (Smart Money Concepts) Scanner

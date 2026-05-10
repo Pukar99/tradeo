@@ -2,7 +2,7 @@ import { useState, useEffect, useRef } from 'react'
 import { useAuth } from '../context/AuthContext'
 import { useTheme } from '../context/ThemeContext'
 import { useLanguage } from '../context/LanguageContext'
-import { sendAgentMessage, getChatSuggestions, BASE_URL, saveChatSession, listChatSessions, loadChatSession, deleteChatSession } from '../api'
+import { sendAgentMessage, getChatSuggestions, BASE_URL, transcribeAudio, saveChatSession, listChatSessions, loadChatSession, deleteChatSession } from '../api'
 import { dispatchChatAction, DEBRIEF_EVENT } from '../utils/chatEvents'
 import { useNavigate } from 'react-router-dom'
 
@@ -956,14 +956,7 @@ function AIChat({ isFullPage = false, onClose }) {
       const blob     = new Blob(chunks, { type: 'audio/webm' })
       const formData = new FormData()
       formData.append('audio', blob, 'audio.webm')
-      const token = localStorage.getItem('token')
-      const res   = await fetch(`${BASE_URL}/api/chat/transcribe`, {
-        method: 'POST',
-        headers: { Authorization: `Bearer ${token}` },
-        body:    formData,
-      })
-      const data = await res.json()
-      if (!res.ok) throw new Error(data.error || 'Transcription failed')
+      const { data } = await transcribeAudio(formData)
       const text = data.text?.trim()
       if (!text) { setVoiceState('idle'); return }
       setInput(prev => (prev ? prev + ' ' : '') + text)

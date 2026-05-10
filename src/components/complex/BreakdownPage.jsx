@@ -1,18 +1,11 @@
 import { useState, useEffect, useRef, useCallback, useMemo, memo } from 'react'
 import { useTheme } from '../../context/ThemeContext'
-import { BASE_URL } from '../../api'
+import {
+  getMarketCycles, runDropAnalysis, getSectorStocks,
+  getSectorIndexChart, getStockPriceRange, getSectorYear,
+} from '../../api'
 import { apiError } from '../../utils/format'
 import { INDEX_OPTIONS, MONTHS, SECTOR_IDS } from '../../utils/constants'
-
-const getToken = () => localStorage.getItem('token')
-const API = `${BASE_URL}/api`
-
-// Build a URL safely using URLSearchParams — prevents query-param injection
-const buildUrl = (path, params) => {
-  const url = new URL(`${API}${path}`)
-  Object.entries(params).forEach(([k, v]) => { if (v != null) url.searchParams.set(k, v) })
-  return url.toString()
-}
 
 // ─────────────────────────────────────────────────────────────────────────────
 // COLOUR HELPERS
@@ -443,15 +436,12 @@ function SectorHeatmap({ year, dark }) {
     setLoading(true)
     setError('')
     setData(null)
-    const token = getToken()
-    fetch(`${API}/breakdown/sector-year?year=${year}`, { headers: { Authorization: `Bearer ${token}` }, signal: ctrl.signal })
-      .then(r => r.json())
-      .then(d => {
+    getSectorYear({ year }, { signal: ctrl.signal })
+      .then(r => {
         if (ctrl.signal.aborted) return
-        if (d.error) throw new Error(d.error)
-        setData(d)
+        setData(r.data)
       })
-      .catch(e => { if (!ctrl.signal.aborted) setError(e.name === 'AbortError' ? '' : e.message) })
+      .catch(e => { if (!ctrl.signal.aborted) setError(e.name === 'AbortError' ? '' : apiError(e, 'Failed to load heatmap')) })
       .finally(() => { if (!ctrl.signal.aborted) setLoading(false) })
     return () => ctrl.abort()
   }, [year])
@@ -812,18 +802,15 @@ function SectorIndexChart({ sector, cycle, dark }) {
     setCandles(null)
     setLoading(true)
     setError('')
-    const token = getToken()
-    fetch(
-      buildUrl('/breakdown/sector-index-chart', { index_name: sector.index_name, peak_date: cycle.start_date, trough_date: cycle.end_date }),
-      { headers: { Authorization: `Bearer ${token}` }, signal: ctrl.signal }
+    getSectorIndexChart(
+      { index_name: sector.index_name, peak_date: cycle.start_date, trough_date: cycle.end_date },
+      { signal: ctrl.signal }
     )
-      .then(r => r.json())
-      .then(d => {
+      .then(r => {
         if (ctrl.signal.aborted) return
-        if (d.error) throw new Error(d.error)
-        setCandles(d.candles || [])
+        setCandles(r.data.candles || [])
       })
-      .catch(e => { if (!ctrl.signal.aborted) { setError(e.name === 'AbortError' ? '' : e.message); setCandles([]) } })
+      .catch(e => { if (!ctrl.signal.aborted) { setError(e.name === 'AbortError' ? '' : apiError(e, 'Failed to load chart')); setCandles([]) } })
       .finally(() => { if (!ctrl.signal.aborted) setLoading(false) })
     return () => ctrl.abort()
   }, [sector?.index_name, cycle?.start_date, cycle?.end_date])
@@ -922,13 +909,7 @@ export default function BreakdownPage() {
     setDetecting(true)
     setDetectError('')
     try {
-      const token = getToken()
-      const resp  = await fetch(
-        `${API}/breakdown/market-cycles?threshold=${thresh}&index_id=${idxId}`,
-        { headers: { Authorization: `Bearer ${token}` } }
-      )
-      const data = await resp.json()
-      if (data.error) throw new Error(data.error)
+      const { data } = await getMarketCycles({ threshold: thresh, index_id: idxId })
       setCycles(data.cycles || [])
       setAllCandles(data.candles || [])
       // Reset analysis when index/threshold changes
@@ -964,14 +945,7 @@ export default function BreakdownPage() {
     setAnalyzing(true)
 
     try {
-      const token = getToken()
-      const resp  = await fetch(`${API}/breakdown/drop-analysis`, {
-        method:  'POST',
-        headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
-        body:    JSON.stringify({ peak_date: cycle.start_date, trough_date: cycle.end_date }),
-      })
-      const data = await resp.json()
-      if (!resp.ok) throw new Error(data.error || `HTTP ${resp.status}`)
+      const { data } = await runDropAnalysis({ peak_date: cycle.start_date, trough_date: cycle.end_date })
       setAnalysis(data)
     } catch (e) {
       setAnalyzeError(apiError(e, 'Failed to run analysis'))
@@ -986,13 +960,10 @@ export default function BreakdownPage() {
     setSectorLoading(prev => ({ ...prev, [indexName]: true }))
     const ctrl = new AbortController()
     try {
-      const token = getToken()
-      const resp  = await fetch(
-        buildUrl('/breakdown/sector-stocks', { sector_index: indexName, peak_date: peakDate, trough_date: troughDate }),
-        { headers: { Authorization: `Bearer ${token}` }, signal: ctrl.signal }
+      const { data } = await getSectorStocks(
+        { sector_index: indexName, peak_date: peakDate, trough_date: troughDate },
+        { signal: ctrl.signal }
       )
-      const data = await resp.json()
-      if (!resp.ok) throw new Error(data.error || `HTTP ${resp.status}`)
       const stocks = data.stocks || []
       sectorStocksRef.current[indexName] = stocks
       setSectorStocks(prev => ({ ...prev, [indexName]: stocks }))
@@ -1040,13 +1011,10 @@ export default function BreakdownPage() {
       const today   = new Date().toISOString().slice(0, 10)
       const rawTo   = addDays(activeCycle.end_date, 120)
       const toStr   = rawTo < today ? rawTo : today
-      const token = getToken()
-      const resp  = await fetch(
-        buildUrl('/breakdown/stock-price-range', { symbol: stock.symbol, from: fromStr, to: toStr }),
-        { headers: { Authorization: `Bearer ${token}` }, signal: ctrl.signal }
+      const { data } = await getStockPriceRange(
+        { symbol: stock.symbol, from: fromStr, to: toStr },
+        { signal: ctrl.signal }
       )
-      const data = await resp.json()
-      if (!resp.ok) throw new Error(data.error || `HTTP ${resp.status}`)
       if (!ctrl.signal.aborted) setStockCandles(data.candles || [])
     } catch (e) {
       if (!ctrl.signal.aborted) { setStockError(apiError(e, 'Failed to load stock chart')); setStockCandles([]) }
