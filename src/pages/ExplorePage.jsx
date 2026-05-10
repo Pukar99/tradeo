@@ -2,6 +2,7 @@ import { useState, Suspense, lazy } from 'react'
 import { useParams, useNavigate } from 'react-router-dom'
 import ErrorBoundary from '../components/ErrorBoundary'
 
+// Lazy load — each tab is independent so code-split by default
 const IPOPage      = lazy(() => import('./IPOPage'))
 const ResearchPage = lazy(() => import('./ResearchPage'))
 
@@ -115,7 +116,7 @@ export default function ExplorePage() {
   const active = TABS.find(t => t.id === activeTab)
 
   return (
-    <div className="flex flex-col h-[calc(100vh-56px)] overflow-hidden bg-gray-50 dark:bg-gray-950">
+    <div className="flex flex-col h-[calc(100vh-56px)] bg-white dark:bg-gray-950">
 
       {/* ── Tab bar ── */}
       <div className="shrink-0 flex items-center gap-1 px-4 py-2 border-b border-gray-200 dark:border-gray-800 bg-white dark:bg-gray-900">
@@ -140,7 +141,6 @@ export default function ExplorePage() {
           )
         })}
 
-        {/* Active tab description */}
         {active?.desc && (
           <span className="ml-3 text-[10px] text-gray-400 dark:text-gray-500 hidden md:block truncate">
             {active.desc}
@@ -148,8 +148,8 @@ export default function ExplorePage() {
         )}
       </div>
 
-      {/* ── Content ── */}
-      <div className="flex-1 overflow-hidden min-h-0">
+      {/* ── Content — flex-1 so embedded pages fill remaining height ── */}
+      <div className="flex-1 min-h-0 overflow-auto">
         <TabContent activeTab={activeTab} />
       </div>
     </div>
