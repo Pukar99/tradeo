@@ -1,8 +1,7 @@
-import { useState, Suspense, lazy } from 'react'
+import { useState, Suspense, lazy, useEffect } from 'react'
 import { useParams, useNavigate } from 'react-router-dom'
 import ErrorBoundary from '../components/ErrorBoundary'
 
-// Lazy load — each tab is independent so code-split by default
 const IPOPage      = lazy(() => import('./IPOPage'))
 const ResearchPage = lazy(() => import('./ResearchPage'))
 
@@ -20,9 +19,9 @@ const TABS = [
     desc: 'IPO applications, allotment results and Meroshare integration',
   },
   {
-    id:      'aisignal',
-    label:   'AI Signal',
-    coming:  true,
+    id:     'aisignal',
+    label:  'AI Signal',
+    coming: true,
     icon: (
       <svg className="w-3.5 h-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round">
         <polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2" />
@@ -44,19 +43,12 @@ const TABS = [
   },
 ]
 
-// ── Loading fallback ──────────────────────────────────────────────────────────
-function TabLoader() {
-  return (
-    <div className="flex-1 flex items-center justify-center">
-      <div className="w-6 h-6 border-2 border-blue-600 border-t-transparent rounded-full animate-spin" />
-    </div>
-  )
-}
+const VALID_IDS = new Set(TABS.map(t => t.id))
 
 // ── Coming soon placeholder ───────────────────────────────────────────────────
 function ComingSoon({ label, desc }) {
   return (
-    <div className="flex-1 flex flex-col items-center justify-center gap-3 text-center px-6">
+    <div className="flex flex-col items-center justify-center gap-3 text-center px-6 py-20">
       <div className="w-12 h-12 rounded-2xl bg-gray-100 dark:bg-gray-800 flex items-center justify-center">
         <svg className="w-6 h-6 text-gray-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
           <circle cx="12" cy="12" r="10" />
@@ -74,52 +66,51 @@ function ComingSoon({ label, desc }) {
   )
 }
 
-// ── Tab content ───────────────────────────────────────────────────────────────
-function TabContent({ activeTab }) {
-  const tab = TABS.find(t => t.id === activeTab)
-
-  if (tab?.coming) return <ComingSoon label={tab.label} desc={tab.desc} />
-
-  if (activeTab === 'ipo') return (
-    <ErrorBoundary label="IPO">
-      <Suspense fallback={<TabLoader />}>
-        <IPOPage />
-      </Suspense>
-    </ErrorBoundary>
-  )
-
-  if (activeTab === 'sharemy') return (
-    <ErrorBoundary label="ShareMy">
-      <Suspense fallback={<TabLoader />}>
-        <ResearchPage />
-      </Suspense>
-    </ErrorBoundary>
-  )
-
-  return null
-}
-
 // ── ExplorePage ───────────────────────────────────────────────────────────────
+// Design decisions:
+// - IPOPage and ResearchPage are NOT unmounted on tab switch — they stay mounted
+//   and are hidden with CSS. This preserves Meroshare account state, fetched data,
+//   and scroll position across tab switches.
+// - Coming Soon tabs render inline (no lazy load needed).
+// - URL stays in sync via navigate; browser back/forward updates activeTab via useEffect.
+
 export default function ExplorePage() {
   const { tab: urlTab } = useParams()
   const navigate        = useNavigate()
 
-  const [activeTab, setActiveTab] = useState(
-    () => TABS.find(t => t.id === urlTab)?.id || 'ipo'
-  )
+  const resolveTab = (t) => VALID_IDS.has(t) ? t : 'ipo'
+  const [activeTab, setActiveTab] = useState(() => resolveTab(urlTab))
+
+  // Sync activeTab when URL changes (browser back/forward)
+  useEffect(() => {
+    const resolved = resolveTab(urlTab)
+    if (resolved !== activeTab) setActiveTab(resolved)
+  }, [urlTab]) // eslint-disable-line react-hooks/exhaustive-deps
 
   function handleTab(id) {
+    if (id === activeTab) return
     setActiveTab(id)
     navigate(`/explore/${id}`, { replace: true })
   }
 
   const active = TABS.find(t => t.id === activeTab)
 
-  return (
-    <div className="flex flex-col h-[calc(100vh-56px)] bg-white dark:bg-gray-950">
+  // Track which real tabs have been visited so we only lazy-load them once
+  const [visited, setVisited] = useState(() => new Set([resolveTab(urlTab)]))
+  useEffect(() => {
+    setVisited(prev => {
+      if (prev.has(activeTab)) return prev
+      const next = new Set(prev)
+      next.add(activeTab)
+      return next
+    })
+  }, [activeTab])
 
-      {/* ── Tab bar ── */}
-      <div className="shrink-0 flex items-center gap-1 px-4 py-2 border-b border-gray-200 dark:border-gray-800 bg-white dark:bg-gray-900">
+  return (
+    <div className="flex flex-col bg-white dark:bg-gray-950" style={{ height: 'calc(100vh - 56px)' }}>
+
+      {/* ── Tab bar — fixed height, never scrolls away ── */}
+      <div className="shrink-0 flex items-center gap-1 px-4 border-b border-gray-200 dark:border-gray-800 bg-white dark:bg-gray-900" style={{ height: 44 }}>
         {TABS.map(tab => {
           const isActive = tab.id === activeTab
           return (
@@ -148,9 +139,51 @@ export default function ExplorePage() {
         )}
       </div>
 
-      {/* ── Content — flex-1 so embedded pages fill remaining height ── */}
-      <div className="flex-1 min-h-0 overflow-auto">
-        <TabContent activeTab={activeTab} />
+      {/* ── Content area — each real tab stays mounted, hidden when inactive ── */}
+      <div className="flex-1 min-h-0 relative">
+
+        {/* Coming Soon tabs — rendered inline, no mount/unmount issue */}
+        {active?.coming && (
+          <div className="absolute inset-0 overflow-auto">
+            <ComingSoon label={active.label} desc={active.desc} />
+          </div>
+        )}
+
+        {/* IPO tab — stays mounted once visited, hidden when not active */}
+        {visited.has('ipo') && !TABS.find(t => t.id === 'ipo')?.coming && (
+          <div
+            className="absolute inset-0 overflow-y-auto"
+            style={{ display: activeTab === 'ipo' ? 'block' : 'none' }}
+          >
+            <ErrorBoundary label="IPO">
+              <Suspense fallback={
+                <div className="flex items-center justify-center py-20">
+                  <div className="w-6 h-6 border-2 border-blue-600 border-t-transparent rounded-full animate-spin" />
+                </div>
+              }>
+                <IPOPage />
+              </Suspense>
+            </ErrorBoundary>
+          </div>
+        )}
+
+        {/* ShareMy tab — stays mounted once visited */}
+        {visited.has('sharemy') && !TABS.find(t => t.id === 'sharemy')?.coming && (
+          <div
+            className="absolute inset-0 overflow-y-auto"
+            style={{ display: activeTab === 'sharemy' ? 'block' : 'none' }}
+          >
+            <ErrorBoundary label="ShareMy">
+              <Suspense fallback={
+                <div className="flex items-center justify-center py-20">
+                  <div className="w-6 h-6 border-2 border-blue-600 border-t-transparent rounded-full animate-spin" />
+                </div>
+              }>
+                <ResearchPage />
+              </Suspense>
+            </ErrorBoundary>
+          </div>
+        )}
       </div>
     </div>
   )
