@@ -121,16 +121,21 @@ function AddAccountModal({ dpList, onClose, onAdded }) {
   const [busy,            setBusy]           = useState(false)
   const [error,           setError]          = useState(null)
 
+  const tempIdRef = useRef(null)
+
+  // Keep ref in sync so handleClose always sees the latest tempId without needing it as a dep
+  useEffect(() => { tempIdRef.current = tempId }, [tempId])
+
+  const handleClose = useCallback(async () => {
+    if (tempIdRef.current) await deleteMeroshareAccount(tempIdRef.current).catch(() => {})
+    onClose()
+  }, [onClose])
+
   useEffect(() => {
     const handler = (e) => { if (e.key === 'Escape' && !busy) handleClose() }
     window.addEventListener('keydown', handler)
     return () => window.removeEventListener('keydown', handler)
-  }) // eslint-disable-line react-hooks/exhaustive-deps
-
-  const handleClose = async () => {
-    if (tempId) await deleteMeroshareAccount(tempId).catch(() => {})
-    onClose()
-  }
+  }, [busy, handleClose])
 
   // Phase 1: verify credentials, get bank list
   const handleVerify = async (e) => {
@@ -172,9 +177,11 @@ function AddAccountModal({ dpList, onClose, onAdded }) {
         transaction_pin: savePin ? pin.trim() : undefined,
       })
       setTempId(null)  // committed — don't delete on close
+      tempIdRef.current = null
       onAdded(res.data); onClose()
     } catch (err) {
       setError(err.response?.data?.error || 'Failed to save account')
+    } finally {
       setBusy(false)
     }
   }
@@ -882,8 +889,21 @@ function IPOPage() {
   const [cancelingId,   setCancelingId]   = useState(null)
   const [allotmentMap,  setAllotmentMap]  = useState({})
   const [checkingId,    setCheckingId]    = useState(null)
-  const [appliedMap,    setAppliedMap]    = useState({})
+  // appliedMap persisted to sessionStorage so it survives account switches within a session.
+  // Shape: { [companyShareId]: Set<accountId> } — but Sets aren't JSON-serialisable,
+  // so we store as { [companyShareId]: accountId[] } and restore on init.
+  const [appliedMap, setAppliedMap] = useState(() => {
+    try {
+      const raw = sessionStorage.getItem('tradeo_ipo_applied')
+      if (!raw) return {}
+      const parsed = JSON.parse(raw)
+      // Restore arrays → Sets
+      return Object.fromEntries(Object.entries(parsed).map(([k, v]) => [k, new Set(v)]))
+    } catch { return {} }
+  })
+
   const [actionError,   setActionError]   = useState(null)
+  const [showAllTypes,  setShowAllTypes]  = useState(false)  // false = only Ordinary Shares + FPO; true = show all
   const [quickApplying,    setQuickApplying]    = useState(null)   // companyShareId being quick-applied
   const [togglingAutoApply,  setTogglingAutoApply]  = useState(false)
   const [runningAutoApply,   setRunningAutoApply]   = useState(false)
@@ -977,10 +997,20 @@ function IPOPage() {
     })
   }, [ipos, selectedAcc])
 
+  // Persist appliedMap to sessionStorage whenever it changes
+  useEffect(() => {
+    try {
+      const serialisable = Object.fromEntries(
+        Object.entries(appliedMap).map(([k, v]) => [k, [...v]])
+      )
+      sessionStorage.setItem('tradeo_ipo_applied', JSON.stringify(serialisable))
+    } catch {}
+  }, [appliedMap])
+
   const handleSelectAccount = (id) => {
     setSelectedAcc(id); setIpos([]); setResults([]); setPortfolio([])
     setAllotmentMap({}); setError(null); setActionError(null)
-    setSidebarOpen(false)
+    setShowAllTypes(false); setSidebarOpen(false)
   }
 
   const handleDeleteAccount = async (id) => {
@@ -1018,6 +1048,53 @@ function IPOPage() {
       setAllotmentMap(m => ({ ...m, [formId]: { error: err.response?.data?.error || err.message || 'Failed' } }))
     } finally { setCheckingId(null) }
   }, [selectedAcc])
+
+  // Auto-check allotment for all results when Results tab is active and results load.
+  // Only checks entries that haven't been checked yet (not in allotmentMap).
+  // Sequential with 300ms gap to avoid hammering Meroshare API.
+  // Track which formIds are already in-flight to prevent duplicate requests
+  // when this effect re-fires (e.g. results reference changes after a state update)
+  const allotmentInFlight = useRef(new Set())
+
+  useEffect(() => {
+    if (activeTab !== 'results' || !results.length || !selectedAcc) return
+    const unchecked = results.filter(r => {
+      const id = r.applicantFormId || r.id
+      // Skip: already in allotmentMap OR already being fetched
+      return id && !allotmentMap[id] && !allotmentInFlight.current.has(id)
+    })
+    if (!unchecked.length) return
+
+    let cancelled = false
+    // Mark all as in-flight immediately so concurrent effect calls don't double-fetch
+    unchecked.forEach(r => allotmentInFlight.current.add(r.applicantFormId || r.id))
+
+    const run = async () => {
+      for (const r of unchecked) {
+        if (cancelled) break
+        const formId = r.applicantFormId || r.id
+        try {
+          const res  = await getMeroshareAllotment(selectedAcc, formId)
+          const data = res.data.allotment
+          if (!cancelled) {
+            setAllotmentMap(m => ({
+              ...m,
+              [formId]: (data && Object.keys(data).length > 0) ? data : { error: 'Not published yet' }
+            }))
+          }
+        } catch (err) {
+          if (!cancelled) {
+            setAllotmentMap(m => ({ ...m, [formId]: { error: err.response?.data?.error || 'Failed' } }))
+          }
+        } finally {
+          allotmentInFlight.current.delete(formId)
+        }
+        await new Promise(resolve => setTimeout(resolve, 300))
+      }
+    }
+    run()
+    return () => { cancelled = true }
+  }, [activeTab, results, selectedAcc]) // eslint-disable-line react-hooks/exhaustive-deps
 
   const handleApplied = useCallback((companyShareId, accountId) => {
     // Update appliedMap — tracks applied state across all accounts
@@ -1125,8 +1202,25 @@ function IPOPage() {
   const hasAccounts    = accounts.length > 0
   const hasMultipleAcc = accounts.length > 1
 
+  // Filter IPOs — only show Ordinary Shares (IPO/FPO) by default; hide Mutual Funds, Debentures, Right Shares etc.
+  // Exclude mutual funds, debentures, right shares, promoter shares.
+  // Meroshare is inconsistent — shareTypeName is "IPO" for almost everything including
+  // mutual funds. Check shareTypeName + subGroup for explicit labels, and check company
+  // name for "Fund" (e.g. "Sanima Equity Fund - II") since Meroshare has no cleaner flag.
+  const TYPE_EXCLUDE  = ['mutual fund', 'debenture', 'right share', 'right issue', 'promoter', 'bond', 'preference share']
+  const NAME_EXCLUDE  = [' fund', ' debenture', ' bond']   // leading space avoids false positives
+  const isOrdinaryShare = (ipo) => {
+    const typStr = ((ipo.shareTypeName || '') + ' ' + (ipo.subGroup || '')).toLowerCase()
+    const nameStr = (ipo.companyName || '').toLowerCase()
+    if (TYPE_EXCLUDE.some(kw => typStr.includes(kw))) return false
+    if (NAME_EXCLUDE.some(kw => nameStr.includes(kw)))  return false
+    return true
+  }
+  const filteredIpos   = showAllTypes ? ipos : ipos.filter(isOrdinaryShare)
+  const hiddenCount    = ipos.length - filteredIpos.length
+
   // Stats
-  const appliedCount  = ipos.filter(ipo => appliedMap[ipo.companyShareId]?.has(selectedAcc)).length
+  const appliedCount  = filteredIpos.filter(ipo => appliedMap[ipo.companyShareId]?.has(selectedAcc)).length
   const holdingsCount = portfolio.length
 
   // Sorted portfolio
@@ -1374,7 +1468,7 @@ function IPOPage() {
             {/* Stats strip */}
             {activeAccount && (
               <div className="flex gap-3 mb-4">
-                <StatTile label="Open IPOs"   value={ipos.length}    accent="blue" />
+                <StatTile label="Open IPOs"   value={filteredIpos.length}    accent="blue" />
                 <StatTile label="Applied"     value={appliedCount}   accent="emerald" />
                 <StatTile label="Holdings"    value={holdingsCount}  accent="purple" />
               </div>
@@ -1422,17 +1516,30 @@ function IPOPage() {
 
             {/* ── Open IPOs ── */}
             {!loading && activeTab === 'ipos' && (
-              ipos.length === 0 ? (
+              filteredIpos.length === 0 ? (
                 <div className="bg-white dark:bg-gray-900 rounded-2xl border border-gray-100 dark:border-gray-800 p-10 text-center">
                   <svg className="w-10 h-10 text-gray-200 dark:text-gray-700 mx-auto mb-3" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
                   </svg>
                   <p className="text-[13px] font-semibold text-gray-400">No open IPOs at the moment</p>
-                  <p className="text-[10px] text-gray-300 dark:text-gray-600 mt-1">Check back when a new IPO opens</p>
+                  {hiddenCount > 0 && (
+                    <button onClick={() => setShowAllTypes(true)} className="mt-2 text-[10px] text-blue-500 hover:underline">
+                      {hiddenCount} other issue{hiddenCount > 1 ? 's' : ''} hidden (mutual funds, debentures…) — show all
+                    </button>
+                  )}
                 </div>
               ) : (
                 <div className="space-y-3">
-                  {ipos.map((ipo, i) => {
+                  {/* Type filter toggle */}
+                  {hiddenCount > 0 && (
+                    <div className="flex items-center justify-end">
+                      <button onClick={() => setShowAllTypes(s => !s)}
+                        className="text-[10px] font-semibold text-gray-400 hover:text-gray-600 dark:hover:text-gray-300 transition-colors">
+                        {showAllTypes ? 'Hide mutual funds & debentures' : `+${hiddenCount} hidden (mutual funds, debentures…)`}
+                      </button>
+                    </div>
+                  )}
+                  {filteredIpos.map((ipo, i) => {
                     const noBankSetup   = !activeAccount?.bank_id || !activeAccount?.account_number
                     const hasSavedPin   = !!activeAccount?.auto_apply
                     const thisApplied   = appliedMap[ipo.companyShareId]
@@ -1489,6 +1596,24 @@ function IPOPage() {
                                 }`}>{days <= 0 ? 'Closing today' : `${days}d left`}</span>
                               )}
                             </div>
+                            {/* Cross-account applied status pills — visible regardless of selected account */}
+                            {hasMultipleAcc && (
+                              <div className="flex flex-wrap gap-1.5 mt-2">
+                                {accounts.map(a => {
+                                  const applied = appliedMap[ipo.companyShareId]?.has(a.id)
+                                  return (
+                                    <span key={a.id} className={`inline-flex items-center gap-1 text-[9px] font-semibold px-2 py-0.5 rounded-full border ${
+                                      applied
+                                        ? 'bg-emerald-50 dark:bg-emerald-900/20 border-emerald-200 dark:border-emerald-800/40 text-emerald-600 dark:text-emerald-400'
+                                        : 'bg-gray-50 dark:bg-gray-800/60 border-gray-200 dark:border-gray-700 text-gray-400 dark:text-gray-500'
+                                    }`}>
+                                      <span className={`w-1.5 h-1.5 rounded-full flex-shrink-0 ${applied ? 'bg-emerald-500' : 'bg-gray-300 dark:bg-gray-600'}`} />
+                                      {a.label}{applied ? ' ✓' : ''}
+                                    </span>
+                                  )
+                                })}
+                              </div>
+                            )}
                           </div>
 
                           <div className="flex flex-col items-end gap-2 flex-shrink-0">
@@ -1600,6 +1725,11 @@ function IPOPage() {
                                   </span>
                                 ) : allotment?.error ? (
                                   <span className="text-[9px] text-red-400">{allotment.error}</span>
+                                ) : appId && !allotmentMap[appId] ? (
+                                  <span className="inline-flex items-center gap-1 text-[9px] text-gray-400">
+                                    <span className="w-2 h-2 border border-gray-300 border-t-gray-500 dark:border-gray-600 dark:border-t-gray-300 rounded-full animate-spin" />
+                                    Checking…
+                                  </span>
                                 ) : (
                                   <span className="text-[9px] text-gray-300 dark:text-gray-600">—</span>
                                 )}
@@ -1611,11 +1741,11 @@ function IPOPage() {
                               </td>
                               <td className="px-4 py-3 text-right">
                                 <div className="flex items-center justify-end gap-2">
-                                  {appId && (
-                                    <button onClick={() => handleCheckAllotment(appId)} disabled={isChecking} title="Check allotment result"
+                                  {appId && allotment && (
+                                    <button onClick={() => handleCheckAllotment(appId)} disabled={isChecking} title="Refresh allotment result"
                                       className="text-[10px] font-semibold text-blue-500 hover:text-blue-600 disabled:opacity-40 flex items-center gap-1 transition-colors">
                                       {isChecking && <span className="w-2.5 h-2.5 border-2 border-blue-400/40 border-t-blue-500 rounded-full animate-spin" />}
-                                      {isChecking ? 'Checking…' : allotment && !allotment.error ? 'Refresh' : 'Check Result'}
+                                      {isChecking ? 'Checking…' : 'Refresh'}
                                     </button>
                                   )}
                                   {canCancel && appId && (

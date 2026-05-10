@@ -258,7 +258,7 @@ function Check() {
 }
 
 // ── Task row ──────────────────────────────────────────────────────────────────
-function TaskRow({ done, label, onClick, onDelete, hint }) {
+function TaskRow({ done, label, onClick, onDelete }) {
   const handleContextMenu = onDelete ? (e) => {
     e.preventDefault()
     e.stopPropagation()
@@ -283,9 +283,6 @@ function TaskRow({ done, label, onClick, onDelete, hint }) {
       <span className={`text-[11px] flex-1 leading-snug ${done ? 'line-through text-gray-400 dark:text-gray-600' : 'text-gray-700 dark:text-gray-300'}`}>
         {label}
       </span>
-      {!done && hint && (
-        <span className="text-[9px] text-gray-300 dark:text-gray-600">{hint}</span>
-      )}
     </div>
   )
 }
@@ -408,12 +405,6 @@ function TaskBoard({ initData, mindsetContent }) {
   const pendingCustom  = customTasks.filter(t => !t.completed)
   const doneCustom     = customTasks.filter(t => t.completed)
 
-  const hintFor = (task) => {
-    if (task.type === 'external') return '↗ open'
-    if (task.type === 'internal') return '→ go'
-    return '📖 read'
-  }
-
   return (
     <>
       <ContextMenuPortal />
@@ -424,97 +415,47 @@ function TaskBoard({ initData, mindsetContent }) {
         <ExternalLinkModal task={activeModal.task} onClose={() => setActiveModal(null)} onDone={() => handleTaskDone(activeModal.task.id)} />
       )}
 
-      <div className="bg-white dark:bg-gray-900 rounded-2xl border border-gray-100 dark:border-gray-800 flex flex-col">
+      <div className="bg-white dark:bg-gray-900 rounded-2xl border border-gray-100 dark:border-gray-800 p-4 flex flex-col gap-3">
 
-        {/* Header */}
-        <div className="px-4 py-3 border-b border-gray-100 dark:border-gray-800 flex items-center justify-between flex-shrink-0">
-          <h3 className="text-[11px] font-semibold uppercase tracking-widest text-gray-400 dark:text-gray-500">
-            Daily Routine
-          </h3>
-          <span className="text-[10px] text-gray-400">
-            {completedCount}/{totalTasks}
-          </span>
+        {/* Header — matches DisciplineScore */}
+        <div className="flex items-center justify-between">
+          <h3 className="text-[11px] font-semibold uppercase tracking-widest text-gray-400 dark:text-gray-500">Daily Routine</h3>
+          <span className="text-[10px] text-gray-400">{completedCount}/{totalTasks}</span>
         </div>
 
-        {/* Progress ring + task breakdown */}
-        <div className="px-4 py-3 border-b border-gray-100 dark:border-gray-800 flex-shrink-0">
-          <div className="flex items-center gap-4">
+        {/* Ring (left) + Task list (right) — same layout as DisciplineScore */}
+        <div className="flex items-start gap-4">
+
+          {/* Left: circular gauge */}
+          <div className="flex flex-col items-center gap-1 flex-shrink-0">
             <ProgressRing progress={progress} />
-            <div className="flex-1 space-y-2">
-              {/* Fixed tasks mini bars */}
-              {fixedTasks.map(task => (
-                <div key={task.id} className="flex items-center gap-2">
-                  <div className={`w-1.5 h-1.5 rounded-full flex-shrink-0 ${task.completed ? 'bg-emerald-400' : 'bg-gray-200 dark:bg-gray-700'}`} />
-                  <div className="flex-1 h-1 bg-gray-100 dark:bg-gray-800 rounded-full overflow-hidden">
-                    <div
-                      className={`h-full rounded-full transition-all duration-500 ${task.completed ? barColor : ''}`}
-                      style={{ width: task.completed ? '100%' : '0%' }}
-                    />
-                  </div>
-                </div>
-              ))}
-              <p className="text-[9px] text-gray-400 pt-0.5">{completedCount} of {totalTasks} tasks done</p>
-            </div>
+            <span className="text-[9px] text-gray-400 text-center leading-tight">
+              daily<br/>progress
+            </span>
+          </div>
+
+          {/* Right: task list */}
+          <div className="flex-1 min-w-0 space-y-0.5 pt-1">
+            {pendingFixed.map(task => (
+              <TaskRow key={task.id} done={false} label={task.title} onClick={() => handleFixedClick(task)} />
+            ))}
+            {pendingCustom.map(task => (
+              <TaskRow key={task.id} done={false} label={task.title} onClick={() => handleToggleCustom(task)} onDelete={() => handleDeleteCustom(task.id)} />
+            ))}
+            {(completedFixed.length > 0 || doneCustom.length > 0) && (
+              <>
+                <p className="text-[9px] font-semibold uppercase tracking-widest text-gray-300 dark:text-gray-700 px-2 pt-1">Done</p>
+                {completedFixed.map(task => <TaskRow key={task.id} done label={task.title} />)}
+                {doneCustom.map(task => (
+                  <TaskRow key={task.id} done label={task.title} onClick={() => handleToggleCustom(task)} onDelete={() => handleDeleteCustom(task.id)} />
+                ))}
+              </>
+            )}
           </div>
         </div>
 
-        {/* Task list */}
-        <div className="overflow-y-auto no-scrollbar px-2 py-2">
-
-          {/* Pending fixed */}
-          {pendingFixed.length > 0 && (
-            <div className="mb-1">
-              {pendingFixed.map(task => (
-                <TaskRow
-                  key={task.id}
-                  done={false}
-                  label={task.title}
-                  hint={hintFor(task)}
-                  onClick={() => handleFixedClick(task)}
-                />
-              ))}
-            </div>
-          )}
-
-          {/* Pending custom */}
-          {pendingCustom.length > 0 && (
-            <div className="mb-1">
-              {pendingCustom.map(task => (
-                <TaskRow
-                  key={task.id}
-                  done={false}
-                  label={task.title}
-                  onClick={() => handleToggleCustom(task)}
-                  onDelete={() => handleDeleteCustom(task.id)}
-                />
-              ))}
-            </div>
-          )}
-
-          {/* Completed section */}
-          {(completedFixed.length > 0 || doneCustom.length > 0) && (
-            <div className="mt-2">
-              <p className="text-[9px] font-semibold uppercase tracking-widest text-gray-300 dark:text-gray-700 px-2 mb-1">
-                Completed
-              </p>
-              {completedFixed.map(task => (
-                <TaskRow key={task.id} done label={task.title} />
-              ))}
-              {doneCustom.map(task => (
-                <TaskRow
-                  key={task.id}
-                  done
-                  label={task.title}
-                  onClick={() => handleToggleCustom(task)}
-                  onDelete={() => handleDeleteCustom(task.id)}
-                />
-              ))}
-            </div>
-          )}
-        </div>
-
-        {/* Add task footer */}
-        <div className="px-3 pb-3 pt-2 border-t border-gray-100 dark:border-gray-800 flex-shrink-0">
+        {/* Add task — matches impact tag placement in DisciplineScore */}
+        <div className="border-t border-gray-50 dark:border-gray-800 pt-2">
           {showAdd ? (
             <form onSubmit={handleAddTask} className="flex gap-1.5">
               <input
@@ -523,29 +464,19 @@ function TaskBoard({ initData, mindsetContent }) {
                 onChange={e => setNewTask(e.target.value)}
                 placeholder="Add a task…"
                 autoFocus
-                className="flex-1 bg-gray-50 dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-xl px-3 py-1.5 text-[11px] text-gray-800 dark:text-white placeholder-gray-400 focus:outline-none focus:border-green-400 transition-colors"
+                className="flex-1 bg-gray-50 dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg px-2 py-1 text-[11px] text-gray-800 dark:text-white placeholder-gray-400 focus:outline-none focus:border-green-400 transition-colors min-w-0"
               />
-              <button
-                type="submit"
-                disabled={adding || !newTask.trim()}
-                className="bg-green-500 hover:bg-green-400 disabled:opacity-40 text-white px-3 py-1.5 rounded-xl text-[11px] font-semibold transition-colors"
-              >
+              <button type="submit" disabled={adding || !newTask.trim()}
+                className="bg-green-500 hover:bg-green-400 disabled:opacity-40 text-white px-2 py-1 rounded-lg text-[11px] font-semibold transition-colors flex-shrink-0">
                 {adding ? '…' : 'Add'}
               </button>
-              <button
-                type="button"
-                onClick={() => { setShowAdd(false); setNewTask('') }}
-                className="text-gray-400 hover:text-gray-600 px-2 text-[11px] transition-colors"
-              >
-                Cancel
-              </button>
+              <button type="button" onClick={() => { setShowAdd(false); setNewTask('') }}
+                className="text-gray-400 hover:text-gray-600 px-1.5 text-[11px] transition-colors flex-shrink-0">✕</button>
             </form>
           ) : (
-            <button
-              onClick={() => setShowAdd(true)}
-              className="w-full flex items-center gap-2 px-2 py-2 rounded-xl text-[11px] text-green-500 hover:text-green-400 hover:bg-green-50 dark:hover:bg-green-900/20 transition-colors"
-            >
-              <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+            <button onClick={() => setShowAdd(true)}
+              className="flex items-center gap-1.5 text-[10px] text-gray-400 hover:text-green-500 transition-colors">
+              <svg className="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
               </svg>
               Add custom task

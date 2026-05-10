@@ -3,7 +3,6 @@ import { Link, useLocation, useNavigate } from 'react-router-dom'
 import { useAuth } from '../context/AuthContext'
 import { useTheme } from '../context/ThemeContext'
 import { useLanguage } from '../context/LanguageContext'
-import { useMarket } from '../context/MarketContext'
 
 function TradeoLogo() {
   return (
@@ -39,7 +38,6 @@ function Navbar() {
   const { user, logout } = useAuth()
   const { isDark, toggleTheme } = useTheme()
   const { t } = useLanguage()
-  const { market, isNepse, toggleMarket } = useMarket()
   const location = useLocation()
   const navigate = useNavigate()
 
@@ -78,16 +76,16 @@ function Navbar() {
     window.location.reload()
   }
 
-  // ── Nav links — filtered by market mode ────────────────────────────────────
+  // ── Nav links ───────────────────────────────────────────────────────────────
   const NAV_LINKS = [
-    { path: '/',          label: t('nav.home'),      markets: ['nepse', 'forex'] },
-    { path: '/screen',    label: t('nav.analysis'),  markets: ['nepse'] },
-    { path: '/logs',      label: t('nav.trader'),    markets: ['nepse', 'forex'] },
-    { path: '/portfolio', label: t('nav.portfolio'), markets: ['nepse', 'forex'] },
-    { path: '/research',  label: t('nav.research'),  markets: ['nepse', 'forex'] },
-    { path: '/risklab',   label: t('nav.risklab'),   markets: ['nepse', 'forex'] },
-    { path: '/ipo',       label: 'IPO',              markets: ['nepse'] },
-  ].filter(l => l.markets.includes(market))
+    { path: '/',          label: t('nav.home')      },
+    { path: '/screen',    label: t('nav.analysis')  },
+    { path: '/logs',      label: t('nav.trader')    },
+    { path: '/portfolio', label: t('nav.portfolio') },
+    { path: '/datalab',   label: 'Data Lab'         },
+    { path: '/risklab',   label: t('nav.risklab')   },
+    { path: '/explore',   label: 'Explore'          },
+  ]
 
   // ── Close dropdown on outside click ────────────────────────────────────────
   useEffect(() => {
@@ -135,16 +133,6 @@ function Navbar() {
     navigate('/login')
   }
 
-  // ── Market toggle — redirect if current page isn't valid for new market ──────
-  const NEPSE_ONLY_ROUTES = ['/screen', '/ipo', '/calendar']
-  const handleToggleMarket = () => {
-    const nextMarket = isNepse ? 'forex' : 'nepse'
-    if (nextMarket === 'forex' && NEPSE_ONLY_ROUTES.some(r => location.pathname.startsWith(r))) {
-      navigate('/')
-    }
-    toggleMarket()
-  }
-
   const displayName = user?.name?.trim() || user?.email || 'User'
   const firstName = displayName.split(/\s+/)[0]
 
@@ -184,38 +172,14 @@ function Navbar() {
       {/* ── Right: Controls ────────────────────────────────────────────────── */}
       <div className="flex items-center gap-2">
 
-        {/* Market mode toggle — NEPSE ⇄ Forex */}
-        <button
-          onClick={handleToggleMarket}
-          title={isNepse ? 'Switch to Forex mode' : 'Switch to NEPSE mode'}
-          aria-label={isNepse ? 'Switch to Forex mode' : 'Switch to NEPSE mode'}
-          className="flex items-center gap-1.5 px-2.5 py-1 rounded-lg border transition-colors text-xs font-bold
-            bg-gray-900 dark:bg-white text-white dark:text-gray-900
-            border-gray-900 dark:border-white
-            hover:opacity-80"
-        >
-          {isNepse ? (
-            <>
-              <span className="text-[10px]">🇳🇵</span>
-              <span className="hidden sm:inline">NEPSE</span>
-            </>
-          ) : (
-            <>
-              <span className="text-[10px]">💹</span>
-              <span className="hidden sm:inline">FOREX</span>
-            </>
-          )}
-        </button>
-
-        {/* Language toggle */}
+        {/* Language toggle — small indicator */}
         <button
           onClick={toggleGoogleTranslate}
-          className="flex items-center gap-1 px-2.5 py-1 rounded-lg border border-gray-200 dark:border-gray-700 text-xs font-semibold text-gray-600 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors"
+          className="flex items-center gap-1 px-2 py-1 rounded-lg text-xs text-gray-500 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors"
           title={isNepali ? 'Switch to English' : 'नेपालीमा हेर्नुस्'}
           aria-label={isNepali ? 'Switch to English' : 'Switch to Nepali'}
         >
-          <span>{isNepali ? '🇬🇧' : '🇳🇵'}</span>
-          <span className="hidden sm:inline">{isNepali ? 'EN' : 'नेपाली'}</span>
+          <span className="text-[13px]">{isNepali ? '🇬🇧' : '🇳🇵'}</span>
         </button>
 
         {/* Theme toggle */}

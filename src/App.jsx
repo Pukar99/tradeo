@@ -1,6 +1,12 @@
 import { BrowserRouter, Routes, Route, useLocation, useNavigate } from 'react-router-dom'
 import { Component, useEffect, useMemo, lazy, Suspense } from 'react'
-import { Toaster } from 'react-hot-toast'
+import toast, { Toaster } from 'react-hot-toast'
+import { PriceAlertContainer, useAlertToasts } from './components/PriceAlertToast'
+import { usePriceAlerts } from './hooks/usePriceAlerts'
+import { useAuth } from './context/AuthContext'
+import { useTheme } from './context/ThemeContext'
+import { useHotkeys } from './hooks/useHotkeys'
+import { getProfile, runMeroshareAutoApplyOnLogin } from './api'
 import Navbar from './components/Navbar'
 import FloatingChat from './components/FloatingChat'
 
@@ -21,6 +27,16 @@ const RiskLabPage        = lazy(() => import('./pages/RiskLabPage'))
 const CalendarPage       = lazy(() => import('./pages/CalendarPage'))
 const IPOPage            = lazy(() => import('./pages/IPOPage'))
 
+// Placeholder for pages being built in v2.0
+function ComingSoonPage({ title }) {
+  return (
+    <div className="flex flex-col items-center justify-center min-h-[60vh] gap-3">
+      <p className="text-2xl font-bold text-gray-900 dark:text-white">{title}</p>
+      <p className="text-sm text-gray-400">Coming soon — being built in v2.0</p>
+    </div>
+  )
+}
+
 // Shared page-level loading spinner
 function PageSpinner() {
   return (
@@ -29,12 +45,6 @@ function PageSpinner() {
     </div>
   )
 }
-import { PriceAlertContainer, useAlertToasts } from './components/PriceAlertToast'
-import { usePriceAlerts } from './hooks/usePriceAlerts'
-import { useAuth } from './context/AuthContext'
-import { useTheme } from './context/ThemeContext'
-import { useHotkeys } from './hooks/useHotkeys'
-import { getProfile } from './api'
 
 // P4-005: catch uncaught render errors so the whole app doesn't white-screen
 class ErrorBoundary extends Component {
@@ -88,6 +98,26 @@ function AppContent() {
   const isAuthPage = AUTH_ROUTES.includes(location.pathname)
 
   const userId = user?.id ?? null
+
+  // On fresh login (flag set by AuthContext.login), trigger on-login auto-apply.
+  // Fire-and-forget — doesn't block navigation. Shows a toast only if something was applied.
+  useEffect(() => {
+    if (!userId) return
+    if (sessionStorage.getItem('ipoAutoApplyPending') !== '1') return
+    sessionStorage.removeItem('ipoAutoApplyPending')
+
+    runMeroshareAutoApplyOnLogin()
+      .then(res => {
+        const results = res.data?.results || []
+        const applied = results.filter(r => r.status === 'success')
+        const errors  = results.filter(r => r.status === 'error')
+        // Show one toast per result — react-hot-toast doesn't render \n in strings
+        applied.forEach(r => toast.success(`IPO Auto-Apply: ${r.label} — ${r.message}`, { duration: 6000 }))
+        errors.forEach(r  => toast.error(`IPO Auto-Apply failed: ${r.label} — ${r.message}`, { duration: 6000 }))
+      })
+      .catch(() => {})  // silent — convenience feature, never block the user
+  }, [userId]) // eslint-disable-line react-hooks/exhaustive-deps
+
   useEffect(() => {
     if (!userId) return
 
@@ -125,6 +155,8 @@ function AppContent() {
           <Route path="/risklab" element={<RiskLabPage />} />
           <Route path="/calendar" element={<CalendarPage />} />
           <Route path="/ipo" element={<IPOPage />} />
+          <Route path="/datalab" element={<ComingSoonPage title="Data Lab" />} />
+          <Route path="/explore" element={<ComingSoonPage title="Explore" />} />
           <Route path="/login" element={<LoginPage />} />
           <Route path="/signup" element={<SignupPage />} />
           <Route path="*" element={<NotFoundPage />} />

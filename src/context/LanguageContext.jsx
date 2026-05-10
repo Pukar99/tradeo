@@ -70,7 +70,7 @@ export const translations = {
     tasks: { title: "Today's Tasks", done: 'done', addTask: '+ Add task', dailyRoutine: 'Daily Routine', completed: 'Completed', addRoutine: 'Add Routine Log' },
     // Goals
     goals: {
-      title: 'Monthly Goals', add: '+ Add Goal', cancel: 'Cancel',
+      title: 'Goals', add: '+ Add Goal', cancel: 'Cancel',
       completed: 'completed', save: 'Save Goal', saving: 'Saving...',
       noGoals: 'No goals set for this month',
       noGoalsHint: 'Click "+ Add Goal" to set your monthly targets',

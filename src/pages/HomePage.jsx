@@ -1,6 +1,5 @@
 import { useAuth } from '../context/AuthContext'
 import { useLanguage } from '../context/LanguageContext'
-import { useMarket } from '../context/MarketContext'
 import { useContextMenu } from '../components/ContextMenu'
 import { useChatRefresh } from '../utils/chatEvents'
 import TaskBoard from '../components/dashboard/TaskBoard'
@@ -9,6 +8,7 @@ import MonthlyGoals from '../components/dashboard/MonthlyGoals'
 import { Link, useNavigate } from 'react-router-dom'
 import { useState, useEffect, useCallback, useRef } from 'react'
 import MorningBriefing from '../components/MorningBriefing'
+import NEPSEChart from '../components/NEPSEChart'
 import {
   getDashboardInit, getStockPrice,
   addToWatchlist, removeFromWatchlist,
@@ -262,6 +262,239 @@ function LoggedOutHome() {
   )
 }
 
+// ── Alerts widget (right column) ─────────────────────────────────────────────
+function AlertsWidget({ initData }) {
+  const navigate = useNavigate()
+  const trades   = initData?.trades   || []
+  const watchlist = initData?.watchlist || []
+  const goals    = initData?.goals    || []
+  const prices   = initData?.prices   || {}
+
+  const today = new Date().toISOString().slice(0, 10)
+
+  const alerts = []
+
+  // SL near / No SL — open positions
+  for (const t of trades) {
+    if (t.status !== 'OPEN' && t.status !== 'PARTIAL') continue
+    const entry = parseFloat(t.entry_price) || 0
+    const ltp   = parseFloat(prices[t.symbol]?.price) || 0
+    const sl    = t.sl != null ? parseFloat(t.sl) : null
+    const tp    = t.tp != null ? parseFloat(t.tp) : null
+
+    if (!sl) {
+      alerts.push({ type: 'nosl', label: `${t.symbol} — No SL set`, severity: 'warn', to: '/logs' })
+    } else if (ltp > 0) {
+      const slDist = t.position === 'LONG'
+        ? ((ltp - sl) / ltp) * 100
+        : ((sl - ltp) / ltp) * 100
+      if (slDist >= 0 && slDist <= 3)
+        alerts.push({ type: 'sl', label: `${t.symbol} SL near — ${slDist.toFixed(1)}% away`, severity: 'danger', to: '/logs' })
+    }
+
+    if (tp && ltp > 0) {
+      const tpDist = t.position === 'LONG'
+        ? ((tp - ltp) / ltp) * 100
+        : ((ltp - tp) / ltp) * 100
+      if (tpDist >= 0 && tpDist <= 3)
+        alerts.push({ type: 'tp', label: `${t.symbol} TP near — ${tpDist.toFixed(1)}% away`, severity: 'success', to: '/logs' })
+    }
+  }
+
+  // Watchlist price alert
+  for (const w of watchlist) {
+    if (!w.price_alert) continue
+    const ltp    = parseFloat(prices[w.symbol]?.price) || 0
+    const target = parseFloat(w.price_alert)
+    if (ltp <= 0) continue
+    const dist = Math.abs((ltp - target) / target) * 100
+    if (dist <= 2)
+      alerts.push({ type: 'watch', label: `${w.symbol} near alert Rs.${target.toLocaleString()} — ${dist.toFixed(1)}% away`, severity: 'info', to: '/' })
+  }
+
+  // Goal deadline — expiring within 7 days
+  for (const g of goals) {
+    if (g.completed || !g.target_date) continue
+    const daysLeft = Math.ceil((new Date(g.target_date) - new Date(today)) / 86400000)
+    if (daysLeft >= 0 && daysLeft <= 7)
+      alerts.push({ type: 'goal', label: `Goal "${g.title}" — ${daysLeft === 0 ? 'due today' : `${daysLeft}d left`}`, severity: 'warn', to: '/logs' })
+  }
+
+  // Circuit near — open positions within 5% of ±10% circuit
+  for (const t of trades) {
+    if (t.status !== 'OPEN' && t.status !== 'PARTIAL') continue
+    const ltp   = parseFloat(prices[t.symbol]?.price) || 0
+    const chg   = parseFloat(prices[t.symbol]?.change) || 0
+    if (ltp <= 0) continue
+    if (Math.abs(chg) >= 8)
+      alerts.push({ type: 'circuit', label: `${t.symbol} near circuit — ${chg > 0 ? '+' : ''}${chg}%`, severity: chg > 0 ? 'success' : 'danger', to: '/screen' })
+  }
+
+  const iconMap = {
+    nosl: '⚠', sl: '🔴', tp: '🟢', watch: '🔔', goal: '📅', circuit: '⚡',
+  }
+  const severityClass = {
+    danger:  'border-l-red-400 bg-red-50 dark:bg-red-900/10',
+    warn:    'border-l-orange-400 bg-orange-50 dark:bg-orange-900/10',
+    success: 'border-l-green-400 bg-green-50 dark:bg-green-900/10',
+    info:    'border-l-blue-400 bg-blue-50 dark:bg-blue-900/10',
+  }
+  const textClass = {
+    danger: 'text-red-600 dark:text-red-400',
+    warn:   'text-orange-600 dark:text-orange-400',
+    success:'text-green-600 dark:text-green-400',
+    info:   'text-blue-600 dark:text-blue-400',
+  }
+
+  return (
+    <div className="bg-white dark:bg-gray-900 rounded-2xl border border-gray-100 dark:border-gray-800 overflow-hidden">
+      <div className="flex items-center justify-between px-4 py-3 border-b border-gray-100 dark:border-gray-800">
+        <h3 className="text-[12px] font-semibold text-gray-700 dark:text-gray-300 uppercase tracking-wide">Alerts</h3>
+        {alerts.length > 0 && (
+          <span className="w-4 h-4 rounded-full bg-red-500 text-white text-[10px] font-bold flex items-center justify-center">
+            {alerts.length > 9 ? '9+' : alerts.length}
+          </span>
+        )}
+      </div>
+
+      {alerts.length === 0 ? (
+        <div className="px-4 py-6 text-center">
+          <p className="text-xs text-gray-400">All clear — no active alerts</p>
+        </div>
+      ) : (
+        <div className="divide-y divide-gray-50 dark:divide-gray-800 max-h-64 overflow-y-auto">
+          {alerts.map((a, i) => (
+            <button
+              key={i}
+              onClick={() => navigate(a.to)}
+              className={`w-full text-left flex items-center gap-2.5 px-3 py-2.5 border-l-2 hover:opacity-80 transition-opacity ${severityClass[a.severity]}`}
+            >
+              <span className="text-sm flex-shrink-0">{iconMap[a.type]}</span>
+              <span className={`text-[11px] font-medium leading-snug ${textClass[a.severity]}`}>{a.label}</span>
+            </button>
+          ))}
+        </div>
+      )}
+    </div>
+  )
+}
+
+// ── Open Positions panel (right column) ──────────────────────────────────────
+function OpenPositionsPanel({ openPositions, perfStats, navigate }) {
+  const { t: tr } = useLanguage()
+  const [collapsed, setCollapsed] = useState(false)
+
+  return (
+    <div className="bg-white dark:bg-gray-900 rounded-2xl border border-gray-100 dark:border-gray-800 overflow-hidden">
+      <div className="flex items-center justify-between px-4 py-3 border-b border-gray-100 dark:border-gray-800">
+        <h3 className="text-[12px] font-semibold text-gray-700 dark:text-gray-300 uppercase tracking-wide">
+          {tr('positions.title')}
+          {perfStats && perfStats.openCount > 0 && (
+            <span className="ml-2 text-[10px] font-normal text-gray-400">({perfStats.openCount})</span>
+          )}
+        </h3>
+        <div className="flex items-center gap-2">
+          <button
+            onClick={() => setCollapsed(c => !c)}
+            className="text-xs text-gray-400 hover:text-gray-600 dark:hover:text-gray-200 flex items-center gap-1 transition-colors"
+            aria-expanded={!collapsed}
+          >
+            <svg className={`w-3 h-3 transition-transform ${collapsed ? '' : 'rotate-180'}`} fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+            </svg>
+          </button>
+          <button onClick={() => navigate('/portfolio')} className="text-xs text-blue-500 hover:text-blue-700 transition-colors">›</button>
+        </div>
+      </div>
+
+      {!collapsed && (
+        openPositions.length === 0 ? (
+          <div className="p-6 text-center">
+            <p className="text-gray-400 text-xs">{tr('positions.noPositions')}</p>
+            <button onClick={() => navigate('/logs')} className="mt-2 text-blue-500 text-xs hover:underline">+ Add a trade</button>
+          </div>
+        ) : (
+          <div className="divide-y divide-gray-50 dark:divide-gray-800">
+            {openPositions.slice(0, 5).map(t => {
+              const slDistPct = t.sl != null && t.currentPrice
+                ? t.position === 'SHORT'
+                  ? (((t.sl - t.currentPrice) / t.currentPrice) * 100).toFixed(1)
+                  : (((t.currentPrice - t.sl) / t.currentPrice) * 100).toFixed(1)
+                : null
+              const tpDistPct = t.tp != null && t.currentPrice
+                ? t.position === 'SHORT'
+                  ? (((t.currentPrice - t.tp) / t.currentPrice) * 100).toFixed(1)
+                  : (((t.tp - t.currentPrice) / t.currentPrice) * 100).toFixed(1)
+                : null
+
+              return (
+                <div key={t.id} className="px-4 py-2.5 hover:bg-gray-50 dark:hover:bg-gray-800 transition-colors" translate="no">
+                  <div className="flex items-center justify-between">
+                    <div className="flex items-center gap-2">
+                      <StockAvatar symbol={t.symbol} size="w-7 h-7" textSize="text-[10px]" />
+                      <div>
+                        <div className="flex items-center gap-1.5">
+                          <p className="text-xs font-semibold text-gray-900 dark:text-white">{t.symbol}</p>
+                          <span className={`text-[10px] px-1 py-0.5 rounded font-medium ${
+                            t.position === 'LONG'
+                              ? 'bg-green-100 text-green-700 dark:bg-green-900 dark:text-green-300'
+                              : 'bg-red-100 text-red-700 dark:bg-red-900 dark:text-red-300'
+                          }`}>{t.position}</span>
+                          {t.status === 'PARTIAL' && (
+                            <span className="text-[10px] px-1 py-0.5 rounded bg-orange-100 text-orange-600 dark:bg-orange-900 dark:text-orange-300 font-medium">P</span>
+                          )}
+                        </div>
+                        <p className="text-[10px] text-gray-400">{t.quantity} @ Rs.{t.entry_price.toLocaleString()}</p>
+                      </div>
+                    </div>
+                    <div className="text-right">
+                      {t.unrealizedPnl != null ? (
+                        <p className={`text-xs font-semibold ${t.unrealizedPnl >= 0 ? 'text-green-500' : 'text-red-500'}`}>
+                          {t.unrealizedPnl >= 0 ? '+' : ''}Rs.{Math.abs(t.unrealizedPnl).toLocaleString()}
+                        </p>
+                      ) : (
+                        <p className="text-xs text-gray-400">—</p>
+                      )}
+                      {t.pnlPct != null && (
+                        <p className={`text-[10px] ${parseFloat(t.pnlPct) >= 0 ? 'text-green-400' : 'text-red-400'}`}>
+                          {parseFloat(t.pnlPct) >= 0 ? '+' : ''}{t.pnlPct}%
+                        </p>
+                      )}
+                    </div>
+                  </div>
+                  {/* SL / TP compact pills */}
+                  <div className="flex items-center gap-1.5 mt-1.5 ml-9 flex-wrap">
+                    {t.sl != null ? (
+                      <span className="text-[10px] bg-red-50 dark:bg-red-900/40 text-red-500 px-1.5 py-0.5 rounded">
+                        SL {slDistPct !== null ? `${parseFloat(slDistPct) > 0 ? '+' : ''}${slDistPct}%` : `Rs.${t.sl.toLocaleString()}`}
+                      </span>
+                    ) : (
+                      <span className="text-[10px] bg-orange-50 dark:bg-orange-900/40 text-orange-500 px-1.5 py-0.5 rounded">⚠ No SL</span>
+                    )}
+                    {t.tp != null && (
+                      <span className="text-[10px] bg-green-50 dark:bg-green-900/40 text-green-500 px-1.5 py-0.5 rounded">
+                        TP {tpDistPct !== null ? `${parseFloat(tpDistPct) > 0 ? '+' : ''}${tpDistPct}%` : `Rs.${t.tp.toLocaleString()}`}
+                      </span>
+                    )}
+                  </div>
+                </div>
+              )
+            })}
+            {openPositions.length > 5 && (
+              <button
+                onClick={() => navigate('/portfolio')}
+                className="w-full px-4 py-2 text-[11px] font-semibold text-blue-500 hover:text-blue-700 hover:bg-blue-50 dark:hover:bg-blue-900/20 transition-colors text-center"
+              >
+                +{openPositions.length - 5} more → Portfolio
+              </button>
+            )}
+          </div>
+        )
+      )}
+    </div>
+  )
+}
+
 // ── Stats bar ─────────────────────────────────────────────────────────────────
 function StatCard({ label, value, color, sub }) {
   return (
@@ -274,14 +507,13 @@ function StatCard({ label, value, color, sub }) {
 }
 
 // ── Center dashboard (authenticated) ─────────────────────────────────────────
-function CenterDashboard({ navigate, initData, onRefresh }) {
+function CenterDashboard({ navigate, initData, onRefresh, onDataReady }) {
   const { t: tr } = useLanguage()
   const [openPositions, setOpenPositions] = useState([])
   const [perfStats, setPerfStats] = useState(null)
   const [watchlist, setWatchlist] = useState([])
   const [watchlistTab, setWatchlistTab] = useState('active')
   const { onContextMenu: watchCtx, ContextMenuPortal: WatchMenuPortal } = useContextMenu()
-  const [positionsCollapsed, setPositionsCollapsed] = useState(false)
   const [loading, setLoading] = useState(!initData)
   const [error, setError] = useState(null)
   const [showAddWatch, setShowAddWatch] = useState(false)
@@ -352,7 +584,14 @@ function CenterDashboard({ navigate, initData, onRefresh }) {
       pnlPct: t.pnlPct, sl: t.sl, tp: t.tp, status: t.status,
     }))
     setWatchlist([...watchWithPrices, ...portfolioItems])
-  }, [])
+    if (onDataReady) onDataReady({ openPositions: openWithPrices, perfStats: {
+      totalPnl: totalRealized + totalUnrealized, unrealizedPnl: totalUnrealized,
+      realizedPnl: totalRealized, winRate, openCount: openWithPrices.length,
+      closedCount: closed.length,
+      totalInvested:  openWithPrices.reduce((s, t) => s + (t.entry_price * t.quantity), 0),
+      currentValue:   openWithPrices.reduce((s, t) => s + ((t.currentPrice || t.entry_price) * t.quantity), 0),
+    }})
+  }, [onDataReady])
 
   // Hydrate from parent-supplied initData (avoids a second /init fetch)
   // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -446,21 +685,19 @@ function CenterDashboard({ navigate, initData, onRefresh }) {
             label={tr('stats.totalPL')}
             value={`${perfStats.totalPnl >= 0 ? '+' : ''}Rs. ${Math.abs(Math.round(perfStats.totalPnl)).toLocaleString()}`}
             color={perfStats.totalPnl >= 0 ? 'text-green-500' : 'text-red-500'}
+            sub={`Realized ${perfStats.realizedPnl >= 0 ? '+' : ''}Rs.${Math.round(perfStats.realizedPnl).toLocaleString()} · Open ${perfStats.unrealizedPnl >= 0 ? '+' : ''}Rs.${Math.round(perfStats.unrealizedPnl).toLocaleString()}`}
           />
           <StatCard
-            label="Unrealized P/L"
-            value={`${perfStats.unrealizedPnl >= 0 ? '+' : ''}Rs. ${Math.abs(Math.round(perfStats.unrealizedPnl)).toLocaleString()}`}
-            color={perfStats.unrealizedPnl >= 0 ? 'text-green-500' : 'text-red-500'}
-            sub={perfStats.totalInvested > 0
-              ? `${((perfStats.unrealizedPnl / perfStats.totalInvested) * 100).toFixed(2)}% of invested`
-              : undefined
-            }
+            label="Realized P/L"
+            value={`${perfStats.realizedPnl >= 0 ? '+' : ''}Rs. ${Math.abs(Math.round(perfStats.realizedPnl)).toLocaleString()}`}
+            color={perfStats.realizedPnl > 0 ? 'text-green-500' : perfStats.realizedPnl < 0 ? 'text-red-500' : 'text-gray-500 dark:text-gray-400'}
+            sub={perfStats.closedCount > 0 ? `${perfStats.closedCount} closed trade${perfStats.closedCount !== 1 ? 's' : ''}` : 'No closed trades yet'}
           />
           <StatCard
             label={tr('stats.winRate')}
             value={`${perfStats.winRate}%`}
             color={perfStats.winRate >= 50 ? 'text-green-500' : perfStats.winRate > 0 ? 'text-yellow-500' : 'text-gray-500 dark:text-gray-400'}
-            sub={perfStats.closedCount > 0 ? `${perfStats.closedCount} closed trades` : 'No closed trades yet'}
+            sub={perfStats.closedCount > 0 ? `from ${perfStats.closedCount} closed trades` : 'No closed trades yet'}
           />
           <StatCard
             label={tr('stats.openPositions')}
@@ -485,137 +722,8 @@ function CenterDashboard({ navigate, initData, onRefresh }) {
         </div>
       )}
 
-      {/* ── Open Positions ─────────────────────────────────────────────────── */}
-      <div className="bg-white dark:bg-gray-900 rounded-2xl border border-gray-100 dark:border-gray-800 overflow-hidden">
-        <div className="flex items-center justify-between px-5 py-3 border-b border-gray-100 dark:border-gray-800">
-          <h3 className="text-[12px] font-semibold text-gray-700 dark:text-gray-300 uppercase tracking-wide">
-            {tr('positions.title')}
-            {perfStats && perfStats.openCount > 0 && (
-              <span className="ml-2 text-[10px] font-normal text-gray-400">({perfStats.openCount})</span>
-            )}
-          </h3>
-          <div className="flex items-center gap-2">
-            <button
-              onClick={() => setPositionsCollapsed(c => !c)}
-              className="text-xs text-gray-400 hover:text-gray-600 dark:hover:text-gray-200 flex items-center gap-1 transition-colors"
-              aria-expanded={!positionsCollapsed}
-            >
-              {positionsCollapsed ? tr('positions.expand') : tr('positions.collapse')}
-              <svg className={`w-3 h-3 transition-transform ${positionsCollapsed ? '' : 'rotate-180'}`} fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
-              </svg>
-            </button>
-            <button onClick={() => navigate('/portfolio')} className="text-xs text-blue-500 hover:text-blue-700 transition-colors">›</button>
-          </div>
-        </div>
-
-        {!positionsCollapsed && (
-          openPositions.length === 0 ? (
-            <div className="p-8 text-center">
-              <p className="text-gray-400 text-sm">{tr('positions.noPositions')}</p>
-              <button onClick={() => navigate('/logs')} className="mt-2 text-blue-500 text-xs hover:underline">+ Add a trade</button>
-            </div>
-          ) : (
-            <div className="divide-y divide-gray-50 dark:divide-gray-800">
-              {openPositions.slice(0, 4).map(t => {
-                // Rule 6 — guard SL/TP distance divisions
-                const slDistPct = t.sl != null && t.currentPrice
-                  ? t.position === 'SHORT'
-                    ? (((t.sl - t.currentPrice) / t.currentPrice) * 100).toFixed(2)
-                    : (((t.currentPrice - t.sl) / t.currentPrice) * 100).toFixed(2)
-                  : null
-                const tpDistPct = t.tp != null && t.currentPrice
-                  ? t.position === 'SHORT'
-                    ? (((t.currentPrice - t.tp) / t.currentPrice) * 100).toFixed(2)
-                    : (((t.tp - t.currentPrice) / t.currentPrice) * 100).toFixed(2)
-                  : null
-
-                return (
-                  <div key={t.id} className="px-5 py-3 hover:bg-gray-50 dark:hover:bg-gray-800 transition-colors" translate="no">
-                    <div className="flex items-center justify-between">
-                      <div className="flex items-center gap-3">
-                        <StockAvatar symbol={t.symbol} />
-                        <div>
-                          <div className="flex items-center gap-2">
-                            <p className="text-sm font-semibold text-gray-900 dark:text-white">{t.symbol}</p>
-                            <span className={`text-xs px-1.5 py-0.5 rounded font-medium ${
-                              t.position === 'LONG'
-                                ? 'bg-green-100 text-green-700 dark:bg-green-900 dark:text-green-300'
-                                : 'bg-red-100 text-red-700 dark:bg-red-900 dark:text-red-300'
-                            }`}>
-                              {t.position}
-                            </span>
-                            {t.status === 'PARTIAL' && (
-                              <span className="text-xs px-1.5 py-0.5 rounded bg-orange-100 text-orange-600 dark:bg-orange-900 dark:text-orange-300 font-medium">PARTIAL</span>
-                            )}
-                          </div>
-                          <p className="text-[10px] text-gray-400 mt-0.5">
-                            {t.quantity} @ Rs.{t.entry_price.toLocaleString()}
-                          </p>
-                        </div>
-                      </div>
-                      <div className="text-right">
-                        <p className="text-sm font-semibold text-gray-900 dark:text-white">
-                          Rs.{t.currentPrice != null ? t.currentPrice.toLocaleString() : '—'}
-                        </p>
-                        {t.change != null && (
-                          <p className={`text-xs ${t.change >= 0 ? 'text-green-500' : 'text-red-500'}`}>
-                            {t.change >= 0 ? '+' : ''}{t.change}%
-                          </p>
-                        )}
-                        {t.unrealizedPnl != null && (
-                          <p className={`text-xs font-medium mt-0.5 ${t.unrealizedPnl >= 0 ? 'text-green-500' : 'text-red-500'}`}>
-                            {t.unrealizedPnl >= 0 ? '+' : ''}Rs.{Math.abs(t.unrealizedPnl).toLocaleString()}
-                            {t.pnlPct != null && <span className="text-[10px] ml-1 opacity-70">({t.pnlPct}%)</span>}
-                          </p>
-                        )}
-                      </div>
-                    </div>
-
-                    {/* SL / TP pills */}
-                    <div className="flex items-center gap-2 mt-2 ml-11 flex-wrap">
-                      {t.sl != null ? (
-                        <div className="flex items-center gap-1.5 bg-red-50 dark:bg-red-900/40 px-2.5 py-1 rounded-lg">
-                          <span className="text-xs text-red-500 font-medium">SL</span>
-                          <span className="text-xs text-gray-700 dark:text-gray-200">Rs.{t.sl.toLocaleString()}</span>
-                          {slDistPct !== null && (
-                            <span className="text-[10px] text-red-400 font-medium">
-                              ({parseFloat(slDistPct) > 0 ? '+' : ''}{slDistPct}%)
-                            </span>
-                          )}
-                        </div>
-                      ) : (
-                        <div className="flex items-center gap-1.5 bg-orange-50 dark:bg-orange-900/40 px-2.5 py-1 rounded-lg">
-                          <span className="text-xs text-orange-500 font-medium">⚠ No SL</span>
-                        </div>
-                      )}
-                      {t.tp != null && (
-                        <div className="flex items-center gap-1.5 bg-green-50 dark:bg-green-900/40 px-2.5 py-1 rounded-lg">
-                          <span className="text-xs text-green-500 font-medium">TP</span>
-                          <span className="text-xs text-gray-700 dark:text-gray-200">Rs.{t.tp.toLocaleString()}</span>
-                          {tpDistPct !== null && (
-                            <span className="text-[10px] text-green-500 font-medium">
-                              ({parseFloat(tpDistPct) > 0 ? '+' : ''}{tpDistPct}%)
-                            </span>
-                          )}
-                        </div>
-                      )}
-                    </div>
-                  </div>
-                )
-              })}
-              {openPositions.length > 4 && (
-                <button
-                  onClick={() => navigate('/portfolio')}
-                  className="w-full px-5 py-2.5 text-[11px] font-semibold text-blue-500 hover:text-blue-700 hover:bg-blue-50 dark:hover:bg-blue-900/20 transition-colors text-center"
-                >
-                  +{openPositions.length - 4} more positions — View all in Portfolio →
-                </button>
-              )}
-            </div>
-          )
-        )}
-      </div>
+      {/* ── NEPSE Chart ───────────────────────────────────────────────────────── */}
+      <NEPSEChart fixed={true} />
 
       {/* ── Watchlist ─────────────────────────────────────────────────────────── */}
       <div className="bg-white dark:bg-gray-900 rounded-2xl border border-gray-100 dark:border-gray-800 overflow-hidden">
@@ -951,320 +1059,18 @@ function CenterDashboard({ navigate, initData, onRefresh }) {
   )
 }
 
-// ── Forex session clock ───────────────────────────────────────────────────────
-// All times in NPT (UTC+5:45). Sessions overlap is normal in Forex.
-const FOREX_SESSIONS = [
-  { name: 'Sydney',  open: { h: 3,  m: 45 }, close: { h: 12, m: 45 }, color: 'bg-sky-500',    dot: 'bg-sky-400'    },
-  { name: 'Tokyo',   open: { h: 5,  m: 45 }, close: { h: 14, m: 45 }, color: 'bg-pink-500',   dot: 'bg-pink-400'   },
-  { name: 'London',  open: { h: 13, m: 45 }, close: { h: 22, m: 45 }, color: 'bg-blue-600',   dot: 'bg-blue-500'   },
-  { name: 'New York',open: { h: 18, m: 45 }, close: { h: 1,  m: 45 }, color: 'bg-amber-500',  dot: 'bg-amber-400'  },
-]
-
-function getNptNow() {
-  const now = new Date()
-  // NPT = UTC + 5h 45m
-  const utcMs = now.getTime() + now.getTimezoneOffset() * 60000
-  return new Date(utcMs + (5 * 60 + 45) * 60000)
-}
-
-function isSessionOpen(session, nptNow) {
-  const h = nptNow.getHours()
-  const m = nptNow.getMinutes()
-  const total = h * 60 + m
-  const open  = session.open.h  * 60 + session.open.m
-  const close = session.close.h * 60 + session.close.m
-  if (close < open) {
-    // crosses midnight (e.g. NY: 18:45 → 01:45 next day)
-    return total >= open || total < close
-  }
-  return total >= open && total < close
-}
-
-function minutesUntil(target, nptNow) {
-  const h = nptNow.getHours()
-  const m = nptNow.getMinutes()
-  const total = h * 60 + m
-  const t = target.h * 60 + target.m
-  let diff = t - total
-  if (diff < 0) diff += 24 * 60
-  return diff
-}
-
-function fmtDuration(mins) {
-  if (mins < 60) return `${mins}m`
-  return `${Math.floor(mins / 60)}h ${mins % 60}m`
-}
-
-function ForexSessionClock() {
-  const [nptNow, setNptNow] = useState(getNptNow)
-
-  useEffect(() => {
-    const id = setInterval(() => setNptNow(getNptNow()), 30000)
-    return () => clearInterval(id)
-  }, [])
-
-  const timeStr = nptNow.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit', hour12: true })
-  const dateStr = nptNow.toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric' })
-
-  return (
-    <div className="bg-white dark:bg-gray-900 rounded-2xl border border-gray-100 dark:border-gray-800 overflow-hidden">
-      <div className="flex items-center justify-between px-5 py-3 border-b border-gray-100 dark:border-gray-800">
-        <h3 className="text-[12px] font-semibold text-gray-700 dark:text-gray-300 uppercase tracking-wide">Market Sessions</h3>
-        <div className="text-right">
-          <p className="text-xs font-semibold text-gray-800 dark:text-white">{timeStr}</p>
-          <p className="text-[10px] text-gray-400">NPT · {dateStr}</p>
-        </div>
-      </div>
-      <div className="divide-y divide-gray-50 dark:divide-gray-800">
-        {FOREX_SESSIONS.map(sess => {
-          const open = isSessionOpen(sess, nptNow)
-          const minsToOpen  = open ? null : minutesUntil(sess.open,  nptNow)
-          const minsToClose = open ? minutesUntil(sess.close, nptNow) : null
-          return (
-            <div key={sess.name} className={`flex items-center justify-between px-5 py-3 transition-colors ${open ? 'bg-green-50/40 dark:bg-green-900/10' : ''}`}>
-              <div className="flex items-center gap-2.5">
-                <span className={`w-2 h-2 rounded-full flex-shrink-0 ${open ? sess.dot + ' animate-pulse' : 'bg-gray-300 dark:bg-gray-600'}`} />
-                <div>
-                  <p className={`text-xs font-semibold ${open ? 'text-gray-900 dark:text-white' : 'text-gray-400'}`}>{sess.name}</p>
-                  <p className="text-[10px] text-gray-400">
-                    {sess.open.h.toString().padStart(2,'0')}:{sess.open.m.toString().padStart(2,'0')} – {sess.close.h.toString().padStart(2,'0')}:{sess.close.m.toString().padStart(2,'0')} NPT
-                  </p>
-                </div>
-              </div>
-              <div className="text-right">
-                {open ? (
-                  <>
-                    <span className="text-[10px] font-semibold text-green-600 dark:text-green-400 bg-green-100 dark:bg-green-900/50 px-2 py-0.5 rounded-full">OPEN</span>
-                    {minsToClose !== null && (
-                      <p className="text-[10px] text-gray-400 mt-0.5">Closes in {fmtDuration(minsToClose)}</p>
-                    )}
-                  </>
-                ) : (
-                  <>
-                    <span className="text-[10px] font-medium text-gray-400 bg-gray-100 dark:bg-gray-800 px-2 py-0.5 rounded-full">CLOSED</span>
-                    {minsToOpen !== null && (
-                      <p className="text-[10px] text-gray-400 mt-0.5">Opens in {fmtDuration(minsToOpen)}</p>
-                    )}
-                  </>
-                )}
-              </div>
-            </div>
-          )
-        })}
-      </div>
-    </div>
-  )
-}
-
-// ── Gold price widget ─────────────────────────────────────────────────────────
-function GoldPriceWidget() {
-  const [gold, setGold] = useState(null)
-  const [prev, setPrev] = useState(null)
-  const [error, setError] = useState(false)
-  const [loading, setLoading] = useState(true)
-  const prevRef = useRef(null)
-
-  const fetchGold = useCallback(async () => {
-    try {
-      // Using open exchange rates / Frankfurt Open Data for gold proxy
-      // We use Yahoo Finance compatible public endpoint
-      const res = await fetch('https://query1.finance.yahoo.com/v8/finance/chart/GC=F?interval=1m&range=1d', {
-        headers: { 'Accept': 'application/json' }
-      })
-      if (!res.ok) throw new Error('fetch failed')
-      const json = await res.json()
-      const meta = json?.chart?.result?.[0]?.meta
-      if (!meta) throw new Error('no meta')
-      const price = parseFloat(meta.regularMarketPrice) || null
-      const prevClose = parseFloat(meta.chartPreviousClose) || parseFloat(meta.previousClose) || null
-      if (price) {
-        setPrev(prevRef.current)
-        prevRef.current = price
-        setGold({ price, prevClose, symbol: meta.symbol, currency: meta.currency || 'USD' })
-        setError(false)
-      }
-    } catch {
-      setError(true)
-    } finally {
-      setLoading(false)
-    }
-  }, [])
-
-  useEffect(() => {
-    fetchGold()
-  }, [fetchGold])
-
-  const change    = gold && gold.prevClose ? gold.price - gold.prevClose : null
-  const changePct = gold && gold.prevClose && gold.prevClose > 0 ? ((change / gold.prevClose) * 100).toFixed(2) : null
-  const isUp      = change != null ? change >= 0 : null
-  const flash     = prev !== null && gold !== null && prev !== gold.price
-    ? (gold.price > prev ? 'text-green-500' : 'text-red-500')
-    : ''
-
-  return (
-    <div className="bg-white dark:bg-gray-900 rounded-2xl border border-gray-100 dark:border-gray-800 overflow-hidden">
-      <div className="flex items-center justify-between px-5 py-3 border-b border-gray-100 dark:border-gray-800">
-        <div className="flex items-center gap-2">
-          <span className="text-base">🥇</span>
-          <h3 className="text-[12px] font-semibold text-gray-700 dark:text-gray-300 uppercase tracking-wide">Gold · XAUUSD</h3>
-        </div>
-        <button onClick={fetchGold} className="text-[10px] text-gray-400 hover:text-gray-600 dark:hover:text-gray-200 transition-colors">↻ Refresh</button>
-      </div>
-      <div className="px-5 py-4">
-        {loading ? (
-          <div className="h-12 animate-pulse bg-gray-100 dark:bg-gray-800 rounded-xl" />
-        ) : error ? (
-          <div className="text-center py-3">
-            <p className="text-xs text-gray-400">Unable to fetch Gold price.</p>
-            <p className="text-[10px] text-gray-300 dark:text-gray-600 mt-1">Market may be closed or network unavailable.</p>
-          </div>
-        ) : gold ? (
-          <>
-            <div className="flex items-end justify-between">
-              <div>
-                <p className={`text-3xl font-bold tabular-nums tracking-tight transition-colors duration-300 ${flash || (isUp ? 'text-gray-900 dark:text-white' : 'text-gray-900 dark:text-white')}`}>
-                  ${gold.price.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
-                </p>
-                <p className="text-[10px] text-gray-400 mt-0.5">per troy oz · {gold.currency}</p>
-              </div>
-              <div className="text-right">
-                {change != null && (
-                  <p className={`text-sm font-semibold ${isUp ? 'text-green-500' : 'text-red-500'}`}>
-                    {isUp ? '+' : ''}{change.toFixed(2)}
-                  </p>
-                )}
-                {changePct != null && (
-                  <p className={`text-xs font-medium px-2 py-0.5 rounded-full mt-1 ${isUp ? 'bg-green-100 dark:bg-green-900/50 text-green-600 dark:text-green-400' : 'bg-red-100 dark:bg-red-900/50 text-red-500'}`}>
-                    {isUp ? '+' : ''}{changePct}%
-                  </p>
-                )}
-              </div>
-            </div>
-            {gold.prevClose && (
-              <div className="mt-3 pt-3 border-t border-gray-50 dark:border-gray-800 flex justify-between text-[10px] text-gray-400">
-                <span>Prev. Close: ${gold.prevClose.toFixed(2)}</span>
-                <span className="flex items-center gap-1">
-                  <span className="w-1.5 h-1.5 bg-green-400 rounded-full animate-pulse" />
-                  Live · updates every 1m
-                </span>
-              </div>
-            )}
-          </>
-        ) : null}
-      </div>
-    </div>
-  )
-}
-
-// ── Forex open positions widget ───────────────────────────────────────────────
-function ForexOpenPositions({ navigate, initData }) {
-  const [positions, setPositions] = useState([])
-  const [stats, setStats] = useState(null)
-  const [loading, setLoading] = useState(!initData)
-
-  useEffect(() => {
-    const trades = initData?.trades
-    if (!trades) return
-    const open = trades.filter(t => (t.status === 'OPEN' || t.status === 'PARTIAL') && t.market === 'forex')
-    const closed = trades.filter(t => t.status === 'CLOSED' && t.market === 'forex')
-    const realizedPnl = closed.reduce((s, t) => s + (parseFloat(t.realized_pnl) || 0), 0)
-    const profitable = closed.filter(t => (parseFloat(t.realized_pnl) || 0) > 0).length
-    const winRate = closed.length > 0 ? Math.round((profitable / closed.length) * 100) : null
-    setPositions(open)
-    setStats({ realizedPnl, winRate, openCount: open.length, closedCount: closed.length })
-    setLoading(false)
-  }, [initData])
-
-  if (loading) return <div className="bg-white dark:bg-gray-900 rounded-2xl border border-gray-100 dark:border-gray-800 h-32 animate-pulse" />
-
-  return (
-    <div className="bg-white dark:bg-gray-900 rounded-2xl border border-gray-100 dark:border-gray-800 overflow-hidden">
-      <div className="flex items-center justify-between px-5 py-3 border-b border-gray-100 dark:border-gray-800">
-        <h3 className="text-[12px] font-semibold text-gray-700 dark:text-gray-300 uppercase tracking-wide">
-          Forex Positions
-          {stats?.openCount > 0 && <span className="ml-2 text-[10px] font-normal text-gray-400">({stats.openCount})</span>}
-        </h3>
-        <button onClick={() => navigate('/logs')} className="text-xs text-blue-500 hover:text-blue-700 transition-colors">›</button>
-      </div>
-
-      {/* Quick stats */}
-      {stats && (
-        <div className="grid grid-cols-3 divide-x divide-gray-100 dark:divide-gray-800 border-b border-gray-100 dark:border-gray-800">
-          <div className="px-4 py-2.5 text-center">
-            <p className="text-[10px] text-gray-400 uppercase tracking-wide">Realized P/L</p>
-            <p className={`text-sm font-bold ${stats.realizedPnl >= 0 ? 'text-green-500' : 'text-red-500'}`}>
-              {stats.realizedPnl >= 0 ? '+' : ''}${Math.abs(stats.realizedPnl).toFixed(2)}
-            </p>
-          </div>
-          <div className="px-4 py-2.5 text-center">
-            <p className="text-[10px] text-gray-400 uppercase tracking-wide">Win Rate</p>
-            <p className="text-sm font-bold text-gray-900 dark:text-white">
-              {stats.winRate !== null ? `${stats.winRate}%` : '—'}
-            </p>
-          </div>
-          <div className="px-4 py-2.5 text-center">
-            <p className="text-[10px] text-gray-400 uppercase tracking-wide">Closed</p>
-            <p className="text-sm font-bold text-gray-900 dark:text-white">{stats.closedCount}</p>
-          </div>
-        </div>
-      )}
-
-      {positions.length === 0 ? (
-        <div className="p-8 text-center">
-          <p className="text-gray-400 text-sm">No open Forex positions.</p>
-          <button onClick={() => navigate('/logs')} className="mt-2 text-blue-500 text-xs hover:underline">+ Log a trade</button>
-        </div>
-      ) : (
-        <div className="divide-y divide-gray-50 dark:divide-gray-800">
-          {positions.map(t => (
-            <div key={t.id} className="flex items-center justify-between px-5 py-3">
-              <div>
-                <div className="flex items-center gap-2">
-                  <p className="text-sm font-semibold text-gray-900 dark:text-white">{t.symbol}</p>
-                  <span className={`text-xs px-1.5 py-0.5 rounded font-medium ${
-                    t.position === 'LONG'
-                      ? 'bg-green-100 text-green-700 dark:bg-green-900 dark:text-green-300'
-                      : 'bg-red-100 text-red-700 dark:bg-red-900 dark:text-red-300'
-                  }`}>{t.position}</span>
-                </div>
-                <p className="text-[10px] text-gray-400 mt-0.5">
-                  {t.lots ? `${t.lots} lot${parseFloat(t.lots) !== 1 ? 's' : ''}` : `${t.quantity} units`}
-                  {t.entry_price ? ` @ ${parseFloat(t.entry_price).toFixed(t.symbol?.includes('JPY') ? 3 : 5)}` : ''}
-                </p>
-              </div>
-              <div className="text-right">
-                {t.realized_pnl != null && (
-                  <p className={`text-sm font-semibold ${parseFloat(t.realized_pnl) >= 0 ? 'text-green-500' : 'text-red-500'}`}>
-                    {parseFloat(t.realized_pnl) >= 0 ? '+' : ''}${Math.abs(parseFloat(t.realized_pnl)).toFixed(2)}
-                  </p>
-                )}
-              </div>
-            </div>
-          ))}
-        </div>
-      )}
-    </div>
-  )
-}
-
-// ── Forex center dashboard ────────────────────────────────────────────────────
-function ForexCenterDashboard({ navigate, initData }) {
-  return (
-    <div className="flex flex-col gap-4">
-      <GoldPriceWidget />
-      <ForexSessionClock />
-      <ForexOpenPositions navigate={navigate} initData={initData} />
-    </div>
-  )
-}
-
+// ── Logged-in layout ─────────────────────────────────────────────────────────
 // ── Logged-in layout ──────────────────────────────────────────────────────────
 function LoggedInHome() {
   const { user } = useAuth()
-  const { isForex } = useMarket()
   const navigate = useNavigate()
   const [initData, setInitData] = useState(null)
   const [showBriefing, setShowBriefing] = useState(false)
+  const [dashData, setDashData] = useState({ openPositions: [], perfStats: null })
+
+  const handleDashData = useCallback(({ openPositions, perfStats }) => {
+    setDashData({ openPositions, perfStats })
+  }, [])
 
   // Module-level cache so navigating away and back within 60s skips the refetch
   const fetchDashboard = useCallback(async (force = false) => {
@@ -1326,73 +1132,22 @@ function LoggedInHome() {
       {/* 3-Column Layout — stacks on mobile, side-by-side on lg */}
       <div className="grid grid-cols-12 gap-3 sm:gap-4">
 
-        {/* LEFT — TaskBoard + Monthly Goals */}
+        {/* LEFT — Daily Routine + Goals */}
         <div className="col-span-12 lg:col-span-3 flex flex-col gap-3 sm:gap-4">
           <TaskBoard initData={initData?.tasks} mindsetContent={initData?.mindset?.content} />
           <MonthlyGoals initData={initData?.goals} />
         </div>
 
-        {/* CENTER — Stats + Positions + Watchlist (NEPSE) / Gold + Sessions + Positions (Forex) */}
+        {/* CENTER — Stats + Watchlist */}
         <div className="col-span-12 lg:col-span-6">
-          {isForex ? <ForexCenterDashboard navigate={navigate} initData={initData} /> : <CenterDashboard navigate={navigate} initData={initData} onRefresh={() => fetchDashboard(true)} />}
+          <CenterDashboard navigate={navigate} initData={initData} onRefresh={() => fetchDashboard(true)} onDataReady={handleDashData} />
         </div>
 
-        {/* RIGHT — Discipline Score + Journal shortcuts */}
+        {/* RIGHT — Discipline Score + Open Positions + Alerts */}
         <div className="col-span-12 lg:col-span-3 flex flex-col gap-3 sm:gap-4">
           <DisciplineScore initData={initData?.discipline} />
-
-          {/* Journal shortcuts */}
-          <div className="bg-white dark:bg-gray-900 rounded-2xl border border-gray-100 dark:border-gray-800 flex flex-col">
-            <div className="flex items-center justify-between px-4 py-3 border-b border-gray-100 dark:border-gray-800">
-              <h3 className="text-[11px] font-semibold uppercase tracking-widest text-gray-400 dark:text-gray-500">Journal</h3>
-              <button onClick={() => navigate('/logs')} className="text-[10px] text-gray-400 hover:text-green-500 transition-colors">view all →</button>
-            </div>
-            <div className="p-3 space-y-1">
-              {[
-                { icon: '📈', label: 'NEPSE Journal', desc: 'Write & track your NEPSE trades', dot: 'bg-blue-400' },
-                { icon: '💹', label: 'Forex Journal', desc: 'Write & track your Forex trades', dot: 'bg-purple-400' },
-              ].map(({ icon, label, desc, dot }) => (
-                <Link key={label} to="/logs" className="flex items-center justify-between px-3 py-2.5 rounded-xl hover:bg-gray-50 dark:hover:bg-gray-800 transition-colors group">
-                  <div className="flex items-center gap-2.5">
-                    <span className={`w-1.5 h-1.5 rounded-full ${dot} flex-shrink-0`} />
-                    <div>
-                      <p className="text-[11px] font-medium text-gray-700 dark:text-gray-200">{label}</p>
-                      <p className="text-[10px] text-gray-400">{desc}</p>
-                    </div>
-                  </div>
-                  <svg className="w-3 h-3 text-gray-300 group-hover:text-green-400 transition-colors flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
-                  </svg>
-                </Link>
-              ))}
-            </div>
-          </div>
-
-          {/* Quick Tools */}
-          <div className="bg-white dark:bg-gray-900 rounded-2xl border border-gray-100 dark:border-gray-800 flex flex-col">
-            <div className="px-4 py-3 border-b border-gray-100 dark:border-gray-800">
-              <h3 className="text-[11px] font-semibold uppercase tracking-widest text-gray-400 dark:text-gray-500">Quick Tools</h3>
-            </div>
-            <div className="p-3 space-y-1">
-              {[
-                { icon: '📅', label: 'Corporate Actions', desc: 'Dividends, rights, bonuses', to: '/calendar', dot: 'bg-amber-400' },
-                { icon: '⚖️', label: 'Risk Lab', desc: 'Position sizing & risk calculator', to: '/risklab', dot: 'bg-rose-400' },
-              ].map(({ icon, label, desc, to, dot }) => (
-                <Link key={label} to={to} className="flex items-center justify-between px-3 py-2.5 rounded-xl hover:bg-gray-50 dark:hover:bg-gray-800 transition-colors group">
-                  <div className="flex items-center gap-2.5">
-                    <span className={`w-1.5 h-1.5 rounded-full ${dot} flex-shrink-0`} />
-                    <div>
-                      <p className="text-[11px] font-medium text-gray-700 dark:text-gray-200">{label}</p>
-                      <p className="text-[10px] text-gray-400">{desc}</p>
-                    </div>
-                  </div>
-                  <svg className="w-3 h-3 text-gray-300 group-hover:text-green-400 transition-colors flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
-                  </svg>
-                </Link>
-              ))}
-            </div>
-          </div>
+          <OpenPositionsPanel openPositions={dashData.openPositions} perfStats={dashData.perfStats} navigate={navigate} />
+          <AlertsWidget initData={initData} />
         </div>
 
       </div>

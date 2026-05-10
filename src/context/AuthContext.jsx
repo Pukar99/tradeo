@@ -34,6 +34,7 @@ export function AuthProvider({ children }) {
   const login = (userData, token) => {
     localStorage.setItem('token', token)
     localStorage.setItem('user', JSON.stringify(userData))
+    sessionStorage.setItem('ipoAutoApplyPending', '1')
     setUser(userData)
   }
 
@@ -54,6 +55,7 @@ export function AuthProvider({ children }) {
     localStorage.removeItem('user')
     // Clear once-per-session flags so they fire again on next login
     sessionStorage.removeItem('briefingShown')
+    sessionStorage.removeItem('ipoAutoApplyPending')
     setUser(null)
   }
 

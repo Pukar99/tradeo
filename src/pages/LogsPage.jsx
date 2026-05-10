@@ -13,9 +13,11 @@ import {
 import { useChatRefresh, dispatchDebrief } from '../utils/chatEvents'
 
 // Tab components
-import TradesTab   from '../components/logs/TradesTab'
-import JournalTab  from '../components/logs/JournalTab'
-import AuditTab    from '../components/logs/AuditTab'
+import TradesTab          from '../components/logs/TradesTab'
+import JournalTab         from '../components/logs/JournalTab'
+import AuditTab           from '../components/logs/AuditTab'
+import RulesTab           from '../components/logs/RulesTab'
+import MarketJournalTab   from '../components/logs/MarketJournalTab'
 
 // ── Constants ─────────────────────────────────────────────────────────────────
 
@@ -1334,6 +1336,16 @@ function LogsPage() {
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 17v-2m3 2v-4m3 4v-6m2 10H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
               </svg>
             )},
+            { key: 'rules',   label: 'Rules',   icon: (
+              <svg className="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-6 9l2 2 4-4" />
+              </svg>
+            )},
+            { key: 'mjournal', label: 'Market',  icon: (
+              <svg className="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 20H5a2 2 0 01-2-2V6a2 2 0 012-2h10a2 2 0 012 2v1m2 13a2 2 0 01-2-2V7m2 13a2 2 0 002-2V9a2 2 0 00-2-2h-2m-4-3H9M7 16h6M7 8h6v4H7V8z" />
+              </svg>
+            )},
           ].map(tab => (
             <button key={tab.key} onClick={() => setActiveTab(tab.key)}
               className={`flex items-center gap-1.5 px-3.5 py-1.5 rounded-lg text-[11px] font-semibold transition-all ${
@@ -1408,6 +1420,19 @@ function LogsPage() {
       {/* ── Audit tab ── */}
       {activeTab === 'audit' && (
         <AuditTab trades={trades} market={market} user={user} />
+      )}
+
+      {/* ── Rules tab ── */}
+      {activeTab === 'rules' && (
+        <RulesTab />
+      )}
+
+      {/* ── Market Journal tab ── */}
+      {activeTab === 'mjournal' && (
+        <MarketJournalTab
+          marketJournals={marketJournals}
+          onMarketJournalSaved={handleMarketJournalSaved}
+        />
       )}
 
     </div>
