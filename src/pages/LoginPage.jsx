@@ -20,6 +20,15 @@ function LoginPage() {
     if (user) navigate('/', { replace: true })
   }, [user, navigate])
 
+  // Show session-expired message set by 401 interceptor before redirect
+  useEffect(() => {
+    const msg = sessionStorage.getItem('authExpiredMsg')
+    if (msg) {
+      setServerError(msg)
+      sessionStorage.removeItem('authExpiredMsg')
+    }
+  }, [])
+
   const validate = () => {
     const errs = {}
     const trimmedEmail = email.trim()

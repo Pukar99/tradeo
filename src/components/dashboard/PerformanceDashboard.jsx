@@ -56,26 +56,29 @@ function PerformanceDashboard() {
   useChatRefresh(['trades'], fetchData)
 
   const calculateStats = (tradeData, openWithPrices, closedTrades) => {
-    const realizedPnl = closedTrades.reduce((sum, t) => sum + (t.realized_pnl || 0), 0)
+    const realizedPnl = closedTrades.reduce((sum, t) => sum + (parseFloat(t.realized_pnl) || 0), 0)
 
     let unrealizedPnl = 0
     openWithPrices.forEach(t => {
       if (t.currentPrice) {
-        const qty = t.remaining_quantity || t.quantity
-        const pnl = t.position === 'LONG'
-          ? (t.currentPrice - t.entry_price) * qty
-          : (t.entry_price - t.currentPrice) * qty
+        const entry = parseFloat(t.entry_price) || 0
+        const qty   = parseFloat(t.remaining_quantity || t.quantity) || 0
+        const pnl   = t.position === 'LONG'
+          ? (t.currentPrice - entry) * qty
+          : (entry - t.currentPrice) * qty
         unrealizedPnl += pnl
       }
     })
 
     const totalInvested = openWithPrices.reduce((sum, t) => {
-      return sum + (t.entry_price * (t.remaining_quantity || t.quantity))
+      const entry = parseFloat(t.entry_price) || 0
+      const qty   = parseFloat(t.remaining_quantity || t.quantity) || 0
+      return sum + (entry * qty)
     }, 0)
 
     const currentValue = openWithPrices.reduce((sum, t) => {
-      const price = t.currentPrice || t.entry_price
-      const qty = t.remaining_quantity || t.quantity
+      const price = t.currentPrice || (parseFloat(t.entry_price) || 0)
+      const qty   = parseFloat(t.remaining_quantity || t.quantity) || 0
       return sum + (price * qty)
     }, 0)
 
@@ -113,7 +116,7 @@ function PerformanceDashboard() {
 
     let cumPnl = 0
     const curve = closed.map(t => {
-      cumPnl += t.realized_pnl || 0
+      cumPnl += parseFloat(t.realized_pnl) || 0
       return {
         date: t.date,
         pnl: Math.round(cumPnl)
@@ -122,10 +125,11 @@ function PerformanceDashboard() {
 
     const unrealized = openWithPrices.reduce((sum, t) => {
       if (t.currentPrice) {
-        const qty = t.remaining_quantity || t.quantity
+        const entry = parseFloat(t.entry_price) || 0
+        const qty   = parseFloat(t.remaining_quantity || t.quantity) || 0
         return sum + (t.position === 'LONG'
-          ? (t.currentPrice - t.entry_price) * qty
-          : (t.entry_price - t.currentPrice) * qty)
+          ? (t.currentPrice - entry) * qty
+          : (entry - t.currentPrice) * qty)
       }
       return sum
     }, 0)
@@ -281,12 +285,12 @@ function PerformanceDashboard() {
           {showHoldings && (
             <div className="space-y-2">
               {openPositions.map(t => {
-                const qty = t.remaining_quantity || t.quantity
-                const ltp = t.currentPrice || t.entry_price
-                const pnl = t.position === 'LONG'
-                  ? (ltp - t.entry_price) * qty
-                  : (t.entry_price - ltp) * qty
-                const pnlPct = ((pnl / (t.entry_price * qty)) * 100).toFixed(2)
+                const entry  = parseFloat(t.entry_price) || 0
+                const qty    = parseFloat(t.remaining_quantity || t.quantity) || 0
+                const ltp    = t.currentPrice || entry
+                const pnl    = t.position === 'LONG' ? (ltp - entry) * qty : (entry - ltp) * qty
+                const cost   = entry * qty
+                const pnlPct = cost > 0 ? ((pnl / cost) * 100).toFixed(2) : '0.00'
 
                 return (
                   <div key={t.id} className="flex items-center justify-between bg-gray-50 dark:bg-gray-700 rounded-lg px-3 py-2">

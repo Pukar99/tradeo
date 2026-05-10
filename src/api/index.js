@@ -84,6 +84,7 @@ API.interceptors.response.use(
       localStorage.removeItem('user')
       sessionStorage.removeItem('briefingShown')
       if (!window.location.pathname.startsWith('/login')) {
+        sessionStorage.setItem('authExpiredMsg', 'Your session has expired. Please log in again.')
         window.location.href = '/login'
       }
     }
@@ -172,6 +173,7 @@ export const deleteChatSession  = (id)         => API.delete(`/api/chat/sessions
 export const getMarketSymbols  = ()             => API.get('/api/market/symbols')
 export const getIndexChart     = (params)       => API.get('/api/market/index-chart', { params })
 export const getStockChart     = (params)       => API.get('/api/market/stock-chart', { params })
+export const getPerformance    = (params)       => API.get('/api/market/performance', { params })
 export const getTopVolume      = (params)       => API.get('/api/market/top-volume', { params })
 export const getLatestDate     = ()             => API.get('/api/market/latest-date')
 export const getMarketDates    = ()             => API.get('/api/market/dates')
@@ -258,7 +260,8 @@ export const getMeroshareBanks       = (accountId)     => API.get('/api/meroshar
 export const getMeroshareDisclaimer  = (accountId, companyShareId) => API.get('/api/meroshare/disclaimer', { params: { account_id: accountId, company_share_id: companyShareId } })
 export const updateMeroshareAccount  = (id, data)      => API.put(`/api/meroshare/accounts/${id}`, data)
 export const toggleMeroshareAutoApply = (accountId, enabled) => API.post('/api/meroshare/auto-apply/toggle', { account_id: accountId, enabled })
-export const runMeroshareAutoApply   = ()              => API.post('/api/meroshare/auto-apply/run')
+export const runMeroshareAutoApply        = ()  => API.post('/api/meroshare/auto-apply/run')
+export const runMeroshareAutoApplyOnLogin = ()  => API.post('/api/meroshare/auto-apply/on-login')
 
 // Market Journal
 export const getMarketJournals      = ()         => API.get('/api/market-journal')

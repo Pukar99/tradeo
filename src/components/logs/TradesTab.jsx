@@ -172,7 +172,8 @@ function TradeRow({ trade, ltp, onEdit, onClose, onPartialClose, onDelete, onJou
     { label: 'Delete', icon: '🗑️', danger: true, action: () => onDelete(trade.id) },
   ]
 
-  const hasExpand = trade.notes || trade.entry_reason || trade.exit_reflection || (trade.partial_exits?.length > 0) || trade.exit_price
+  const hasPositionEntries = Array.isArray(trade.position_entries) && trade.position_entries.length > 0
+  const hasExpand = hasPositionEntries || trade.notes || trade.entry_reason || trade.exit_reflection || (trade.partial_exits?.length > 0) || trade.exit_price
 
   return (
     <>
@@ -294,16 +295,76 @@ function TradeRow({ trade, ltp, onEdit, onClose, onPartialClose, onDelete, onJou
       {expanded && (
         <tr className="bg-gray-50/60 dark:bg-gray-800/20">
           <td colSpan={9} className="px-4 pt-0 pb-4">
-            <div className="pt-3 border-t border-gray-100 dark:border-gray-800/60 grid grid-cols-1 gap-3">
-              {trade.entry_reason && (
-                <div className="flex gap-3">
-                  <div className="w-0.5 rounded-full bg-emerald-200 dark:bg-emerald-800/50 flex-shrink-0" />
-                  <div>
-                    <p className="text-[9px] uppercase tracking-widest font-semibold text-gray-400 mb-1">Why I took this</p>
-                    <p className="text-[11px] text-gray-600 dark:text-gray-300 leading-relaxed">{trade.entry_reason}</p>
+            <div className="pt-3 border-t border-gray-100 dark:border-gray-800/60 space-y-2">
+
+              {/* ── Position timeline (chronological BUY/ADD/SELL events) ── */}
+              {hasPositionEntries && (() => {
+                // Build a single sorted timeline from entries + exits
+                const entries = (trade.position_entries || []).map(e => ({ ...e, _kind: 'entry' }))
+                const exits   = (trade.partial_exits   || []).map(e => ({ ...e, _kind: 'exit',  date: e.date?.slice(0,10) || trade.date }))
+                const timeline = [...entries, ...exits].sort((a, b) => (a.date > b.date ? 1 : a.date < b.date ? -1 : 0))
+
+                return (
+                  <div className="space-y-1.5">
+                    <p className="text-[9px] uppercase tracking-widest font-semibold text-gray-400 mb-2">Position Timeline</p>
+                    {timeline.map((evt, i) => {
+                      if (evt._kind === 'entry') {
+                        const isBuy = evt.type === 'BUY'
+                        return (
+                          <div key={i} className="flex gap-3 items-start">
+                            <div className={`mt-1 w-1.5 h-1.5 rounded-full flex-shrink-0 ${isBuy ? 'bg-emerald-400' : 'bg-blue-400'}`} />
+                            <div className="flex-1 min-w-0">
+                              <div className="flex items-center gap-2 flex-wrap">
+                                <span className={`text-[9px] font-bold uppercase tracking-wide ${isBuy ? 'text-emerald-500' : 'text-blue-400'}`}>{evt.type}</span>
+                                <span className="text-[10px] font-semibold text-gray-700 dark:text-gray-200 tabular-nums">{evt.qty} @ {fmtPrice(evt.price)}</span>
+                                {evt.setup_tag && <span className="text-[8px] px-1.5 py-0.5 rounded-full bg-gray-100 dark:bg-gray-800 text-gray-500 dark:text-gray-400">{evt.setup_tag}</span>}
+                                <span className="text-[9px] text-gray-400 tabular-nums">{evt.date}</span>
+                              </div>
+                              {evt.entry_reason && <p className="text-[10px] text-gray-500 dark:text-gray-400 mt-0.5 leading-relaxed">{evt.entry_reason}</p>}
+                              {(evt.sl || evt.tp) && (
+                                <div className="flex gap-2 mt-0.5">
+                                  {evt.sl && <span className="text-[9px] tabular-nums"><span className="text-red-400 font-semibold">SL</span> <span className="text-gray-400">{fmtPrice(evt.sl)}{evt.sl_pct && evt.sl_pct !== 100 ? ` (${evt.sl_pct}%)` : ''}</span></span>}
+                                  {evt.tp && <span className="text-[9px] tabular-nums"><span className="text-emerald-400 font-semibold">TP</span> <span className="text-gray-400">{fmtPrice(evt.tp)}{evt.tp_pct && evt.tp_pct !== 100 ? ` (${evt.tp_pct}%)` : ''}</span></span>}
+                                </div>
+                              )}
+                            </div>
+                          </div>
+                        )
+                      } else {
+                        // SELL / partial exit
+                        const pnl = parseFloat(evt.pnl) || 0
+                        return (
+                          <div key={i} className="flex gap-3 items-start">
+                            <div className="mt-1 w-1.5 h-1.5 rounded-full flex-shrink-0 bg-amber-400" />
+                            <div className="flex items-center gap-2 flex-wrap">
+                              <span className="text-[9px] font-bold uppercase tracking-wide text-amber-500">SELL</span>
+                              <span className="text-[10px] font-semibold text-gray-700 dark:text-gray-200 tabular-nums">{evt.exit_quantity} @ {fmtPrice(evt.exit_price)}</span>
+                              <span className={`text-[10px] font-bold tabular-nums ${pnl >= 0 ? 'text-emerald-500' : 'text-red-400'}`}>{fmtPnl(pnl)}</span>
+                              <span className="text-[9px] text-gray-400 tabular-nums">{evt.date}</span>
+                            </div>
+                          </div>
+                        )
+                      }
+                    })}
+
+                    {/* Full exit line */}
+                    {trade.exit_price && (
+                      <div className="flex gap-3 items-start">
+                        <div className="mt-1 w-1.5 h-1.5 rounded-full flex-shrink-0 bg-gray-400" />
+                        <div className="flex items-center gap-2 flex-wrap">
+                          <span className="text-[9px] font-bold uppercase tracking-wide text-gray-400">CLOSED</span>
+                          <span className="text-[10px] font-semibold text-gray-700 dark:text-gray-200 tabular-nums">{fmtPrice(trade.exit_price)}</span>
+                          {trade.close_date && <span className="text-[9px] text-gray-400 tabular-nums">{trade.close_date}</span>}
+                          {trade.mfe != null && <span className="text-[9px] tabular-nums"><span className="text-emerald-400 font-semibold">MFE</span> <span className="text-gray-400">{fmtPrice(trade.mfe)}</span></span>}
+                          {trade.mae != null && <span className="text-[9px] tabular-nums"><span className="text-red-400 font-semibold">MAE</span> <span className="text-gray-400">{fmtPrice(trade.mae)}</span></span>}
+                        </div>
+                      </div>
+                    )}
                   </div>
-                </div>
-              )}
+                )
+              })()}
+
+              {/* Exit reflection (still show standalone if present) */}
               {trade.exit_reflection && (
                 <div className="flex gap-3">
                   <div className="w-0.5 rounded-full bg-violet-200 dark:bg-violet-800/50 flex-shrink-0" />
@@ -313,58 +374,60 @@ function TradeRow({ trade, ltp, onEdit, onClose, onPartialClose, onDelete, onJou
                   </div>
                 </div>
               )}
-              {trade.notes && (
-                <div className="flex gap-3">
-                  <div className="w-0.5 rounded-full bg-blue-200 dark:bg-blue-800/50 flex-shrink-0" />
-                  <div>
-                    <p className="text-[9px] uppercase tracking-widest font-semibold text-gray-400 mb-1">Trade Thesis</p>
-                    <p className="text-[11px] text-gray-600 dark:text-gray-300 leading-relaxed">{trade.notes}</p>
-                  </div>
-                </div>
-              )}
-              {trade.partial_exits?.length > 0 && (
-                <div className="flex gap-3">
-                  <div className="w-0.5 rounded-full bg-amber-200 dark:bg-amber-800/50 flex-shrink-0" />
-                  <div className="w-full">
-                    <p className="text-[9px] uppercase tracking-widest font-semibold text-gray-400 mb-2">Partial Exits</p>
-                    <div className="flex flex-wrap gap-2">
-                      {trade.partial_exits.map((pe, i) => (
-                        <div key={i} className="inline-flex items-center gap-1.5 bg-white dark:bg-gray-900 border border-gray-100 dark:border-gray-800 rounded-lg px-2.5 py-1.5">
-                          <span className="text-[10px] font-semibold text-gray-700 dark:text-gray-300 tabular-nums">
-                            {pe.exit_quantity} @ {fmtPrice(pe.exit_price)}
-                          </span>
-                          <span className={`text-[10px] font-bold tabular-nums ${pe.pnl >= 0 ? 'text-emerald-500' : 'text-red-400'}`}>
-                            {fmtPnl(pe.pnl)}
-                          </span>
+
+              {/* Fallback: legacy trades without position_entries */}
+              {!hasPositionEntries && (
+                <>
+                  {trade.entry_reason && (
+                    <div className="flex gap-3">
+                      <div className="w-0.5 rounded-full bg-emerald-200 dark:bg-emerald-800/50 flex-shrink-0" />
+                      <div>
+                        <p className="text-[9px] uppercase tracking-widest font-semibold text-gray-400 mb-1">Why I took this</p>
+                        <p className="text-[11px] text-gray-600 dark:text-gray-300 leading-relaxed">{trade.entry_reason}</p>
+                      </div>
+                    </div>
+                  )}
+                  {trade.notes && (
+                    <div className="flex gap-3">
+                      <div className="w-0.5 rounded-full bg-blue-200 dark:bg-blue-800/50 flex-shrink-0" />
+                      <div>
+                        <p className="text-[9px] uppercase tracking-widest font-semibold text-gray-400 mb-1">Trade Thesis</p>
+                        <p className="text-[11px] text-gray-600 dark:text-gray-300 leading-relaxed">{trade.notes}</p>
+                      </div>
+                    </div>
+                  )}
+                  {trade.partial_exits?.length > 0 && (
+                    <div className="flex gap-3">
+                      <div className="w-0.5 rounded-full bg-amber-200 dark:bg-amber-800/50 flex-shrink-0" />
+                      <div className="w-full">
+                        <p className="text-[9px] uppercase tracking-widest font-semibold text-gray-400 mb-2">Partial Exits</p>
+                        <div className="flex flex-wrap gap-2">
+                          {trade.partial_exits.map((pe, i) => (
+                            <div key={i} className="inline-flex items-center gap-1.5 bg-white dark:bg-gray-900 border border-gray-100 dark:border-gray-800 rounded-lg px-2.5 py-1.5">
+                              <span className="text-[10px] font-semibold text-gray-700 dark:text-gray-300 tabular-nums">{pe.exit_quantity} @ {fmtPrice(pe.exit_price)}</span>
+                              <span className={`text-[10px] font-bold tabular-nums ${pe.pnl >= 0 ? 'text-emerald-500' : 'text-red-400'}`}>{fmtPnl(pe.pnl)}</span>
+                            </div>
+                          ))}
                         </div>
-                      ))}
+                      </div>
                     </div>
-                  </div>
-                </div>
-              )}
-              {trade.exit_price && (
-                <div className="flex gap-3">
-                  <div className="w-0.5 rounded-full bg-gray-200 dark:bg-gray-700 flex-shrink-0" />
-                  <div className="flex-1">
-                    <p className="text-[9px] uppercase tracking-widest font-semibold text-gray-400 mb-1">Full Exit</p>
-                    <div className="flex items-center gap-4 flex-wrap">
-                      <p className="text-[11px] text-gray-600 dark:text-gray-300 tabular-nums font-medium">{fmtPrice(trade.exit_price)}</p>
-                      {trade.mfe != null && (
-                        <span className="text-[10px] tabular-nums">
-                          <span className="font-semibold text-emerald-500">MFE</span>
-                          <span className="text-gray-500 dark:text-gray-400 ml-1">{fmtPrice(trade.mfe)}</span>
-                        </span>
-                      )}
-                      {trade.mae != null && (
-                        <span className="text-[10px] tabular-nums">
-                          <span className="font-semibold text-red-400">MAE</span>
-                          <span className="text-gray-500 dark:text-gray-400 ml-1">{fmtPrice(trade.mae)}</span>
-                        </span>
-                      )}
+                  )}
+                  {trade.exit_price && (
+                    <div className="flex gap-3">
+                      <div className="w-0.5 rounded-full bg-gray-200 dark:bg-gray-700 flex-shrink-0" />
+                      <div className="flex-1">
+                        <p className="text-[9px] uppercase tracking-widest font-semibold text-gray-400 mb-1">Full Exit</p>
+                        <div className="flex items-center gap-4 flex-wrap">
+                          <p className="text-[11px] text-gray-600 dark:text-gray-300 tabular-nums font-medium">{fmtPrice(trade.exit_price)}</p>
+                          {trade.mfe != null && <span className="text-[10px] tabular-nums"><span className="font-semibold text-emerald-500">MFE</span><span className="text-gray-500 dark:text-gray-400 ml-1">{fmtPrice(trade.mfe)}</span></span>}
+                          {trade.mae != null && <span className="text-[10px] tabular-nums"><span className="font-semibold text-red-400">MAE</span><span className="text-gray-500 dark:text-gray-400 ml-1">{fmtPrice(trade.mae)}</span></span>}
+                        </div>
+                      </div>
                     </div>
-                  </div>
-                </div>
+                  )}
+                </>
               )}
+
               {trade.status === 'CLOSED' && trade.exit_price && getWhatIf && (
                 <WhatIfPanel trade={trade} getWhatIf={getWhatIf} />
               )}

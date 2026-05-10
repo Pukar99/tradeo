@@ -4,9 +4,10 @@ import { useLocation } from 'react-router-dom'
 const ScreenContext = createContext(null)
 
 export function ScreenProvider({ children }) {
-  const [selectedSymbol,  setSelectedSymbol]  = useState('NEPSE')
-  const [selectedIndexId, setSelectedIndexId] = useState(12)
-  const [selectedIsIndex, setSelectedIsIndex] = useState(true)
+  const [selectedSymbol,      setSelectedSymbol]      = useState('NEPSE')
+  const [selectedCompanyName, setSelectedCompanyName] = useState(null)
+  const [selectedIndexId,     setSelectedIndexId]     = useState(12)
+  const [selectedIsIndex,     setSelectedIsIndex]     = useState(true)
   const [chartType,       setChartType]       = useState('candlestick')
   const [timeframe,       setTimeframe]       = useState('1Y')
   const [activeIndicators,setActiveIndicators]= useState([])
@@ -17,9 +18,6 @@ export function ScreenProvider({ children }) {
   const [hoveredMovers, setHoveredMovers] = useState(null)  // { gainers, losers }
   const [pinnedMovers,  setPinnedMovers]  = useState(null)
 
-  // SMC overlay toggle
-  const [smcEnabled, setSmcEnabled] = useState(false)
-
   // Active positions array — supports multiple entries for same symbol
   // Each: { id, entry_price, sl, tp, position, quantity }
   // null when viewing watchlist or index
@@ -29,8 +27,9 @@ export function ScreenProvider({ children }) {
 
   const isIndex = () => selectedIsIndex
 
-  const selectSymbol = useCallback((sym, indexId = null, positions = null) => {
+  const selectSymbol = useCallback((sym, indexId = null, positions = null, companyName = null) => {
     setSelectedSymbol(sym)
+    setSelectedCompanyName(indexId != null ? null : companyName)
     setSelectedIsIndex(indexId != null)
     if (indexId != null) setSelectedIndexId(indexId)
     setPinnedDate(null)
@@ -97,7 +96,7 @@ export function ScreenProvider({ children }) {
 
   return (
     <ScreenContext.Provider value={{
-      selectedSymbol, selectedIndexId,
+      selectedSymbol, selectedCompanyName, selectedIndexId,
       chartType,       setChartType,
       timeframe,       setTimeframe,
       activeIndicators, toggleIndicator,
@@ -106,7 +105,6 @@ export function ScreenProvider({ children }) {
       hoveredMovers, pinnedMovers, activeMovers,
       clickedMovers,
       onHover, onPin, clearPin,
-      smcEnabled, setSmcEnabled,
       activePositions,
       // backwards-compat: components that read activePosition get the first entry
       activePosition: activePositions?.[0] ?? null,
