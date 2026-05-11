@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from 'react'
+import { useState, useEffect, useCallback, useRef } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { useAuth } from '../context/AuthContext'
 import { useLanguage } from '../context/LanguageContext'
@@ -6,6 +6,7 @@ import { useMarket } from '../context/MarketContext'
 import {
   getTradeLog, addTradeLog, updateTradeLog,
   closeTradeLog, partialCloseTradeLog, deleteTradeLog, bulkDeleteTradeLog,
+  bulkImportTradeLog,
   getTradeJournal, addTradeJournal, updateTradeJournal, deleteTradeJournal,
   getBatchPrices, getTradeDebrief, getWhatIf,
   getMarketJournals, autoCreateMarketJournal,
@@ -831,12 +832,19 @@ function parseCSV(text) {
   return { rows, error: null }
 }
 
-function ImportCSVModal({ onClose, onImport }) {
-  const [step,     setStep]     = useState('input')
-  const [csvText,  setCsvText]  = useState('')
-  const [rows,     setRows]     = useState([])
-  const [parseErr, setParseErr] = useState('')
-  const [progress, setProgress] = useState({ done: 0, total: 0, failed: 0 })
+function ImportCSVModal({ onClose, onImported }) {
+  const [step,      setStep]      = useState('input')
+  const [csvText,   setCsvText]   = useState('')
+  const [rows,      setRows]      = useState([])
+  const [parseErr,  setParseErr]  = useState('')
+  const [importErr, setImportErr] = useState('')
+  const [progress,  setProgress]  = useState({ done: 0, total: 0, failed: 0 })
+  const abortRef = useRef(null)
+
+  const handleClose = () => {
+    if (abortRef.current) abortRef.current.abort()
+    onClose()
+  }
 
   const handleFile = (e) => {
     const file = e.target.files[0]; if (!file) return
@@ -853,27 +861,37 @@ function ImportCSVModal({ onClose, onImport }) {
   const toggleRow = (idx) => setRows(prev => prev.map((r, i) => i === idx ? { ...r, _import: !r._import && r.errors.length === 0 } : r))
   const handleImport = async () => {
     const toImport = rows.filter(r => r._import); if (toImport.length === 0) return
-    setStep('importing'); setProgress({ done: 0, total: toImport.length, failed: 0 })
-    const BATCH = 10; let done = 0, failed = 0
-    for (let i = 0; i < toImport.length; i += BATCH) {
-      const batch   = toImport.slice(i, i + BATCH)
-      const results = await Promise.allSettled(batch.map(r => onImport({ date: r.date, symbol: r.symbol, position: r.position, quantity: r.quantity, entry_price: r.entry_price, sl: r.sl || null, tp: r.tp || null, notes: r.notes || null })))
-      failed += results.filter(r => r.status === 'rejected').length
-      done   += batch.length
-      setProgress({ done, total: toImport.length, failed })
+    setStep('importing'); setImportErr(''); setProgress({ done: 0, total: toImport.length, failed: 0 })
+
+    const ctrl = new AbortController()
+    abortRef.current = ctrl
+
+    try {
+      const payload = toImport.map(r => ({ date: r.date, symbol: r.symbol, position: r.position, quantity: r.quantity, entry_price: r.entry_price, sl: r.sl || null, tp: r.tp || null, notes: r.notes || null }))
+      setProgress({ done: toImport.length, total: toImport.length, failed: 0 })
+      const res = await bulkImportTradeLog(payload, { signal: ctrl.signal })
+      const failed = res.data.errors?.length ?? 0
+      setProgress({ done: toImport.length, total: toImport.length, failed })
+      if (onImported) onImported(res.data.trades ?? [])
+      setStep('done')
+    } catch (err) {
+      if (err.name === 'CanceledError' || err.name === 'AbortError') return
+      setImportErr(err.response?.data?.message || 'Import failed. Please try again.')
+      setStep('preview')
+    } finally {
+      abortRef.current = null
     }
-    setStep('done'); setProgress(p => ({ ...p, failed }))
   }
   const validCount    = rows.filter(r => r.errors.length === 0).length
   const selectedCount = rows.filter(r => r._import).length
   const errorCount    = rows.filter(r => r.errors.length > 0).length
 
   return (
-    <Modal onClose={step === 'importing' ? undefined : onClose} wide>
+    <Modal onClose={step === 'importing' ? undefined : handleClose} wide>
       <ModalHeader
         title="Import Trades from CSV"
         sub={step === 'input' ? 'Upload a file or paste CSV text below' : step === 'preview' ? `${rows.length} rows parsed · ${errorCount} errors` : step === 'done' ? 'Import complete' : 'Importing…'}
-        onClose={step === 'importing' ? undefined : onClose}
+        onClose={step === 'importing' ? undefined : handleClose}
       />
       <div className="p-5 space-y-4">
         {step === 'input' && (
@@ -905,7 +923,7 @@ function ImportCSVModal({ onClose, onImport }) {
             </div>
             {parseErr && <p className="text-[11px] text-red-400 bg-red-50 dark:bg-red-900/10 border border-red-200 dark:border-red-800/30 rounded-lg px-3 py-2">{parseErr}</p>}
             <div className="flex gap-2 pt-1">
-              <button onClick={onClose} className="flex-1 py-2.5 rounded-xl border border-gray-200 dark:border-gray-700 text-[11px] font-medium text-gray-500 hover:bg-gray-50 dark:hover:bg-gray-800 transition-colors">Cancel</button>
+              <button onClick={handleClose} className="flex-1 py-2.5 rounded-xl border border-gray-200 dark:border-gray-700 text-[11px] font-medium text-gray-500 hover:bg-gray-50 dark:hover:bg-gray-800 transition-colors">Cancel</button>
               <button onClick={handleParse} disabled={!csvText.trim()} className="flex-1 py-2.5 rounded-xl bg-blue-600 hover:bg-blue-700 text-white text-[11px] font-semibold disabled:opacity-40 transition-colors">Parse CSV</button>
             </div>
           </>
@@ -950,6 +968,7 @@ function ImportCSVModal({ onClose, onImport }) {
               </div>
             )}
             <p className="text-[10px] text-gray-400">Click a row to toggle selection. Rows with errors cannot be imported.</p>
+            {importErr && <p className="text-[11px] text-red-400 bg-red-50 dark:bg-red-900/10 border border-red-200 dark:border-red-800/30 rounded-lg px-3 py-2">{importErr}</p>}
             <div className="flex gap-2 pt-1">
               <button onClick={() => setStep('input')} className="flex-1 py-2.5 rounded-xl border border-gray-200 dark:border-gray-700 text-[11px] font-medium text-gray-500 hover:bg-gray-50 dark:hover:bg-gray-800 transition-colors">Back</button>
               <button onClick={handleImport} disabled={selectedCount === 0}
@@ -985,7 +1004,7 @@ function ImportCSVModal({ onClose, onImport }) {
               </p>
               {progress.failed > 0 && <p className="text-[11px] text-red-400 mt-1">{progress.failed} failed to save</p>}
             </div>
-            <button onClick={onClose} className="px-6 py-2.5 rounded-xl bg-blue-600 hover:bg-blue-700 text-white text-[11px] font-semibold transition-colors">Done</button>
+            <button onClick={handleClose} className="px-6 py-2.5 rounded-xl bg-blue-600 hover:bg-blue-700 text-white text-[11px] font-semibold transition-colors">Done</button>
           </div>
         )}
       </div>
@@ -1166,12 +1185,10 @@ function LogsPage() {
     })
   }
 
-  const handleImportTrade = async (form) => {
-    const res = await addTradeLog(form)
-    setTrades(prev => [res.data, ...prev])
+  const handleImportDone = (importedTrades) => {
+    if (importedTrades?.length > 0) fetchData()
+    setShowImport(false)
   }
-
-  const handleImportDone = () => { setShowImport(false); fetchData() }
 
   const handleGoToChart = (trade) => {
     // With position model: one row per symbol+direction, pass it directly
@@ -1262,7 +1279,7 @@ function LogsPage() {
         />
       )}
       {showImport && (
-        <ImportCSVModal onClose={handleImportDone} onImport={handleImportTrade} />
+        <ImportCSVModal onClose={() => handleImportDone([])} onImported={handleImportDone} />
       )}
       {confirmDelete && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4"

@@ -197,6 +197,7 @@ export const closeTradeLog            = (id, data)   => API.post(`/api/tradelog/
 export const partialCloseTradeLog     = (id, data)   => API.post(`/api/tradelog/${id}/partial-close`, data)
 export const deleteTradeLog           = (id)         => API.delete(`/api/tradelog/${id}`)
 export const bulkDeleteTradeLog       = (ids)        => API.delete('/api/tradelog/bulk', { data: { ids } })
+export const bulkImportTradeLog       = (trades, cfg) => API.post('/api/tradelog/bulk', { trades }, cfg)
 export const getOpenPosition          = (symbol, direction) => API.get('/api/tradelog/open-position', { params: { symbol, direction } })
 export const retroactiveMerge         = (symbol, direction) => API.post('/api/tradelog/retroactive-merge', { symbol, direction })
 export const getTradeJournal          = ()           => API.get('/api/tradelog/journal')
