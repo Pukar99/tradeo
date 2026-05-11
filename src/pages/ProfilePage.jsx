@@ -165,8 +165,8 @@ function ProfilePage() {
       setPasswordError('New passwords do not match')
       return
     }
-    if (passwordForm.newPassword.length < 6) {
-      setPasswordError('Password must be at least 6 characters')
+    if (passwordForm.newPassword.length < 8) {
+      setPasswordError('Password must be at least 8 characters')
       return
     }
     if (passwordForm.currentPassword === passwordForm.newPassword) {

@@ -49,13 +49,14 @@ export const gCache = {
 
 // ── Pre-defined TTLs ───────────────────────────────────────────────────────────
 export const TTL = {
-  SYMBOLS:   60 * 60_000,  // 1 hour — symbol list is stable
-  PROFILE:   10 * 60_000,  // 10 min — profile rarely changes
-  PRICES:     5 * 60_000,  // 5 min  — prices update intraday
-  CHART:     60 * 60_000,  // 1 hour — daily OHLCV doesn't change
-  MOVERS:     5 * 60_000,  // 5 min  — today's movers
-  MOVERS_PAST: 60 * 60_000, // 1 hour — past date movers never change
-  DASHBOARD: 60 * 1_000,   // 1 min  — dashboard data
+  SYMBOLS:      60 * 60_000,  // 1 hour — symbol list is stable
+  PROFILE:      10 * 60_000,  // 10 min — profile rarely changes
+  PRICES:        5 * 60_000,  // 5 min  — prices update intraday
+  CHART:        60 * 60_000,  // 1 hour — daily OHLCV doesn't change
+  MOVERS:        5 * 60_000,  // 5 min  — today's movers
+  MOVERS_PAST:  60 * 60_000,  // 1 hour — past date movers never change
+  DASHBOARD:    60 * 1_000,   // 1 min  — dashboard data
+  ELIGIBILITY:  60 * 60_000,  // 1 hour — trade stats change rarely
 }
 
 // ── Cached wrappers for the most-fetched endpoints ────────────────────────────
@@ -63,6 +64,7 @@ export const TTL = {
 
 import { getMarketSymbols as _getMarketSymbols } from '../api'
 import { getProfile       as _getProfile       } from '../api'
+import { getResearchEligibility as _getResearchEligibility } from '../api'
 
 export async function getMarketSymbols() {
   const cached = gCache.get('symbols')
@@ -80,9 +82,25 @@ export async function getProfile() {
   return result
 }
 
+// Research eligibility is expensive (full trade scan). Cache 1 hr client-side.
+// Invalidate when a trade is closed (call clearEligibilityCache() from LogsPage).
+export async function getResearchEligibility() {
+  const cached = gCache.get('eligibility')
+  if (cached !== undefined) return cached
+  const result = await _getResearchEligibility()
+  gCache.set('eligibility', result, TTL.ELIGIBILITY)
+  return result
+}
+
 // Call this on login/logout to reset user-specific caches
 export function clearUserCache() {
   gCache.del('profile')
   gCache.del('dashboard')
+  gCache.del('eligibility')
   gCache.delPrefix('tradelog')
+}
+
+// Call after closing a trade so the eligibility re-check picks up the new stats
+export function clearEligibilityCache() {
+  gCache.del('eligibility')
 }

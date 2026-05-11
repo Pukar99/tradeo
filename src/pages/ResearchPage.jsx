@@ -4,12 +4,12 @@ import { Link, useNavigate } from 'react-router-dom'
 import { useContextMenu } from '../components/ContextMenu'
 import {
   getResearchPosts,
-  getResearchEligibility,
   deleteResearchPost,
   verifyResearchPost,
   pinResearchPost,
   getAdminPending
 } from '../api'
+import { getResearchEligibility } from '../utils/globalCache'
 
 
 const formatDate = (dateStr) => {
