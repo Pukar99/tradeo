@@ -26,11 +26,12 @@ export default function ClosePositionModal({ position, onClose, onSaved }) {
 
   const set = (k, v) => setForm(f => ({ ...f, [k]: v }))
 
-  const wacc     = parseFloat(position.wacc) || 0
-  const totalQty = parseFloat(position.total_qty) || 0
-  const exitNum  = parseFloat(form.exit_price) || 0
-  const estPnl   = exitNum > 0
-    ? (position.direction === 'LONG' ? (exitNum - wacc) * totalQty : (wacc - exitNum) * totalQty)
+  const wacc      = parseFloat(position.wacc) || 0
+  const totalQty  = parseFloat(position.total_qty) || 0
+  const direction = position.direction?.toUpperCase() === 'LONG' ? 'LONG' : 'SHORT'
+  const exitNum   = parseFloat(form.exit_price) || 0
+  const estPnl    = exitNum > 0
+    ? (direction === 'LONG' ? (exitNum - wacc) * totalQty : (wacc - exitNum) * totalQty)
     : null
 
   const handleSubmit = useCallback(async e => {
@@ -67,7 +68,7 @@ export default function ClosePositionModal({ position, onClose, onSaved }) {
           <div>
             <h2 className="text-[15px] font-bold text-gray-900 dark:text-gray-100">Close Position</h2>
             <p className="text-[11px] text-gray-400 dark:text-gray-500 mt-0.5 font-mono">
-              {position.symbol} · {position.direction} · {totalQty} kittā @ Rs.{fmt(wacc)}
+              {position.symbol} · {direction} · {totalQty} units @ Rs.{fmt(wacc)}
             </p>
           </div>
           <button onClick={onClose} className="w-7 h-7 flex items-center justify-center rounded-lg text-gray-400 hover:text-gray-600 dark:hover:text-gray-200 hover:bg-gray-100 dark:hover:bg-gray-800 transition-all text-sm">✕</button>

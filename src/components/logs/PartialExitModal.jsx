@@ -26,13 +26,14 @@ export default function PartialExitModal({ position, onClose, onSaved }) {
 
   const set = (k, v) => setForm(f => ({ ...f, [k]: v }))
 
-  const wacc     = parseFloat(position.wacc) || 0
-  const totalQty = parseFloat(position.total_qty) || 0
-  const exitNum  = parseFloat(form.exit_price) || 0
-  const exitQty  = parseInt(form.exit_quantity, 10) || 0
+  const wacc      = parseFloat(position.wacc) || 0
+  const totalQty  = parseFloat(position.total_qty) || 0
+  const direction = position.direction?.toUpperCase() === 'LONG' ? 'LONG' : 'SHORT'
+  const exitNum   = parseFloat(form.exit_price) || 0
+  const exitQty   = parseInt(form.exit_quantity, 10) || 0
   const remaining = totalQty - exitQty
-  const estPnl   = exitNum > 0 && exitQty > 0
-    ? (position.direction === 'LONG' ? (exitNum - wacc) * exitQty : (wacc - exitNum) * exitQty)
+  const estPnl    = exitNum > 0 && exitQty > 0
+    ? (direction === 'LONG' ? (exitNum - wacc) * exitQty : (wacc - exitNum) * exitQty)
     : null
 
   const handleSubmit = useCallback(async e => {
@@ -72,7 +73,7 @@ export default function PartialExitModal({ position, onClose, onSaved }) {
           <div>
             <h2 className="text-[15px] font-bold text-gray-900 dark:text-gray-100">Partial Exit</h2>
             <p className="text-[11px] text-gray-400 dark:text-gray-500 mt-0.5 font-mono">
-              {position.symbol} · {position.direction} · {totalQty} kittā @ Rs.{fmt(wacc)}
+              {position.symbol} · {direction} · {totalQty} units @ Rs.{fmt(wacc)}
             </p>
           </div>
           <button onClick={onClose} className="w-7 h-7 flex items-center justify-center rounded-lg text-gray-400 hover:text-gray-600 dark:hover:text-gray-200 hover:bg-gray-100 dark:hover:bg-gray-800 transition-all text-sm">✕</button>
@@ -87,7 +88,7 @@ export default function PartialExitModal({ position, onClose, onSaved }) {
                 onChange={e => set('date', e.target.value)} className={INPUT} />
             </div>
             <div>
-              <label className={LABEL}>Exit Qty (kittā)</label>
+              <label className={LABEL}>Exit Qty (units)</label>
               <input type="number" value={form.exit_quantity}
                 onChange={e => set('exit_quantity', e.target.value)}
                 placeholder={`max ${totalQty - 1}`} min="1" max={totalQty - 1}
@@ -111,7 +112,7 @@ export default function PartialExitModal({ position, onClose, onSaved }) {
               )}
               {exitQty > 0 && remaining >= 0 && (
                 <div className="text-[11px] text-gray-400 dark:text-gray-500 font-mono">
-                  {remaining} kittā remaining
+                  {remaining} units remaining
                 </div>
               )}
             </div>

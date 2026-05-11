@@ -64,11 +64,11 @@ export default function ActionHistory({ actions, onEdit, onDelete }) {
                     </span>
                   )}
                 </div>
-                <div className="flex items-center gap-2">
+                <div className="flex items-center gap-1">
                   {onEdit && (
                     <button
                       onClick={() => onEdit(action)}
-                      className="text-xs text-gray-400 hover:text-blue-500 transition-colors"
+                      className="px-2 py-0.5 rounded text-[10px] font-semibold text-gray-500 dark:text-gray-400 hover:text-blue-600 dark:hover:text-blue-400 hover:bg-blue-50 dark:hover:bg-blue-900/20 transition-colors"
                     >
                       Edit
                     </button>
@@ -76,7 +76,7 @@ export default function ActionHistory({ actions, onEdit, onDelete }) {
                   {onDelete && (
                     <button
                       onClick={() => onDelete(action)}
-                      className="text-xs text-gray-400 hover:text-red-500 transition-colors"
+                      className="px-2 py-0.5 rounded text-[10px] font-semibold text-gray-500 dark:text-gray-400 hover:text-red-600 dark:hover:text-red-400 hover:bg-red-50 dark:hover:bg-red-900/20 transition-colors"
                     >
                       Delete
                     </button>
@@ -88,17 +88,17 @@ export default function ActionHistory({ actions, onEdit, onDelete }) {
               <div className="text-sm text-gray-700 dark:text-gray-300 mb-2">
                 {isBuy ? (
                   <>
-                    Bought <span className="font-mono font-semibold">{parseInt(action.quantity)} kittā</span>
+                    Bought <span className="font-mono font-semibold">{parseInt(action.quantity)} units</span>
                     {' '}@ <span className="font-mono font-semibold">Rs.{fmt(action.entry_price)}</span>
                     {action.after_qty != null && (
                       <span className="text-gray-400 dark:text-gray-500 text-xs ml-2">
-                        → position: {parseFloat(action.after_qty)} kittā
+                        → position: {parseFloat(action.after_qty)} units
                       </span>
                     )}
                   </>
                 ) : (
                   <>
-                    Sold <span className="font-mono font-semibold">{parseInt(action.quantity)} kittā</span>
+                    Sold <span className="font-mono font-semibold">{parseInt(action.quantity)} units</span>
                     {' '}@ <span className="font-mono font-semibold">Rs.{fmt(action.exit_price)}</span>
                     {action.realized_pnl != null && (
                       <span className={`ml-2 font-mono font-semibold ${parseFloat(action.realized_pnl) >= 0 ? 'text-emerald-600 dark:text-emerald-400' : 'text-red-600 dark:text-red-400'}`}>
@@ -107,7 +107,7 @@ export default function ActionHistory({ actions, onEdit, onDelete }) {
                     )}
                     {action.after_qty != null && (
                       <span className="text-gray-400 dark:text-gray-500 text-xs ml-2">
-                        → remaining: {parseFloat(action.after_qty)} kittā
+                        → remaining: {parseFloat(action.after_qty)} units
                       </span>
                     )}
                   </>

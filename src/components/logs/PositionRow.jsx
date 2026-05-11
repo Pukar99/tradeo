@@ -2,6 +2,7 @@ import { useState, useEffect, useCallback } from 'react'
 import { getTradeHistory } from '../../api'
 import { useContextMenu } from '../ContextMenu'
 import ActionHistory from './ActionHistory'
+import EditActionModal from './EditActionModal'
 import { fmt } from '../../utils/format'
 
 const STATUS_BADGE = {
@@ -10,21 +11,23 @@ const STATUS_BADGE = {
   CLOSED:  'bg-gray-100 text-gray-500 dark:bg-gray-800 dark:text-gray-400',
 }
 
-export default function PositionRow({ position, ltp, onAdd, onPartialExit, onClose, onDelete, onEditAction, onDeleteAction }) {
-  const [expanded, setExpanded] = useState(false)
-  const [actions,  setActions]  = useState(null)
-  const [loading,  setLoading]  = useState(false)
-  const [error,    setError]    = useState(null)
+export default function PositionRow({ position, ltp, onAdd, onPartialExit, onClose, onDelete, onDeleteAction, onRefresh }) {
+  const [expanded,    setExpanded]    = useState(false)
+  const [actions,     setActions]     = useState(null)
+  const [loading,     setLoading]     = useState(false)
+  const [error,       setError]       = useState(null)
+  const [editTarget,  setEditTarget]  = useState(null)
 
   const { onContextMenu, ContextMenuPortal } = useContextMenu()
 
-  const wacc     = parseFloat(position.wacc) || 0
-  const totalQty = parseFloat(position.total_qty) || 0
-  const ltpNum   = ltp ? parseFloat(ltp) : null
-  const isClosed = position.status === 'CLOSED'
+  const wacc      = parseFloat(position.wacc) || 0
+  const totalQty  = parseFloat(position.total_qty) || 0
+  const ltpNum    = ltp ? parseFloat(ltp) : null
+  const isClosed  = position.status === 'CLOSED'
+  const direction = position.direction?.toUpperCase() === 'LONG' ? 'LONG' : 'SHORT'
 
   const unrealPnl = ltpNum != null && !isClosed
-    ? (position.direction === 'LONG' ? (ltpNum - wacc) * totalQty : (wacc - ltpNum) * totalQty)
+    ? (direction === 'LONG' ? (ltpNum - wacc) * totalQty : (wacc - ltpNum) * totalQty)
     : null
 
   const fetchHistory = useCallback(async () => {
@@ -58,19 +61,32 @@ export default function PositionRow({ position, ltp, onAdd, onPartialExit, onClo
 
   const menuItems = isClosed
     ? [
-        { label: 'Delete Trade', icon: '🗑', danger: true, action: () => onDelete(position) },
+        { label: 'Delete Trade', icon: '🗑', action: () => onDelete(position) },
       ]
     : [
         { label: 'Add to Position', icon: '＋', action: () => onAdd(position) },
         { label: 'Partial Exit',    icon: '↗', action: () => onPartialExit(position) },
         { label: 'Close Position',  icon: '✓', action: () => onClose(position) },
         { separator: true },
-        { label: 'Delete Trade',    icon: '🗑', danger: true, action: () => onDelete(position) },
+        { label: 'Delete Trade',    icon: '🗑', action: () => onDelete(position) },
       ]
+
+  const handleEditSaved = useCallback((updatedAction) => {
+    setActions(prev => prev ? prev.map(a => a.id === updatedAction.id ? updatedAction : a) : prev)
+    setEditTarget(null)
+    onRefresh()
+  }, [onRefresh])
 
   return (
     <>
       <ContextMenuPortal />
+      {editTarget && (
+        <EditActionModal
+          action={editTarget}
+          onClose={() => setEditTarget(null)}
+          onSaved={handleEditSaved}
+        />
+      )}
       <div
         className={`group rounded-xl border transition-all duration-150 overflow-hidden
           ${expanded
@@ -92,11 +108,11 @@ export default function PositionRow({ position, ltp, onAdd, onPartialExit, onClo
             <div className="flex items-center gap-2 flex-wrap">
               <span className="font-bold text-[13px] text-gray-900 dark:text-gray-100 tracking-wide">{position.symbol}</span>
               <span className={`text-[10px] font-semibold px-1.5 py-0.5 rounded-md ${
-                position.direction === 'LONG'
+                direction === 'LONG'
                   ? 'text-emerald-700 bg-emerald-50 dark:bg-emerald-900/30 dark:text-emerald-400'
                   : 'text-red-700 bg-red-50 dark:bg-red-900/30 dark:text-red-400'
               }`}>
-                {position.direction}
+                {direction}
               </span>
               <span className={`text-[10px] font-medium px-1.5 py-0.5 rounded-full ${STATUS_BADGE[position.status] || STATUS_BADGE.CLOSED}`}>
                 {position.status}
@@ -131,10 +147,15 @@ export default function PositionRow({ position, ltp, onAdd, onPartialExit, onClo
             )}
           </div>
 
-          {/* right-click hint — fades in on hover */}
-          <span className="hidden lg:block text-[9px] text-gray-300 dark:text-gray-700 group-hover:text-gray-400 dark:group-hover:text-gray-500 transition-colors shrink-0 select-none pr-1">
-            right-click
-          </span>
+          {/* action buttons — visible on hover */}
+          <div className="hidden sm:flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity shrink-0" onClick={e => e.stopPropagation()}>
+            {!isClosed && <>
+              <ActionBtn label="Add"     onClick={() => onAdd(position)} />
+              <ActionBtn label="Exit"    onClick={() => onPartialExit(position)} />
+              <ActionBtn label="Close"   onClick={() => onClose(position)} color="text-red-500 hover:bg-red-50 dark:hover:bg-red-900/20" />
+            </>}
+            <ActionBtn label="Delete" onClick={() => onDelete(position)} color="text-red-500 hover:bg-red-50 dark:hover:bg-red-900/20" />
+          </div>
         </div>
 
         {/* ── expanded history ── */}
@@ -152,7 +173,7 @@ export default function PositionRow({ position, ltp, onAdd, onPartialExit, onClo
             {!loading && !error && actions !== null && (
               <ActionHistory
                 actions={actions}
-                onEdit={onEditAction}
+                onEdit={a => setEditTarget(a)}
                 onDelete={a => onDeleteAction(a, refreshHistory)}
               />
             )}
@@ -160,6 +181,19 @@ export default function PositionRow({ position, ltp, onAdd, onPartialExit, onClo
         )}
       </div>
     </>
+  )
+}
+
+function ActionBtn({ label, onClick, color }) {
+  return (
+    <button
+      onClick={onClick}
+      className={`px-2 py-1 rounded-md text-[10px] font-semibold transition-colors ${
+        color || 'text-gray-500 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-gray-800'
+      }`}
+    >
+      {label}
+    </button>
   )
 }
 

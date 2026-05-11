@@ -1,5 +1,5 @@
 import { useState, useCallback, useMemo } from 'react'
-import { getPositions, deleteTradeAction, deleteEntireTrade } from '../../api'
+import { deleteTradeAction, deleteEntireTrade } from '../../api'
 import PositionRow from './PositionRow'
 import AddTradeModal from './AddTradeModal'
 import ClosePositionModal from './ClosePositionModal'
@@ -12,8 +12,9 @@ export default function TradeActionsTab({ positions, ltpMap, onRefresh }) {
   const [closeTarget,  setCloseTarget]  = useState(null)
   const [partialTarget,setPartialTarget]= useState(null)
   const [addTarget,    setAddTarget]    = useState(null)     // position to add to
-  const [confirmDel,   setConfirmDel]   = useState(null)     // { type: 'trade'|'action', target }
+  const [confirmDel,   setConfirmDel]   = useState(null)     // { type: 'trade'|'action', target, refreshHistory? }
   const [deleting,     setDeleting]     = useState(false)
+  const [deleteErr,    setDeleteErr]    = useState(null)
 
   const displayed = useMemo(() => {
     let list = positions || []
@@ -33,31 +34,29 @@ export default function TradeActionsTab({ positions, ltpMap, onRefresh }) {
     onRefresh()
   }, [onRefresh])
 
-  const handleDeleteTrade = useCallback(async () => {
+  const handleConfirmDelete = useCallback(async () => {
     if (!confirmDel) return
     setDeleting(true)
+    setDeleteErr(null)
     try {
       if (confirmDel.type === 'trade') {
         await deleteEntireTrade(confirmDel.target.trade_id)
       } else {
         await deleteTradeAction(confirmDel.target.id)
+        confirmDel.refreshHistory?.()
       }
       setConfirmDel(null)
       onRefresh()
     } catch (err) {
-      console.error(err)
+      setDeleteErr(err.response?.data?.message || err.response?.data?.error || err.message || 'Delete failed')
     } finally {
       setDeleting(false)
     }
   }, [confirmDel, onRefresh])
 
   const handleDeleteAction = useCallback((action, refreshHistory) => {
-    setConfirmDel({ type: 'action', target: action, onConfirm: async () => {
-      await deleteTradeAction(action.id)
-      refreshHistory()
-      onRefresh()
-    }})
-  }, [onRefresh])
+    setConfirmDel({ type: 'action', target: action, refreshHistory })
+  }, [])
 
   return (
     <div className="space-y-3">
@@ -133,8 +132,8 @@ export default function TradeActionsTab({ positions, ltpMap, onRefresh }) {
               onPartialExit={p => setPartialTarget(p)}
               onClose={p => setCloseTarget(p)}
               onDelete={p => setConfirmDel({ type: 'trade', target: p })}
-              onEditAction={() => {}}
               onDeleteAction={handleDeleteAction}
+              onRefresh={onRefresh}
             />
           ))}
         </div>
@@ -171,26 +170,29 @@ export default function TradeActionsTab({ positions, ltpMap, onRefresh }) {
 
       {/* delete confirm */}
       {confirmDel && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50 backdrop-blur-sm">
+        <div className="fixed inset-0 z-[9999] flex items-center justify-center p-4 bg-black/50 backdrop-blur-sm">
           <div className="w-full max-w-sm bg-white dark:bg-gray-900 rounded-xl shadow-2xl border border-gray-200 dark:border-gray-700 p-5">
             <h3 className="text-base font-semibold text-gray-900 dark:text-gray-100 mb-2">
               {confirmDel.type === 'trade' ? 'Delete entire trade?' : 'Delete this action?'}
             </h3>
-            <p className="text-sm text-gray-500 dark:text-gray-400 mb-5">
+            <p className="text-sm text-gray-500 dark:text-gray-400 mb-4">
               {confirmDel.type === 'trade'
                 ? `This will delete all actions for ${confirmDel.target.symbol}. This cannot be undone.`
-                : 'This action row will be removed. The position view will recalculate.'}
+                : 'This action row will be removed. The position will recalculate.'}
             </p>
+            {deleteErr && (
+              <p className="text-xs text-red-500 bg-red-50 dark:bg-red-900/20 px-3 py-2 rounded-lg mb-3">{deleteErr}</p>
+            )}
             <div className="flex justify-end gap-3">
               <button
-                onClick={() => setConfirmDel(null)}
+                onClick={() => { setConfirmDel(null); setDeleteErr(null) }}
                 disabled={deleting}
                 className="px-4 py-2 text-sm rounded-lg border border-gray-200 dark:border-gray-700 text-gray-600 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-800 transition-colors"
               >
                 Cancel
               </button>
               <button
-                onClick={confirmDel.onConfirm ? async () => { await confirmDel.onConfirm(); setConfirmDel(null) } : handleDeleteTrade}
+                onClick={handleConfirmDelete}
                 disabled={deleting}
                 className="px-4 py-2 text-sm rounded-lg bg-red-600 text-white hover:bg-red-700 disabled:opacity-50 transition-colors font-medium"
               >

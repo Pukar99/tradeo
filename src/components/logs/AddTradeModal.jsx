@@ -133,7 +133,7 @@ export default function AddTradeModal({ onClose, onSaved, existingPosition }) {
             </h2>
             {isAddMode && (
               <p className="text-[11px] text-gray-400 dark:text-gray-500 mt-0.5">
-                {conflict.direction} · {conflict.total_qty} kittā · WACC Rs.{parseFloat(conflict.wacc || 0).toFixed(2)}
+                {conflict.direction} · {conflict.total_qty} units · WACC Rs.{parseFloat(conflict.wacc || 0).toFixed(2)}
               </p>
             )}
           </div>
@@ -148,7 +148,7 @@ export default function AddTradeModal({ onClose, onSaved, existingPosition }) {
                 <div className="px-4 py-3 flex items-center justify-between gap-3">
                   <div className="text-[12px]">
                     <span className="font-bold text-emerald-700 dark:text-emerald-300">{brokerParsed.symbol}</span>
-                    <span className="text-gray-500 dark:text-gray-400"> · {brokerParsed.position} · {brokerParsed.quantity} kittā @ Rs.{brokerParsed.entry_price} · {brokerParsed.date}</span>
+                    <span className="text-gray-500 dark:text-gray-400"> · {brokerParsed.position} · {brokerParsed.quantity} units @ Rs.{brokerParsed.entry_price} · {brokerParsed.date}</span>
                   </div>
                   <div className="flex items-center gap-2 shrink-0">
                     <button type="button"
@@ -186,7 +186,7 @@ export default function AddTradeModal({ onClose, onSaved, existingPosition }) {
         {conflict && mode === 'new' && (
           <div className="mx-6 mt-4 p-3 rounded-xl bg-amber-50 dark:bg-amber-900/20 border border-amber-200 dark:border-amber-700/50">
             <p className="text-[12px] text-amber-800 dark:text-amber-300 font-semibold mb-2">
-              Open {conflict.direction} in {conflict.symbol} — {conflict.total_qty} kittā @ WACC Rs.{parseFloat(conflict.wacc || 0).toFixed(2)}
+              Open {conflict.direction} in {conflict.symbol} — {conflict.total_qty} units @ WACC Rs.{parseFloat(conflict.wacc || 0).toFixed(2)}
             </p>
             <div className="flex gap-2">
               <button onClick={() => setMode('add')}
@@ -244,7 +244,7 @@ export default function AddTradeModal({ onClose, onSaved, existingPosition }) {
                   onChange={e => set('date', e.target.value)} className={INPUT} />
               </div>
               <div>
-                <label className={LABEL}>Quantity (kittā)</label>
+                <label className={LABEL}>Quantity (units)</label>
                 <input type="number" value={form.quantity}
                   onChange={e => set('quantity', e.target.value)}
                   placeholder="100" min="1" autoComplete="off" className={INPUT} />
