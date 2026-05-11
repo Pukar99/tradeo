@@ -1,4 +1,5 @@
 import { createContext, useContext, useState } from 'react'
+import { clearUserCache } from '../utils/globalCache'
 
 const AuthContext = createContext()
 
@@ -54,8 +55,8 @@ export function AuthProvider({ children }) {
     localStorage.removeItem('token')
     localStorage.removeItem('user')
     // Clear once-per-session flags so they fire again on next login
-    sessionStorage.removeItem('briefingShown')
     sessionStorage.removeItem('ipoAutoApplyPending')
+    clearUserCache()
     setUser(null)
   }
 

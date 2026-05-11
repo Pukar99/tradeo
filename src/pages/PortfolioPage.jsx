@@ -2,7 +2,6 @@ import { useState, useEffect, useCallback, useMemo } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { useAuth } from '../context/AuthContext'
 import { useLanguage } from '../context/LanguageContext'
-import { useMarket } from '../context/MarketContext'
 import { getTradeLog, getStockPrice, getBatchPrices } from '../api'
 import { useChatRefresh } from '../utils/chatEvents'
 import {
@@ -360,8 +359,7 @@ function AllocationDonut({ openPositions }) {
 // ── Monthly P&L bar chart ─────────────────────────────────────────────────────
 
 function MonthlyPnlChart({ closedTrades }) {
-  const { market } = useMarket()
-  const fx = market === 'forex'
+  const fx = false
   const months = []
   const now = new Date()
   for (let i = 11; i >= 0; i--) {
@@ -435,8 +433,7 @@ function MonthlyPnlChart({ closedTrades }) {
 // ── Equity Curve ──────────────────────────────────────────────────────────────
 
 function EquityCurve({ closedTrades }) {
-  const { market } = useMarket()
-  const fx = market === 'forex'
+  const fx = false
   if (closedTrades.length === 0) return null
   const sorted = [...closedTrades]
     .filter(t => t.realized_pnl != null)
@@ -511,8 +508,7 @@ function EquityCurve({ closedTrades }) {
 // ── Position row (table style) ────────────────────────────────────────────────
 
 function PositionRow({ trade, onChart }) {
-  const { market } = useMarket()
-  const fx = market === 'forex'
+  const fx = false
   const [expanded, setExpanded] = useState(false)
   const qty      = parseFloat(trade.remaining_quantity ?? trade.quantity) || 0
   const entry    = parseFloat(trade.entry_price) || 0
@@ -628,8 +624,7 @@ function PositionRow({ trade, onChart }) {
 // ── Grouped position rows ─────────────────────────────────────────────────────
 
 function GroupedPositionRows({ symbol, entries, onChart }) {
-  const { market } = useMarket()
-  const fx = market === 'forex'
+  const fx = false
   const [expanded, setExpanded] = useState(false)
   const totalQty      = entries.reduce((s, t) => s + (parseFloat(t.remaining_quantity ?? t.quantity) || 0), 0)
   const totalInvested = entries.reduce((s, t) => s + (parseFloat(t.entry_price) || 0) * (parseFloat(t.remaining_quantity ?? t.quantity) || 0), 0)
@@ -848,20 +843,14 @@ function PortfolioPage() {
 
   const { user }     = useAuth()
   const { t }        = useLanguage()
-  const { market }   = useMarket()
   const navigate     = useNavigate()
-  // Currency-aware formatter scoped to this page instance
-  const isForexPf    = market === 'forex'
-  const fmtC = (n) => isForexPf
-    ? `$${Math.abs(n).toFixed(2)}`
-    : `Rs.${Math.abs(Math.round(n)).toLocaleString()}`
+  const fmtC = (n) => `Rs.${Math.abs(Math.round(n)).toLocaleString()}`
 
   const fetchData = useCallback(async () => {
     try {
       const res       = await getTradeLog()
       const allTrades = res.data ?? []
-      // Filter to current market only (old trades with no market field → treat as nepse)
-      const mktTrades = allTrades.filter(tr => tr.market === market || (!tr.market && market === 'nepse'))
+      const mktTrades = allTrades.filter(tr => tr.market !== 'forex')
       setTrades(mktTrades)
       const open = mktTrades.filter(tr => tr.status === 'OPEN' || tr.status === 'PARTIAL')
 

@@ -7,7 +7,6 @@ import DisciplineScore from '../components/dashboard/DisciplineScore'
 import MonthlyGoals from '../components/dashboard/MonthlyGoals'
 import { Link, useNavigate } from 'react-router-dom'
 import { useState, useEffect, useCallback, useRef } from 'react'
-import MorningBriefing from '../components/MorningBriefing'
 import NEPSEChart from '../components/NEPSEChart'
 import {
   getDashboardInit, getStockPrice,
@@ -1065,7 +1064,6 @@ function LoggedInHome() {
   const { user } = useAuth()
   const navigate = useNavigate()
   const [initData, setInitData] = useState(null)
-  const [showBriefing, setShowBriefing] = useState(false)
   const [dashData, setDashData] = useState({ openPositions: [], perfStats: null })
 
   const handleDashData = useCallback(({ openPositions, perfStats }) => {
@@ -1090,15 +1088,6 @@ function LoggedInHome() {
   }, [])
 
   useEffect(() => { fetchDashboard() }, [fetchDashboard])
-
-  // Show morning briefing once per session — after initData is ready
-  useEffect(() => {
-    if (!initData) return
-    if (sessionStorage.getItem('briefingShown')) return
-    sessionStorage.setItem('briefingShown', 'true')
-    const t = setTimeout(() => setShowBriefing(true), 800)
-    return () => clearTimeout(t)
-  }, [initData])
 
   const getGreeting = () => {
     const h = new Date().getHours()
@@ -1153,9 +1142,6 @@ function LoggedInHome() {
       </div>
     </div>
 
-    {showBriefing && (
-      <MorningBriefing initData={initData} onClose={() => setShowBriefing(false)} />
-    )}
     </>
   )
 }
