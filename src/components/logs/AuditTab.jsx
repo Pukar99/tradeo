@@ -1,5 +1,7 @@
-import { useState, useMemo, useRef } from 'react'
+import { useState, useEffect, useCallback, useMemo, useRef } from 'react'
 import { useTheme } from '../../context/ThemeContext'
+import { useAuth } from '../../context/AuthContext'
+import { getTradeActions } from '../../api'
 import TraderCard from './TraderCard'
 
 // ── NEPSE broker commission tiers ─────────────────────────────────────────────
@@ -93,20 +95,19 @@ function ShareModal({ onClose, kpis, trades, dateLabel, user }) {
 
       const tradeRows = trades.map(t => {
         const entryDate = t.date || ''
-        const exitDate  = (t.updated_at || t.date || '').slice(0, 10)
+        const exitDate  = (t.updated_at || t.created_at || t.date || '').slice(0, 10)
         const days      = entryDate && exitDate
           ? Math.max(0, Math.floor((new Date(exitDate) - new Date(entryDate)) / 86400000))
           : 0
         const pnl = parseFloat(t.realized_pnl) || 0
-        const isFx = t.market === 'forex'
         return `<tr style="border-bottom:1px solid #e5e7eb">
           <td>${entryDate}</td>
           <td style="font-weight:700">${t.symbol}</td>
           <td style="color:${t.position === 'LONG' ? '#059669' : '#dc2626'}">${t.position}</td>
-          <td>${isFx && t.lots ? `${parseFloat(t.lots)}L` : (t.remaining_quantity ?? t.quantity)}</td>
-          <td>${parseFloat(t.entry_price).toFixed(2)}</td>
+          <td>${parseFloat(t.quantity) || 0}</td>
+          <td>${parseFloat(t.entry_price || 0).toFixed(2)}</td>
           <td>${t.exit_price ? parseFloat(t.exit_price).toFixed(2) : '—'}</td>
-          <td style="color:${pnl >= 0 ? '#059669' : '#dc2626'};font-weight:600">${pnl >= 0 ? '+' : '−'}${fmt(pnl, isFx)}</td>
+          <td style="color:${pnl >= 0 ? '#059669' : '#dc2626'};font-weight:600">${pnl >= 0 ? '+' : '−'}Rs.${Math.abs(Math.round(pnl)).toLocaleString()}</td>
           <td>${days}d</td>
         </tr>`
       }).join('')
@@ -231,9 +232,26 @@ ${cardDataUrl ? `<img src="${cardDataUrl}" class="card-img" alt="Trader Card"/>`
 }
 
 // ── Main AuditTab ─────────────────────────────────────────────────────────────
-export default function AuditTab({ trades, market, user }) {
+export default function AuditTab() {
   const { isDark } = useTheme()
-  const isForex    = market === 'forex'
+  const { user }   = useAuth()
+  const isForex    = false
+
+  const [trades,   setTrades]   = useState([])
+  const [loading,  setLoading]  = useState(true)
+
+  const fetchTrades = useCallback(async () => {
+    try {
+      const res = await getTradeActions()
+      setTrades(res.data || [])
+    } catch {
+      setTrades([])
+    } finally {
+      setLoading(false)
+    }
+  }, [])
+
+  useEffect(() => { fetchTrades() }, [fetchTrades])
 
   // Default date range: current month start → today
   const today     = new Date().toISOString().slice(0, 10)
@@ -246,15 +264,14 @@ export default function AuditTab({ trades, market, user }) {
 
   const handleApply = () => setApplied({ from: fromDate, to: toDate })
 
-  // Filter trades by date range (entry date) + market
+  // Filter action rows by date range — use only Close/Partial Exit actions for P&L
   const rangedTrades = useMemo(() => {
     return trades.filter(t => {
-      if (t.market !== market && !((!t.market) && market === 'nepse')) return false
       if (applied.from && t.date < applied.from) return false
       if (applied.to   && t.date > applied.to)   return false
       return true
     })
-  }, [trades, market, applied])
+  }, [trades, applied])
 
   const closed = rangedTrades.filter(t => t.status === 'CLOSED')
 
@@ -270,29 +287,25 @@ export default function AuditTab({ trades, market, user }) {
     const netPnl      = grossProfit - grossLoss
     const profitFactor = grossLoss > 0 ? grossProfit / grossLoss : grossProfit > 0 ? Infinity : null
 
-    // Broker fees — only NEPSE trades (entry value × tier rate, each side)
+    // Broker fees — NEPSE only (entry value × tier rate, each side)
     let brokerFees = 0
     let cgt        = 0
     let totalTradedValue = 0
 
     for (const t of closed) {
       const entry = parseFloat(t.entry_price) || 0
-      const qty   = parseFloat(t.remaining_quantity ?? t.quantity) || 0
+      const qty   = parseFloat(t.quantity) || 0
       const exitP = parseFloat(t.exit_price) || 0
       const pnl   = parseFloat(t.realized_pnl) || 0
 
-      if (t.market !== 'forex') {
-        const entryVal = entry * qty
-        const exitVal  = exitP * qty
-        brokerFees   += calcBrokerFee(entryVal) + calcBrokerFee(exitVal)
-        totalTradedValue += entryVal
-        // CGT on realized gain only
-        const exitDate = (t.updated_at || t.date || '').slice(0, 10)
-        if (pnl > 0 && t.date && exitDate) {
-          cgt += calcCGT(pnl, t.date, exitDate)
-        }
-      } else {
-        totalTradedValue += entry * (parseFloat(t.lots) || qty)
+      const entryVal = entry * qty
+      const exitVal  = exitP * qty
+      brokerFees   += calcBrokerFee(entryVal) + calcBrokerFee(exitVal)
+      totalTradedValue += entryVal
+      // CGT on realized gain — use created_at as exit date proxy
+      const exitDate = (t.updated_at || t.created_at || t.date || '').slice(0, 10)
+      if (pnl > 0 && t.date && exitDate) {
+        cgt += calcCGT(pnl, t.date, exitDate)
       }
     }
 
@@ -311,8 +324,8 @@ export default function AuditTab({ trades, market, user }) {
 
     // Max drawdown from equity curve of closed trades sorted by exit date
     const sortedClosed = [...closed].sort((a, b) => {
-      const ad = (a.updated_at || a.date || '')
-      const bd = (b.updated_at || b.date || '')
+      const ad = (a.updated_at || a.created_at || a.date || '')
+      const bd = (b.updated_at || b.created_at || b.date || '')
       return ad < bd ? -1 : 1
     })
     let equity = 0, peak = 0, maxDDPct = 0
@@ -324,15 +337,18 @@ export default function AuditTab({ trades, market, user }) {
     }
 
     // Best / worst
-    const sortedByPnl = [...closed].sort((a, b) => (parseFloat(b.realized_pnl) || 0) - (parseFloat(a.realized_pnl) || 0))
-    const bestTrade   = sortedByPnl[0] || null
-    const worstTrade  = sortedByPnl[sortedByPnl.length - 1] || null
+    // best/worst — from Close Position actions only (they carry realized_pnl)
+    const closeActions = closed.filter(t => t.action_type === 'Close Position' || t.action_type === 'Partial Exit')
+    const sortedByPnl  = [...closeActions].sort((a, b) => (parseFloat(b.realized_pnl) || 0) - (parseFloat(a.realized_pnl) || 0))
+    const bestTrade    = sortedByPnl[0] || null
+    const worstTrade   = sortedByPnl[sortedByPnl.length - 1] || null
 
     // Avg hold days (closed trades with dates)
-    const closedWithDates = closed.filter(t => t.date && t.updated_at)
+    const closedWithDates = closed.filter(t => t.date && (t.updated_at || t.created_at))
     const avgHoldDays     = closedWithDates.length > 0
       ? closedWithDates.reduce((s, t) => {
-          const d = Math.max(0, Math.floor((new Date(t.updated_at.slice(0,10)) - new Date(t.date)) / 86400000))
+          const exitStr = (t.updated_at || t.created_at || '').slice(0, 10)
+          const d = Math.max(0, Math.floor((new Date(exitStr) - new Date(t.date)) / 86400000))
           return s + d
         }, 0) / closedWithDates.length
       : null
@@ -340,7 +356,7 @@ export default function AuditTab({ trades, market, user }) {
     // Daily win streak (current)
     const byDate = {}
     for (const t of closed) {
-      const d = (t.updated_at || t.date || '').slice(0, 10)
+      const d = (t.updated_at || t.created_at || t.date || '').slice(0, 10)
       if (!d) continue
       byDate[d] = (byDate[d] || 0) + (parseFloat(t.realized_pnl) || 0)
     }
@@ -395,6 +411,12 @@ export default function AuditTab({ trades, market, user }) {
   const dateLabel = applied.from === applied.to
     ? applied.from
     : `${applied.from} – ${applied.to}`
+
+  if (loading) return (
+    <div className="flex items-center justify-center py-16">
+      <div className="w-7 h-7 border-2 border-blue-500 border-t-transparent rounded-full animate-spin" />
+    </div>
+  )
 
   return (
     <div className="space-y-5">

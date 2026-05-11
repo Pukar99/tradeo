@@ -82,7 +82,6 @@ API.interceptors.response.use(
     if (error.response?.status === 401) {
       localStorage.removeItem('token')
       localStorage.removeItem('user')
-      sessionStorage.removeItem('briefingShown')
       if (!window.location.pathname.startsWith('/login')) {
         sessionStorage.setItem('authExpiredMsg', 'Your session has expired. Please log in again.')
         window.location.href = '/login'
@@ -189,21 +188,52 @@ export const getIPOs           = ()             => API.get('/api/market/ipos')
 export const getMarketNews     = ()             => API.get('/api/market/news')
 export const triggerBackfill   = (date)         => API.post('/api/market/backfill', { date })
 
-// Trade Log (position-based model)
-export const getTradeLog              = ()           => API.get('/api/tradelog')
-export const addTradeLog              = (data)       => API.post('/api/tradelog', data)
-export const updateTradeLog           = (id, data)   => API.put(`/api/tradelog/${id}`, data)
-export const closeTradeLog            = (id, data)   => API.post(`/api/tradelog/${id}/close`, data)
-export const partialCloseTradeLog     = (id, data)   => API.post(`/api/tradelog/${id}/partial-close`, data)
-export const deleteTradeLog           = (id)         => API.delete(`/api/tradelog/${id}`)
-export const bulkDeleteTradeLog       = (ids)        => API.delete('/api/tradelog/bulk', { data: { ids } })
-export const bulkImportTradeLog       = (trades, cfg) => API.post('/api/tradelog/bulk', { trades }, cfg)
-export const getOpenPosition          = (symbol, direction) => API.get('/api/tradelog/open-position', { params: { symbol, direction } })
-export const retroactiveMerge         = (symbol, direction) => API.post('/api/tradelog/retroactive-merge', { symbol, direction })
-export const getTradeJournal          = ()           => API.get('/api/tradelog/journal')
-export const addTradeJournal          = (data)       => API.post('/api/tradelog/journal', data)
-export const updateTradeJournal       = (id, data)   => API.put(`/api/tradelog/journal/${id}`, data)
-export const deleteTradeJournal       = (id)         => API.delete(`/api/tradelog/journal/${id}`)
+// Trade Log — action-based model (v2.2)
+// Compatibility shims — LeftPanel, PortfolioPage, PerformanceDashboard, Watchlist still use old field names.
+// Remap position_view shape → legacy shape so those components keep working without refactor.
+export const getTradeLog = async () => {
+  const res = await API.get('/api/tradelog/positions')
+  const remapped = (res.data || []).map(p => ({
+    id:                 p.trade_id,
+    trade_id:           p.trade_id,
+    symbol:             p.symbol,
+    position:           p.direction === 'LONG' ? 'Long' : 'Short',
+    quantity:           parseFloat(p.total_qty) || 0,
+    remaining_quantity: parseFloat(p.total_qty) || 0,
+    entry_price:        p.wacc,
+    sl:                 p.sl,
+    tp:                 p.tp,
+    status:             p.status,
+    realized_pnl:       p.total_realized_pnl,
+    date:               p.opened_at?.slice(0, 10),
+    updated_at:         p.last_action_at,
+    market:             'nepse',
+  }))
+  return { ...res, data: remapped }
+}
+// addTradeLog: quick-add from LeftPanel — sends to new POST / (new position)
+export const addTradeLog = (data) => API.post('/api/tradelog', {
+  ...data,
+  position: data.position === 'LONG' ? 'Long' : data.position === 'SHORT' ? 'Short' : data.position,
+})
+// closeTradeLog: LeftPanel passes trade_id (mapped as id from getTradeLog shim)
+export const closeTradeLog = (trade_id, data) => API.post(`/api/tradelog/${trade_id}/close`, {
+  date: data.exit_date || new Date().toISOString().slice(0, 10),
+  exit_price: data.exit_price,
+})
+
+export const getPositions             = (status)          => API.get('/api/tradelog/positions', { params: status ? { status } : {} })
+export const getTradeActions          = ()                => API.get('/api/tradelog/actions')
+export const getTradeHistory          = (trade_id)        => API.get(`/api/tradelog/trade/${trade_id}/history`)
+export const newPosition              = (data)            => API.post('/api/tradelog', data)
+export const addToPosition            = (trade_id, data)  => API.post(`/api/tradelog/${trade_id}/add`, data)
+export const partialExitPosition      = (trade_id, data)  => API.post(`/api/tradelog/${trade_id}/partial-exit`, data)
+export const closePosition            = (trade_id, data)  => API.post(`/api/tradelog/${trade_id}/close`, data)
+export const updateTradeAction        = (id, data)        => API.put(`/api/tradelog/${id}`, data)
+export const deleteTradeAction        = (id)              => API.delete(`/api/tradelog/${id}`)
+export const deleteEntireTrade        = (trade_id)        => API.delete(`/api/tradelog/trade/${trade_id}`)
+export const getSetupTypes            = ()                => API.get('/api/tradelog/setup-types')
+export const saveSetupType            = (name)            => API.post('/api/tradelog/setup-types', { name })
 
 // Complex Tab — Insight
 export const getInsightSignals      = (params) => API.get('/api/insight/signals',        { params })
@@ -233,9 +263,6 @@ export const getTradeDebrief = (tradeData) => API.post('/api/chat/debrief', trad
 
 // What If I Had Held? Simulator
 export const getWhatIf = (params) => API.get('/api/market/what-if', { params })
-
-// Corporate Actions Calendar
-export const getCorporateActions = () => API.get('/api/market/corporate-actions')
 
 // Tax Report
 export const getTaxReport        = (fy)       => API.get('/api/tax/report', { params: fy ? { fy } : {} })
