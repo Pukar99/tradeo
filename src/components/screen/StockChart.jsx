@@ -1111,7 +1111,7 @@ export default function StockChart() {
 
       if (activePositions?.length) {
         activePositions.forEach((pos, idx) => {
-          const { entry_price, sl, tp, entry_date, date: trade_date, position: dir, position_entries, partial_exits } = pos
+          const { entry_price, sl, tp, entry_date, date: trade_date, position: dir, position_entries = [], partial_exits = [] } = pos
           const entryColor = ENTRY_COLORS[idx % ENTRY_COLORS.length]
           // entry_date: set by LogsPage/Portfolio "Go to Chart" mapping
           // trade_date: raw trade_log row clicked from LeftPanel (has `date` not `entry_date`)
