@@ -42,6 +42,7 @@ function Menu({ x, y, items, onClose }) {
   return (
     <div
       ref={ref}
+      role="menu"
       style={{ position: 'fixed', left: pos.x, top: pos.y, zIndex: 9999 }}
       className="bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-700 rounded-xl shadow-xl overflow-hidden min-w-[148px] py-1"
     >
@@ -72,6 +73,7 @@ function Menu({ x, y, items, onClose }) {
         return (
           <button
             key={i}
+            role="menuitem"
             onClick={() => {
               if (isDanger) { setConfirmIdx(i); return }
               item.action()

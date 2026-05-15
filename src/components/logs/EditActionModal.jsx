@@ -5,6 +5,7 @@ import { fmt } from '../../utils/format'
 
 const MARKET_CONDITIONS  = ['Bullish', 'Bearish', 'Sideways', 'Volatile', 'Low Vol']
 const EMOTIONAL_STATES   = ['Confident', 'Calm', 'Anxious', 'Fearful', 'Greedy', 'FOMO', 'Neutral']
+const EXIT_REASONS       = ['Target Hit', 'SL Hit', 'Manual Exit', 'Reversal Signal', 'Time Stop']
 
 const INPUT = 'w-full px-3 py-2 text-[12px] rounded-lg border border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-800/80 text-gray-900 dark:text-gray-100 placeholder-gray-400 focus:outline-none focus:ring-1 focus:ring-blue-500 focus:border-blue-500 transition-all'
 const LABEL = 'block text-[10px] font-semibold uppercase tracking-widest text-gray-400 dark:text-gray-500 mb-1.5'
@@ -19,6 +20,7 @@ export default function EditActionModal({ action, onClose, onSaved }) {
     quantity:              String(action.quantity || ''),
     entry_price:           String(action.entry_price || ''),
     exit_price:            String(action.exit_price || ''),
+    exit_reason:           action.exit_reason || '',
     sl:                    String(action.sl || ''),
     tp:                    String(action.tp || ''),
     setup_type:            action.setup_type || '',
@@ -61,6 +63,7 @@ export default function EditActionModal({ action, onClose, onSaved }) {
         post_trade_evaluation: form.post_trade_evaluation || null,
         lessons_notes:         form.lessons_notes || null,
         notes:                 form.notes || null,
+        ...(!isBuy ? { exit_reason: form.exit_reason || null } : {}),
       }
       const res = await updateTradeAction(action.id, payload)
       onSaved(res.data)
@@ -137,12 +140,30 @@ export default function EditActionModal({ action, onClose, onSaved }) {
               </>
             )}
             {!isBuy && (
-              <div className="col-span-2">
-                <label className={LABEL}>Reflection</label>
-                <textarea value={form.post_trade_evaluation}
-                  onChange={e => set('post_trade_evaluation', e.target.value)}
-                  rows={2} className={INPUT + ' resize-none'} />
-              </div>
+              <>
+                <div className="col-span-2">
+                  <label className={LABEL}>Exit Reason</label>
+                  <div className="flex flex-wrap gap-1.5">
+                    {EXIT_REASONS.map(r => (
+                      <button key={r} type="button"
+                        onClick={() => toggle('exit_reason', r)}
+                        className={`px-2.5 py-1 rounded-lg text-[11px] font-semibold border-2 transition-all ${
+                          form.exit_reason === r
+                            ? 'border-amber-400 bg-amber-50 dark:bg-amber-900/30 text-amber-700 dark:text-amber-300'
+                            : 'border-gray-200 dark:border-gray-700 text-gray-400 dark:text-gray-500'
+                        }`}>
+                        {r}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+                <div className="col-span-2">
+                  <label className={LABEL}>Reflection</label>
+                  <textarea value={form.post_trade_evaluation}
+                    onChange={e => set('post_trade_evaluation', e.target.value)}
+                    rows={2} className={INPUT + ' resize-none'} />
+                </div>
+              </>
             )}
           </div>
 

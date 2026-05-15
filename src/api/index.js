@@ -105,12 +105,6 @@ export const getTopGainers = () => API.get('/api/top-gainers')
 export const getStockPrice = (symbol) => API.get(`/api/market/stock-price/${symbol}`)
 export const getBatchPrices = (symbols) => API.get('/api/market/batch-prices', { params: { symbols: symbols.join(',') } })
 
-// Journal (old general journal - keep for now)
-export const getJournal = () => API.get('/api/journal')
-export const addJournalEntry = (data) => API.post('/api/journal', data)
-export const updateJournalEntry = (id, data) => API.put(`/api/journal/${id}`, data)
-export const deleteJournalEntry = (id) => API.delete(`/api/journal/${id}`)
-
 // Dashboard
 export const getDashboardInit = () => API.get('/api/dashboard/init')
 export const getTodayTasks = () => API.get('/api/dashboard/tasks/today')
@@ -222,6 +216,7 @@ export const closeTradeLog = (trade_id, data) => API.post(`/api/tradelog/${trade
   exit_price: data.exit_price,
 })
 
+export const bulkImportTradeLog       = (trades, cfg)      => API.post('/api/tradelog/bulk', { trades }, cfg)
 export const getPositions             = (status)          => API.get('/api/tradelog/positions', { params: status ? { status } : {} })
 export const getTradeActions          = ()                => API.get('/api/tradelog/actions')
 export const getTradeHistory          = (trade_id)        => API.get(`/api/tradelog/trade/${trade_id}/history`)

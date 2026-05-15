@@ -1,168 +1,193 @@
+import { useContextMenu } from '../ContextMenu'
 import { fmt } from '../../utils/format'
 
-const ACTION_COLORS = {
-  'New Position':   'bg-emerald-100 text-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-300',
-  'Add Position':   'bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-300',
-  'Partial Exit':   'bg-yellow-100 text-yellow-700 dark:bg-yellow-900/30 dark:text-yellow-300',
-  'Close Position': 'bg-gray-100 text-gray-600 dark:bg-gray-800 dark:text-gray-400',
-  'Reversal':       'bg-purple-100 text-purple-700 dark:bg-purple-900/30 dark:text-purple-300',
+const ACTION_CFG = {
+  'New Position':   { label: 'Buy',     color: 'text-emerald-600 dark:text-emerald-400', badge: 'bg-emerald-100 text-emerald-700 dark:bg-emerald-500/10 dark:text-emerald-400', dot: 'bg-emerald-500', accent: 'border-l-emerald-400' },
+  'Add Position':   { label: 'Add',     color: 'text-blue-600 dark:text-blue-400',       badge: 'bg-blue-100 text-blue-700 dark:bg-blue-500/10 dark:text-blue-400',             dot: 'bg-blue-500',    accent: 'border-l-blue-400' },
+  'Partial Exit':   { label: 'Partial', color: 'text-amber-600 dark:text-amber-400',     badge: 'bg-amber-100 text-amber-700 dark:bg-amber-500/10 dark:text-amber-400',         dot: 'bg-amber-500',   accent: 'border-l-amber-400' },
+  'Close Position': { label: 'Close',   color: 'text-gray-600 dark:text-gray-400',       badge: 'bg-gray-100 text-gray-600 dark:bg-gray-500/10 dark:text-gray-400',             dot: 'bg-gray-400',    accent: 'border-l-gray-400' },
+  'Reversal':       { label: 'Rev',     color: 'text-purple-600 dark:text-purple-400',   badge: 'bg-purple-100 text-purple-700 dark:bg-purple-500/10 dark:text-purple-400',     dot: 'bg-purple-500',  accent: 'border-l-purple-400' },
 }
 
-const EMOTIONAL_PILL = {
-  Confident: 'text-blue-600 bg-blue-50 dark:bg-blue-900/30 dark:text-blue-400',
-  Calm:      'text-emerald-600 bg-emerald-50 dark:bg-emerald-900/30 dark:text-emerald-400',
-  Anxious:   'text-yellow-600 bg-yellow-50 dark:bg-yellow-900/30 dark:text-yellow-400',
-  Fearful:   'text-orange-600 bg-orange-50 dark:bg-orange-900/30 dark:text-orange-400',
-  Greedy:    'text-red-600 bg-red-50 dark:bg-red-900/30 dark:text-red-400',
-  FOMO:      'text-purple-600 bg-purple-50 dark:bg-purple-900/30 dark:text-purple-400',
-  Neutral:   'text-gray-500 bg-gray-100 dark:bg-gray-800 dark:text-gray-400',
+const EMOTION_CFG = {
+  Confident: 'text-blue-700 bg-blue-100 dark:text-blue-400 dark:bg-blue-500/10',
+  Calm:      'text-emerald-700 bg-emerald-100 dark:text-emerald-400 dark:bg-emerald-500/10',
+  Anxious:   'text-yellow-700 bg-yellow-100 dark:text-yellow-400 dark:bg-yellow-500/10',
+  Fearful:   'text-orange-700 bg-orange-100 dark:text-orange-400 dark:bg-orange-500/10',
+  Greedy:    'text-red-700 bg-red-100 dark:text-red-400 dark:bg-red-500/10',
+  FOMO:      'text-purple-700 bg-purple-100 dark:text-purple-400 dark:bg-purple-500/10',
+  Neutral:   'text-gray-600 bg-gray-100 dark:text-gray-400 dark:bg-gray-500/10',
 }
 
-const MARKET_PILL = {
-  Bullish:  'text-emerald-600 bg-emerald-50 dark:bg-emerald-900/30 dark:text-emerald-400',
-  Bearish:  'text-red-600 bg-red-50 dark:bg-red-900/30 dark:text-red-400',
-  Sideways: 'text-yellow-600 bg-yellow-50 dark:bg-yellow-900/30 dark:text-yellow-400',
-  Volatile: 'text-orange-600 bg-orange-50 dark:bg-orange-900/30 dark:text-orange-400',
-  'Low Vol':'text-gray-500 bg-gray-100 dark:bg-gray-800 dark:text-gray-400',
+const MARKET_CFG = {
+  Bullish:  'text-emerald-700 bg-emerald-100 dark:text-emerald-400 dark:bg-emerald-500/10',
+  Bearish:  'text-red-700 bg-red-100 dark:text-red-400 dark:bg-red-500/10',
+  Sideways: 'text-yellow-700 bg-yellow-100 dark:text-yellow-400 dark:bg-yellow-500/10',
+  Volatile: 'text-orange-700 bg-orange-100 dark:text-orange-400 dark:bg-orange-500/10',
+  'Low Vol':'text-gray-600 bg-gray-100 dark:text-gray-400 dark:bg-gray-500/10',
 }
 
-const isBuyAction = t => t.action_type === 'New Position' || t.action_type === 'Add Position'
+const EXIT_REASON_CFG = {
+  'Target Hit':      'text-emerald-700 bg-emerald-100 dark:text-emerald-400 dark:bg-emerald-500/10',
+  'SL Hit':          'text-red-700 bg-red-100 dark:text-red-400 dark:bg-red-500/10',
+  'Manual Exit':     'text-blue-700 bg-blue-100 dark:text-blue-400 dark:bg-blue-500/10',
+  'Reversal Signal': 'text-purple-700 bg-purple-100 dark:text-purple-400 dark:bg-purple-500/10',
+  'Time Stop':       'text-yellow-700 bg-yellow-100 dark:text-yellow-400 dark:bg-yellow-500/10',
+}
 
-export default function ActionHistory({ actions, onEdit, onDelete }) {
-  if (!actions || actions.length === 0) {
-    return (
-      <div className="px-4 py-6 text-center text-sm text-gray-400 dark:text-gray-500">
-        No actions yet.
-      </div>
-    )
-  }
+const isBuy = t => t.action_type === 'New Position' || t.action_type === 'Add Position'
+
+function ActionCard({ action, onEdit, onDelete, isLast }) {
+  const { onContextMenu, ContextMenuPortal } = useContextMenu()
+  const cfg    = ACTION_CFG[action.action_type] || ACTION_CFG['Close Position']
+  const buy    = isBuy(action)
+  const price  = buy ? parseFloat(action.entry_price) : parseFloat(action.exit_price)
+  const qty    = parseInt(action.quantity) || 0
+  const pnl    = parseFloat(action.realized_pnl)
+  const hasPnl = !buy && !isNaN(pnl)
+
+  const menuItems = [
+    onEdit   && { label: 'Edit Action',   icon: '✏️', action: () => onEdit(action) },
+    onDelete && { label: 'Delete Action', icon: '🗑️', danger: true, action: () => onDelete(action) },
+  ].filter(Boolean)
 
   return (
-    <div className="relative pl-6 pr-4 py-3">
-      {/* vertical timeline line */}
-      <span className="absolute left-6 top-3 bottom-3 w-px bg-gray-200 dark:bg-gray-700" />
+    <div className="flex gap-3">
+      <ContextMenuPortal />
 
-      {actions.map((action, i) => {
-        const isBuy = isBuyAction(action)
+      {/* timeline spine */}
+      <div className="flex flex-col items-center shrink-0">
+        <div className={`w-2.5 h-2.5 rounded-full mt-3.5 shrink-0 ring-2 ring-white dark:ring-gray-900 ${cfg.dot}`} />
+        {!isLast && <div className="w-px flex-1 bg-gray-100 dark:bg-gray-800 mt-1" />}
+      </div>
 
-        return (
-          <div key={action.id} className="relative mb-4 last:mb-0">
-            {/* dot */}
-            <span className="absolute -left-[18px] top-1 w-3 h-3 rounded-full border-2 border-white dark:border-gray-900 bg-gray-400 dark:bg-gray-500" />
+      {/* action card */}
+      <div
+        className={`flex-1 mb-3 rounded-xl border-l-2 border border-gray-100 dark:border-gray-800 bg-white dark:bg-gray-800/40 p-3 cursor-context-menu ${cfg.accent}`}
+        onContextMenu={onContextMenu(menuItems)}
+      >
+        {/* header row */}
+        <div className="flex items-start gap-2 mb-2 flex-wrap">
+          <span className={`text-[10px] font-bold uppercase tracking-wide px-2 py-0.5 rounded-md ${cfg.badge}`}>
+            {cfg.label}
+          </span>
+          <span className="text-[10px] text-gray-400 dark:text-gray-500 font-mono">{action.date}</span>
+          {action.setup_type && (
+            <span className="text-[10px] px-1.5 py-0.5 rounded border border-gray-200 dark:border-gray-700 text-gray-500 dark:text-gray-400">
+              {action.setup_type}
+            </span>
+          )}
+        </div>
 
-            <div className="bg-gray-50 dark:bg-gray-800/60 rounded-lg border border-gray-100 dark:border-gray-700/50 p-3">
-              {/* header row */}
-              <div className="flex items-center justify-between gap-2 flex-wrap mb-2">
-                <div className="flex items-center gap-2 flex-wrap">
-                  <span className={`text-xs font-semibold px-2 py-0.5 rounded-full ${ACTION_COLORS[action.action_type] || 'bg-gray-100 text-gray-600'}`}>
-                    {action.action_type}
+              {/* main numbers */}
+              <div className="flex items-baseline gap-3 flex-wrap mb-2">
+                <span className="text-[13px] font-bold font-mono text-gray-900 dark:text-gray-100">
+                  {qty} <span className="text-[11px] font-normal text-gray-500 dark:text-gray-400">units</span>
+                </span>
+                <span className="text-[13px] font-bold font-mono text-gray-900 dark:text-gray-100">
+                  @ Rs.{fmt(price)}
+                </span>
+                {action.after_qty != null && (
+                  <span className="text-[10px] font-mono text-gray-500 dark:text-gray-500">
+                    → {parseFloat(action.after_qty)} remaining
                   </span>
-                  <span className="text-xs text-gray-500 dark:text-gray-400">{action.date}</span>
-                  {action.setup_type && (
-                    <span className="text-xs px-2 py-0.5 rounded border border-gray-200 dark:border-gray-600 text-gray-500 dark:text-gray-400">
-                      {action.setup_type}
-                    </span>
-                  )}
-                </div>
-                <div className="flex items-center gap-1">
-                  {onEdit && (
-                    <button
-                      onClick={() => onEdit(action)}
-                      className="px-2 py-0.5 rounded text-[10px] font-semibold text-gray-500 dark:text-gray-400 hover:text-blue-600 dark:hover:text-blue-400 hover:bg-blue-50 dark:hover:bg-blue-900/20 transition-colors"
-                    >
-                      Edit
-                    </button>
-                  )}
-                  {onDelete && (
-                    <button
-                      onClick={() => onDelete(action)}
-                      className="px-2 py-0.5 rounded text-[10px] font-semibold text-gray-500 dark:text-gray-400 hover:text-red-600 dark:hover:text-red-400 hover:bg-red-50 dark:hover:bg-red-900/20 transition-colors"
-                    >
-                      Delete
-                    </button>
-                  )}
-                </div>
-              </div>
-
-              {/* trade numbers */}
-              <div className="text-sm text-gray-700 dark:text-gray-300 mb-2">
-                {isBuy ? (
-                  <>
-                    Bought <span className="font-mono font-semibold">{parseInt(action.quantity)} units</span>
-                    {' '}@ <span className="font-mono font-semibold">Rs.{fmt(action.entry_price)}</span>
-                    {action.after_qty != null && (
-                      <span className="text-gray-400 dark:text-gray-500 text-xs ml-2">
-                        → position: {parseFloat(action.after_qty)} units
-                      </span>
-                    )}
-                  </>
-                ) : (
-                  <>
-                    Sold <span className="font-mono font-semibold">{parseInt(action.quantity)} units</span>
-                    {' '}@ <span className="font-mono font-semibold">Rs.{fmt(action.exit_price)}</span>
-                    {action.realized_pnl != null && (
-                      <span className={`ml-2 font-mono font-semibold ${parseFloat(action.realized_pnl) >= 0 ? 'text-emerald-600 dark:text-emerald-400' : 'text-red-600 dark:text-red-400'}`}>
-                        {parseFloat(action.realized_pnl) >= 0 ? '+' : ''}Rs.{fmt(action.realized_pnl)}
-                      </span>
-                    )}
-                    {action.after_qty != null && (
-                      <span className="text-gray-400 dark:text-gray-500 text-xs ml-2">
-                        → remaining: {parseFloat(action.after_qty)} units
-                      </span>
-                    )}
-                  </>
+                )}
+                {hasPnl && (
+                  <span className={`text-[13px] font-bold font-mono ml-auto ${pnl >= 0 ? 'text-emerald-600 dark:text-emerald-400' : 'text-red-600 dark:text-red-400'}`}>
+                    {pnl >= 0 ? '+' : ''}Rs.{fmt(pnl)}
+                  </span>
                 )}
               </div>
 
               {/* SL / TP */}
               {(action.sl || action.tp) && (
-                <div className="flex gap-3 text-xs text-gray-500 dark:text-gray-400 mb-2">
-                  {action.sl && <span>SL <span className="font-mono text-red-500">Rs.{fmt(action.sl)}</span></span>}
-                  {action.tp && <span>TP <span className="font-mono text-emerald-500">Rs.{fmt(action.tp)}</span></span>}
+                <div className="flex gap-3 mb-2">
+                  {action.sl && (
+                    <span className="text-[10px] font-mono text-red-600 dark:text-red-400">
+                      SL Rs.{fmt(action.sl)}
+                    </span>
+                  )}
+                  {action.tp && (
+                    <span className="text-[10px] font-mono text-emerald-600 dark:text-emerald-400">
+                      TP Rs.{fmt(action.tp)}
+                    </span>
+                  )}
                 </div>
               )}
 
-              {/* journal fields */}
-              {(action.market_condition || action.emotional_state) && (
-                <div className="flex gap-2 flex-wrap mb-2">
+              {/* pills row */}
+              {(action.market_condition || action.emotional_state || action.exit_reason) && (
+                <div className="flex gap-1.5 flex-wrap mb-2">
+                  {action.exit_reason && (
+                    <span className={`text-[10px] font-semibold px-2 py-0.5 rounded-full ${EXIT_REASON_CFG[action.exit_reason] || 'text-gray-600 bg-gray-100'}`}>
+                      {action.exit_reason}
+                    </span>
+                  )}
                   {action.market_condition && (
-                    <span className={`text-xs px-2 py-0.5 rounded-full ${MARKET_PILL[action.market_condition] || 'bg-gray-100 text-gray-500'}`}>
+                    <span className={`text-[10px] px-2 py-0.5 rounded-full ${MARKET_CFG[action.market_condition] || 'text-gray-600 bg-gray-100'}`}>
                       {action.market_condition}
                     </span>
                   )}
                   {action.emotional_state && (
-                    <span className={`text-xs px-2 py-0.5 rounded-full ${EMOTIONAL_PILL[action.emotional_state] || 'bg-gray-100 text-gray-500'}`}>
+                    <span className={`text-[10px] px-2 py-0.5 rounded-full ${EMOTION_CFG[action.emotional_state] || 'text-gray-600 bg-gray-100'}`}>
                       {action.emotional_state}
                     </span>
                   )}
                 </div>
               )}
 
+              {/* journal text fields */}
               {action.why_taking_trade && (
-                <p className="text-xs text-gray-600 dark:text-gray-300 mb-1">
-                  <span className="text-gray-400 dark:text-gray-500">Thesis: </span>{action.why_taking_trade}
+                <p className="text-[11px] text-gray-600 dark:text-gray-300 mb-1 leading-relaxed">
+                  <span className="text-[9px] uppercase tracking-widest text-gray-400 dark:text-gray-500 mr-1.5">Thesis</span>
+                  {action.why_taking_trade}
                 </p>
               )}
               {action.thesis_notes && (
-                <p className="text-xs text-gray-500 dark:text-gray-400 mb-1 italic">{action.thesis_notes}</p>
+                <p className="text-[11px] text-gray-500 dark:text-gray-400 mb-1 italic leading-relaxed">
+                  {action.thesis_notes}
+                </p>
               )}
               {action.post_trade_evaluation && (
-                <p className="text-xs text-gray-600 dark:text-gray-300 mb-1">
-                  <span className="text-gray-400 dark:text-gray-500">Reflection: </span>{action.post_trade_evaluation}
+                <p className="text-[11px] text-gray-600 dark:text-gray-300 mb-1 leading-relaxed">
+                  <span className="text-[9px] uppercase tracking-widest text-gray-400 dark:text-gray-500 mr-1.5">Reflection</span>
+                  {action.post_trade_evaluation}
                 </p>
               )}
               {action.lessons_notes && (
-                <p className="text-xs text-gray-500 dark:text-gray-400 italic">
-                  <span className="text-gray-400 dark:text-gray-500">Lessons: </span>{action.lessons_notes}
+                <p className="text-[11px] text-gray-500 dark:text-gray-400 italic leading-relaxed">
+                  <span className="text-[9px] uppercase tracking-widest text-gray-400 dark:text-gray-500 mr-1.5">Lessons</span>
+                  {action.lessons_notes}
                 </p>
               )}
               {action.notes && (
-                <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">{action.notes}</p>
-              )}
-            </div>
-          </div>
-        )
-      })}
+          <p className="text-[11px] text-gray-500 dark:text-gray-400 mt-1 leading-relaxed">{action.notes}</p>
+        )}
+      </div>
+    </div>
+  )
+}
+
+export default function ActionHistory({ actions, direction, onEdit, onDelete }) {
+  if (!actions || actions.length === 0) {
+    return (
+      <div className="px-6 py-8 text-center text-xs text-gray-400 dark:text-gray-600">
+        No actions yet.
+      </div>
+    )
+  }
+
+  return (
+    <div className="px-4 py-4 space-y-0">
+      {actions.map((action, i) => (
+        <ActionCard
+          key={action.id}
+          action={action}
+          onEdit={onEdit}
+          onDelete={onDelete}
+          isLast={i === actions.length - 1}
+        />
+      ))}
     </div>
   )
 }
