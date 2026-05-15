@@ -68,7 +68,19 @@ export default function LogsPage() {
       const today = new Date().toISOString().split('T')[0]
       await autoCreateMarketJournal(today)
       const journalsRes = await getMarketJournals()
-      setMarketJournals(journalsRes.data || [])
+      const all = journalsRes.data || []
+      setMarketJournals(all)
+
+      // Backfill news for recent entries that have none — fire sequentially, max 5
+      // auto-create uses a 15-min shared cache so these calls are cheap
+      const missing = all.filter(e => !e.news).slice(0, 5)
+      for (const e of missing) {
+        await autoCreateMarketJournal(e.date).catch(() => {})
+      }
+      if (missing.length > 0) {
+        const refreshed = await getMarketJournals()
+        setMarketJournals(refreshed.data || [])
+      }
     } catch { /* non-critical */ }
   }, [])
 
