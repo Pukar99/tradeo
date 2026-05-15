@@ -1,7 +1,7 @@
 import { useState, useEffect, useCallback, useMemo } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { useAuth } from '../context/AuthContext'
-import { getPositions, getBatchPrices } from '../api'
+import { getPositions, getBatchPrices, getMarketJournals, autoCreateMarketJournal } from '../api'
 import { useChatRefresh } from '../utils/chatEvents'
 import { clearEligibilityCache } from '../utils/globalCache'
 
@@ -26,11 +26,14 @@ export default function LogsPage() {
   const [activeTab,  setActiveTab]  = useState('trades')
   const [error,      setError]      = useState(null)
 
-  // Trades-tab controls — lifted here so they live on the same bar as tabs
+  // Shared log view — persists across Trades + Market tabs
   const [view,   setView]   = useState('database')
   const [filter, setFilter] = useState('open')
   const [search, setSearch] = useState('')
   const [addModal, setAddModal] = useState(false)
+
+  // Market-tab state
+  const [marketJournals, setMarketJournals] = useState([])
 
   const fetchData = useCallback(async () => {
     try {
@@ -60,13 +63,27 @@ export default function LogsPage() {
     }
   }, [])
 
+  const fetchMarketJournals = useCallback(async () => {
+    try {
+      const today = new Date().toISOString().split('T')[0]
+      await autoCreateMarketJournal(today)
+      const journalsRes = await getMarketJournals()
+      setMarketJournals(journalsRes.data || [])
+    } catch { /* non-critical */ }
+  }, [])
+
   useEffect(() => { fetchData() }, [fetchData])
+  useEffect(() => { fetchMarketJournals() }, [fetchMarketJournals])
   useChatRefresh(['trades'], fetchData)
 
   const handleRefresh = useCallback(() => {
     clearEligibilityCache()
     fetchData()
   }, [fetchData])
+
+  const handleMarketJournalSaved = useCallback((updated) => {
+    setMarketJournals(prev => prev.map(e => e.date === updated.date ? updated : e))
+  }, [])
 
   const allSymbols = useMemo(() => {
     const seen = new Set()
@@ -127,25 +144,31 @@ export default function LogsPage() {
         {/* spacer — pushes everything right */}
         <div className="flex-1" />
 
-        {/* trades-only controls — right side */}
-        {activeTab === 'trades' && <>
-
-          {/* view toggle */}
+        {/* shared view toggle — Trades + Market */}
+        {(activeTab === 'trades' || activeTab === 'market') && (
           <div className="flex items-center bg-gray-100/80 dark:bg-gray-800/60 rounded-lg p-0.5 gap-0.5">
-            {['database', 'calendar'].map(v => (
-              <button key={v}
-                onClick={() => setView(v)}
-                className={`px-3 py-1 rounded-md text-[11px] font-semibold transition-all capitalize ${
-                  view === v
+            {[
+              { key: 'database', label: 'Database' },
+              { key: 'gallery',  label: 'Gallery'  },
+              { key: 'calendar', label: 'Calendar' },
+            ].map(v => (
+              <button key={v.key}
+                onClick={() => setView(v.key)}
+                className={`px-3 py-1 rounded-md text-[11px] font-semibold transition-all ${
+                  view === v.key
                     ? 'bg-white dark:bg-gray-900 text-gray-900 dark:text-gray-100 shadow-sm'
                     : 'text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-300'
                 }`}>
-                {v}
+                {v.label}
               </button>
             ))}
           </div>
+        )}
 
-          {view === 'database' && <>
+        {/* trades-only controls — right side */}
+        {activeTab === 'trades' && <>
+
+          {(view === 'database' || view === 'gallery') && <>
             {/* divider */}
             <div className="w-px h-4 bg-gray-200 dark:bg-gray-700" />
 
@@ -207,7 +230,13 @@ export default function LogsPage() {
           onRefresh={handleRefresh}
         />
       )}
-      {activeTab === 'market' && <MarketJournalTab />}
+      {activeTab === 'market' && (
+        <MarketJournalTab
+          view={view}
+          marketJournals={marketJournals}
+          onMarketJournalSaved={handleMarketJournalSaved}
+        />
+      )}
       {activeTab === 'audit'  && <AuditTab />}
       {activeTab === 'stats'  && (
         <div className="flex items-center justify-center min-h-48 text-gray-400 dark:text-gray-500 text-sm">
