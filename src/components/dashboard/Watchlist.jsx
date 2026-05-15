@@ -6,7 +6,7 @@ import {
   removeFromWatchlist,
   getStockPrice,
   getBatchPrices,
-  getTradeLog
+  getPositions
 } from '../../api'
 import { useContextMenu } from '../ContextMenu'
 import { useChatRefresh } from '../../utils/chatEvents'
@@ -198,14 +198,24 @@ function Watchlist() {
 
   const fetchWatchlist = async () => {
     try {
-      const [watchRes, tradeLogRes] = await Promise.all([
+      const [watchRes, posRes] = await Promise.all([
         getWatchlist(),
-        getTradeLog()
+        getPositions()
       ])
 
-      const openTrades = tradeLogRes.data.filter(
-        t => t.status === 'OPEN' || t.status === 'PARTIAL'
-      )
+      const openTrades = (posRes.data || [])
+        .filter(p => p.status === 'OPEN' || p.status === 'PARTIAL')
+        .map(p => ({
+          id:                 p.trade_id,
+          symbol:             p.symbol,
+          position:           p.direction,
+          status:             p.status,
+          entry_price:        parseFloat(p.wacc) || 0,
+          remaining_quantity: parseFloat(p.total_qty) || 0,
+          quantity:           parseFloat(p.total_qty) || 0,
+          sl:                 p.sl,
+          tp:                 p.tp,
+        }))
       const watchItems = watchRes.data.filter(w => w.category !== 'portfolio')
 
       // Single batch request for all symbols — replaces N individual getStockPrice calls

@@ -182,40 +182,6 @@ export const getIPOs           = ()             => API.get('/api/market/ipos')
 export const getMarketNews     = ()             => API.get('/api/market/news')
 export const triggerBackfill   = (date)         => API.post('/api/market/backfill', { date })
 
-// Trade Log — action-based model (v2.2)
-// Compatibility shims — LeftPanel, PortfolioPage, PerformanceDashboard, Watchlist still use old field names.
-// Remap position_view shape → legacy shape so those components keep working without refactor.
-export const getTradeLog = async () => {
-  const res = await API.get('/api/tradelog/positions')
-  const remapped = (res.data || []).map(p => ({
-    id:                 p.trade_id,
-    trade_id:           p.trade_id,
-    symbol:             p.symbol,
-    position:           p.direction === 'LONG' ? 'Long' : 'Short',
-    quantity:           parseFloat(p.total_qty) || 0,
-    remaining_quantity: parseFloat(p.total_qty) || 0,
-    entry_price:        p.wacc,
-    sl:                 p.sl,
-    tp:                 p.tp,
-    status:             p.status,
-    realized_pnl:       p.total_realized_pnl,
-    date:               p.opened_at?.slice(0, 10),
-    updated_at:         p.last_action_at,
-    market:             'nepse',
-  }))
-  return { ...res, data: remapped }
-}
-// addTradeLog: quick-add from LeftPanel — sends to new POST / (new position)
-export const addTradeLog = (data) => API.post('/api/tradelog', {
-  ...data,
-  position: data.position === 'LONG' ? 'Long' : data.position === 'SHORT' ? 'Short' : data.position,
-})
-// closeTradeLog: LeftPanel passes trade_id (mapped as id from getTradeLog shim)
-export const closeTradeLog = (trade_id, data) => API.post(`/api/tradelog/${trade_id}/close`, {
-  date: data.exit_date || new Date().toISOString().slice(0, 10),
-  exit_price: data.exit_price,
-})
-
 export const bulkImportTradeLog       = (trades, cfg)      => API.post('/api/tradelog/bulk', { trades }, cfg)
 export const getPositions             = (status)          => API.get('/api/tradelog/positions', { params: status ? { status } : {} })
 export const getTradeActions          = ()                => API.get('/api/tradelog/actions')

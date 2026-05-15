@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback, useRef } from 'react'
-import { getTradeLog, getWatchlist, removeFromWatchlist, updateWatchlist, addTradeLog, closeTradeLog, getBatchPrices } from '../../api'
+import { getPositions, newPosition, closePosition, getWatchlist, removeFromWatchlist, updateWatchlist, getBatchPrices } from '../../api'
 import { useContextMenu } from '../ContextMenu'
 import { useChatRefresh, dispatchChatAction } from '../../utils/chatEvents'
 import { useScreen } from '../../context/ScreenContext'
@@ -22,7 +22,7 @@ function TradeModal({ side, symbol, onClose, onSaved }) {
     if (!form.entry_price || !form.quantity) { setErr('Entry price and quantity are required'); return }
     setSaving(true); setErr(null)
     try {
-      await addTradeLog({
+      await newPosition({
         symbol,
         position:    isBuy ? 'LONG' : 'SHORT',
         entry_price: parseFloat(form.entry_price),
@@ -31,7 +31,6 @@ function TradeModal({ side, symbol, onClose, onSaved }) {
         quantity:    parseInt(form.quantity),
         notes:       form.notes || null,
         entry_date:  new Date().toISOString().slice(0, 10),
-        status:      'OPEN',
       })
       dispatchChatAction('ADD_TRADE')
       onSaved()
@@ -120,7 +119,7 @@ function CloseConfirm({ position, onClose, onDone }) {
     setSaving(true); setErr(null)
     try {
       const latestClose = position._latestPrice || position.entry_price
-      await closeTradeLog(position.id, { exit_price: latestClose, exit_date: new Date().toISOString().slice(0, 10) })
+      await closePosition(position.id, { exit_price: latestClose, date: new Date().toISOString().slice(0, 10) })
       dispatchChatAction('CLOSE_TRADE')
       onDone()
       onClose()
@@ -237,8 +236,21 @@ export default function LeftPanel() {
   const [editWatchItem,  setEditWatchItem]  = useState(null)
 
   const loadTrades = useCallback(() => {
-    getTradeLog()
-      .then(r => setPositions((r.data || []).filter(t => t.status === 'OPEN' || t.status === 'PARTIAL')))
+    getPositions()
+      .then(r => setPositions(
+        (r.data || [])
+          .filter(p => p.status === 'OPEN' || p.status === 'PARTIAL')
+          .map(p => ({
+            id:                 p.trade_id,
+            symbol:             p.symbol,
+            position:           p.direction,
+            remaining_quantity: parseFloat(p.total_qty) || 0,
+            entry_price:        p.wacc,
+            sl:                 p.sl,
+            tp:                 p.tp,
+            status:             p.status,
+          }))
+      ))
       .catch(() => {})
   }, [])
 

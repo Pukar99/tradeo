@@ -538,9 +538,8 @@ function CenterDashboard({ navigate, initData, onRefresh, onDataReady }) {
   const applyData = useCallback((d) => {
     const trades    = d.trades || []
     const priceMap  = d.prices || {}
-    const tradeData = trades.filter(t => t.market !== 'forex')
-    const open      = tradeData.filter(t => t.status === 'OPEN' || t.status === 'PARTIAL')
-    const closed    = tradeData.filter(t => t.status === 'CLOSED')
+    const open      = trades.filter(t => t.status === 'OPEN' || t.status === 'PARTIAL')
+    const closed    = trades.filter(t => t.status === 'CLOSED')
 
     const openWithPrices = open.map(t => {
       const entry = parseFloat(t.entry_price) || 0
@@ -1059,7 +1058,6 @@ function CenterDashboard({ navigate, initData, onRefresh, onDataReady }) {
 }
 
 // ── Logged-in layout ─────────────────────────────────────────────────────────
-// ── Logged-in layout ──────────────────────────────────────────────────────────
 function LoggedInHome() {
   const { user } = useAuth()
   const navigate = useNavigate()

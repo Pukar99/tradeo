@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback } from 'react'
-import { getTradeLog, getBatchPrices } from '../../api'
+import { getPositions, getBatchPrices } from '../../api'
 import { useChatRefresh } from '../../utils/chatEvents'
 import {
   LineChart, Line, XAxis, YAxis, CartesianGrid,
@@ -16,35 +16,45 @@ function PerformanceDashboard() {
   const [openPositions, setOpenPositions] = useState([])
 
   const fetchData = useCallback(async () => {
-      try {
-        const tradesRes = await getTradeLog()
-        const tradeData = tradesRes.data
-        setTrades(tradeData)
+    try {
+      const posRes = await getPositions()
+      const posData = (posRes.data || []).map(p => ({
+        id:                 p.trade_id,
+        symbol:             p.symbol,
+        position:           p.direction,
+        status:             p.status,
+        entry_price:        parseFloat(p.wacc) || 0,
+        remaining_quantity: parseFloat(p.total_qty) || 0,
+        quantity:           parseFloat(p.total_qty) || 0,
+        sl:                 p.sl,
+        tp:                 p.tp,
+        realized_pnl:       parseFloat(p.total_realized_pnl) || 0,
+        date:               p.last_action_at?.slice(0, 10),
+      }))
+      setTrades(posData)
 
-        const open = tradeData.filter(t => t.status === 'OPEN' || t.status === 'PARTIAL')
-        const closed = tradeData.filter(t => t.status === 'CLOSED')
+      const open   = posData.filter(t => t.status === 'OPEN' || t.status === 'PARTIAL')
+      const closed = posData.filter(t => t.status === 'CLOSED')
 
-        // Fetch latest prices for all open positions in one batch request
-        let openWithPrices = open.map(t => ({ ...t, currentPrice: null }))
-        if (open.length > 0) {
-          try {
-            const symbols = [...new Set(open.map(t => t.symbol))]
-            const batchRes = await getBatchPrices(symbols)
-            const priceMap = batchRes.data.prices || {}
-            const latestDate = batchRes.data.latestDate || ''
-            openWithPrices = open.map(t => ({
-              ...t,
-              currentPrice: priceMap[t.symbol]?.price ?? null,
-              latestDate,
-            }))
-            if (latestDate) setPriceDate(latestDate)
-          } catch { /* prices unavailable — UI still works */ }
-        }
+      let openWithPrices = open.map(t => ({ ...t, currentPrice: null }))
+      if (open.length > 0) {
+        try {
+          const symbols = [...new Set(open.map(t => t.symbol))]
+          const batchRes = await getBatchPrices(symbols)
+          const priceMap = batchRes.data.prices || {}
+          const latestDate = batchRes.data.latestDate || ''
+          openWithPrices = open.map(t => ({
+            ...t,
+            currentPrice: priceMap[t.symbol]?.price ?? null,
+            latestDate,
+          }))
+          if (latestDate) setPriceDate(latestDate)
+        } catch { /* prices unavailable — UI still works */ }
+      }
 
-        setOpenPositions(openWithPrices)
-
-        calculateStats(tradeData, openWithPrices, closed)
-        buildEquityCurve(tradeData, openWithPrices)
+      setOpenPositions(openWithPrices)
+      calculateStats(posData, openWithPrices, closed)
+      buildEquityCurve(posData, openWithPrices)
     } catch (err) {
       console.error(err)
     } finally {
