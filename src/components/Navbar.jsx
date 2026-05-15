@@ -83,7 +83,6 @@ function Navbar() {
     { path: '/logs',      label: 'Logs'             },
     { path: '/portfolio', label: t('nav.portfolio') },
     { path: '/datalab',   label: 'Data Lab'         },
-    { path: '/risklab',   label: t('nav.risklab')   },
     { path: '/explore',   label: 'Explore'          },
   ]
 

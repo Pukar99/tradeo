@@ -331,7 +331,6 @@ export default function BacktestPage() {
             updatePositionLocal(showPartial.id, {
               status: data.status,
               remaining_quantity: data.remaining_quantity,
-              partial_exits: data.partial_exits,
             })
             updateCapitalLocal(data.available_capital_after)
             setShowPartial(null)

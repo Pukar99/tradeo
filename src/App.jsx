@@ -23,7 +23,6 @@ const ResearchEditorPage = lazy(() => import('./pages/ResearchEditorPage'))
 const ResearchViewPage   = lazy(() => import('./pages/ResearchViewPage'))
 const ProfilePage        = lazy(() => import('./pages/ProfilePage'))
 const ChatPage           = lazy(() => import('./pages/ChatPage'))
-const RiskLabPage        = lazy(() => import('./pages/RiskLabPage'))
 const IPOPage            = lazy(() => import('./pages/IPOPage'))
 const DataLabPage        = lazy(() => import('./pages/DataLabPage'))
 const ExplorePage        = lazy(() => import('./pages/ExplorePage'))
@@ -91,7 +90,7 @@ function AppContent() {
     'alt+l':  () => navigate('/logs'),
     'alt+p':  () => navigate('/portfolio'),
     'alt+c':  () => navigate('/chat'),
-    'alt+r':  () => navigate('/risklab'),
+    'alt+r':  () => navigate('/explore/risklab'),
     '/':      () => { if (location.pathname === '/screen') { document.querySelector('[data-chart-search]')?.focus() } },
   }), [toggleTheme, navigate, location.pathname])
   useHotkeys(hotkeys)
@@ -153,7 +152,6 @@ function AppContent() {
           <Route path="/research/:id" element={<ResearchViewPage />} />
           <Route path="/profile" element={<ProfilePage />} />
           <Route path="/chat" element={<ChatPage />} />
-          <Route path="/risklab" element={<RiskLabPage />} />
           <Route path="/ipo" element={<IPOPage />} />
           <Route path="/explore/ipo" element={<IPOPage />} />
           <Route path="/datalab" element={<DataLabPage />} />

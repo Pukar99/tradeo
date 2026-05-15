@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState, useCallback } from 'react'
 import { useTheme } from '../../context/ThemeContext'
 import { useScreen } from '../../context/ScreenContext'
-import { getIndexChart, getStockChart, getTopMovers, triggerBackfill } from '../../api'
+import { getIndexChart, getStockChart, getTopMovers, triggerBackfill, getTradeHistory } from '../../api'
 import { getMarketSymbols } from '../../utils/globalCache'
 
 // ── Module-level caches (survive re-renders, shared across StockChart instances) ─
@@ -901,14 +901,40 @@ export default function StockChart() {
     setDrawVersion(v => v + 1) // repaint canvas with restored drawings
   }, [drawKey]) // eslint-disable-line react-hooks/exhaustive-deps
 
-  const canvasRef       = useRef(null)
-  const priceSeriesRef  = useRef(null)  // set after chart build — needed for coordinate conversion
-  const drawingsRef     = useRef([])
-  const drawPreviewRef  = useRef(null)
-  const rafRef          = useRef(null)
+  const canvasRef           = useRef(null)
+  const priceSeriesRef      = useRef(null)  // set after chart build — needed for coordinate conversion
+  const drawingsRef         = useRef([])
+  const drawPreviewRef      = useRef(null)
+  const rafRef              = useRef(null)
   // Always-fresh ref so drawing handlers (inside effects) can call saveDrawings without stale closure
-  const saveDrawingsRef = useRef(saveDrawings)
+  const saveDrawingsRef     = useRef(saveDrawings)
   useEffect(() => { saveDrawingsRef.current = saveDrawings }, [saveDrawings])
+
+  // Action rows for active positions — keyed by trade_id. Fetched when activePositions changes.
+  // Stored in a ref so the chart build effect can read them without adding them to its dep array.
+  const positionActionsRef  = useRef({})
+  const [actionsReady, setActionsReady] = useState(0)  // bump triggers chart rebuild after fetch
+
+  useEffect(() => {
+    if (!activePositions?.length) { positionActionsRef.current = {}; return }
+    let cancelled = false
+    Promise.all(
+      activePositions.map(pos => {
+        const id = pos.id || pos.trade_id
+        if (!id) return Promise.resolve([id, []])
+        return getTradeHistory(id)
+          .then(res => [id, res.data || []])
+          .catch(() => [id, []])
+      })
+    ).then(results => {
+      if (cancelled) return
+      const map = {}
+      results.forEach(([id, rows]) => { if (id) map[id] = rows })
+      positionActionsRef.current = map
+      setActionsReady(v => v + 1)
+    })
+    return () => { cancelled = true }
+  }, [activePositions])
 
   const [chartData,      setChartData]      = useState([])
   const [loading,        setLoading]        = useState(true)
@@ -1111,7 +1137,8 @@ export default function StockChart() {
 
       if (activePositions?.length) {
         activePositions.forEach((pos, idx) => {
-          const { entry_price, sl, tp, entry_date, date: trade_date, position: dir, position_entries = [], partial_exits = [] } = pos
+          const { entry_price, sl, tp, entry_date, date: trade_date, position: dir } = pos
+          const tradeId    = pos.id || pos.trade_id
           const entryColor = ENTRY_COLORS[idx % ENTRY_COLORS.length]
           // entry_date: set by LogsPage/Portfolio "Go to Chart" mapping
           // trade_date: raw trade_log row clicked from LeftPanel (has `date` not `entry_date`)
@@ -1153,41 +1180,43 @@ export default function StockChart() {
             })
           }
 
-          // ADD markers — one per subsequent position_entry (skip first which is the BUY)
-          if (Array.isArray(position_entries) && position_entries.length > 1) {
-            position_entries.slice(1).forEach(pe => {
-              const peDate = pe.date ? pe.date.slice(0, 10) : null
-              if (!peDate) return
-              const peCandle = chartData.find(d => d.time >= peDate)
-              if (!peCandle) return
+          // ADD / SELL markers — derived from v2.2 action rows (fetched async, stored in ref)
+          const actionRows = tradeId ? (positionActionsRef.current[tradeId] || []) : []
+          actionRows.forEach(row => {
+            const rowDate = row.date ? row.date.slice(0, 10) : null
+            if (!rowDate) return
+            const rowCandle = chartData.find(d => d.time >= rowDate)
+            if (!rowCandle) return
+
+            if (row.action_type === 'Add Position') {
               markers.push({
-                time:     peCandle.time,
+                time:     rowCandle.time,
                 position: dir === 'SHORT' ? 'aboveBar' : 'belowBar',
                 color:    entryColor,
                 shape:    'circle',
                 text:     '+',
                 size:     1,
               })
-            })
-          }
-
-          // SELL markers — one per partial exit
-          if (Array.isArray(partial_exits) && partial_exits.length) {
-            partial_exits.forEach(pe => {
-              const peDate = (pe.date || '').slice(0, 10)
-              if (!peDate) return
-              const peCandle = chartData.find(d => d.time >= peDate)
-              if (!peCandle) return
+            } else if (row.action_type === 'Partial Exit') {
               markers.push({
-                time:     peCandle.time,
+                time:     rowCandle.time,
                 position: dir === 'SHORT' ? 'belowBar' : 'aboveBar',
                 color:    '#f59e0b',
                 shape:    'circle',
                 text:     '−',
                 size:     1,
               })
-            })
-          }
+            } else if (row.action_type === 'Close Position' || row.action_type === 'Reversal') {
+              markers.push({
+                time:     rowCandle.time,
+                position: dir === 'SHORT' ? 'belowBar' : 'aboveBar',
+                color:    '#f87171',
+                shape:    dir === 'SHORT' ? 'arrowUp' : 'arrowDown',
+                text:     activePositions.length > 1 ? `X${idx + 1}` : 'X',
+                size:     2,
+              })
+            }
+          })
         })
       }
 
@@ -1300,9 +1329,10 @@ export default function StockChart() {
         activePositions.forEach(p => {
           const ed = p.entry_date || p.date   // handle both nav paths
           if (ed) allEntryDates.push(ed.slice(0, 10))
-          if (Array.isArray(p.position_entries)) {
-            p.position_entries.forEach(pe => { if (pe.date) allEntryDates.push(pe.date.slice(0, 10)) })
-          }
+          // Also include Add Position dates so scroll range covers the full trade
+          const id = p.id || p.trade_id
+          const rows = id ? (positionActionsRef.current[id] || []) : []
+          rows.forEach(row => { if (row.date) allEntryDates.push(row.date.slice(0, 10)) })
         })
         const earliest = allEntryDates.filter(Boolean).sort()[0]
         if (earliest) {
@@ -1356,7 +1386,7 @@ export default function StockChart() {
       Object.values(chartsRef.current).forEach(c => { try { c.remove() } catch (_) {} })
       chartsRef.current = {}
     }
-  }, [chartData, isDark, chartType, activeIndicators, activePositions]) // eslint-disable-line react-hooks/exhaustive-deps
+  }, [chartData, isDark, chartType, activeIndicators, activePositions, actionsReady]) // eslint-disable-line react-hooks/exhaustive-deps
 
   useEffect(() => {
     pinnedDateRef.current = pinnedDate

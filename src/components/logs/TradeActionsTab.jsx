@@ -5,6 +5,7 @@ import AddTradeModal from './AddTradeModal'
 import ClosePositionModal from './ClosePositionModal'
 import PartialExitModal from './PartialExitModal'
 import TradeCalendarView from './TradeCalendarView'
+import TradeGalleryView from './TradeGalleryView'
 
 export default function TradeActionsTab({ positions, ltpMap, view, filter, search, addModal, setAddModal, onRefresh }) {
   const [closeTarget,   setCloseTarget]  = useState(null)
@@ -67,6 +68,21 @@ export default function TradeActionsTab({ positions, ltpMap, view, filter, searc
 
       {/* calendar view */}
       {view === 'calendar' && <TradeCalendarView />}
+
+      {/* gallery view */}
+      {view === 'gallery' && (
+        <TradeGalleryView
+          positions={positions}
+          ltpMap={ltpMap}
+          filter={filter}
+          search={search}
+          onAdd={p => setAddTarget(p)}
+          onPartialExit={p => setPartialTarget(p)}
+          onClose={p => setCloseTarget(p)}
+          onDelete={p => setConfirmDel({ type: 'trade', target: p })}
+          onOpenAddModal={() => setAddModal(true)}
+        />
+      )}
 
       {/* database view */}
       {view === 'database' && (

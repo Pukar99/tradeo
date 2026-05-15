@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from 'react'
+import { useState, useEffect } from 'react'
 import { useLanguage } from '../context/LanguageContext'
 import {
   LineChart, Line, XAxis, YAxis, CartesianGrid,
@@ -22,12 +22,9 @@ const getCGT = (gain, isLongTerm) => gain > 0 ? gain * (isLongTerm ? 0.05 : 0.07
 const PIE_COLORS = ['#3b82f6', '#ef4444', '#f59e0b', '#22c55e', '#8b5cf6']
 
 const TABS = [
-  { id: 'nepse',       label: 'NEPSE Calc',   desc: 'Trade Calculator' },
-  { id: 'forex',       label: 'Forex Calc',   desc: 'Lot Size & Pip Value' },
-  { id: 'position',   label: 'Position',      desc: 'Size & Risk/Reward' },
-  { id: 'performance',label: 'Performance',   desc: 'Win Rate & Drawdown' },
-  { id: 'sip',        label: 'SIP',           desc: 'Systematic Investment' },
-  { id: 'montecarlo', label: 'Monte Carlo',   desc: 'Position Sizing Sim' },
+  { id: 'nepse',    label: 'NEPSE Calc', desc: 'Trade Calculator' },
+  { id: 'position', label: 'Position',   desc: 'Size & Risk/Reward' },
+  { id: 'sip',      label: 'SIP',        desc: 'Systematic Investment' },
 ]
 
 const INPUT = "bg-gray-50 dark:bg-gray-800 border border-gray-200 dark:border-gray-700 text-xs text-gray-800 dark:text-gray-100 focus:border-blue-400 rounded-xl px-3 py-2 w-full outline-none placeholder-gray-300 dark:placeholder-gray-600"
@@ -113,7 +110,6 @@ function NEPSECalculator() {
     const netProfit = grossProfit + cashDiv - totalCharges
     const netProfitPct = buyAmount > 0 ? (netProfit / buyAmount) * 100 : 0
     // Break-even: price at which net profit = 0, solved for sellPrice
-    // sellAmount_be = buyAmount + totalBuyCharges + sellBroker(be) + sellSebon(be) + sellDp
     // Approximate: ignore small change in sell-side charges at break-even price
     const breakEven = totalShares > 0
       ? (buyAmount + totalBuyCharges + sellBroker + sellSebon + sellDp) / totalShares
@@ -328,227 +324,11 @@ function NEPSECalculator() {
 }
 
 // ─── POSITION & RISK CALCULATOR ────────────────────────────
-// ─── FOREX POSITION CALCULATOR ────────────────────────────────
-// Supports Gold (XAUUSD), Forex majors, and Crypto CFDs
-// Lot sizes: Standard=100k units, Mini=10k, Micro=1k
-// Gold: 1 standard lot = 100 troy oz. Pip = $0.01 per oz
-// Most forex pairs: pip = 4th decimal. JPY pairs: pip = 2nd decimal
-const FOREX_INSTRUMENTS = [
-  { id: 'XAUUSD',  label: 'Gold (XAUUSD)',  pipSize: 0.01,  lotUnits: 100,   pipPerLot: 1.00,  isJpy: false },
-  { id: 'XAGUSD',  label: 'Silver (XAGUSD)',pipSize: 0.001, lotUnits: 5000,  pipPerLot: 5.00,  isJpy: false },
-  { id: 'EURUSD',  label: 'EUR/USD',         pipSize: 0.0001,lotUnits: 100000,pipPerLot: 10.00, isJpy: false },
-  { id: 'GBPUSD',  label: 'GBP/USD',         pipSize: 0.0001,lotUnits: 100000,pipPerLot: 10.00, isJpy: false },
-  { id: 'USDJPY',  label: 'USD/JPY',         pipSize: 0.01,  lotUnits: 100000,pipPerLot: null,  isJpy: true  },
-  { id: 'USDCHF',  label: 'USD/CHF',         pipSize: 0.0001,lotUnits: 100000,pipPerLot: null,  isJpy: false },
-  { id: 'AUDUSD',  label: 'AUD/USD',         pipSize: 0.0001,lotUnits: 100000,pipPerLot: 10.00, isJpy: false },
-  { id: 'NZDUSD',  label: 'NZD/USD',         pipSize: 0.0001,lotUnits: 100000,pipPerLot: 10.00, isJpy: false },
-  { id: 'USDCAD',  label: 'USD/CAD',         pipSize: 0.0001,lotUnits: 100000,pipPerLot: null,  isJpy: false },
-  { id: 'BTCUSD',  label: 'BTC/USD',         pipSize: 1,     lotUnits: 1,     pipPerLot: 1.00,  isJpy: false },
-  { id: 'ETHUSD',  label: 'ETH/USD',         pipSize: 0.01,  lotUnits: 1,     pipPerLot: 0.01,  isJpy: false },
-  { id: 'custom',  label: 'Custom…',          pipSize: null,  lotUnits: null,  pipPerLot: null,  isJpy: false },
-]
-
-function ForexCalculator() {
-  const [instrId,  setInstrId]  = useState('XAUUSD')
-  const [lots,     setLots]     = useState('0.10')
-  const [entryStr, setEntryStr] = useState('')
-  const [slStr,    setSlStr]    = useState('')
-  const [tpStr,    setTpStr]    = useState('')
-  const [capital,  setCapital]  = useState('')
-  const [riskPct,  setRiskPct]  = useState('2')
-  const [customPip,setCustomPip]= useState('')
-  const [customPPL,setCustomPPL]= useState('')
-  const [result,   setResult]   = useState(null)
-  const [err,      setErr]      = useState(null)
-
-  const instr = FOREX_INSTRUMENTS.find(i => i.id === instrId) || FOREX_INSTRUMENTS[0]
-  const pipSize    = instrId === 'custom' ? (parseFloat(customPip) || 0)  : instr.pipSize
-  const pipPerLot  = instrId === 'custom' ? (parseFloat(customPPL) || 0)  : (instr.pipPerLot || 0)
-
-  const calculate = () => {
-    setErr(null)
-    const lotsVal  = parseFloat(lots)  || 0
-    const entry    = parseFloat(entryStr) || 0
-    const sl       = parseFloat(slStr)    || 0
-    const tp       = parseFloat(tpStr)    || 0
-    const cap      = parseFloat(capital)  || 0
-    const riskPctV = parseFloat(riskPct)  || 2
-
-    if (!lotsVal || !entry || !sl) {
-      setErr('Enter lots, entry price, and stop loss.')
-      return
-    }
-    if (pipSize <= 0 || pipPerLot <= 0) {
-      setErr('Invalid pip size or pip value per lot. Check instrument selection.')
-      return
-    }
-
-    const priceDiffSL = Math.abs(entry - sl)
-    const pipsSL      = priceDiffSL / pipSize
-    if (pipsSL < 0.5) {
-      setErr('Stop loss is too close to entry — check price values.')
-      return
-    }
-
-    const dollarRiskPerLot = pipsSL * pipPerLot
-    const totalRisk        = dollarRiskPerLot * lotsVal
-    const pipValueTotal    = pipPerLot * lotsVal  // $ per pip for position
-
-    const priceDiffTP      = tp ? Math.abs(tp - entry) : null
-    const pipsTP           = priceDiffTP ? priceDiffTP / pipSize : null
-    const reward           = pipsTP ? pipsTP * pipPerLot * lotsVal : null
-    const rr               = reward && totalRisk > 0 ? (reward / totalRisk).toFixed(2) : null
-
-    // Suggested lot size based on capital & risk %
-    let suggestedLots = null
-    if (cap > 0 && dollarRiskPerLot > 0) {
-      const maxRiskDollars = cap * riskPctV / 100
-      suggestedLots = (maxRiskDollars / dollarRiskPerLot).toFixed(2)
-    }
-
-    setResult({ pipsSL, pipsTP, totalRisk, pipValueTotal, reward, rr, suggestedLots })
-  }
-
-  const decPrec = instrId === 'USDJPY' || instrId === 'XAGUSD' ? 3 : instrId === 'BTCUSD' ? 1 : instrId === 'XAUUSD' ? 2 : 5
-
-  return (
-    <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
-      {/* Inputs */}
-      <div className="bg-white dark:bg-gray-900 rounded-2xl border border-gray-100 dark:border-gray-800 p-5 space-y-3">
-        <p className="text-[11px] font-semibold uppercase tracking-widest text-gray-400">Forex Lot Size & Pip Calculator</p>
-
-        {/* Instrument */}
-        <div>
-          <label className={LABEL}>Instrument</label>
-          <select value={instrId} onChange={e => setInstrId(e.target.value)} className={INPUT}>
-            {FOREX_INSTRUMENTS.map(i => <option key={i.id} value={i.id}>{i.label}</option>)}
-          </select>
-        </div>
-
-        {/* Custom pip inputs */}
-        {instrId === 'custom' && (
-          <div className="grid grid-cols-2 gap-3">
-            <div>
-              <label className={LABEL}>Pip Size (e.g. 0.0001)</label>
-              <input type="number" step="0.00001" value={customPip} onChange={e => setCustomPip(e.target.value)} placeholder="0.0001" className={INPUT} />
-            </div>
-            <div>
-              <label className={LABEL}>Pip Value / lot ($)</label>
-              <input type="number" step="0.01" value={customPPL} onChange={e => setCustomPPL(e.target.value)} placeholder="10.00" className={INPUT} />
-            </div>
-          </div>
-        )}
-
-        <div className="grid grid-cols-2 gap-3">
-          <div>
-            <label className={LABEL}>Lot Size</label>
-            <input type="number" step="0.01" value={lots} onChange={e => setLots(e.target.value)} placeholder="0.10" className={INPUT} />
-            <p className="text-[9px] text-gray-400 mt-1">Micro=0.01 · Mini=0.1 · Std=1</p>
-          </div>
-          <div>
-            <label className={LABEL}>Risk % (for suggestion)</label>
-            <input type="number" step="0.5" value={riskPct} onChange={e => setRiskPct(e.target.value)} placeholder="2" className={INPUT} />
-          </div>
-        </div>
-
-        <div>
-          <label className={LABEL}>Account Capital ($) <span className="normal-case font-normal text-gray-300">for suggested lot</span></label>
-          <input type="number" value={capital} onChange={e => setCapital(e.target.value)} placeholder="10000" className={INPUT} />
-        </div>
-
-        <div className="grid grid-cols-3 gap-3">
-          <div>
-            <label className={LABEL}>Entry</label>
-            <input type="number" step={pipSize || 0.0001} value={entryStr} onChange={e => setEntryStr(e.target.value)} placeholder={instrId === 'XAUUSD' ? '2300.00' : '1.0850'} className={INPUT} />
-          </div>
-          <div>
-            <label className={LABEL}>Stop Loss</label>
-            <input type="number" step={pipSize || 0.0001} value={slStr} onChange={e => setSlStr(e.target.value)} placeholder={instrId === 'XAUUSD' ? '2280.00' : '1.0800'} className={INPUT} />
-          </div>
-          <div>
-            <label className={LABEL}>Take Profit <span className="normal-case font-normal text-gray-300">opt.</span></label>
-            <input type="number" step={pipSize || 0.0001} value={tpStr} onChange={e => setTpStr(e.target.value)} placeholder={instrId === 'XAUUSD' ? '2340.00' : '1.0950'} className={INPUT} />
-          </div>
-        </div>
-
-        {err && <div className="text-[10px] text-red-500 bg-red-50 dark:bg-red-900/20 rounded-xl px-3 py-2 border border-red-100 dark:border-red-800/50">{err}</div>}
-
-        <button
-          onClick={calculate}
-          disabled={!lots || !entryStr || !slStr}
-          className="w-full bg-purple-600 hover:bg-purple-700 text-white py-2.5 rounded-xl text-[11px] font-semibold disabled:opacity-40 transition-colors"
-        >
-          Calculate
-        </button>
-      </div>
-
-      {/* Results */}
-      <div>
-        {!result ? (
-          <EmptyState text="Enter trade details to calculate pip value and lot risk" />
-        ) : (
-          <div className="bg-white dark:bg-gray-900 rounded-2xl border border-gray-100 dark:border-gray-800 p-5 space-y-4">
-            <div className="grid grid-cols-2 gap-2">
-              <StatCard label="Lot Size" value={`${parseFloat(lots)} lot${parseFloat(lots) !== 1 ? 's' : ''}`} color="text-purple-500" />
-              <StatCard label="Pip Value (pos.)" value={`$${result.pipValueTotal.toFixed(2)} / pip`} color="text-blue-500" />
-              <StatCard label="SL Distance" value={`${result.pipsSL.toFixed(1)} pips`} />
-              <StatCard label="Dollar Risk" value={`-$${result.totalRisk.toFixed(2)}`} color="text-red-400" />
-              {result.pipsTP && <StatCard label="TP Distance" value={`${result.pipsTP.toFixed(1)} pips`} />}
-              {result.reward && <StatCard label="Potential Profit" value={`+$${result.reward.toFixed(2)}`} color="text-emerald-500" />}
-              {result.rr && (
-                <StatCard
-                  label="Risk : Reward"
-                  value={`1 : ${result.rr}`}
-                  color={parseFloat(result.rr) >= 2 ? 'text-emerald-500' : parseFloat(result.rr) >= 1 ? 'text-amber-500' : 'text-red-400'}
-                />
-              )}
-              {result.suggestedLots && (
-                <StatCard
-                  label={`Suggested Lot (${riskPct}% risk)`}
-                  value={`${result.suggestedLots} lots`}
-                  color="text-amber-500"
-                />
-              )}
-            </div>
-
-            {/* Pip value reference */}
-            {instrId !== 'custom' && (
-              <div className="mt-2 bg-gray-50 dark:bg-gray-800/50 rounded-xl p-3 space-y-1">
-                <p className="text-[9px] font-semibold uppercase tracking-widest text-gray-400 mb-1.5">Reference — {instrId}</p>
-                <div className="grid grid-cols-3 gap-2 text-center">
-                  {[
-                    { lot: 0.01, label: 'Micro' },
-                    { lot: 0.10, label: 'Mini'  },
-                    { lot: 1.00, label: 'Std'   },
-                  ].map(({ lot, label }) => (
-                    <div key={label} className="bg-white dark:bg-gray-900 rounded-lg py-2">
-                      <p className="text-[9px] text-gray-400">{label} ({lot})</p>
-                      <p className="text-[11px] font-bold text-gray-800 dark:text-white">
-                        ${(pipPerLot * lot).toFixed(2)}/pip
-                      </p>
-                    </div>
-                  ))}
-                </div>
-                <p className="text-[9px] text-gray-400 text-center pt-1">
-                  {instrId === 'XAUUSD' ? 'Gold: 1 pip = $0.01/oz · 1 std lot = 100oz' :
-                   instrId === 'USDJPY' ? 'JPY pairs: pip value varies with exchange rate' :
-                   'Pip value in USD for USD-quoted pairs'}
-                </p>
-              </div>
-            )}
-          </div>
-        )}
-      </div>
-    </div>
-  )
-}
-
 function PositionCalculator() {
   const [form, setForm] = useState({
     capital: '', riskPct: '2', entryPrice: '', slPrice: '', tpPrice: ''
   })
   const [result, setResult] = useState(null)
-
   const [posErr, setPosErr] = useState(null)
 
   const calculate = () => {
@@ -581,7 +361,6 @@ function PositionCalculator() {
 
     const chartData = []
     for (let r = 0.5; r <= 5; r += 0.5) {
-      // Gain at each R multiple = actual shares * (riskPerShare * r)
       chartData.push({ rr: `1:${r}`, gain: Math.round(riskPerShare * positionSize * r), loss: Math.round(maxLoss) })
     }
 
@@ -660,155 +439,12 @@ function PositionCalculator() {
   )
 }
 
-// ─── PERFORMANCE CALCULATOR ────────────────────────────────
-function PerformanceCalculator() {
-  const [form, setForm] = useState({
-    totalTrades: '', winRate: '', avgWin: '', avgLoss: '', capital: '', riskPct: '2'
-  })
-  const [result, setResult] = useState(null)
-
-  const [perfErr, setPerfErr] = useState(null)
-
-  const calculate = () => {
-    setPerfErr(null)
-    const trades = Math.floor(parseFloat(form.totalTrades) || 0)
-    const wrRaw = parseFloat(form.winRate) || 0
-    const avgWin = parseFloat(form.avgWin) || 0
-    const avgLoss = parseFloat(form.avgLoss) || 0
-    const capital = parseFloat(form.capital) || 0
-    const riskPct = Math.min(Math.max(parseFloat(form.riskPct) / 100 || 0.02, 0.0001), 1)
-    if (!trades || !wrRaw || !avgWin || !avgLoss) return
-
-    if (wrRaw <= 0 || wrRaw >= 100) {
-      setPerfErr('Win rate must be between 1% and 99%.')
-      return
-    }
-    if (avgLoss <= 0) {
-      setPerfErr('Average loss must be greater than 0.')
-      return
-    }
-    if (avgWin <= 0) {
-      setPerfErr('Average win must be greater than 0.')
-      return
-    }
-
-    const wr = wrRaw / 100
-    const expectancy = (wr * avgWin) - ((1 - wr) * avgLoss)
-    const rr = (avgWin / avgLoss).toFixed(2)
-    const wins = Math.round(trades * wr)
-    const losses = Math.max(0, trades - wins)
-    const totalPnl = (wins * avgWin) - (losses * avgLoss)
-    const breakEvenWR = ((avgLoss / (avgWin + avgLoss)) * 100).toFixed(2)
-
-    // Risk of Ruin using Kelly-derived formula: RoR = ((1-edge)/(1+edge))^(1/riskPct)
-    // edge = expectancy / avgWin (fraction of capital edge)
-    const edgeFraction = expectancy > 0 ? expectancy / (avgWin + avgLoss) : 0
-    const ror = edgeFraction > 0
-      ? Math.min(100, Math.max(0, Math.pow((1 - edgeFraction) / (1 + edgeFraction), 1 / riskPct) * 100))
-      : 100
-
-    // Deterministic simulation: alternate wins/losses proportionally for reproducibility
-    const chartData = []
-    let equity = capital || 10000
-    let peak = equity
-    let maxDD = 0
-    const simTrades = Math.min(trades, 50)
-    // Use a deterministic sequence based on win rate pattern instead of Math.random
-    for (let i = 0; i < simTrades; i++) {
-      // Deterministic: treat fractional position in win/loss cycle
-      const cycleLen = 1 / wr
-      const isWin = (i % Math.max(1, Math.round(cycleLen))) < Math.round(cycleLen * wr)
-      equity += isWin ? avgWin : -avgLoss
-      if (equity > peak) peak = equity
-      const dd = peak > 0 ? ((peak - equity) / peak) * 100 : 0
-      if (dd > maxDD) maxDD = dd
-      chartData.push({ trade: i + 1, equity: Math.round(equity), drawdown: parseFloat((-dd).toFixed(2)) })
-    }
-
-    setResult({ expectancy, rr, wins, losses, totalPnl, breakEvenWR, ror, maxDD: maxDD.toFixed(2), chartData })
-  }
-
-  return (
-    <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
-      <div className="bg-white dark:bg-gray-900 rounded-2xl border border-gray-100 dark:border-gray-800 p-5 space-y-3">
-        <p className="text-[11px] font-semibold uppercase tracking-widest text-gray-400">Performance Analytics</p>
-        <div className="grid grid-cols-2 gap-3">
-          <div>
-            <label className={LABEL}>Total Trades</label>
-            <input type="number" value={form.totalTrades} onChange={e => setForm(p => ({ ...p, totalTrades: e.target.value }))} placeholder="50" className={INPUT} />
-          </div>
-          <div>
-            <label className={LABEL}>Win Rate %</label>
-            <input type="number" value={form.winRate} onChange={e => setForm(p => ({ ...p, winRate: e.target.value }))} placeholder="55" className={INPUT} />
-          </div>
-          <div>
-            <label className={LABEL}>Avg Win (Rs.)</label>
-            <input type="number" value={form.avgWin} onChange={e => setForm(p => ({ ...p, avgWin: e.target.value }))} placeholder="1500" className={INPUT} />
-          </div>
-          <div>
-            <label className={LABEL}>Avg Loss (Rs.)</label>
-            <input type="number" value={form.avgLoss} onChange={e => setForm(p => ({ ...p, avgLoss: e.target.value }))} placeholder="800" className={INPUT} />
-          </div>
-          <div>
-            <label className={LABEL}>Capital <span className="normal-case font-normal text-gray-300">opt.</span></label>
-            <input type="number" value={form.capital} onChange={e => setForm(p => ({ ...p, capital: e.target.value }))} placeholder="100000" className={INPUT} />
-          </div>
-          <div>
-            <label className={LABEL}>Risk % per Trade</label>
-            <input type="number" value={form.riskPct} onChange={e => setForm(p => ({ ...p, riskPct: e.target.value }))} placeholder="2" className={INPUT} />
-          </div>
-        </div>
-        {perfErr && (
-          <div className="text-[10px] text-red-500 bg-red-50 dark:bg-red-900/20 rounded-xl px-3 py-2 border border-red-100 dark:border-red-800/50">
-            {perfErr}
-          </div>
-        )}
-        <button onClick={calculate} disabled={!form.totalTrades || !form.winRate || !form.avgWin || !form.avgLoss} className="w-full bg-blue-500 hover:bg-blue-600 text-white py-2.5 rounded-xl text-[11px] font-semibold disabled:opacity-40 transition-colors">
-          Analyze
-        </button>
-      </div>
-
-      <div>
-        {!result ? (
-          <EmptyState text="Enter your trading stats to analyze performance" />
-        ) : (
-          <div className="bg-white dark:bg-gray-900 rounded-2xl border border-gray-100 dark:border-gray-800 p-5 space-y-4">
-            <div className="grid grid-cols-2 gap-2">
-              <StatCard label="Expectancy" value={`${result.expectancy >= 0 ? '+' : ''}Rs.${Math.round(result.expectancy)}`} color={result.expectancy >= 0 ? 'text-emerald-500' : 'text-red-400'} />
-              <StatCard label="Risk:Reward" value={`1:${result.rr}`} color={parseFloat(result.rr) >= 1.5 ? 'text-emerald-500' : 'text-amber-500'} />
-              <StatCard label="Total P&L" value={`${result.totalPnl >= 0 ? '+' : ''}Rs.${Math.round(result.totalPnl).toLocaleString()}`} color={result.totalPnl >= 0 ? 'text-emerald-500' : 'text-red-400'} />
-              <StatCard label="Break-even WR" value={`${result.breakEvenWR}%`} color="text-blue-500" />
-              <StatCard label="Max Drawdown" value={`-${result.maxDD}%`} color="text-red-400" />
-              <StatCard label="Risk of Ruin" value={`${result.ror.toFixed(1)}%`} color={result.ror < 5 ? 'text-emerald-500' : result.ror < 20 ? 'text-amber-500' : 'text-red-400'} />
-              <StatCard label="Wins / Losses" value={`${result.wins} / ${result.losses}`} />
-            </div>
-
-            <div>
-              <p className="text-[9px] font-semibold uppercase tracking-widest text-gray-400 mb-2">Simulated Equity Curve</p>
-              <ResponsiveContainer width="100%" height={140}>
-                <LineChart data={result.chartData} margin={{ top: 0, right: 0, left: -20, bottom: 0 }}>
-                  <CartesianGrid strokeDasharray="3 3" stroke="#f3f4f6" className="dark:stroke-gray-800" />
-                  <XAxis dataKey="trade" tick={{ fontSize: 9 }} tickLine={false} axisLine={false} />
-                  <YAxis tick={{ fontSize: 9 }} tickLine={false} axisLine={false} />
-                  <Tooltip formatter={(val) => `Rs.${val?.toLocaleString?.() ?? val}`} contentStyle={{ fontSize: 11, borderRadius: 8, border: '1px solid #e5e7eb' }} />
-                  <Line type="monotone" dataKey="equity" stroke="#3b82f6" strokeWidth={2} dot={false} name="Equity" />
-                </LineChart>
-              </ResponsiveContainer>
-            </div>
-          </div>
-        )}
-      </div>
-    </div>
-  )
-}
-
 // ─── SIP CALCULATOR ─────────────────────────────────────────
 function SIPCalculator() {
   const [form, setForm] = useState({
     monthly: '', annualReturn: '12', years: '10', initialLump: ''
   })
   const [result, setResult] = useState(null)
-
   const [sipErr, setSipErr] = useState(null)
 
   const calculate = () => {
@@ -921,267 +557,6 @@ function SIPCalculator() {
   )
 }
 
-// ─── MONTE CARLO SIMULATOR ─────────────────────────────────
-const NUM_SIMS   = 1000
-const MC_COLORS  = { p5: '#ef4444', p25: '#f97316', p50: '#3b82f6', p75: '#22c55e', p95: '#8b5cf6' }
-
-function runMonteCarlo({ winRate, avgWin, avgLoss, capital, riskPct, numTrades }) {
-  const riskAmt  = capital * (riskPct / 100)
-  const curves   = []
-
-  for (let s = 0; s < NUM_SIMS; s++) {
-    let eq = capital
-    const curve = [eq]
-    for (let t = 0; t < numTrades; t++) {
-      const win = Math.random() < winRate / 100
-      eq = win ? eq + avgWin * riskAmt : eq - avgLoss * riskAmt
-      if (eq <= 0) { eq = 0 }
-      curve.push(eq)
-    }
-    curves.push(curve)
-  }
-
-  // Build percentile bands per trade step
-  const chartData = []
-  for (let t = 0; t <= numTrades; t++) {
-    const vals = curves.map(c => c[t]).sort((a, b) => a - b)
-    const pct  = (p) => vals[Math.floor(p * (NUM_SIMS - 1))]
-    chartData.push({
-      trade: t,
-      p5:   Math.round(pct(0.05)),
-      p25:  Math.round(pct(0.25)),
-      p50:  Math.round(pct(0.50)),
-      p75:  Math.round(pct(0.75)),
-      p95:  Math.round(pct(0.95)),
-    })
-  }
-
-  // Max drawdown per simulation
-  const drawdowns = curves.map(curve => {
-    let peak = curve[0], maxDD = 0
-    for (const v of curve) {
-      if (v > peak) peak = v
-      const dd = peak > 0 ? (peak - v) / peak * 100 : 0
-      if (dd > maxDD) maxDD = dd
-    }
-    return maxDD
-  })
-  drawdowns.sort((a, b) => a - b)
-
-  const pctD = (p) => drawdowns[Math.floor(p * (NUM_SIMS - 1))]
-  const ruinCount = curves.filter(c => c[c.length - 1] <= 0).length
-
-  const finalVals = curves.map(c => c[c.length - 1]).sort((a, b) => a - b)
-  const pctF = (p) => finalVals[Math.floor(p * (NUM_SIMS - 1))]
-
-  return {
-    chartData,
-    finalP50:   Math.round(pctF(0.50)),
-    finalP5:    Math.round(pctF(0.05)),
-    finalP95:   Math.round(pctF(0.95)),
-    medianDD:   pctD(0.50).toFixed(1),
-    worstDD:    pctD(0.95).toFixed(1),
-    ruinPct:    ((ruinCount / NUM_SIMS) * 100).toFixed(1),
-    medianReturn: (((pctF(0.50) - capital) / capital) * 100).toFixed(1),
-  }
-}
-
-// Drawdown distribution histogram (bucket into 10 bins)
-function ddHistogram(results) {
-  if (!results) return []
-  const max = parseFloat(results.worstDD)
-  const step = max / 10 || 10
-  const bins = Array.from({ length: 10 }, (_, i) => ({
-    range: `${(i * step).toFixed(0)}–${((i + 1) * step).toFixed(0)}%`,
-    count: 0,
-  }))
-  // Re-run just enough to get distribution — use chartData endpoint values as proxy
-  return bins
-}
-
-function MonteCarloSimulator() {
-  const [form, setForm] = useState({
-    winRate:   55,
-    avgWin:    1.5,
-    avgLoss:   1.0,
-    capital:   100000,
-    riskPct:   2,
-    numTrades: 100,
-  })
-  const [results, setResults] = useState(null)
-  const [running, setRunning] = useState(false)
-
-  const set = (k) => (e) => setForm(p => ({ ...p, [k]: parseFloat(e.target.value) || 0 }))
-
-  const run = useCallback(() => {
-    setRunning(true)
-    // Defer to next frame so button re-renders before heavy computation
-    setTimeout(() => {
-      try {
-        const r = runMonteCarlo(form)
-        setResults(r)
-      } finally {
-        setRunning(false)
-      }
-    }, 50)
-  }, [form])
-
-  const expectancy = ((form.winRate / 100) * form.avgWin - (1 - form.winRate / 100) * form.avgLoss).toFixed(3)
-  const isPositive = parseFloat(expectancy) > 0
-
-  const fmtRs = (v) => `Rs.${Number(v).toLocaleString()}`
-
-  return (
-    <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
-      {/* Left: Inputs */}
-      <div className="lg:col-span-1 space-y-4">
-        <div className="bg-white dark:bg-gray-900 rounded-2xl border border-gray-100 dark:border-gray-800 p-4 space-y-3">
-          <p className="text-[11px] font-semibold text-gray-700 dark:text-gray-200">Simulation Inputs</p>
-
-          <div>
-            <label className={LABEL}>Win Rate (%)</label>
-            <input type="number" min="1" max="99" value={form.winRate} onChange={set('winRate')} className={INPUT} />
-          </div>
-          <div className="grid grid-cols-2 gap-2">
-            <div>
-              <label className={LABEL}>Avg Win (R)</label>
-              <input type="number" min="0.1" step="0.1" value={form.avgWin} onChange={set('avgWin')} className={INPUT} />
-            </div>
-            <div>
-              <label className={LABEL}>Avg Loss (R)</label>
-              <input type="number" min="0.1" step="0.1" value={form.avgLoss} onChange={set('avgLoss')} className={INPUT} />
-            </div>
-          </div>
-          <div>
-            <label className={LABEL}>Starting Capital (Rs.)</label>
-            <input type="number" min="1000" step="1000" value={form.capital} onChange={set('capital')} className={INPUT} />
-          </div>
-          <div>
-            <label className={LABEL}>Risk Per Trade (%)</label>
-            <input type="number" min="0.1" max="20" step="0.1" value={form.riskPct} onChange={set('riskPct')} className={INPUT} />
-          </div>
-          <div>
-            <label className={LABEL}>Number of Trades</label>
-            <input type="number" min="10" max="500" step="10" value={form.numTrades} onChange={set('numTrades')} className={INPUT} />
-          </div>
-
-          {/* Expectancy preview */}
-          <div className={`rounded-xl px-3 py-2.5 border text-[11px] ${isPositive ? 'bg-emerald-50 dark:bg-emerald-900/20 border-emerald-200 dark:border-emerald-800/50' : 'bg-red-50 dark:bg-red-900/20 border-red-200 dark:border-red-800/50'}`}>
-            <span className="text-gray-500 dark:text-gray-400">Expectancy: </span>
-            <span className={`font-bold ${isPositive ? 'text-emerald-600 dark:text-emerald-400' : 'text-red-600 dark:text-red-400'}`}>{expectancy}R</span>
-            <span className="text-gray-400 text-[9px] ml-1">per trade</span>
-          </div>
-
-          <button
-            onClick={run}
-            disabled={running || !isPositive && form.winRate < 1}
-            className="w-full py-2.5 bg-violet-600 text-white text-[11px] font-bold rounded-xl hover:bg-violet-700 disabled:opacity-60 transition-colors"
-          >
-            {running ? 'Running 1,000 simulations…' : 'Run Monte Carlo'}
-          </button>
-        </div>
-
-        {/* Key stats */}
-        {results && (
-          <div className="bg-white dark:bg-gray-900 rounded-2xl border border-gray-100 dark:border-gray-800 p-4 space-y-3">
-            <p className="text-[11px] font-semibold text-gray-700 dark:text-gray-200">Results ({NUM_SIMS.toLocaleString()} sims)</p>
-            <div className="grid grid-cols-2 gap-2">
-              <StatCard label="Median Final Equity"  value={fmtRs(results.finalP50)} color={results.finalP50 >= form.capital ? 'text-emerald-500' : 'text-red-500'} />
-              <StatCard label="Median Return"        value={`${results.medianReturn >= 0 ? '+' : ''}${results.medianReturn}%`} color={results.medianReturn >= 0 ? 'text-emerald-500' : 'text-red-500'} />
-              <StatCard label="Best 5% Outcome"      value={fmtRs(results.finalP95)} color="text-violet-500" />
-              <StatCard label="Worst 5% Outcome"     value={fmtRs(results.finalP5)}  color="text-red-500" />
-              <StatCard label="Median Max Drawdown"  value={`${results.medianDD}%`}  color="text-amber-500" />
-              <StatCard label="Worst-case Drawdown"  value={`${results.worstDD}%`}   color="text-red-500" />
-            </div>
-            <div className={`rounded-xl px-3 py-2.5 border text-center ${
-              parseFloat(results.ruinPct) < 1
-                ? 'bg-emerald-50 dark:bg-emerald-900/20 border-emerald-200 dark:border-emerald-800/50'
-                : parseFloat(results.ruinPct) < 5
-                  ? 'bg-amber-50 dark:bg-amber-900/20 border-amber-200 dark:border-amber-800/50'
-                  : 'bg-red-50 dark:bg-red-900/20 border-red-200 dark:border-red-800/50'
-            }`}>
-              <p className="text-[9px] text-gray-400 uppercase tracking-widest">Ruin Probability</p>
-              <p className={`text-[18px] font-bold mt-0.5 ${
-                parseFloat(results.ruinPct) < 1 ? 'text-emerald-500' : parseFloat(results.ruinPct) < 5 ? 'text-amber-500' : 'text-red-500'
-              }`}>{results.ruinPct}%</p>
-              <p className="text-[9px] text-gray-400 mt-0.5">of simulations ended at Rs.0</p>
-            </div>
-          </div>
-        )}
-      </div>
-
-      {/* Right: Chart */}
-      <div className="lg:col-span-2 space-y-4">
-        {!results ? (
-          <EmptyState text="Set your parameters and click Run Monte Carlo to see 1,000 equity curve simulations" />
-        ) : (
-          <>
-            <div className="bg-white dark:bg-gray-900 rounded-2xl border border-gray-100 dark:border-gray-800 p-4">
-              <div className="flex items-center justify-between mb-3">
-                <p className="text-[11px] font-semibold text-gray-700 dark:text-gray-200">Equity Curve Percentile Bands</p>
-                <div className="flex items-center gap-3">
-                  {[
-                    { label: 'Best 5%',   color: MC_COLORS.p95 },
-                    { label: '75th pct',  color: MC_COLORS.p75 },
-                    { label: 'Median',    color: MC_COLORS.p50 },
-                    { label: '25th pct',  color: MC_COLORS.p25 },
-                    { label: 'Worst 5%',  color: MC_COLORS.p5  },
-                  ].map(l => (
-                    <div key={l.label} className="flex items-center gap-1">
-                      <span className="w-2 h-2 rounded-full flex-shrink-0" style={{ background: l.color }} />
-                      <span className="text-[9px] text-gray-400">{l.label}</span>
-                    </div>
-                  ))}
-                </div>
-              </div>
-              <ResponsiveContainer width="100%" height={280}>
-                <LineChart data={results.chartData} margin={{ top: 4, right: 8, left: 8, bottom: 0 }}>
-                  <CartesianGrid strokeDasharray="3 3" stroke="#f0f0f0" />
-                  <XAxis dataKey="trade" tick={{ fontSize: 9 }} label={{ value: 'Trade #', position: 'insideBottom', offset: -2, fontSize: 9 }} />
-                  <YAxis tick={{ fontSize: 9 }} tickFormatter={v => `${(v / 1000).toFixed(0)}k`} width={42} />
-                  <Tooltip
-                    formatter={(v, name) => [`Rs.${Number(v).toLocaleString()}`, name]}
-                    labelFormatter={l => `Trade ${l}`}
-                    contentStyle={{ fontSize: 10 }}
-                  />
-                  <Line type="monotone" dataKey="p95" stroke={MC_COLORS.p95} dot={false} strokeWidth={1.5} name="Best 5%" />
-                  <Line type="monotone" dataKey="p75" stroke={MC_COLORS.p75} dot={false} strokeWidth={1.5} name="75th pct" />
-                  <Line type="monotone" dataKey="p50" stroke={MC_COLORS.p50} dot={false} strokeWidth={2}   name="Median" strokeDasharray="none" />
-                  <Line type="monotone" dataKey="p25" stroke={MC_COLORS.p25} dot={false} strokeWidth={1.5} name="25th pct" />
-                  <Line type="monotone" dataKey="p5"  stroke={MC_COLORS.p5}  dot={false} strokeWidth={1.5} name="Worst 5%" />
-                </LineChart>
-              </ResponsiveContainer>
-            </div>
-
-            {/* Risk per trade guidance */}
-            <div className="bg-white dark:bg-gray-900 rounded-2xl border border-gray-100 dark:border-gray-800 p-4">
-              <p className="text-[11px] font-semibold text-gray-700 dark:text-gray-200 mb-3">Risk Per Trade Sensitivity</p>
-              <div className="grid grid-cols-4 gap-2">
-                {[0.5, 1, 2, 3].map(r => {
-                  const q = runMonteCarlo({ ...form, riskPct: r })
-                  const ret = parseFloat(q.medianReturn)
-                  return (
-                    <div key={r} className={`rounded-xl border p-3 text-center ${r === form.riskPct ? 'border-violet-400 dark:border-violet-600 bg-violet-50 dark:bg-violet-900/20' : 'border-gray-100 dark:border-gray-800'}`}>
-                      <p className="text-[9px] text-gray-400 uppercase tracking-widest">{r}% risk</p>
-                      <p className={`text-[12px] font-bold mt-1 ${ret >= 0 ? 'text-emerald-500' : 'text-red-500'}`}>{ret >= 0 ? '+' : ''}{ret}%</p>
-                      <p className="text-[9px] text-gray-400 mt-0.5">median</p>
-                      <p className="text-[9px] text-red-400 mt-0.5">{q.worstDD}% DD</p>
-                    </div>
-                  )
-                })}
-              </div>
-              <p className="text-[9px] text-gray-400 mt-3 leading-relaxed">
-                Higher risk-per-trade amplifies both gains and drawdowns. The recommended range for most traders is 1–2% per trade.
-                Ruin probability rises sharply above 3% in negative expectancy conditions.
-              </p>
-            </div>
-          </>
-        )}
-      </div>
-    </div>
-  )
-}
-
 // ─── MAIN PAGE ─────────────────────────────────────────────
 function RiskLabPage() {
   const [activeTab, setActiveTab] = useState('nepse')
@@ -1219,12 +594,9 @@ function RiskLabPage() {
       </div>
 
       {/* Content */}
-      {activeTab === 'nepse'       && <NEPSECalculator />}
-      {activeTab === 'forex'       && <ForexCalculator />}
-      {activeTab === 'position'    && <PositionCalculator />}
-      {activeTab === 'performance' && <PerformanceCalculator />}
-      {activeTab === 'sip'         && <SIPCalculator />}
-      {activeTab === 'montecarlo'  && <MonteCarloSimulator />}
+      {activeTab === 'nepse'    && <NEPSECalculator />}
+      {activeTab === 'position' && <PositionCalculator />}
+      {activeTab === 'sip'      && <SIPCalculator />}
 
     </div>
   )

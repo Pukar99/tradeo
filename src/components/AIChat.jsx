@@ -1195,11 +1195,10 @@ function AIChat({ isFullPage = false, onClose }) {
     }
   }
 
-  // Save journal draft — routes through the agent so it hits the correct trade_journal table
+  // Save journal draft — routes through ADD_JOURNAL agent action, saves as notes on the trade_log action row
   const handleJournalSave = async (symbol, content) => {
     setJournalDraft(null)
     setLastAction(null)
-    // Send as an ADD_JOURNAL agent message — agent will insert into trade_journal with content field
     await handleSend(`Add journal note for ${symbol}: ${content}`)
   }
 

@@ -66,14 +66,33 @@ function DimBar({ label, score, extra }) {
 function DisciplineScore({ initData }) {
   const [data, setData] = useState(initData || null)
   const [loading, setLoading] = useState(!initData)
+  const [error, setError] = useState(null)
+
+  const load = () => {
+    setLoading(true)
+    setError(null)
+    getDiscipline()
+      .then(res => setData(res.data))
+      .catch(err => setError(err?.message || 'Failed to load'))
+      .finally(() => setLoading(false))
+  }
 
   useEffect(() => {
     if (initData) { setData(initData); setLoading(false); return }
-    getDiscipline()
-      .then(res => setData(res.data))
-      .catch(console.error)
-      .finally(() => setLoading(false))
+    load()
   }, [initData]) // re-sync when parent passes fresh data
+
+  if (error) return (
+    <div className="bg-white dark:bg-gray-900 rounded-2xl border border-gray-100 dark:border-gray-800 p-4 flex flex-col items-center justify-center gap-3 min-h-[120px]">
+      <p className="text-[11px] text-red-400">{error}</p>
+      <button
+        onClick={load}
+        className="text-[11px] px-3 py-1 rounded-lg bg-gray-100 dark:bg-gray-800 text-gray-600 dark:text-gray-300 hover:bg-gray-200 dark:hover:bg-gray-700 transition-colors"
+      >
+        Retry
+      </button>
+    </div>
+  )
 
   if (loading) return (
     <div className="bg-white dark:bg-gray-900 rounded-2xl border border-gray-100 dark:border-gray-800 p-4 space-y-3 animate-pulse">
