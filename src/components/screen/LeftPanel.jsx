@@ -262,15 +262,16 @@ export default function LeftPanel() {
   useEffect(() => { loadWatchlist() }, []) // eslint-disable-line react-hooks/exhaustive-deps
   useChatRefresh(['trades', 'watchlist'], loadData)
 
-  // Within 2% of SL or TP — single batch request, only when the SL/TP position IDs change
-  const alertKeyRef = useRef('')
+  // Stable string key for SL/TP alert positions — prevents new array reference from re-triggering the effect
+  const alertPositionsKey = useMemo(
+    () => positions.filter(p => p.sl || p.tp).map(p => `${p.id}:${p.sl}:${p.tp}`).sort().join(','),
+    [positions]
+  )
+
+  // Within 2% of SL or TP — single batch request, only when positions-with-alerts actually change
   useEffect(() => {
     const withAlerts = positions.filter(p => p.sl || p.tp)
-    if (!withAlerts.length) { alertKeyRef.current = ''; setAlertPositions([]); return }
-    // Stable key: sorted ids — avoid re-fetching when array reference changes but data didn't
-    const key = withAlerts.map(p => p.id).sort().join(',')
-    if (key === alertKeyRef.current) return
-    alertKeyRef.current = key
+    if (!withAlerts.length) { setAlertPositions([]); return }
     let cancelled = false
     const symbols = [...new Set(withAlerts.map(p => p.symbol))]
     getBatchPrices(symbols)
@@ -296,7 +297,7 @@ export default function LeftPanel() {
       })
       .catch(() => {})
     return () => { cancelled = true }
-  }, [positions])
+  }, [alertPositionsKey]) // eslint-disable-line react-hooks/exhaustive-deps
 
   const canTrade = !isIndex()
   const { onContextMenu, ContextMenuPortal } = useContextMenu()
@@ -534,7 +535,7 @@ export default function LeftPanel() {
         <CloseConfirm
           position={closeTarget}
           onClose={() => setCloseTarget(null)}
-          onDone={() => loadTrades()}
+          onDone={() => loadData()}
         />
       )}
 
