@@ -1,5 +1,6 @@
 import { useState, useEffect, useCallback, useRef } from 'react'
-import { getPositions, newPosition, closePosition, getWatchlist, removeFromWatchlist, updateWatchlist, getBatchPrices } from '../../api'
+import { newPosition, closePosition, getWatchlist, removeFromWatchlist, updateWatchlist } from '../../api'
+import { getBatchPrices } from '../../utils/globalCache'
 import { useContextMenu } from '../ContextMenu'
 import { useChatRefresh, dispatchChatAction } from '../../utils/chatEvents'
 import { useScreen } from '../../context/ScreenContext'
@@ -222,8 +223,22 @@ function EditWatchItemForm({ item, onClose, onSaved }) {
 // ── Main ──────────────────────────────────────────────────────────────────────
 
 export default function LeftPanel() {
-  const { selectedSymbol, selectSymbol, isIndex } = useScreen()
-  const [positions, setPositions] = useState([])
+  const { selectedSymbol, selectSymbol, isIndex, sharedPositions, refreshPositions } = useScreen()
+
+  // Derive mapped positions from shared context — no independent getPositions() call
+  const positions = (sharedPositions || [])
+    .filter(p => p.status === 'OPEN' || p.status === 'PARTIAL')
+    .map(p => ({
+      id:                 p.trade_id,
+      symbol:             p.symbol,
+      position:           p.direction,
+      remaining_quantity: parseFloat(p.total_qty) || 0,
+      entry_price:        p.wacc,
+      sl:                 p.sl,
+      tp:                 p.tp,
+      status:             p.status,
+    }))
+
   const [watchlist,     setWatchlist]     = useState([])
   const [pendingDelete, setPendingDelete] = useState(null) // watchlist item id awaiting confirm
   const [tab,       setTab]       = useState('portfolio')
@@ -235,35 +250,16 @@ export default function LeftPanel() {
   const [alertPositions, setAlertPositions] = useState([])
   const [editWatchItem,  setEditWatchItem]  = useState(null)
 
-  const loadTrades = useCallback(() => {
-    getPositions()
-      .then(r => setPositions(
-        (r.data || [])
-          .filter(p => p.status === 'OPEN' || p.status === 'PARTIAL')
-          .map(p => ({
-            id:                 p.trade_id,
-            symbol:             p.symbol,
-            position:           p.direction,
-            remaining_quantity: parseFloat(p.total_qty) || 0,
-            entry_price:        p.wacc,
-            sl:                 p.sl,
-            tp:                 p.tp,
-            status:             p.status,
-          }))
-      ))
-      .catch(() => {})
-  }, [])
-
   const loadWatchlist = useCallback(() => {
     getWatchlist()
       .then(r => setWatchlist((r.data || []).filter(w => w.category === 'active' || w.category === 'pre' || w.category === 'pre-watch')))
       .catch(() => {})
   }, [])
 
-  // Load both in parallel — used on mount and chat refresh
-  const loadData = useCallback(() => { loadTrades(); loadWatchlist() }, [loadTrades, loadWatchlist])
+  // After trade write, refresh both shared positions and local watchlist
+  const loadData = useCallback(() => { refreshPositions(); loadWatchlist() }, [refreshPositions, loadWatchlist])
 
-  useEffect(() => { loadData() }, []) // eslint-disable-line react-hooks/exhaustive-deps
+  useEffect(() => { loadWatchlist() }, []) // eslint-disable-line react-hooks/exhaustive-deps
   useChatRefresh(['trades', 'watchlist'], loadData)
 
   // Within 2% of SL or TP — single batch request, only when the SL/TP position IDs change

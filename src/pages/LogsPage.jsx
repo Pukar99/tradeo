@@ -1,13 +1,22 @@
-import { useState, useEffect, useCallback, useMemo } from 'react'
+import { useState, useEffect, useCallback, useMemo, lazy, Suspense } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { useAuth } from '../context/AuthContext'
-import { getPositions, getBatchPrices, getMarketJournals, autoCreateMarketJournal } from '../api'
+import { getPositions, getMarketJournals, autoCreateMarketJournal } from '../api'
+import { getBatchPrices } from '../utils/globalCache'
 import { useChatRefresh } from '../utils/chatEvents'
 import { clearEligibilityCache } from '../utils/globalCache'
 
 import TradeActionsTab  from '../components/logs/TradeActionsTab'
-import AuditTab         from '../components/logs/AuditTab'
-import MarketJournalTab from '../components/logs/MarketJournalTab'
+const AuditTab         = lazy(() => import('../components/logs/AuditTab'))
+const MarketJournalTab = lazy(() => import('../components/logs/MarketJournalTab'))
+
+function TabSpinner() {
+  return (
+    <div className="flex items-center justify-center py-16">
+      <div className="w-6 h-6 border-2 border-blue-500 border-t-transparent rounded-full animate-spin" />
+    </div>
+  )
+}
 
 const TABS = [
   { key: 'trades', label: 'Trades' },
@@ -123,11 +132,40 @@ export default function LogsPage() {
   )
 
   if (loading) return (
-    <div className="w-full px-6 py-6 flex items-center justify-center min-h-64">
-      <div className="text-center">
-        <div className="w-8 h-8 border-2 border-blue-500 border-t-transparent rounded-full animate-spin mx-auto mb-3" />
-        <p className="text-xs text-gray-400">Loading positions…</p>
+    <div className="w-full px-3 sm:px-5 pt-4 sm:pt-5 pb-16 max-w-7xl mx-auto animate-pulse">
+      {/* toolbar row 1 */}
+      <div className="flex items-center gap-2 mb-2">
+        <div className="h-8 w-56 bg-gray-100 dark:bg-gray-800 rounded-xl" />
+        <div className="flex-1" />
+        <div className="h-8 w-24 bg-gray-100 dark:bg-gray-800 rounded-xl" />
       </div>
+      {/* toolbar row 2 */}
+      <div className="flex items-center gap-2 mb-5">
+        <div className="h-7 w-52 bg-gray-100 dark:bg-gray-800 rounded-lg" />
+        <div className="h-7 w-24 bg-gray-100 dark:bg-gray-800 rounded-lg" />
+        <div className="h-7 w-36 bg-gray-100 dark:bg-gray-800 rounded-lg" />
+      </div>
+      {/* position rows */}
+      {[1, 2, 3].map(i => (
+        <div key={i} className="mb-3 bg-white dark:bg-gray-900 border border-gray-100 dark:border-gray-800 rounded-2xl p-4">
+          <div className="flex items-center justify-between mb-3">
+            <div className="flex items-center gap-3">
+              <div className="h-4 w-16 bg-gray-100 dark:bg-gray-800 rounded" />
+              <div className="h-4 w-10 bg-gray-100 dark:bg-gray-800 rounded-full" />
+              <div className="h-4 w-12 bg-gray-100 dark:bg-gray-800 rounded-full" />
+            </div>
+            <div className="h-6 w-20 bg-gray-100 dark:bg-gray-800 rounded-lg" />
+          </div>
+          <div className="grid grid-cols-4 gap-3">
+            {[1, 2, 3, 4].map(j => (
+              <div key={j}>
+                <div className="h-3 w-12 bg-gray-100 dark:bg-gray-800 rounded mb-1" />
+                <div className="h-4 w-16 bg-gray-100 dark:bg-gray-800 rounded" />
+              </div>
+            ))}
+          </div>
+        </div>
+      ))}
     </div>
   )
 
@@ -247,13 +285,19 @@ export default function LogsPage() {
         />
       )}
       {activeTab === 'market' && (
-        <MarketJournalTab
-          view={view}
-          marketJournals={marketJournals}
-          onMarketJournalSaved={handleMarketJournalSaved}
-        />
+        <Suspense fallback={<TabSpinner />}>
+          <MarketJournalTab
+            view={view}
+            marketJournals={marketJournals}
+            onMarketJournalSaved={handleMarketJournalSaved}
+          />
+        </Suspense>
       )}
-      {activeTab === 'audit'  && <AuditTab />}
+      {activeTab === 'audit'  && (
+        <Suspense fallback={<TabSpinner />}>
+          <AuditTab />
+        </Suspense>
+      )}
       {activeTab === 'stats'  && (
         <div className="flex items-center justify-center min-h-48 text-gray-400 dark:text-gray-500 text-sm">
           Stats tab — coming soon

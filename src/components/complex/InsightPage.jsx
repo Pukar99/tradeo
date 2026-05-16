@@ -1,6 +1,7 @@
 import { useState, useCallback, useRef, useEffect, useMemo } from 'react'
-import { createChart, CrosshairMode } from 'lightweight-charts'
 import { useTheme } from '../../context/ThemeContext'
+
+async function loadLC() { return import('lightweight-charts') }
 import { getMonthlyReturns, getMonthDetail, getSectorMonth, getSectorMonthStocks } from '../../api/index'
 import { apiError } from '../../utils/format'
 import { INDEX_OPTIONS, RECENT_N, MONTHS as MONTHS_EN } from '../../utils/constants'
@@ -327,6 +328,9 @@ function MonthChart({ candles, dark }) {
   useEffect(() => {
     const el = ref.current
     if (!el || !candles?.length) return
+    let cancelled = false
+    loadLC().then(({ createChart, CrosshairMode }) => {
+    if (cancelled || !ref.current) return
 
     const chart = createChart(el, {
       width:  el.clientWidth  || 400,
@@ -396,7 +400,8 @@ function MonthChart({ candles, dark }) {
         cRef.current.applyOptions({ width: ref.current.clientWidth, height: ref.current.clientHeight })
     })
     ro.observe(el)
-    return () => { ro.disconnect(); chart.remove(); cRef.current = null }
+    }) // end loadLC().then
+    return () => { cancelled = true; cRef.current?.remove(); cRef.current = null }
   }, [candles, dark])
 
   return <div ref={ref} className="w-full h-full" />

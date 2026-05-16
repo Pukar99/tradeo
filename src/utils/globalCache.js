@@ -65,6 +65,7 @@ export const TTL = {
 import { getMarketSymbols as _getMarketSymbols } from '../api'
 import { getProfile       as _getProfile       } from '../api'
 import { getResearchEligibility as _getResearchEligibility } from '../api'
+import { getBatchPrices   as _getBatchPrices   } from '../api'
 
 export async function getMarketSymbols() {
   const cached = gCache.get('symbols')
@@ -92,12 +93,38 @@ export async function getResearchEligibility() {
   return result
 }
 
+// Batch prices — keyed by sorted symbol list so different symbol sets get independent cache entries.
+// 5-min TTL — prices are end-of-day on NEPSE; stale within a session is acceptable.
+// Invalidate on logout via clearUserCache() (delPrefix 'prices:').
+export async function getBatchPrices(symbols) {
+  const key = 'prices:' + [...symbols].sort().join(',')
+  const cached = gCache.get(key)
+  if (cached !== undefined) return cached
+  const result = await _getBatchPrices(symbols)
+  gCache.set(key, result, TTL.PRICES)
+  return result
+}
+
+// Dashboard init — cached 1 min client-side so navigating back to / is instant.
+// Backend also has 60s initCache, so double-caching is intentional (saves the RTT).
+// Pass force=true to bypass cache (e.g. after a trade write).
+export async function getDashboardInit(fetchFn, force = false) {
+  if (!force) {
+    const cached = gCache.get('dashboard')
+    if (cached !== undefined) return cached
+  }
+  const result = await fetchFn()
+  gCache.set('dashboard', result, TTL.DASHBOARD)
+  return result
+}
+
 // Call this on login/logout to reset user-specific caches
 export function clearUserCache() {
   gCache.del('profile')
   gCache.del('dashboard')
   gCache.del('eligibility')
   gCache.delPrefix('tradelog')
+  gCache.delPrefix('prices:')
 }
 
 // Call after closing a trade so the eligibility re-check picks up the new stats

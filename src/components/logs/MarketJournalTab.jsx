@@ -2,6 +2,7 @@ import { useState, useMemo, useEffect, useRef } from 'react'
 import { useTheme } from '../../context/ThemeContext'
 import { getIndexChart } from '../../api'
 import MarketJournalModal from './MarketJournalModal'
+import { safeUrl } from '../../utils/format'
 
 // ── Module-level chart cache (shared across all cards, 5-min TTL) ─────────────
 const _chartCache = new Map()
@@ -588,7 +589,7 @@ function EntryCard({ entry, news, onOpen }) {
                 {news.map((item, i) => (
                   <a
                     key={i}
-                    href={item.url}
+                    href={safeUrl(item.url)}
                     target="_blank"
                     rel="noopener noreferrer"
                     onClick={e => e.stopPropagation()}

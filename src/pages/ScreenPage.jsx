@@ -1,14 +1,23 @@
-import { useState, useEffect } from 'react'
+import { useState, useEffect, lazy, Suspense } from 'react'
 import { ScreenProvider }       from '../context/ScreenContext'
 import { ComplexTabProvider }   from '../hooks/useComplexTab.jsx'
 import StockChart               from '../components/screen/StockChart'
 import MarketStatusBadge        from '../components/screen/MarketStatusBadge'
 import LeftPanel                from '../components/screen/LeftPanel'
 import RightPanel               from '../components/screen/RightPanel'
-import BacktestPage             from '../components/backtest/BacktestPage'
-import ReplayPage               from '../components/screen/ReplayPage'
 import ErrorBoundary            from '../components/ErrorBoundary'
 import ComingSoon               from '../components/ComingSoon'
+
+const BacktestPage = lazy(() => import('../components/backtest/BacktestPage'))
+const ReplayPage   = lazy(() => import('../components/screen/ReplayPage'))
+
+function TabSpinner() {
+  return (
+    <div className="flex-1 flex items-center justify-center">
+      <div className="w-6 h-6 border-2 border-blue-500 border-t-transparent rounded-full animate-spin" />
+    </div>
+  )
+}
 
 // ── Tab definitions ──────────────────────────────────────────────────────────
 
@@ -69,14 +78,18 @@ function SimpleContent({ activeTab, mobilePanel, setMobilePanel }) {
 
 function ComplexContent({ activeTab }) {
   if (activeTab === 'Backtesting') return (
-    <ErrorBoundary label="Backtesting">
-      <BacktestPage />
-    </ErrorBoundary>
+    <Suspense fallback={<TabSpinner />}>
+      <ErrorBoundary label="Backtesting">
+        <BacktestPage />
+      </ErrorBoundary>
+    </Suspense>
   )
   if (activeTab === 'Replay') return (
-    <ErrorBoundary label="Replay">
-      <ReplayPage />
-    </ErrorBoundary>
+    <Suspense fallback={<TabSpinner />}>
+      <ErrorBoundary label="Replay">
+        <ReplayPage />
+      </ErrorBoundary>
+    </Suspense>
   )
   if (activeTab === 'StrategyLab') return <ComingSoon compact label="Strategy Lab — automated strategy testing" />
   return (

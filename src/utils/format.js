@@ -1,5 +1,5 @@
 // ── Shared number / string formatting utilities ────────────────────────────────
-// Used by: BacktestReport, BacktestActivePanel, BacktestControls, InsightPage, BreakdownPage, AuditTab, PortfolioPage, PerformanceDashboard, RiskLabPage
+// Used by: BacktestReport, BacktestActivePanel, BacktestControls, InsightPage, BreakdownPage, AuditTab, PortfolioPage, RiskLabPage
 
 // ── NEPSE Equity broker commission (SEBON-regulated, effective 2024) ──────────
 // Source: SEBON official fee schedule

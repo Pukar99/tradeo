@@ -12,6 +12,7 @@ import { useCreateBlockNote } from '@blocknote/react'
 import { BlockNoteView } from '@blocknote/mantine'
 import '@blocknote/core/fonts/inter.css'
 import '@blocknote/mantine/style.css'
+import { safeUrl } from '../utils/format'
 
 function ResearchEditorPage() {
   const { user } = useAuth()
@@ -314,7 +315,7 @@ function ResearchEditorPage() {
                 </div>
                 <div className="flex items-center gap-2">
                   <a
-                    href={pdfUrl}
+                    href={safeUrl(pdfUrl)}
                     target="_blank"
                     rel="noopener noreferrer"
                     className="text-xs text-blue-600 hover:underline"

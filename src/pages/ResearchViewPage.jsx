@@ -12,6 +12,7 @@ import {
 } from '../api'
 import { useCreateBlockNote } from '@blocknote/react'
 import { BlockNoteView } from '@blocknote/mantine'
+import { safeUrl } from '../utils/format'
 import '@blocknote/core/fonts/inter.css'
 import '@blocknote/mantine/style.css'
 
@@ -286,7 +287,7 @@ function ResearchViewPage() {
                 </div>
               </div>
               <a
-                href={post.pdf_url}
+                href={safeUrl(post.pdf_url)}
                 target="_blank"
                 rel="noopener noreferrer"
                 className="bg-blue-600 text-white px-4 py-1.5 rounded-xl text-xs font-medium hover:bg-blue-700 transition-colors"

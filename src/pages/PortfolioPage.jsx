@@ -2,7 +2,8 @@ import { useState, useEffect, useCallback, useMemo } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { useAuth } from '../context/AuthContext'
 import { useLanguage } from '../context/LanguageContext'
-import { getPositions, getTradeActions, getBatchPrices } from '../api'
+import { getPositions, getTradeActions } from '../api'
+import { getBatchPrices } from '../utils/globalCache'
 import { useChatRefresh } from '../utils/chatEvents'
 import {
   PieChart, Pie, Cell, Tooltip, ResponsiveContainer,
@@ -829,10 +830,48 @@ function PortfolioPage() {
   )
 
   if (loading) return (
-    <div className="max-w-7xl mx-auto px-6 py-6 flex items-center justify-center min-h-64">
-      <div className="text-center">
-        <div className="w-8 h-8 border-2 border-blue-400 border-t-transparent rounded-full animate-spin mx-auto mb-3" />
-        <p className="text-[11px] text-gray-400">Loading portfolio…</p>
+    <div className="max-w-7xl mx-auto px-3 sm:px-4 lg:px-6 pt-3 sm:pt-4 lg:pt-5 pb-14 space-y-4 animate-pulse">
+      {/* header */}
+      <div className="flex items-center justify-between">
+        <div className="space-y-1.5">
+          <div className="h-5 w-24 bg-gray-100 dark:bg-gray-800 rounded" />
+          <div className="h-3 w-40 bg-gray-100 dark:bg-gray-800 rounded" />
+        </div>
+        <div className="h-8 w-24 bg-gray-100 dark:bg-gray-800 rounded-xl" />
+      </div>
+      {/* row 1: pie + 3 stat cards */}
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
+        <div className="bg-white dark:bg-gray-900 border border-gray-100 dark:border-gray-800 rounded-2xl p-4 flex items-center justify-center">
+          <div className="w-36 h-36 rounded-full bg-gray-100 dark:bg-gray-800" />
+        </div>
+        <div className="lg:col-span-2 grid grid-cols-1 sm:grid-cols-3 gap-3">
+          {[1, 2, 3].map(i => (
+            <div key={i} className="bg-white dark:bg-gray-900 border border-gray-100 dark:border-gray-800 rounded-2xl p-4 space-y-3">
+              <div className="h-3 w-20 bg-gray-100 dark:bg-gray-800 rounded" />
+              <div className="h-6 w-28 bg-gray-100 dark:bg-gray-800 rounded" />
+              <div className="h-3 w-16 bg-gray-100 dark:bg-gray-800 rounded" />
+            </div>
+          ))}
+        </div>
+      </div>
+      {/* row 2: positions table header + rows */}
+      <div className="bg-white dark:bg-gray-900 border border-gray-100 dark:border-gray-800 rounded-2xl overflow-hidden">
+        <div className="px-4 py-3 border-b border-gray-100 dark:border-gray-800 flex gap-2">
+          <div className="h-4 w-32 bg-gray-100 dark:bg-gray-800 rounded" />
+          <div className="flex-1" />
+          <div className="h-7 w-24 bg-gray-100 dark:bg-gray-800 rounded-lg" />
+        </div>
+        {[1, 2, 3, 4].map(i => (
+          <div key={i} className="flex items-center gap-4 px-4 py-3 border-b border-gray-50 dark:border-gray-800/60 last:border-0">
+            <div className="w-8 h-8 rounded-lg bg-gray-100 dark:bg-gray-800 shrink-0" />
+            <div className="flex-1 space-y-1.5">
+              <div className="h-3.5 w-16 bg-gray-100 dark:bg-gray-800 rounded" />
+              <div className="h-3 w-24 bg-gray-100 dark:bg-gray-800 rounded" />
+            </div>
+            <div className="h-4 w-20 bg-gray-100 dark:bg-gray-800 rounded" />
+            <div className="h-6 w-16 bg-gray-100 dark:bg-gray-800 rounded-lg hidden sm:block" />
+          </div>
+        ))}
       </div>
     </div>
   )

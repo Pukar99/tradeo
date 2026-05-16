@@ -870,8 +870,9 @@ export default function StockChart() {
   const atrRef     = useRef(null)
   const chartsRef  = useRef({})
   const seriesRef  = useRef({})
-  const moversCache    = useRef({})
-  const pendingHover   = useRef(null)
+  const moversCache      = useRef({})
+  const pendingHover     = useRef(null)
+  const lastFetchedDate  = useRef(null)   // prevents duplicate fetch for the same candle date
   const pinnedDateRef  = useRef(pinnedDate)
 
   // Drawing tools — persisted to localStorage keyed by symbol:timeframe
@@ -974,6 +975,7 @@ export default function StockChart() {
   // Fetch chart data — with client-side cache to avoid redundant server hits
   useEffect(() => {
     setError(null); setTooltip(null); setOverlayData(null)
+    lastFetchedDate.current = null   // reset date guard on every symbol/timeframe change
 
     const cacheKey = isIndex()
       ? `idx:${selectedIndexId}:${timeframe}`
@@ -1230,8 +1232,9 @@ export default function StockChart() {
 
       if (markers.length) priceSeries.setMarkers(markers)
 
-      // Crosshair events — movers fetch only for index charts, not stock charts
-      const indexView = isIndex?.()
+      // Crosshair events — movers fetch only for NEPSE index charts, never for stock symbols.
+      // isIndex() is called inside each handler (not captured at build time) so switching
+      // symbol→index or index→symbol always evaluates the current state.
       main.subscribeCrosshairMove(param => {
         if (pinnedDateRef.current) return
         if (cancelled) return
@@ -1240,11 +1243,16 @@ export default function StockChart() {
         if (!bar) return
         setTooltip({ ...bar, time: param.time, change: changeMap[param.time] })
 
-        if (!indexView) return
-        // Debounce movers fetch
+        if (!isIndex?.()) return
+        // Skip if already fetched/fetching this exact date — prevents duplicate network calls
+        // when the cursor lingers on the same candle across multiple crosshair move events
+        if (param.time === lastFetchedDate.current) return
+        // Debounce: only fire after cursor settles for 80ms on the candle
         if (pendingHover.current) clearTimeout(pendingHover.current)
         pendingHover.current = setTimeout(async () => {
           if (cancelled || pinnedDateRef.current) return
+          if (param.time === lastFetchedDate.current) return
+          lastFetchedDate.current = param.time
           const movers = await getMovers(param.time)
           if (cancelled || pinnedDateRef.current) return
           setOverlayData({ date: param.time, movers, pinned: false })
@@ -1259,8 +1267,9 @@ export default function StockChart() {
         if (!bar) return
         setTooltip({ ...bar, time: param.time, change: changeMap[param.time] })
 
-        if (!indexView) return
+        if (!isIndex?.()) return
         if (pendingHover.current) { clearTimeout(pendingHover.current); pendingHover.current = null }
+        lastFetchedDate.current = param.time
         const movers = await getMovers(param.time)
         if (cancelled) return
         setOverlayData({ date: param.time, movers, pinned: true })

@@ -215,10 +215,44 @@ function ProfilePage() {
   }
 
   if (loading) return (
-    <div className="w-full px-3 sm:px-6 py-6 flex items-center justify-center min-h-64">
-      <div className="text-center">
-        <div className="w-10 h-10 border-4 border-blue-500 border-t-transparent rounded-full animate-spin mx-auto mb-3" />
-        <p className="text-gray-400 text-sm">Loading profile...</p>
+    <div className="w-full px-3 sm:px-6 pt-4 sm:pt-6 pb-10 max-w-5xl mx-auto animate-pulse">
+      {/* hero banner */}
+      <div className="bg-gray-900 rounded-2xl overflow-hidden mb-6 p-4 sm:p-8">
+        <div className="flex items-start justify-between flex-wrap gap-4">
+          <div className="flex items-center gap-4 sm:gap-6">
+            <div className="w-16 h-16 sm:w-24 sm:h-24 rounded-2xl bg-gray-700" />
+            <div className="space-y-2.5">
+              <div className="h-5 w-32 bg-gray-700 rounded" />
+              <div className="h-3 w-24 bg-gray-700 rounded" />
+              <div className="h-3 w-20 bg-gray-700 rounded" />
+            </div>
+          </div>
+          <div className="h-8 w-20 bg-gray-700 rounded-xl" />
+        </div>
+        {/* stat bar */}
+        <div className="mt-6 grid grid-cols-2 sm:grid-cols-4 gap-3">
+          {[1, 2, 3, 4].map(i => (
+            <div key={i} className="bg-gray-800 rounded-xl p-3 space-y-1.5">
+              <div className="h-5 w-14 bg-gray-700 rounded" />
+              <div className="h-3 w-16 bg-gray-700 rounded" />
+            </div>
+          ))}
+        </div>
+      </div>
+      {/* tab strip */}
+      <div className="flex gap-1 mb-6">
+        {[1, 2, 3].map(i => (
+          <div key={i} className="h-8 w-24 bg-gray-100 dark:bg-gray-800 rounded-lg" />
+        ))}
+      </div>
+      {/* stat cards grid */}
+      <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+        {[1, 2, 3, 4, 5, 6, 7, 8].map(i => (
+          <div key={i} className="bg-gray-50 dark:bg-gray-700 rounded-xl p-4 space-y-2">
+            <div className="h-5 w-16 bg-gray-200 dark:bg-gray-600 rounded mx-auto" />
+            <div className="h-3 w-20 bg-gray-200 dark:bg-gray-600 rounded mx-auto" />
+          </div>
+        ))}
       </div>
     </div>
   )

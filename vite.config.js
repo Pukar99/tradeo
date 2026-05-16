@@ -33,13 +33,14 @@ export default defineConfig({
           'vendor-react':     ['react', 'react-dom', 'react-router-dom'],
           'vendor-blocknote': ['@blocknote/core', '@blocknote/react', '@blocknote/mantine'],
           'vendor-chart':     ['recharts'],
+          'vendor-lc':        ['lightweight-charts'],
           'vendor-axios':     ['axios'],
         },
       },
     },
   },
   optimizeDeps: {
-    include: ['html2canvas'],
+    // html2canvas is dynamically imported (AuditTab screenshot only) — no pre-bundling needed
   },
   // Faster HMR in dev
   server: {

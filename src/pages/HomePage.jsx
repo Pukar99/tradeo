@@ -9,9 +9,10 @@ import { Link, useNavigate } from 'react-router-dom'
 import { useState, useEffect, useCallback, useRef } from 'react'
 import NEPSEChart from '../components/NEPSEChart'
 import {
-  getDashboardInit, getStockPrice,
+  getDashboardInit as _getDashboardInit, getStockPrice,
   addToWatchlist, removeFromWatchlist,
 } from '../api'
+import { getDashboardInit } from '../utils/globalCache'
 
 const MOTIVATIONAL_QUOTES = [
   "The market is a device for transferring money from the impatient to the patient.",
@@ -1068,17 +1069,10 @@ function LoggedInHome() {
     setDashData({ openPositions, perfStats })
   }, [])
 
-  // Module-level cache so navigating away and back within 60s skips the refetch
+  // gCache-backed fetch — survives navigate-away-and-back within 60s TTL
   const fetchDashboard = useCallback(async (force = false) => {
-    const CACHE_TTL = 60_000
-    const cache = fetchDashboard._cache
-    if (!force && cache && Date.now() - cache.ts < CACHE_TTL) {
-      setInitData(cache.data)
-      return
-    }
     try {
-      const res = await getDashboardInit()
-      fetchDashboard._cache = { data: res.data, ts: Date.now() }
+      const res = await getDashboardInit(() => _getDashboardInit(), force)
       setInitData(res.data)
     } catch (err) {
       console.error(err)

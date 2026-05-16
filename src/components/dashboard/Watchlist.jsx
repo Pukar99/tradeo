@@ -5,9 +5,9 @@ import {
   updateWatchlist,
   removeFromWatchlist,
   getStockPrice,
-  getBatchPrices,
   getPositions
 } from '../../api'
+import { getBatchPrices } from '../../utils/globalCache'
 import { useContextMenu } from '../ContextMenu'
 import { useChatRefresh } from '../../utils/chatEvents'
 

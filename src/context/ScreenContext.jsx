@@ -1,5 +1,6 @@
-import { createContext, useContext, useState, useCallback, useEffect } from 'react'
+import { createContext, useContext, useState, useCallback, useEffect, useRef } from 'react'
 import { useLocation } from 'react-router-dom'
+import { getPositions } from '../api'
 
 const ScreenContext = createContext(null)
 
@@ -17,6 +18,23 @@ export function ScreenProvider({ children }) {
   const [pinnedDate,    setPinnedDate]    = useState(null)  // null = not pinned
   const [hoveredMovers, setHoveredMovers] = useState(null)  // { gainers, losers }
   const [pinnedMovers,  setPinnedMovers]  = useState(null)
+
+  // ── Shared positions — fetched once, consumed by LeftPanel + any future ScreenPage component ──
+  // Raw position_view rows — each consumer does its own field mapping.
+  const [sharedPositions,    setSharedPositions]    = useState([])
+  const [positionsLoading,   setPositionsLoading]   = useState(true)
+  const positionsFetchedRef  = useRef(false)
+
+  const refreshPositions = useCallback(() => {
+    setPositionsLoading(true)
+    getPositions()
+      .then(r => { setSharedPositions(r.data || []); positionsFetchedRef.current = true })
+      .catch(() => {})
+      .finally(() => setPositionsLoading(false))
+  }, [])
+
+  // Fetch once on mount — all three consumers share this result
+  useEffect(() => { refreshPositions() }, [refreshPositions])
 
   // Active positions array — supports multiple entries for same symbol
   // Each: { id, entry_price, sl, tp, position, quantity }
@@ -108,6 +126,8 @@ export function ScreenProvider({ children }) {
       activePositions,
       // backwards-compat: components that read activePosition get the first entry
       activePosition: activePositions?.[0] ?? null,
+      // Shared positions — one fetch for all ScreenPage consumers
+      sharedPositions, positionsLoading, refreshPositions,
     }}>
       {children}
     </ScreenContext.Provider>
