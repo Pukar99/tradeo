@@ -108,9 +108,10 @@ export function useContextMenu() {
 
   const ContextMenuPortal = useCallback(() => {
     if (!menu) return null
+    const target = document.getElementById('portal-root') || document.body
     return createPortal(
       <Menu x={menu.x} y={menu.y} items={menu.items} onClose={close} />,
-      document.body
+      target
     )
   }, [menu, close])
 

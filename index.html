@@ -75,11 +75,13 @@
       gtObserver.observe(document.documentElement, { childList: true, subtree: true })
     </script>
   </head>
-  <body>
+  <body translate="no">
     <!-- Google Translate mount — kept in DOM but hidden off-screen -->
     <div id="google_translate_element"></div>
 
     <div id="root" translate="no"></div>
+    <!-- Portal target for modals/menus — outside #root but still translate=no -->
+    <div id="portal-root" translate="no"></div>
     <script type="module" src="/src/main.jsx"></script>
   </body>
 </html>
