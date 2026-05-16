@@ -136,7 +136,7 @@ function Navbar() {
   const firstName = displayName.split(/\s+/)[0]
 
   return (
-    <nav className="glass-bar px-4 lg:px-6 py-0 flex justify-between items-center sticky top-0 z-40">
+    <nav className="glass-bar px-4 lg:px-6 py-0 flex justify-between items-center sticky top-0 z-50">
 
       {/* ── Left: Logo + Desktop nav links ─────────────────────────────────── */}
       <div className="flex items-center gap-6">
@@ -236,7 +236,7 @@ function Navbar() {
             {dropdownOpen && (
               <div
                 role="menu"
-                className="absolute right-0 top-full mt-2 w-52 bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-700 rounded-xl shadow-lg overflow-hidden z-50"
+                className="absolute right-0 top-full mt-2 w-52 bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-700 rounded-xl shadow-lg overflow-hidden z-[60]"
               >
                 <div className="px-4 py-3 border-b border-gray-100 dark:border-gray-700">
                   <p className="text-sm font-semibold text-gray-900 dark:text-white truncate">
@@ -316,7 +316,7 @@ function Navbar() {
 
       {/* ── Mobile menu drawer ──────────────────────────────────────────────── */}
       {mobileMenuOpen && (
-        <div className="lg:hidden absolute top-full left-0 right-0 bg-white dark:bg-gray-950 border-b border-gray-200 dark:border-gray-800 shadow-lg z-40">
+        <div className="lg:hidden absolute top-full left-0 right-0 bg-white dark:bg-gray-950 border-b border-gray-200 dark:border-gray-800 shadow-lg z-50">
           <div className="px-4 py-2 space-y-0.5">
             {NAV_LINKS.map(link => (
               <Link

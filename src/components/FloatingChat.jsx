@@ -139,7 +139,7 @@ function FloatingChat() {
       {/* ── Open panel ── */}
       {isOpen && (
         <div
-          className="fixed z-50 glass-panel rounded-2xl overflow-hidden flex flex-col"
+          className="fixed z-[60] glass-panel rounded-2xl overflow-hidden flex flex-col"
           style={{
             left: Math.max(EDGE_PAD, panelX),
             top: panelY,
@@ -205,7 +205,7 @@ function FloatingChat() {
       {/* ── FAB button ── */}
       <div
         ref={fabRef}
-        className="fixed z-50"
+        className="fixed z-[60]"
         style={{ left: pos.x, top: pos.y, width: BUTTON_SIZE, height: BUTTON_SIZE }}
         onMouseDown={onMouseDown}
         onTouchStart={onTouchStart}
