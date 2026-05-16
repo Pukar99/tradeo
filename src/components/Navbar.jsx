@@ -37,44 +37,14 @@ function getInitials(name) {
 function Navbar() {
   const { user, logout } = useAuth()
   const { isDark, toggleTheme } = useTheme()
-  const { t } = useLanguage()
+  const { t, isNepali, toggleLang } = useLanguage()
   const location = useLocation()
   const navigate = useNavigate()
 
-  // ── Google Translate cookie toggle ─────────────────────────────────────────
-  const getCookieLang = () => {
-    try {
-      const match = document.cookie.match(/googtrans=\/en\/(\w+)/)
-      return match ? match[1] : 'en'
-    } catch {
-      return 'en'
-    }
-  }
-
-  const [isNepali, setIsNepali] = useState(() => getCookieLang() === 'ne')
   const [dropdownOpen, setDropdownOpen] = useState(false)
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false)
   const [avatarError, setAvatarError] = useState(false)
   const dropdownRef = useRef(null)
-
-  const setGoogTransCookie = (lang) => {
-    const value = lang === 'en' ? '/en/en' : '/en/ne'
-    // Include max-age so the preference persists across sessions (1 year)
-    const maxAge = 'max-age=31536000; SameSite=Lax'
-    document.cookie = `googtrans=${value}; path=/; ${maxAge}`
-    document.cookie = `googtrans=${value}; domain=${window.location.hostname}; path=/; ${maxAge}`
-  }
-
-  const toggleGoogleTranslate = () => {
-    if (isNepali) {
-      setGoogTransCookie('en')
-      setIsNepali(false)
-    } else {
-      setGoogTransCookie('ne')
-      setIsNepali(true)
-    }
-    window.location.reload()
-  }
 
   // ── Nav links ───────────────────────────────────────────────────────────────
   const NAV_LINKS = [
@@ -171,9 +141,9 @@ function Navbar() {
       {/* ── Right: Controls ────────────────────────────────────────────────── */}
       <div className="flex items-center gap-2">
 
-        {/* Language toggle — small indicator */}
+        {/* Language toggle */}
         <button
-          onClick={toggleGoogleTranslate}
+          onClick={toggleLang}
           className="flex items-center gap-1 px-2 py-1 rounded-lg text-xs text-gray-500 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors"
           title={isNepali ? 'Switch to English' : 'नेपालीमा हेर्नुस्'}
           aria-label={isNepali ? 'Switch to English' : 'Switch to Nepali'}

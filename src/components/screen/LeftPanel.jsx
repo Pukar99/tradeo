@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback, useRef } from 'react'
+import { useState, useEffect, useCallback, useRef, useMemo } from 'react'
 import { newPosition, closePosition, getWatchlist, removeFromWatchlist, updateWatchlist } from '../../api'
 import { getBatchPrices } from '../../utils/globalCache'
 import { useContextMenu } from '../ContextMenu'
@@ -226,7 +226,7 @@ export default function LeftPanel() {
   const { selectedSymbol, selectSymbol, isIndex, sharedPositions, refreshPositions } = useScreen()
 
   // Derive mapped positions from shared context — no independent getPositions() call
-  const positions = (sharedPositions || [])
+  const positions = useMemo(() => (sharedPositions || [])
     .filter(p => p.status === 'OPEN' || p.status === 'PARTIAL')
     .map(p => ({
       id:                 p.trade_id,
@@ -237,7 +237,7 @@ export default function LeftPanel() {
       sl:                 p.sl,
       tp:                 p.tp,
       status:             p.status,
-    }))
+    })), [sharedPositions])
 
   const [watchlist,     setWatchlist]     = useState([])
   const [pendingDelete, setPendingDelete] = useState(null) // watchlist item id awaiting confirm
@@ -527,7 +527,7 @@ export default function LeftPanel() {
           side={tradeModal}
           symbol={selectedSymbol}
           onClose={() => setTradeModal(null)}
-          onSaved={() => loadTrades()}
+          onSaved={() => loadData()}
         />
       )}
       {closeTarget && (
