@@ -344,8 +344,8 @@ function MonthChart({ candles, dark }) {
       },
       watermark: { visible: false },
       grid: {
-        vertLines: { color: dark ? '#1e293b' : '#f1f5f9' },
-        horzLines: { color: dark ? '#1e293b' : '#f1f5f9' },
+        vertLines: { color: 'transparent' },
+        horzLines: { color: 'transparent' },
       },
       crosshair:       { mode: CrosshairMode.Normal },
       rightPriceScale: { borderColor: dark ? '#334155' : '#e2e8f0', minimumWidth: 50 },

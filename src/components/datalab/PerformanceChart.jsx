@@ -163,7 +163,7 @@ const MiniCandle = forwardRef(function MiniCandle({ data, height = 360 }, fwdRef
         width: w, height,
         attributionLogo: false,
         layout:    { background: { color: bg }, textColor: tx, fontSize: 10 },
-        grid:      { vertLines: { color: 'transparent' }, horzLines: { color: br } },
+        grid:      { vertLines: { color: 'transparent' }, horzLines: { color: 'transparent' } },
         crosshair: {
           mode: 1,
           vertLine: { color: isDark ? '#475569' : '#94a3b8', width: 1, style: 3, labelVisible: true },

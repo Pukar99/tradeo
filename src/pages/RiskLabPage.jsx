@@ -416,7 +416,6 @@ function PositionCalculator() {
               <p className="text-[9px] font-semibold uppercase tracking-widest text-gray-400 mb-2">Gain vs Risk at Different R:R</p>
               <ResponsiveContainer width="100%" height={140}>
                 <BarChart data={result.chartData} margin={{ top: 0, right: 0, left: -20, bottom: 0 }}>
-                  <CartesianGrid strokeDasharray="3 3" stroke="#f3f4f6" className="dark:stroke-gray-800" />
                   <XAxis dataKey="rr" tick={{ fontSize: 9 }} tickLine={false} axisLine={false} />
                   <YAxis tick={{ fontSize: 9 }} tickLine={false} axisLine={false} />
                   <Tooltip formatter={(val) => `Rs.${val.toLocaleString()}`} contentStyle={{ fontSize: 11, borderRadius: 8, border: '1px solid #e5e7eb' }} />
@@ -533,7 +532,6 @@ function SIPCalculator() {
               <p className="text-[9px] font-semibold uppercase tracking-widest text-gray-400 mb-2">Growth Projection</p>
               <ResponsiveContainer width="100%" height={160}>
                 <LineChart data={result.chartData} margin={{ top: 0, right: 0, left: -10, bottom: 0 }}>
-                  <CartesianGrid strokeDasharray="3 3" stroke="#f3f4f6" className="dark:stroke-gray-800" />
                   <XAxis dataKey="year" tick={{ fontSize: 9 }} tickLine={false} axisLine={false} />
                   <YAxis tick={{ fontSize: 9 }} tickLine={false} axisLine={false} tickFormatter={v => `${Math.round(v/1000)}K`} />
                   <Tooltip formatter={(val) => `Rs.${val.toLocaleString()}`} contentStyle={{ fontSize: 11, borderRadius: 8, border: '1px solid #e5e7eb' }} />

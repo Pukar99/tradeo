@@ -153,12 +153,12 @@ export default function BacktestChart({ candles, cursorIndex, positions }) {
         width:  el.offsetWidth  || 800,
         height: el.offsetHeight || 500,
         layout: {
-          background: { color: dark ? '#030712' : '#ffffff' },
+          background: { color: 'transparent' },
           textColor:  dark ? '#9ca3af' : '#374151',
         },
         grid: {
-          vertLines: { color: dark ? '#111827' : '#f3f4f6' },
-          horzLines: { color: dark ? '#111827' : '#f3f4f6' },
+          vertLines: { color: 'transparent' },
+          horzLines: { color: 'transparent' },
         },
         crosshair: { mode: 1 },
         rightPriceScale: { borderColor: dark ? '#1f2937' : '#e5e7eb' },

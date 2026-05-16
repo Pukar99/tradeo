@@ -227,12 +227,12 @@ function NEPSEChart({ fixed = false }) {
           width:  chartContainerRef.current.clientWidth || 800,
           height: 350,
           layout: {
-            background: { color: isDark ? '#1f2937' : '#ffffff' },
+            background: { color: isDark ? '#111827' : '#ffffff' },
             textColor:  isDark ? '#d1d5db' : '#374151',
           },
           grid: {
-            vertLines: { color: isDark ? '#374151' : '#f3f4f6' },
-            horzLines: { color: isDark ? '#374151' : '#f3f4f6' },
+            vertLines: { color: 'transparent' },
+            horzLines: { color: 'transparent' },
           },
           rightPriceScale: { borderColor: isDark ? '#4b5563' : '#e5e7eb' },
           timeScale:        { borderColor: isDark ? '#4b5563' : '#e5e7eb' },

@@ -564,7 +564,6 @@ function DrawdownWidget({ equityCurve, currentDrawdown, maxDrawdown, peakEquity,
                   <stop offset="95%" stopColor={currentEquity >= 0 ? '#10b981' : '#ef4444'} stopOpacity={0} />
                 </linearGradient>
               </defs>
-              <CartesianGrid strokeDasharray="3 3" stroke="#f0f0f0" vertical={false} />
               <XAxis dataKey="date" tick={{ fontSize: 8 }} tickLine={false} axisLine={false}
                 tickFormatter={d => d.slice(5)} interval="preserveStartEnd" />
               <YAxis tick={{ fontSize: 8 }} tickLine={false} axisLine={false} width={48}
@@ -588,7 +587,6 @@ function DrawdownWidget({ equityCurve, currentDrawdown, maxDrawdown, peakEquity,
                   <stop offset="95%" stopColor="#ef4444" stopOpacity={0} />
                 </linearGradient>
               </defs>
-              <CartesianGrid strokeDasharray="3 3" stroke="#f0f0f0" vertical={false} />
               <XAxis dataKey="date" tick={{ fontSize: 8 }} tickLine={false} axisLine={false}
                 tickFormatter={d => d.slice(5)} interval="preserveStartEnd" />
               <YAxis tick={{ fontSize: 8 }} tickLine={false} axisLine={false} width={36}
