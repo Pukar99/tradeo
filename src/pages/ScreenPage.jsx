@@ -8,6 +8,7 @@ import RightPanel               from '../components/screen/RightPanel'
 import BacktestPage             from '../components/backtest/BacktestPage'
 import ReplayPage               from '../components/screen/ReplayPage'
 import ErrorBoundary            from '../components/ErrorBoundary'
+import ComingSoon               from '../components/ComingSoon'
 
 // ── Tab definitions ──────────────────────────────────────────────────────────
 
@@ -24,30 +25,13 @@ const COMPLEX_TABS = [
   { id: 'StrategyLab',  label: 'Strategy Lab',   short: 'Strat' },
 ]
 
-// ── Coming soon placeholder ──────────────────────────────────────────────────
-
-function ComingSoon({ label }) {
-  return (
-    <div className="flex-1 flex flex-col items-center justify-center gap-2 text-center px-6">
-      <div className="w-10 h-10 rounded-full bg-gray-100 dark:bg-gray-800 flex items-center justify-center">
-        <svg className="w-5 h-5 text-gray-400" viewBox="0 0 24 24" fill="none"
-          stroke="currentColor" strokeWidth={1.8} strokeLinecap="round" strokeLinejoin="round">
-          <circle cx="12" cy="12" r="10" />
-          <path d="M12 8v4l3 3" />
-        </svg>
-      </div>
-      <p className="text-[13px] font-semibold text-gray-600 dark:text-gray-300">{label}</p>
-      <p className="text-[11px] text-gray-400 dark:text-gray-500">Coming soon</p>
-    </div>
-  )
-}
 
 // ── Simple mode content ──────────────────────────────────────────────────────
 
 function SimpleContent({ activeTab, mobilePanel, setMobilePanel }) {
-  if (activeTab === 'MultiChart') return <ComingSoon label="MultiChart — coming soon" />
-  if (activeTab === 'SMC')        return <ComingSoon label="SMC — coming soon" />
-  if (activeTab === 'PriceAction') return <ComingSoon label="Price Action — coming soon" />
+  if (activeTab === 'MultiChart') return <ComingSoon compact label="MultiChart — coming soon" />
+  if (activeTab === 'SMC')        return <ComingSoon compact label="SMC — coming soon" />
+  if (activeTab === 'PriceAction') return <ComingSoon compact label="Price Action — coming soon" />
 
   // General — chart + panels layout
   return (
@@ -94,7 +78,7 @@ function ComplexContent({ activeTab }) {
       <ReplayPage />
     </ErrorBoundary>
   )
-  if (activeTab === 'StrategyLab') return <ComingSoon label="Strategy Lab — automated strategy testing" />
+  if (activeTab === 'StrategyLab') return <ComingSoon compact label="Strategy Lab — automated strategy testing" />
   return (
     <div className="flex-1 flex items-center justify-center text-[12px] text-gray-400">
       {activeTab} — coming soon

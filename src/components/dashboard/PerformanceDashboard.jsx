@@ -34,7 +34,7 @@ function PerformanceDashboard() {
       setTrades(posData)
 
       const open   = posData.filter(t => t.status === 'OPEN' || t.status === 'PARTIAL')
-      const closed = posData.filter(t => t.status === 'CLOSED')
+      const closed = posData.filter(t => t.status === 'CLOSED' || t.status === 'PARTIAL')
 
       let openWithPrices = open.map(t => ({ ...t, currentPrice: null }))
       if (open.length > 0) {
@@ -94,7 +94,7 @@ function PerformanceDashboard() {
 
     const totalPnl = realizedPnl + unrealizedPnl
     const pnlPct = totalInvested > 0
-      ? ((unrealizedPnl / totalInvested) * 100).toFixed(2)
+      ? ((totalPnl / totalInvested) * 100).toFixed(2)
       : '0.00'
 
     const profitableTrades = closedTrades.filter(t => (t.realized_pnl || 0) > 0).length
@@ -119,7 +119,7 @@ function PerformanceDashboard() {
 
   const buildEquityCurve = (tradeData, openWithPrices) => {
     const closed = tradeData
-      .filter(t => t.status === 'CLOSED')
+      .filter(t => t.status === 'CLOSED' || t.status === 'PARTIAL')
       .sort((a, b) => new Date(a.date) - new Date(b.date))
 
     if (!closed.length) return

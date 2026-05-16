@@ -1,5 +1,21 @@
 // ── Shared number / string formatting utilities ────────────────────────────────
-// Used by: BacktestReport, BacktestActivePanel, BacktestControls, InsightPage, BreakdownPage
+// Used by: BacktestReport, BacktestActivePanel, BacktestControls, InsightPage, BreakdownPage, AuditTab, PortfolioPage, PerformanceDashboard
+
+/**
+ * Format a number as Nepali Rupees (rounded integer, no decimals).
+ * fmtRs(12345.6) → 'Rs.12,346'  |  fmtRs(-500) → 'Rs.500' (absolute)
+ * Use signCls() separately for color.
+ */
+export const fmtRs = (n) => `Rs.${Math.abs(Math.round(parseFloat(n) || 0)).toLocaleString()}`
+
+/**
+ * Format with explicit sign prefix.
+ * fmtRsSigned(1200) → '+Rs.1,200'  |  fmtRsSigned(-800) → '-Rs.800'
+ */
+export const fmtRsSigned = (n) => {
+  const v = parseFloat(n) || 0
+  return `${v >= 0 ? '+' : '-'}Rs.${Math.abs(Math.round(v)).toLocaleString()}`
+}
 
 /**
  * Format a number as compact Nepali Rupees with 2 decimal places.

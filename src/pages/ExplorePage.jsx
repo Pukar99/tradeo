@@ -1,6 +1,7 @@
 import { useState, Suspense, lazy, useEffect } from 'react'
 import { useParams, useNavigate } from 'react-router-dom'
 import ErrorBoundary from '../components/ErrorBoundary'
+import ComingSoon from '../components/ComingSoon'
 
 const IPOPage      = lazy(() => import('./IPOPage'))
 const ResearchPage = lazy(() => import('./ResearchPage'))
@@ -55,27 +56,6 @@ const TABS = [
 ]
 
 const VALID_IDS = new Set(TABS.map(t => t.id))
-
-// ── Coming soon placeholder ───────────────────────────────────────────────────
-function ComingSoon({ label, desc }) {
-  return (
-    <div className="flex flex-col items-center justify-center gap-3 text-center px-6 py-20">
-      <div className="w-12 h-12 rounded-2xl bg-gray-100 dark:bg-gray-800 flex items-center justify-center">
-        <svg className="w-6 h-6 text-gray-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-          <circle cx="12" cy="12" r="10" />
-          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M12 8v4l3 3" />
-        </svg>
-      </div>
-      <div>
-        <p className="text-sm font-bold text-gray-700 dark:text-gray-200">{label}</p>
-        <p className="text-xs text-gray-400 mt-1 max-w-xs">{desc}</p>
-      </div>
-      <span className="text-[10px] font-semibold px-2.5 py-1 rounded-full bg-blue-100 dark:bg-blue-900/30 text-blue-600 dark:text-blue-400">
-        Coming Soon
-      </span>
-    </div>
-  )
-}
 
 // ── ExplorePage ───────────────────────────────────────────────────────────────
 // Design decisions:

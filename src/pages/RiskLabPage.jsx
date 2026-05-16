@@ -467,10 +467,10 @@ function SIPCalculator() {
     const rate = annualReturnPct / 100 / 12
     const months = years * 12
 
-    // Guard against rate = 0 (0% annual return): simple sum, no compounding
+    // Standard SIP — ordinary annuity (payments at end of each period)
     const sipValue = rate === 0
       ? monthly * months
-      : monthly * ((Math.pow(1 + rate, months) - 1) / rate) * (1 + rate)
+      : monthly * ((Math.pow(1 + rate, months) - 1) / rate)
 
     const annualRate = annualReturnPct / 100
     const lumpValue = lump * Math.pow(1 + annualRate, years)
@@ -484,7 +484,7 @@ function SIPCalculator() {
       const m = y * 12
       const sv = rate === 0
         ? monthly * m
-        : monthly * ((Math.pow(1 + rate, m) - 1) / rate) * (1 + rate)
+        : monthly * ((Math.pow(1 + rate, m) - 1) / rate)
       const lv = lump * Math.pow(1 + annualRate, y)
       chartData.push({ year: `Yr ${y}`, invested: Math.round(monthly * m + lump), value: Math.round(sv + lv) })
     }

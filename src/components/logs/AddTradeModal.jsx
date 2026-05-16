@@ -294,7 +294,7 @@ export default function AddTradeModal({ onClose, onSaved, existingPosition }) {
       <div className="w-full max-w-lg bg-white dark:bg-gray-950 rounded-2xl shadow-2xl border border-gray-100 dark:border-gray-800 max-h-[92vh] flex flex-col">
 
         {/* header */}
-        <div className="flex items-center justify-between px-6 py-4 border-b border-gray-100 dark:border-gray-800">
+        <div className="flex items-center justify-between px-4 sm:px-6 py-4 border-b border-gray-100 dark:border-gray-800">
           <div>
             <h2 className="text-[15px] font-bold text-gray-900 dark:text-gray-100">
               {isAddMode ? `Add to ${conflict.symbol}` : 'New Trade'}
@@ -338,7 +338,7 @@ export default function AddTradeModal({ onClose, onSaved, existingPosition }) {
         )}
 
         {/* scrollable body */}
-        <form onSubmit={handleSubmit} className="overflow-y-auto flex-1 px-6 py-5 space-y-5">
+        <form onSubmit={handleSubmit} className="overflow-y-auto flex-1 px-4 sm:px-6 py-5 space-y-5">
 
           {/* ── REQUIRED SECTION ── */}
           <section>

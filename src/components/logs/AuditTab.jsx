@@ -273,11 +273,19 @@ export default function AuditTab() {
     })
   }, [trades, applied])
 
-  const closed = rangedTrades.filter(t => t.status === 'CLOSED')
+  // Include both Close Position and Partial Exit rows — both carry realized_pnl
+  const closed = rangedTrades.filter(t => t.status === 'CLOSED' || t.status === 'PARTIAL')
+
+  // Entry date map: trade_id → date from the New Position action row
+  const entryDateMap = useMemo(() => {
+    const map = {}
+    trades.forEach(t => { if (t.action_type === 'New Position') map[t.trade_id] = t.date })
+    return map
+  }, [trades])
 
   // ── KPI calculations (all client-side from loaded trades array) ────────────
   const kpis = useMemo(() => {
-    const totalTrades = rangedTrades.length
+    const totalTrades = new Set(rangedTrades.map(t => t.trade_id)).size
     const winners     = closed.filter(t => (parseFloat(t.realized_pnl) || 0) > 0)
     const losers      = closed.filter(t => (parseFloat(t.realized_pnl) || 0) < 0)
     const winRate     = closed.length > 0 ? (winners.length / closed.length) * 100 : null
@@ -302,10 +310,10 @@ export default function AuditTab() {
       const exitVal  = exitP * qty
       brokerFees   += calcBrokerFee(entryVal) + calcBrokerFee(exitVal)
       totalTradedValue += entryVal
-      // CGT on realized gain — use created_at as exit date proxy
-      const exitDate = (t.updated_at || t.created_at || t.date || '').slice(0, 10)
-      if (pnl > 0 && t.date && exitDate) {
-        cgt += calcCGT(pnl, t.date, exitDate)
+      // CGT: t.date = exit date (action date), entryDateMap = entry date from New Position row
+      const entryDate = entryDateMap[t.trade_id] || t.date
+      if (pnl > 0 && entryDate && t.date) {
+        cgt += calcCGT(pnl, entryDate, t.date)
       }
     }
 
@@ -322,12 +330,8 @@ export default function AuditTab() {
         }, 0) / rrTrades.length
       : null
 
-    // Max drawdown from equity curve of closed trades sorted by exit date
-    const sortedClosed = [...closed].sort((a, b) => {
-      const ad = (a.updated_at || a.created_at || a.date || '')
-      const bd = (b.updated_at || b.created_at || b.date || '')
-      return ad < bd ? -1 : 1
-    })
+    // Max drawdown from equity curve — sort by action date (the canonical date column in v2.2)
+    const sortedClosed = [...closed].sort((a, b) => (a.date || '') < (b.date || '') ? -1 : 1)
     let equity = 0, peak = 0, maxDDPct = 0
     for (const t of sortedClosed) {
       equity += parseFloat(t.realized_pnl) || 0
@@ -343,20 +347,19 @@ export default function AuditTab() {
     const bestTrade    = sortedByPnl[0] || null
     const worstTrade   = sortedByPnl[sortedByPnl.length - 1] || null
 
-    // Avg hold days (closed trades with dates)
-    const closedWithDates = closed.filter(t => t.date && (t.updated_at || t.created_at))
+    // Avg hold days — t.date = exit date, entryDateMap[trade_id] = entry date
+    const closedWithDates = closed.filter(t => t.date && entryDateMap[t.trade_id])
     const avgHoldDays     = closedWithDates.length > 0
       ? closedWithDates.reduce((s, t) => {
-          const exitStr = (t.updated_at || t.created_at || '').slice(0, 10)
-          const d = Math.max(0, Math.floor((new Date(exitStr) - new Date(t.date)) / 86400000))
+          const d = Math.max(0, Math.floor((new Date(t.date) - new Date(entryDateMap[t.trade_id])) / 86400000))
           return s + d
         }, 0) / closedWithDates.length
       : null
 
-    // Daily win streak (current)
+    // Daily win streak (current) — group by exit action date
     const byDate = {}
     for (const t of closed) {
-      const d = (t.updated_at || t.created_at || t.date || '').slice(0, 10)
+      const d = t.date || ''
       if (!d) continue
       byDate[d] = (byDate[d] || 0) + (parseFloat(t.realized_pnl) || 0)
     }
@@ -396,7 +399,7 @@ export default function AuditTab() {
       totalTradedValue,
       equityCurve,
     }
-  }, [rangedTrades, closed])
+  }, [rangedTrades, closed, entryDateMap])
 
   const fmtPnl = (n) => isForex
     ? `${n >= 0 ? '+' : '−'}$${Math.abs(n).toFixed(2)}`

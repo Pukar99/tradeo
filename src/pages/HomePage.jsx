@@ -208,12 +208,12 @@ function LoggedOutHome() {
         <div className="pointer-events-auto w-full max-w-lg mx-4">
           <div className="bg-white/97 dark:bg-gray-900/97 backdrop-blur-md rounded-2xl shadow-2xl border border-gray-200 dark:border-gray-700 overflow-hidden">
             {/* Header strip */}
-            <div className="bg-gradient-to-r from-gray-900 to-gray-800 dark:from-gray-950 dark:to-gray-900 px-8 py-6 border-b border-gray-700">
+            <div className="bg-gradient-to-r from-gray-900 to-gray-800 dark:from-gray-950 dark:to-gray-900 px-5 sm:px-8 py-5 sm:py-6 border-b border-gray-700">
               <div className="flex items-center gap-2 mb-3">
                 <span className="w-1.5 h-1.5 bg-green-400 rounded-full animate-pulse" />
                 <span className="text-green-400 text-xs font-medium tracking-widest uppercase">Trading Workspace</span>
               </div>
-              <h1 className="text-2xl font-bold text-white leading-snug">
+              <h1 className="text-xl sm:text-2xl font-bold text-white leading-snug">
                 {t('hero.headline')}<br />
                 <span className="text-green-400">{t('hero.headlineAccent')}</span>
               </h1>
@@ -221,7 +221,7 @@ function LoggedOutHome() {
             </div>
 
             {/* Features grid */}
-            <div className="px-8 py-5 grid grid-cols-2 gap-3">
+            <div className="px-5 sm:px-8 py-4 sm:py-5 grid grid-cols-1 xs:grid-cols-2 gap-3">
               {[
                 { icon: '📒', title: t('hero.feat1Title'), desc: t('hero.feat1Desc') },
                 { icon: '👁️', title: t('hero.feat2Title'), desc: t('hero.feat2Desc') },
@@ -241,12 +241,12 @@ function LoggedOutHome() {
             </div>
 
             {/* Quote */}
-            <div className="px-8 py-3 border-t border-gray-100 dark:border-gray-800">
+            <div className="px-5 sm:px-8 py-3 border-t border-gray-100 dark:border-gray-800">
               <p className="text-[11px] text-gray-400 italic text-center">"{quote}"</p>
             </div>
 
             {/* CTA */}
-            <div className="px-8 py-5 border-t border-gray-100 dark:border-gray-800 flex gap-3">
+            <div className="px-5 sm:px-8 py-4 sm:py-5 border-t border-gray-100 dark:border-gray-800 flex gap-3">
               <Link to="/signup" className="flex-1 bg-green-500 hover:bg-green-400 text-white py-2.5 rounded-xl text-sm font-semibold text-center transition-colors">
                 {t('hero.cta')}
               </Link>
@@ -443,7 +443,7 @@ function OpenPositionsPanel({ openPositions, perfStats, navigate }) {
                             <span className="text-[10px] px-1 py-0.5 rounded bg-orange-100 text-orange-600 dark:bg-orange-900 dark:text-orange-300 font-medium">P</span>
                           )}
                         </div>
-                        <p className="text-[10px] text-gray-400">{t.quantity} @ Rs.{t.entry_price.toLocaleString()}</p>
+                        <p className="text-[10px] text-gray-400">{t.quantity} @ Rs.{(t.entry_price || 0).toLocaleString()}</p>
                       </div>
                     </div>
                     <div className="text-right">
@@ -539,7 +539,7 @@ function CenterDashboard({ navigate, initData, onRefresh, onDataReady }) {
     const trades    = d.trades || []
     const priceMap  = d.prices || {}
     const open      = trades.filter(t => t.status === 'OPEN' || t.status === 'PARTIAL')
-    const closed    = trades.filter(t => t.status === 'CLOSED')
+    const closed    = trades.filter(t => t.status === 'CLOSED' || t.status === 'PARTIAL')
 
     const openWithPrices = open.map(t => {
       const entry = parseFloat(t.entry_price) || 0

@@ -3,7 +3,6 @@ import { useAuth } from '../context/AuthContext'
 import { useNavigate } from 'react-router-dom'
 import { getProfile, updateProfile, uploadAvatar, changePassword } from '../api'
 
-const ADMIN_USER_ID = 1
 const MAX_AVATAR_SIZE = 5 * 1024 * 1024 // 5 MB
 const ALLOWED_IMAGE_TYPES = ['image/jpeg', 'image/jpg', 'image/png', 'image/gif', 'image/webp']
 
@@ -239,7 +238,6 @@ function ProfilePage() {
   if (!profile) return null
 
   const level = getTraderLevel()
-  const isAdmin = profile.user.id === ADMIN_USER_ID
 
   return (
     <div className="w-full px-3 sm:px-6 pt-4 sm:pt-6 pb-10 max-w-5xl mx-auto">
@@ -296,11 +294,7 @@ function ProfilePage() {
               <div>
                 <div className="flex items-center gap-3 flex-wrap mb-1">
                   <h1 className="text-2xl font-bold text-white">{profile.user.name}</h1>
-                  {isAdmin && (
-                    <span className="bg-yellow-500 text-yellow-900 text-xs font-bold px-2 py-0.5 rounded-full">
-                      👑 Admin
-                    </span>
-                  )}
+
                   {profile.isEligible && (
                     <span className="bg-green-500 bg-opacity-20 text-green-400 border border-green-500 border-opacity-30 text-xs font-medium px-2 py-0.5 rounded-full">
                       ✓ Research Eligible

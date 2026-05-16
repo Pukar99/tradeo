@@ -78,7 +78,7 @@ export default function EditActionModal({ action, onClose, onSaved }) {
     <div className="fixed inset-0 z-[9999] flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm">
       <div className="w-full max-w-md bg-white dark:bg-gray-950 rounded-2xl shadow-2xl border border-gray-100 dark:border-gray-800 max-h-[90vh] flex flex-col">
 
-        <div className="flex items-center justify-between px-6 py-4 border-b border-gray-100 dark:border-gray-800">
+        <div className="flex items-center justify-between px-4 sm:px-6 py-4 border-b border-gray-100 dark:border-gray-800">
           <div>
             <h2 className="text-[15px] font-bold text-gray-900 dark:text-gray-100">Edit Action</h2>
             <p className="text-[11px] text-gray-400 dark:text-gray-500 mt-0.5">
@@ -88,7 +88,7 @@ export default function EditActionModal({ action, onClose, onSaved }) {
           <button onClick={onClose} className="w-7 h-7 flex items-center justify-center rounded-lg text-gray-400 hover:text-gray-600 dark:hover:text-gray-200 hover:bg-gray-100 dark:hover:bg-gray-800 transition-all text-sm">✕</button>
         </div>
 
-        <form onSubmit={handleSubmit} className="overflow-y-auto flex-1 px-6 py-5 space-y-4">
+        <form onSubmit={handleSubmit} className="overflow-y-auto flex-1 px-4 sm:px-6 py-5 space-y-4">
 
           <div className={`grid gap-3 ${isBuy ? 'grid-cols-2' : 'grid-cols-2'}`}>
             <div>

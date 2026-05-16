@@ -111,7 +111,7 @@ export default function PartialExitModal({ position, onClose, onSaved }) {
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm">
       <div className="w-full max-w-md bg-white dark:bg-gray-950 rounded-2xl shadow-2xl border border-gray-100 dark:border-gray-800 max-h-[90vh] flex flex-col">
 
-        <div className="flex items-center justify-between px-6 py-4 border-b border-gray-100 dark:border-gray-800">
+        <div className="flex items-center justify-between px-4 sm:px-6 py-4 border-b border-gray-100 dark:border-gray-800">
           <div>
             <h2 className="text-[15px] font-bold text-gray-900 dark:text-gray-100">Partial Exit</h2>
             <p className="text-[11px] text-gray-400 dark:text-gray-500 mt-0.5 font-mono">
@@ -122,7 +122,7 @@ export default function PartialExitModal({ position, onClose, onSaved }) {
         </div>
 
         {/* Broker paste */}
-        <div className="px-6 pt-4">
+        <div className="px-4 sm:px-6 pt-4">
           <div className={`rounded-xl border-2 border-dashed transition-all ${
             brokerParsed
               ? 'border-emerald-400 bg-emerald-50 dark:bg-emerald-900/20'
@@ -154,7 +154,7 @@ export default function PartialExitModal({ position, onClose, onSaved }) {
           </div>
         </div>
 
-        <form onSubmit={handleSubmit} className="overflow-y-auto flex-1 px-6 py-5 space-y-4">
+        <form onSubmit={handleSubmit} className="overflow-y-auto flex-1 px-4 sm:px-6 py-5 space-y-4">
 
           {/* ── REQUIRED ── */}
           <div className="grid grid-cols-2 gap-3">

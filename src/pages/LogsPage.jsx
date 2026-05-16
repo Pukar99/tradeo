@@ -32,8 +32,9 @@ export default function LogsPage() {
   const [search, setSearch] = useState('')
   const [addModal, setAddModal] = useState(false)
 
-  // Market-tab state
-  const [marketJournals, setMarketJournals] = useState([])
+  // Market-tab state — only loaded when user first opens the Market tab
+  const [marketJournals,      setMarketJournals]      = useState([])
+  const [marketJournalLoaded, setMarketJournalLoaded] = useState(false)
 
   const fetchData = useCallback(async () => {
     try {
@@ -71,21 +72,26 @@ export default function LogsPage() {
       const all = journalsRes.data || []
       setMarketJournals(all)
 
-      // Backfill news for recent entries that have none — fire sequentially, max 5
-      // auto-create uses a 15-min shared cache so these calls are cheap
+      // Backfill news for recent entries that have none — parallel, max 5
       const missing = all.filter(e => !e.news).slice(0, 5)
-      for (const e of missing) {
-        await autoCreateMarketJournal(e.date).catch(() => {})
-      }
       if (missing.length > 0) {
+        await Promise.all(missing.map(e => autoCreateMarketJournal(e.date).catch(() => {})))
         const refreshed = await getMarketJournals()
         setMarketJournals(refreshed.data || [])
       }
-    } catch { /* non-critical */ }
+    } catch (err) {
+      console.error('[fetchMarketJournals]', err?.message)
+    }
   }, [])
 
   useEffect(() => { fetchData() }, [fetchData])
-  useEffect(() => { fetchMarketJournals() }, [fetchMarketJournals])
+  // Defer market journal load until the Market tab is first opened
+  useEffect(() => {
+    if (activeTab === 'market' && !marketJournalLoaded) {
+      setMarketJournalLoaded(true)
+      fetchMarketJournals()
+    }
+  }, [activeTab, marketJournalLoaded, fetchMarketJournals])
   useChatRefresh(['trades'], fetchData)
 
   const handleRefresh = useCallback(() => {
@@ -135,98 +141,96 @@ export default function LogsPage() {
         </div>
       )}
 
-      {/* ── unified single toolbar ── */}
-      <div className="flex items-center gap-2 mb-5">
+      {/* ── unified toolbar — row 1: tabs + New Trade; row 2 (trades only): view + filter + search ── */}
+      <div className="flex flex-col gap-2 mb-5">
 
-        {/* tabs — left */}
-        <div className="flex items-center bg-gray-100/80 dark:bg-gray-800/60 rounded-xl p-1 gap-0.5">
-          {TABS.map(tab => (
-            <button key={tab.key}
-              onClick={() => setActiveTab(tab.key)}
-              className={`px-4 py-1.5 rounded-lg text-xs font-semibold transition-all ${
-                activeTab === tab.key
-                  ? 'bg-white dark:bg-gray-900 text-gray-900 dark:text-white shadow-sm'
-                  : 'text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-300'
-              }`}>
-              {tab.label}
-            </button>
-          ))}
-        </div>
-
-        {/* spacer — pushes everything right */}
-        <div className="flex-1" />
-
-        {/* shared view toggle — Trades + Market */}
-        {(activeTab === 'trades' || activeTab === 'market') && (
-          <div className="flex items-center bg-gray-100/80 dark:bg-gray-800/60 rounded-lg p-0.5 gap-0.5">
-            {[
-              { key: 'database', label: 'Database' },
-              { key: 'gallery',  label: 'Gallery'  },
-              { key: 'calendar', label: 'Calendar' },
-            ].map(v => (
-              <button key={v.key}
-                onClick={() => setView(v.key)}
-                className={`px-3 py-1 rounded-md text-[11px] font-semibold transition-all ${
-                  view === v.key
-                    ? 'bg-white dark:bg-gray-900 text-gray-900 dark:text-gray-100 shadow-sm'
+        {/* Row 1: tabs left, New Trade right */}
+        <div className="flex items-center gap-2">
+          <div className="flex items-center bg-gray-100/80 dark:bg-gray-800/60 rounded-xl p-1 gap-0.5">
+            {TABS.map(tab => (
+              <button key={tab.key}
+                onClick={() => setActiveTab(tab.key)}
+                className={`px-3 sm:px-4 py-1.5 rounded-lg text-xs font-semibold transition-all ${
+                  activeTab === tab.key
+                    ? 'bg-white dark:bg-gray-900 text-gray-900 dark:text-white shadow-sm'
                     : 'text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-300'
                 }`}>
-                {v.label}
+                {tab.label}
               </button>
             ))}
           </div>
-        )}
 
-        {/* trades-only controls — right side */}
-        {activeTab === 'trades' && <>
+          <div className="flex-1" />
 
-          {(view === 'database' || view === 'gallery') && <>
-            {/* divider */}
-            <div className="w-px h-4 bg-gray-200 dark:bg-gray-700" />
+          {activeTab === 'trades' && (
+            <button
+              onClick={() => setAddModal(true)}
+              className="flex items-center gap-1.5 px-3.5 py-1.5 text-[11px] font-bold rounded-xl bg-blue-600 hover:bg-blue-500 active:bg-blue-700 text-white transition-all shadow-sm shadow-blue-500/30">
+              <span className="text-sm leading-none">+</span>
+              <span className="hidden xs:inline">New Trade</span>
+              <span className="xs:hidden">New</span>
+            </button>
+          )}
+        </div>
 
-            {/* open / all */}
+        {/* Row 2: view toggle + trades controls — only for trades/market tabs */}
+        {(activeTab === 'trades' || activeTab === 'market') && (
+          <div className="flex items-center gap-2 flex-wrap">
+
+            {/* view toggle */}
             <div className="flex items-center bg-gray-100/80 dark:bg-gray-800/60 rounded-lg p-0.5 gap-0.5">
-              {['open', 'all'].map(f => (
-                <button key={f}
-                  onClick={() => setFilter(f)}
+              {[
+                { key: 'database', label: 'Database' },
+                { key: 'gallery',  label: 'Gallery'  },
+                { key: 'calendar', label: 'Calendar' },
+              ].map(v => (
+                <button key={v.key}
+                  onClick={() => setView(v.key)}
                   className={`px-3 py-1 rounded-md text-[11px] font-semibold transition-all ${
-                    filter === f
+                    view === v.key
                       ? 'bg-white dark:bg-gray-900 text-gray-900 dark:text-gray-100 shadow-sm'
                       : 'text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-300'
                   }`}>
-                  {f === 'open' ? 'Open' : 'All'}
+                  {v.label}
                 </button>
               ))}
             </div>
 
-            {/* symbol search */}
-            <div className="relative">
-              <span className="absolute left-2.5 top-1/2 -translate-y-1/2 text-gray-400 dark:text-gray-500 text-[11px] pointer-events-none select-none">⌕</span>
-              <input
-                type="text"
-                value={search}
-                onChange={e => setSearch(e.target.value)}
-                placeholder="Symbol"
-                list="symbol-datalist"
-                className="pl-6 pr-3 py-1 w-24 text-[11px] rounded-lg border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-900 text-gray-800 dark:text-gray-200 focus:outline-none focus:ring-1 focus:ring-blue-500 focus:w-32 transition-all"
-              />
-              <datalist id="symbol-datalist">
-                {allSymbols.map(s => <option key={s} value={s} />)}
-              </datalist>
-            </div>
-          </>}
+            {/* trades-only filter + search */}
+            {activeTab === 'trades' && (view === 'database' || view === 'gallery') && <>
+              <div className="w-px h-4 bg-gray-200 dark:bg-gray-700 hidden sm:block" />
 
-          {/* divider */}
-          <div className="w-px h-4 bg-gray-200 dark:bg-gray-700" />
+              <div className="flex items-center bg-gray-100/80 dark:bg-gray-800/60 rounded-lg p-0.5 gap-0.5">
+                {['open', 'all'].map(f => (
+                  <button key={f}
+                    onClick={() => setFilter(f)}
+                    className={`px-3 py-1 rounded-md text-[11px] font-semibold transition-all ${
+                      filter === f
+                        ? 'bg-white dark:bg-gray-900 text-gray-900 dark:text-gray-100 shadow-sm'
+                        : 'text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-300'
+                    }`}>
+                    {f === 'open' ? 'Open' : 'All'}
+                  </button>
+                ))}
+              </div>
 
-          {/* new trade */}
-          <button
-            onClick={() => setAddModal(true)}
-            className="flex items-center gap-1.5 px-3.5 py-1.5 text-[11px] font-bold rounded-xl bg-blue-600 hover:bg-blue-500 active:bg-blue-700 text-white transition-all shadow-sm shadow-blue-500/30">
-            <span className="text-sm leading-none">+</span>
-            New Trade
-          </button>
-        </>}
+              <div className="relative">
+                <span className="absolute left-2.5 top-1/2 -translate-y-1/2 text-gray-400 dark:text-gray-500 text-[11px] pointer-events-none select-none">⌕</span>
+                <input
+                  type="text"
+                  value={search}
+                  onChange={e => setSearch(e.target.value)}
+                  placeholder="Symbol"
+                  list="symbol-datalist"
+                  className="pl-6 pr-3 py-1 w-24 text-[11px] rounded-lg border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-900 text-gray-800 dark:text-gray-200 focus:outline-none focus:ring-1 focus:ring-blue-500 focus:w-32 transition-all"
+                />
+                <datalist id="symbol-datalist">
+                  {allSymbols.map(s => <option key={s} value={s} />)}
+                </datalist>
+              </div>
+            </>}
+          </div>
+        )}
       </div>
 
       {/* ── tab content ── */}

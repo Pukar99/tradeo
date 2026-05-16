@@ -30,6 +30,7 @@ function ChatPage() {
 
   return (
     <div className="min-h-screen bg-gray-100 dark:bg-gray-900">
+      {/* 56px/80px = approximate navbar height (mobile/desktop) — update if Navbar height changes */}
       <div className="max-w-6xl mx-auto px-3 sm:px-4 py-4 sm:py-6 flex gap-4 h-[calc(100dvh-56px)] sm:h-[calc(100dvh-80px)]">
 
         {/* Left — Trader Profile sidebar (desktop only) */}

@@ -19,6 +19,7 @@ const STATUS_CFG = {
 export default function PositionRow({ position, ltp, onAdd, onPartialExit, onClose, onDelete, onDeleteAction, onRefresh, refreshTick }) {
   const [expanded,   setExpanded]   = useState(false)
   const [actions,    setActions]    = useState(null)
+  const [fetched,    setFetched]    = useState(false)
   const [loading,    setLoading]    = useState(false)
   const [error,      setError]      = useState(null)
   const [editTarget, setEditTarget] = useState(null)
@@ -56,23 +57,25 @@ export default function PositionRow({ position, ltp, onAdd, onPartialExit, onClo
     : null
 
   const fetchHistory = useCallback(async () => {
-    if (actions !== null) return
+    if (fetched) return
     setLoading(true)
     try {
       const res = await getTradeHistory(position.trade_id)
       setActions(res.data)
+      setFetched(true)
     } catch {
       setError('Failed to load history')
     } finally {
       setLoading(false)
     }
-  }, [position.trade_id, actions])
+  }, [position.trade_id, fetched])
 
   const refreshHistory = useCallback(async () => {
     setLoading(true)
     try {
       const res = await getTradeHistory(position.trade_id)
       setActions(res.data)
+      setFetched(true)
     } catch {
       setError('Failed to load history')
     } finally {
@@ -81,14 +84,15 @@ export default function PositionRow({ position, ltp, onAdd, onPartialExit, onClo
   }, [position.trade_id])
 
   useEffect(() => {
-    if (expanded && actions === null) fetchHistory()
-  }, [expanded, fetchHistory])
+    if (expanded && !fetched) fetchHistory()
+  }, [expanded, fetchHistory, fetched])
 
   // When parent triggers a refresh (trade saved/closed/exited), clear the
   // cached actions so the next expand (or immediate if already open) re-fetches.
   useEffect(() => {
     if (refreshTick === undefined) return
     setActions(null)
+    setFetched(false)
     if (expanded) refreshHistory()
   }, [refreshTick]) // eslint-disable-line react-hooks/exhaustive-deps
 
@@ -154,7 +158,19 @@ export default function PositionRow({ position, ltp, onAdd, onPartialExit, onClo
             </div>
           </div>
 
-          {/* stats row */}
+          {/* mobile P&L — shown only on xs/sm when full stats bar is hidden */}
+          {hasPnl && (
+            <div className={`sm:hidden flex-shrink-0 px-2 py-1 rounded-lg text-right ${
+              pnlPos ? 'bg-emerald-50 dark:bg-emerald-500/10' : 'bg-red-50 dark:bg-red-500/10'
+            }`}>
+              <div className="text-[8px] uppercase tracking-wide font-semibold text-gray-400 dark:text-gray-500">{pnlLabel}</div>
+              <div className={`text-[11px] font-bold font-mono ${pnlPos ? 'text-emerald-600 dark:text-emerald-400' : 'text-red-600 dark:text-red-400'}`}>
+                {pnlPos ? '+' : ''}Rs.{fmt(pnlValue)}
+              </div>
+            </div>
+          )}
+
+          {/* stats row — desktop */}
           <div className="hidden sm:flex items-center gap-5 shrink-0">
             <StatCell label="Qty"  value={totalQty} mono />
             <StatCell label="WACC" value={`Rs.${fmt(wacc)}`} mono />

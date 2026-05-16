@@ -403,6 +403,19 @@ function GalleryCard({ position, ltp, onAdd, onPartialExit, onClose, onDelete })
   const { onContextMenu, ContextMenuPortal } = useContextMenu()
   const [actions,  setActions]  = useState(null)
   const [hovered,  setHovered]  = useState(false)
+  const [visible,  setVisible]  = useState(false)
+  const cardRef = useRef(null)
+
+  // Only fetch history when the card scrolls into view
+  useEffect(() => {
+    const el = cardRef.current
+    if (!el) return
+    const obs = new IntersectionObserver(([entry]) => {
+      if (entry.isIntersecting) { setVisible(true); obs.disconnect() }
+    }, { threshold: 0.1 })
+    obs.observe(el)
+    return () => obs.disconnect()
+  }, [])
 
   const wacc     = parseFloat(position.wacc) || 0
   const totalQty = parseFloat(position.total_qty) || 0
@@ -427,14 +440,15 @@ function GalleryCard({ position, ltp, onAdd, onPartialExit, onClose, onDelete })
   const rr = position.sl && position.tp && wacc > 0
     ? (Math.abs(parseFloat(position.tp) - wacc) / Math.abs(parseFloat(position.sl) - wacc)).toFixed(1) : null
 
-  // Fetch action history for date range + markers
+  // Fetch action history only once the card is visible in the viewport
   useEffect(() => {
+    if (!visible) return
     let cancelled = false
     getTradeHistory(position.trade_id)
       .then(res => { if (!cancelled) setActions(res.data || []) })
       .catch(() => { if (!cancelled) setActions([]) })
     return () => { cancelled = true }
-  }, [position.trade_id])
+  }, [position.trade_id, visible])
 
   function goToChart() {
     const posPayload = !isClosed ? [{
@@ -462,6 +476,7 @@ function GalleryCard({ position, ltp, onAdd, onPartialExit, onClose, onDelete })
     <>
       <ContextMenuPortal />
       <div
+        ref={cardRef}
         className="rounded-2xl border border-gray-100 dark:border-gray-800/80 bg-white dark:bg-gray-900/80
                    hover:border-gray-200 dark:hover:border-gray-700 hover:shadow-lg hover:shadow-black/5
                    dark:hover:shadow-black/30 transition-all duration-200 overflow-hidden flex flex-col"

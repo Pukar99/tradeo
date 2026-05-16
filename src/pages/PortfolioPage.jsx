@@ -541,12 +541,12 @@ function DrawdownWidget({ equityCurve, currentDrawdown, maxDrawdown, peakEquity,
         </div>
 
         {/* Summary pills */}
-        <div className="flex items-center gap-2">
-          <div className={`text-[10px] font-semibold px-2.5 py-1 rounded-lg border ${ddBg} ${ddColor}`}>
+        <div className="flex items-center gap-1.5 flex-wrap justify-end">
+          <div className={`text-[10px] font-semibold px-2 py-0.5 rounded-lg border ${ddBg} ${ddColor}`}>
             DD: {currentDrawdown.toFixed(1)}%
           </div>
-          <div className="text-[10px] text-gray-400">
-            Max DD: <span className="font-semibold text-red-400">{maxDrawdown.toFixed(1)}%</span>
+          <div className="text-[10px] text-gray-400 whitespace-nowrap">
+            Max: <span className="font-semibold text-red-400">{maxDrawdown.toFixed(1)}%</span>
           </div>
         </div>
       </div>
@@ -692,10 +692,10 @@ function PortfolioPage() {
     }
   }, [user?.id])
 
-  useEffect(() => { if (user?.id) fetchData() }, [user?.id]) // eslint-disable-line react-hooks/exhaustive-deps
+  useEffect(() => { if (user?.id) fetchData() }, [user?.id, fetchData])
   useChatRefresh(['trades'], fetchData)
 
-  const handleGoToChart = ({ symbol, trade_id, wacc, sl, tp, direction, total_qty, last_action_at }) => {
+  const handleGoToChart = ({ symbol, trade_id, wacc, sl, tp, direction, total_qty, opened_at }) => {
     navigate('/screen', { state: { symbol, positions: [{
       id:          trade_id,
       entry_price: parseFloat(wacc),
@@ -703,7 +703,7 @@ function PortfolioPage() {
       tp:          tp ? parseFloat(tp) : null,
       position:    (direction || 'LONG').toUpperCase(),
       quantity:    parseFloat(total_qty) || 0,
-      entry_date:  last_action_at?.slice(0, 10),
+      entry_date:  opened_at?.slice(0, 10),
     }] } })
   }
 
@@ -714,11 +714,11 @@ function PortfolioPage() {
   const openPositions   = positions.filter(p => p.status === 'OPEN' || p.status === 'PARTIAL')
   const closedPositions = positions.filter(p => p.status === 'CLOSED')
 
-  // For closed P&L: sum realized_pnl from the Close/Reversal action rows
+  // Sum realized_pnl from all exit-type action rows (Close, Reversal, Partial Exit)
   const closedPnlByTrade = useMemo(() => {
     const map = {}
     recentActions.forEach(row => {
-      if (row.action_type === 'Close Position' || row.action_type === 'Reversal') {
+      if (row.action_type === 'Close Position' || row.action_type === 'Reversal' || row.action_type === 'Partial Exit') {
         const pnl = parseFloat(row.realized_pnl) || 0
         map[row.trade_id] = (map[row.trade_id] || 0) + pnl
       }
