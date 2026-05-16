@@ -105,25 +105,24 @@ export default function DataLabPage() {
   const active = TABS.find(t => t.id === activeTab)
 
   return (
-    <div className="flex flex-col h-[calc(100vh-56px)] overflow-hidden bg-gray-50 dark:bg-gray-950">
+    <div className="flex flex-col h-[calc(100dvh-56px)] overflow-hidden bg-gray-50 dark:bg-gray-950">
 
       {/* ── Tab bar ── */}
-      <div className="shrink-0 flex items-center gap-1 px-4 py-2 border-b border-gray-200 dark:border-gray-800 bg-white dark:bg-gray-900">
+      <div className="shrink-0 flex items-center gap-1 px-4 py-1.5 border-b border-gray-200 dark:border-gray-800 bg-white dark:bg-gray-900">
         {TABS.map(tab => {
           const isActive = tab.id === activeTab
           return (
             <button
               key={tab.id}
               onClick={() => handleTab(tab.id)}
-              className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-[11px] font-semibold transition-all ${
+              className={`flex items-center gap-1.5 px-3 py-2.5 rounded-lg text-[11px] font-semibold transition-all min-h-[44px] ${
                 isActive
                   ? 'bg-blue-600 text-white shadow-sm'
                   : 'text-gray-500 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-gray-800 hover:text-gray-700 dark:hover:text-gray-200'
               }`}
             >
               {tab.icon}
-              <span className="hidden sm:inline">{tab.label}</span>
-              <span className="sm:hidden">{tab.short}</span>
+              <span>{tab.label}</span>
             </button>
           )
         })}

@@ -8,7 +8,7 @@ const ALLOWED_IMAGE_TYPES = ['image/jpeg', 'image/jpg', 'image/png', 'image/gif'
 
 function StatCard({ label, value, color = 'text-gray-900 dark:text-white', sub }) {
   return (
-    <div className="bg-gray-50 dark:bg-gray-700 rounded-xl p-4 text-center">
+    <div className="bg-gray-50 dark:bg-gray-700 rounded-xl p-4 text-center flex flex-col justify-center min-h-[88px]">
       <p className={`text-2xl font-bold ${color}`}>{value}</p>
       <p className="text-xs text-gray-400 mt-1">{label}</p>
       {sub && <p className="text-xs text-gray-400 mt-0.5">{sub}</p>}
@@ -568,8 +568,8 @@ function ProfilePage() {
 
       {/* ── Overview Tab ── */}
       {activeTab === 'overview' && (
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-          <div className="bg-white dark:bg-gray-800 rounded-2xl p-5 shadow-sm border border-gray-100 dark:border-gray-700">
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-4 items-start">
+          <div className="bg-white dark:bg-gray-800 rounded-2xl p-5 shadow-sm border border-gray-100 dark:border-gray-700 h-full">
             <h3 className="text-sm font-semibold text-gray-900 dark:text-white mb-4 flex items-center gap-2">
               <span>📈</span> Trading Summary
             </h3>

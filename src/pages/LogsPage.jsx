@@ -299,7 +299,7 @@ export default function LogsPage() {
         </Suspense>
       )}
       {activeTab === 'stats'  && (
-        <div className="flex items-center justify-center min-h-48 text-gray-400 dark:text-gray-500 text-sm">
+        <div className="flex items-center justify-center min-h-[50vh] text-gray-400 dark:text-gray-500 text-sm">
           Stats tab — coming soon
         </div>
       )}

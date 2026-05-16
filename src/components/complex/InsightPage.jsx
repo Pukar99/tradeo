@@ -290,7 +290,7 @@ function LeftInsightPanel({ data, years, wAvg, wWinRate, dark, curYear, curRow, 
 
       {/* Top / Bottom years */}
       {data?.best_years?.length > 0 && (
-        <div className="shrink-0 px-3 py-2.5">
+        <div className="shrink-0 px-3 py-2.5 pb-4">
           <div className="grid grid-cols-2 gap-3">
             <div>
               <div className="text-[8px] font-black uppercase tracking-wider text-gray-400 mb-1.5">Top Years</div>
@@ -322,8 +322,9 @@ function LeftInsightPanel({ data, years, wAvg, wWinRate, dark, curYear, curRow, 
 
 // ─── Month OHLC chart (interactive) ───────────────────────────────────────────
 function MonthChart({ candles, dark }) {
-  const ref  = useRef(null)
-  const cRef = useRef(null)
+  const ref   = useRef(null)
+  const cRef  = useRef(null)
+  const roRef = useRef(null)
 
   useEffect(() => {
     const el = ref.current
@@ -399,9 +400,14 @@ function MonthChart({ candles, dark }) {
       if (ref.current && cRef.current)
         cRef.current.applyOptions({ width: ref.current.clientWidth, height: ref.current.clientHeight })
     })
+    roRef.current = ro
     ro.observe(el)
     }) // end loadLC().then
-    return () => { cancelled = true; cRef.current?.remove(); cRef.current = null }
+    return () => {
+      cancelled = true
+      roRef.current?.disconnect(); roRef.current = null
+      cRef.current?.remove(); cRef.current = null
+    }
   }, [candles, dark])
 
   return <div ref={ref} className="w-full h-full" />
@@ -564,7 +570,7 @@ function HistoricalRank({ value, allYears, month }) {
 }
 
 // ─── Right Detail Panel ───────────────────────────────────────────────────────
-function DetailPanel({ cell, onClose, onNavigate, dark, allYears, indexId }) {
+function DetailPanel({ cell, onClose, onNavigate, dark, allYears, indexId, fullPage = false }) {
   const [tab,               setTab]               = useState('chart')
   const [loading,           setLoading]           = useState(false)
   const [candles,           setCandles]           = useState(null)
@@ -609,235 +615,225 @@ function DetailPanel({ cell, onClose, onNavigate, dark, allYears, indexId }) {
   const fg     = cell ? cellFg(cell.value, dark) : (dark ? '#94a3b8' : '#64748b')
   const maxAbs = sectors?.length ? Math.max(...sectors.map(s => Math.abs(s.return_pct ?? 0)), 0.1) : 1
 
-  // If no cell selected, show collapsed placeholder
-  if (!cell) {
-    return (
-      <div className="w-10 shrink-0 border-l border-gray-100 dark:border-gray-800 bg-white dark:bg-gray-900 flex items-center justify-center">
-        <span className="text-[8px] text-gray-300 dark:text-gray-700 writing-mode-vertical rotate-90 whitespace-nowrap select-none">
-          Click a cell
-        </span>
-      </div>
-    )
-  }
+  if (!cell) return null
 
   return (
-    <div className="w-[300px] shrink-0 flex flex-col bg-white dark:bg-gray-900 border-l border-gray-200 dark:border-gray-700/60 overflow-hidden">
+    <div className="flex flex-col h-full bg-white dark:bg-gray-950 overflow-hidden">
 
-      {/* Header */}
-      <div className="shrink-0 px-3 pt-2.5 pb-2 border-b border-gray-100 dark:border-gray-800">
-        <div className="flex items-start justify-between gap-1">
+      {/* ── Header ── */}
+      <div className="shrink-0 flex items-center gap-4 px-5 py-3 border-b border-gray-200 dark:border-gray-800 bg-white dark:bg-gray-900">
+        {/* Color dot + month + return */}
+        <div className="flex items-center gap-3 min-w-0">
+          <div className="w-3 h-3 rounded shrink-0" style={{ background: bg }} />
           <div>
-            <div className="flex items-center gap-1.5 mb-0.5">
-              <div className="w-2 h-2 rounded-sm shrink-0" style={{ background: bg }} />
-              <span className="text-[10px] font-black text-gray-900 dark:text-white leading-none">
-                {MONTHS_FULL[cell.month - 1]} {cell.year}
-              </span>
+            <div className="text-xs font-semibold text-gray-400 dark:text-gray-500 uppercase tracking-widest">
+              {MONTHS_FULL[cell.month - 1]} {cell.year}
             </div>
-            <div className="text-lg font-black leading-none" style={{ color: fg }}>
+            <div className="text-2xl font-black leading-none" style={{ color: fg }}>
               {fmtPct(cell.value, 2)}
             </div>
           </div>
-          <button onClick={onClose}
-            className="mt-0.5 w-5 h-5 flex items-center justify-center rounded text-gray-400
-              hover:text-gray-600 dark:hover:text-gray-200 hover:bg-gray-100 dark:hover:bg-gray-800 text-sm leading-none transition-colors shrink-0">
-            ×
-          </button>
         </div>
+
         {/* Month navigation */}
-        <div className="flex items-center gap-1 mt-2">
+        <div className="flex items-center gap-2 ml-auto">
           <button onClick={() => onNavigate(-1)}
-            className="flex-1 py-0.5 text-[9px] font-bold rounded border border-gray-200 dark:border-gray-700 text-gray-500 hover:bg-gray-50 dark:hover:bg-gray-800 transition-colors">
+            className="flex items-center gap-1 px-3 py-1.5 text-[11px] font-semibold rounded-lg border border-gray-200 dark:border-gray-700 text-gray-600 dark:text-gray-400 hover:bg-gray-50 dark:hover:bg-gray-800 transition-colors">
             ← Prev
           </button>
           <button onClick={() => onNavigate(1)}
-            className="flex-1 py-0.5 text-[9px] font-bold rounded border border-gray-200 dark:border-gray-700 text-gray-500 hover:bg-gray-50 dark:hover:bg-gray-800 transition-colors">
+            className="flex items-center gap-1 px-3 py-1.5 text-[11px] font-semibold rounded-lg border border-gray-200 dark:border-gray-700 text-gray-600 dark:text-gray-400 hover:bg-gray-50 dark:hover:bg-gray-800 transition-colors">
             Next →
+          </button>
+          <button onClick={onClose}
+            className="ml-2 w-8 h-8 flex items-center justify-center rounded-lg text-gray-400 hover:text-gray-700 dark:hover:text-gray-200 hover:bg-gray-100 dark:hover:bg-gray-800 text-lg leading-none transition-colors">
+            ×
           </button>
         </div>
       </div>
 
-      {/* Tabs */}
+      {/* ── Tabs ── */}
       {!loading && !dataError && available && (
-        <div className="shrink-0 flex border-b border-gray-100 dark:border-gray-800">
-          {[['chart','Price'],['sectors','Sectors']].map(([id, lbl]) => (
+        <div className="shrink-0 flex border-b border-gray-100 dark:border-gray-800 bg-white dark:bg-gray-900">
+          {[['chart','Price Chart'],['sectors','Sector Breakdown']].map(([id, lbl]) => (
             <button key={id} onClick={() => setTab(id)}
-              className={`flex-1 py-1.5 text-[9px] font-black uppercase tracking-widest transition-colors ${
+              className={`px-6 py-3 text-[11px] font-bold uppercase tracking-widest transition-colors ${
                 tab === id
-                  ? 'text-blue-500 border-b-2 border-blue-500'
-                  : 'text-gray-400 hover:text-gray-600 dark:hover:text-gray-300'}`}>
+                  ? 'text-blue-600 border-b-2 border-blue-500 dark:text-blue-400'
+                  : 'text-gray-400 hover:text-gray-700 dark:hover:text-gray-300'}`}>
               {lbl}
             </button>
           ))}
         </div>
       )}
 
-      {/* Body */}
-      <div className="flex-1 min-h-0 overflow-y-auto">
+      {/* ── Body ── */}
+      <div className="flex-1 overflow-y-auto bg-white dark:bg-gray-950">
 
         {loading && (
           <div className="flex h-full items-center justify-center">
-            <div className="w-5 h-5 border-2 border-blue-400 border-t-transparent rounded-full animate-spin" />
+            <div className="w-6 h-6 border-2 border-blue-500 border-t-transparent rounded-full animate-spin" />
           </div>
         )}
 
-        {/* Network error */}
         {!loading && dataError && (
-          <div className="p-4 text-center">
-            <div className="text-[10px] text-red-400 mb-1">{dataError}</div>
-            <div className="text-[9px] text-gray-400">Try clicking the cell again</div>
+          <div className="flex flex-col items-center justify-center h-full gap-2 p-8 text-center">
+            <div className="text-sm text-red-400 font-medium">{dataError}</div>
+            <div className="text-xs text-gray-400">Try clicking the cell again</div>
           </div>
         )}
 
-        {/* No data (pre-2021 or missing) */}
         {!loading && !dataError && !available && (
-          <div className="p-4 text-center">
-            <div className="text-xl mb-1">📂</div>
-            <div className="text-[10px] text-gray-400 leading-relaxed">
+          <div className="flex flex-col items-center justify-center h-full gap-3 p-8 text-center">
+            <div className="text-3xl">📂</div>
+            <div className="text-sm text-gray-500 dark:text-gray-400 leading-relaxed max-w-xs">
               Daily chart data is only available from 2021.<br />
               The heatmap return is from historical records.
             </div>
           </div>
         )}
 
-        {/* Chart tab */}
+        {/* ── Chart tab — chart left, stats right ── */}
         {!loading && !dataError && available && tab === 'chart' && (
-          <div>
-            <div style={{ height: 200 }} className="bg-gray-50 dark:bg-gray-950 border-b border-gray-100 dark:border-gray-800">
-              {candles?.length
-                ? <MonthChart candles={candles} dark={dark} />
-                : <div className="h-full flex items-center justify-center text-xs text-gray-400">No candle data</div>}
+          <div className="flex flex-col lg:flex-row gap-0">
+
+            {/* Chart — fixed height, never stretches */}
+            <div className="flex-1 min-w-0 border-b lg:border-b-0 lg:border-r border-gray-100 dark:border-gray-800">
+              <div className="px-5 py-3 border-b border-gray-100 dark:border-gray-800">
+                <span className="text-[10px] font-bold uppercase tracking-widest text-gray-400">Daily Candles</span>
+              </div>
+              <div style={{ height: 380 }}>
+                {candles?.length
+                  ? <MonthChart candles={candles} dark={dark} />
+                  : <div className="h-full flex items-center justify-center text-sm text-gray-400">No candle data available</div>}
+              </div>
             </div>
 
-            {stats && (
-              <div className="p-2.5 space-y-2">
-                <div className="grid grid-cols-2 gap-1">
-                  {[
-                    ['Open',  stats.month_open?.toFixed(1),  null],
-                    ['Close', stats.month_close?.toFixed(1), null],
-                    ['High',  stats.month_high?.toFixed(1),  '#22c55e'],
-                    ['Low',   stats.month_low?.toFixed(1),   '#ef4444'],
-                  ].map(([l, v, c]) => (
-                    <div key={l} className="rounded bg-gray-50 dark:bg-gray-800/80 px-2 py-1.5">
-                      <div className="text-[8px] text-gray-400 uppercase tracking-wide">{l}</div>
-                      <div className="text-[10px] font-black mt-0.5"
-                        style={{ color: c || (dark ? '#e2e8f0' : '#1e293b') }}>
-                        {v ?? '—'}
-                      </div>
-                    </div>
-                  ))}
-                </div>
-
-                <div className="grid grid-cols-3 gap-1">
-                  <div className="rounded bg-gray-50 dark:bg-gray-800/80 px-2 py-1.5">
-                    <div className="text-[8px] text-gray-400 uppercase tracking-wide">Ret</div>
-                    <div className="text-[10px] font-black mt-0.5" style={{ color: (stats.month_return ?? 0) >= 0 ? '#22c55e' : '#ef4444' }}>
-                      {fmtPct(stats.month_return, 2)}
+            {/* Stats panel — right column, scrolls independently */}
+            <div className="w-full lg:w-[340px] shrink-0">
+              {stats && (
+                <div className="p-5 space-y-4">
+                  {/* OHLC */}
+                  <div>
+                    <div className="text-[9px] font-bold uppercase tracking-widest text-gray-400 mb-2">OHLC</div>
+                    <div className="grid grid-cols-2 gap-2">
+                      {[
+                        ['Open',  stats.month_open?.toFixed(1),  null],
+                        ['Close', stats.month_close?.toFixed(1), null],
+                        ['High',  stats.month_high?.toFixed(1),  '#22c55e'],
+                        ['Low',   stats.month_low?.toFixed(1),   '#ef4444'],
+                      ].map(([l, v, c]) => (
+                        <div key={l} className="rounded-xl bg-gray-50 dark:bg-gray-800/60 px-3 py-2.5">
+                          <div className="text-[9px] text-gray-400 uppercase tracking-wide mb-0.5">{l}</div>
+                          <div className="text-sm font-black" style={{ color: c || (dark ? '#e2e8f0' : '#1e293b') }}>
+                            {v ?? '—'}
+                          </div>
+                        </div>
+                      ))}
                     </div>
                   </div>
-                  <div className="rounded bg-gray-50 dark:bg-gray-800/80 px-2 py-1.5">
-                    <div className="text-[8px] text-gray-400 uppercase tracking-wide">Range</div>
-                    <div className="text-[10px] font-black text-gray-700 dark:text-gray-200 mt-0.5">
-                      {stats.range_pct != null ? fmtPct(stats.range_pct) : '—'}
+
+                  {/* Return / Range / Days */}
+                  <div>
+                    <div className="text-[9px] font-bold uppercase tracking-widest text-gray-400 mb-2">Summary</div>
+                    <div className="grid grid-cols-3 gap-2">
+                      {[
+                        ['Return', fmtPct(stats.month_return, 2), (stats.month_return ?? 0) >= 0 ? '#22c55e' : '#ef4444'],
+                        ['Range',  stats.range_pct != null ? fmtPct(stats.range_pct) : '—', null],
+                        ['Days',   stats.trading_days ?? '—', null],
+                      ].map(([l, v, c]) => (
+                        <div key={l} className="rounded-xl bg-gray-50 dark:bg-gray-800/60 px-3 py-2.5">
+                          <div className="text-[9px] text-gray-400 uppercase tracking-wide mb-0.5">{l}</div>
+                          <div className="text-sm font-black" style={{ color: c || (dark ? '#e2e8f0' : '#1e293b') }}>{v}</div>
+                        </div>
+                      ))}
                     </div>
                   </div>
-                  <div className="rounded bg-gray-50 dark:bg-gray-800/80 px-2 py-1.5">
-                    <div className="text-[8px] text-gray-400 uppercase tracking-wide">Days</div>
-                    <div className="text-[10px] font-black text-gray-700 dark:text-gray-200 mt-0.5">
-                      {stats.trading_days ?? '—'}
-                    </div>
-                  </div>
-                </div>
 
-                {(stats.best_day || stats.worst_day) && (
-                  <div className="space-y-1 pt-1.5 border-t border-gray-100 dark:border-gray-800">
-                    {stats.best_day && (
-                      <div className="flex justify-between items-center text-[9px]">
-                        <span className="text-gray-400">Best day</span>
-                        <span className="font-bold text-green-500">
-                          {stats.best_day.date.slice(5)} · {fmtPct(stats.best_day.pct)}
-                        </span>
-                      </div>
-                    )}
-                    {stats.worst_day && (
-                      <div className="flex justify-between items-center text-[9px]">
-                        <span className="text-gray-400">Worst day</span>
-                        <span className="font-bold text-red-400">
-                          {stats.worst_day.date.slice(5)} · {fmtPct(stats.worst_day.pct)}
-                        </span>
-                      </div>
-                    )}
-                  </div>
-                )}
-              </div>
-            )}
-
-            {/* Historical rank — always shown if we have value */}
-            <HistoricalRank value={cell.value} allYears={allYears} month={cell.month} />
-          </div>
-        )}
-
-        {/* Sectors tab */}
-        {!loading && !dataError && available && tab === 'sectors' && (
-          <div>
-            <div className="p-2.5">
-              <div className="text-[8px] text-gray-400 uppercase tracking-widest mb-1.5 font-bold">
-                {MONTHS_FULL[cell.month - 1]} {cell.year} · click a sector to see stocks
-              </div>
-              <div className="space-y-0.5">
-                {(sectors || []).map(s => {
-                  const isActive = activeSectorIndex === s.name
-                  return (
-                    <div key={s.index_id}>
-                      <button
-                        onClick={() => {
-                          // Guard: only set active if we have a valid sector name to query
-                          if (!s.name) return
-                          setActiveSectorIndex(isActive ? null : s.name)
-                        }}
-                        className={`w-full text-left rounded px-1.5 py-1 transition-colors ${
-                          isActive
-                            ? 'bg-blue-50 dark:bg-blue-950/30 ring-1 ring-blue-200 dark:ring-blue-800'
-                            : 'hover:bg-gray-50 dark:hover:bg-gray-800/40'}`}
-                      >
-                        {/* s.label = friendly name from backend e.g. "Commercial Bank"; s.name = sector_index key */}
-                      <SectorBar name={s.label || s.name} ret={s.return_pct} maxAbs={maxAbs} />
-                      </button>
-                      {isActive && s.name && (
-                        <CompanyList
-                          sectorIndex={s.name}
-                          label={s.label}
-                          year={cell.year}
-                          month={cell.month}
-                          onClose={() => setActiveSectorIndex(null)}
-                        />
+                  {/* Best / Worst day */}
+                  {(stats.best_day || stats.worst_day) && (
+                    <div className="rounded-xl bg-gray-50 dark:bg-gray-800/60 px-4 py-3 space-y-2">
+                      <div className="text-[9px] font-bold uppercase tracking-widest text-gray-400">Day extremes</div>
+                      {stats.best_day && (
+                        <div className="flex justify-between items-center text-xs">
+                          <span className="text-gray-500">Best day</span>
+                          <span className="font-bold text-green-500">{stats.best_day.date.slice(5)} · {fmtPct(stats.best_day.pct)}</span>
+                        </div>
+                      )}
+                      {stats.worst_day && (
+                        <div className="flex justify-between items-center text-xs">
+                          <span className="text-gray-500">Worst day</span>
+                          <span className="font-bold text-red-400">{stats.worst_day.date.slice(5)} · {fmtPct(stats.worst_day.pct)}</span>
+                        </div>
                       )}
                     </div>
-                  )
-                })}
-              </div>
-              {sectors?.length > 0 && (
-                <div className="mt-2.5 pt-2 border-t border-gray-100 dark:border-gray-800 space-y-1">
-                  <div className="flex justify-between text-[9px]">
-                    <span className="text-gray-400">Best</span>
-                    <span className="font-bold text-green-500">
-                      {sectors[0].name.replace(' Sub-Index','').replace(' Index','')} {fmtPct(sectors[0].return_pct)}
-                    </span>
-                  </div>
-                  <div className="flex justify-between text-[9px]">
-                    <span className="text-gray-400">Worst</span>
-                    <span className="font-bold text-red-400">
-                      {sectors[sectors.length-1].name.replace(' Sub-Index','').replace(' Index','')} {fmtPct(sectors[sectors.length-1].return_pct)}
-                    </span>
-                  </div>
+                  )}
+
+                  {/* Historical rank */}
+                  <HistoricalRank value={cell.value} allYears={allYears} month={cell.month} />
                 </div>
               )}
             </div>
           </div>
         )}
+
+        {/* ── Sectors tab ── */}
+        {!loading && !dataError && available && tab === 'sectors' && (
+          <div className="p-5 max-w-2xl mx-auto">
+            <div className="text-[9px] text-gray-400 uppercase tracking-widest mb-3 font-bold">
+              {MONTHS_FULL[cell.month - 1]} {cell.year} — click a sector to see its stocks
+            </div>
+            <div className="space-y-1">
+              {(sectors || []).map(s => {
+                const isActive = activeSectorIndex === s.name
+                return (
+                  <div key={s.index_id} className="rounded-xl overflow-hidden border border-transparent hover:border-gray-100 dark:hover:border-gray-800 transition-colors">
+                    <button
+                      onClick={() => { if (!s.name) return; setActiveSectorIndex(isActive ? null : s.name) }}
+                      className={`w-full text-left px-3 py-2 transition-colors ${
+                        isActive
+                          ? 'bg-blue-50 dark:bg-blue-950/30'
+                          : 'hover:bg-gray-50 dark:hover:bg-gray-800/40'}`}
+                    >
+                      <SectorBar name={s.label || s.name} ret={s.return_pct} maxAbs={maxAbs} />
+                    </button>
+                    {isActive && s.name && (
+                      <CompanyList
+                        sectorIndex={s.name}
+                        label={s.label}
+                        year={cell.year}
+                        month={cell.month}
+                        onClose={() => setActiveSectorIndex(null)}
+                      />
+                    )}
+                  </div>
+                )
+              })}
+            </div>
+            {sectors?.length > 0 && (
+              <div className="mt-4 pt-3 border-t border-gray-100 dark:border-gray-800 grid grid-cols-2 gap-3">
+                <div className="rounded-xl bg-green-50 dark:bg-green-900/10 px-4 py-2.5">
+                  <div className="text-[9px] text-green-500 font-bold uppercase mb-0.5">Best Sector</div>
+                  <div className="text-xs font-bold text-green-700 dark:text-green-400">
+                    {(sectors[0].label || sectors[0].name).replace(' Sub-Index','').replace(' Index','')}
+                  </div>
+                  <div className="text-sm font-black text-green-500">{fmtPct(sectors[0].return_pct)}</div>
+                </div>
+                <div className="rounded-xl bg-red-50 dark:bg-red-900/10 px-4 py-2.5">
+                  <div className="text-[9px] text-red-400 font-bold uppercase mb-0.5">Worst Sector</div>
+                  <div className="text-xs font-bold text-red-700 dark:text-red-400">
+                    {(sectors[sectors.length-1].label || sectors[sectors.length-1].name).replace(' Sub-Index','').replace(' Index','')}
+                  </div>
+                  <div className="text-sm font-black text-red-400">{fmtPct(sectors[sectors.length-1].return_pct)}</div>
+                </div>
+              </div>
+            )}
+          </div>
+        )}
       </div>
 
-      <div className="shrink-0 px-2.5 py-1 border-t border-gray-100 dark:border-gray-800">
-        <span className="text-[8px] text-gray-300 dark:text-gray-700">Esc to close · ← → to navigate</span>
+      <div className="shrink-0 px-4 py-1.5 border-t border-gray-100 dark:border-gray-800 bg-white dark:bg-gray-900">
+        <span className="text-[9px] text-gray-300 dark:text-gray-700">Esc to close · ← → arrow keys navigate months</span>
       </div>
     </div>
   )
@@ -933,6 +929,8 @@ export default function InsightPage() {
   }, [])
 
   // Navigate to prev/next month from the detail panel
+  const handleCloseDetail = useCallback(() => setSelected(null), [])
+
   const handleNavigate = useCallback((dir) => {
     if (!selected || !allYears.length) return
     let { year, month } = selected
@@ -1052,7 +1050,7 @@ export default function InsightPage() {
               ))}
             </div>
             {selected && (
-              <button onClick={() => setSelected(null)}
+              <button onClick={handleCloseDetail}
                 className="text-[9px] text-gray-400 hover:text-gray-600 dark:hover:text-gray-300 px-2 py-0.5
                   border border-gray-200 dark:border-gray-700 rounded transition-colors">
                 × Clear
@@ -1246,28 +1244,17 @@ export default function InsightPage() {
         </div>
       </div>
 
-      {/* ── Right Detail Panel — desktop only ───────────────────────────── */}
-      <div className="hidden md:block">
-        <DetailPanel
-          cell={selected}
-          onClose={() => setSelected(null)}
-          onNavigate={handleNavigate}
-          dark={dark}
-          allYears={allYears}
-          indexId={selectedIndexId}
-        />
-      </div>
-
-      {/* Mobile: detail panel as full-screen overlay */}
+      {/* ── Full-page detail overlay — below navbar (top-[56px]) ── */}
       {selected && (
-        <div className="md:hidden fixed inset-0 z-50 bg-white dark:bg-gray-900 flex flex-col">
+        <div className="fixed inset-x-0 top-[56px] bottom-0 z-40 bg-white dark:bg-gray-950 flex flex-col">
           <DetailPanel
             cell={selected}
-            onClose={() => setSelected(null)}
+            onClose={handleCloseDetail}
             onNavigate={handleNavigate}
             dark={dark}
             allYears={allYears}
             indexId={selectedIndexId}
+            fullPage
           />
         </div>
       )}

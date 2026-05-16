@@ -458,7 +458,7 @@ function SectorHeatmap({ year, dark }) {
 
   return (
     <div className="overflow-x-auto">
-      <table className="w-full border-collapse text-[10px]">
+      <table className="border-collapse text-[10px]">
         <thead>
           <tr>
             <th className="px-2 py-1.5 text-left text-[9px] font-semibold text-gray-400 whitespace-nowrap sticky left-0 bg-white dark:bg-gray-950 z-10">Sector</th>
@@ -928,7 +928,18 @@ export default function BreakdownPage() {
     setDetecting(false)
   }, [])
 
-  useEffect(() => { detectCycles(threshold, indexId) }, []) // eslint-disable-line react-hooks/exhaustive-deps
+  const mountedRef = useRef(false)
+  useEffect(() => {
+    if (mountedRef.current) return
+    mountedRef.current = true
+    detectCycles(threshold, indexId)
+  }, []) // eslint-disable-line react-hooks/exhaustive-deps
+
+  const handleIndexSelect = useCallback((id) => {
+    if (id === indexId) return
+    setIndexId(id)
+    detectCycles(threshold, id)
+  }, [indexId, threshold, detectCycles])
 
   // ── Run analysis for a selected cycle ───────────────────────────────────────
   const runAnalysis = useCallback(async (cycle) => {
@@ -1080,6 +1091,17 @@ export default function BreakdownPage() {
 
   const selectedIndexLabel = INDEX_OPTIONS.find(o => o.id === indexId)?.label || 'NEPSE'
 
+  // Memoize sliced candles for the active cycle so the inline filter
+  // doesn't rebuild Date objects on every hover/state change
+  const cycleCandles = useMemo(() => {
+    if (!activeCycle || !allCandles.length) return []
+    const from = new Date(activeCycle.start_date); from.setDate(from.getDate() - 30)
+    const to   = new Date(activeCycle.end_date);   to.setDate(to.getDate() + 200)
+    const fromStr = from.toISOString().slice(0, 10)
+    const toStr   = to.toISOString().slice(0, 10)
+    return allCandles.filter(c => c.date >= fromStr && c.date <= toStr)
+  }, [activeCycle, allCandles])
+
   return (
     <div className="flex flex-col h-full bg-white dark:bg-gray-950 overflow-hidden">
 
@@ -1090,11 +1112,7 @@ export default function BreakdownPage() {
         <IndexSelector
           options={INDEX_OPTIONS}
           activeId={indexId}
-          onSelect={useCallback(id => {
-            if (id === indexId) return
-            setIndexId(id)
-            detectCycles(threshold, id)
-          }, [indexId, threshold, detectCycles])}
+          onSelect={handleIndexSelect}
         />
 
         <div className="w-px h-4 bg-gray-200 dark:bg-gray-700 shrink-0" />
@@ -1424,11 +1442,7 @@ export default function BreakdownPage() {
                       {selectedIndexLabel} — {activeCycle.start_date} to {activeCycle.end_date}
                     </p>
                     <PriceChart
-                      candles={allCandles.filter(c => {
-                        const from = new Date(activeCycle.start_date); from.setDate(from.getDate() - 30)
-                        const to   = new Date(activeCycle.end_date);   to.setDate(to.getDate() + 200)
-                        return c.date >= from.toISOString().slice(0, 10) && c.date <= to.toISOString().slice(0, 10)
-                      })}
+                      candles={cycleCandles}
                       startDate={activeCycle.start_date}
                       endDate={activeCycle.end_date}
                       type={activeCycle.type}
@@ -1527,9 +1541,8 @@ export default function BreakdownPage() {
           {/* No cycle selected yet (detail tab before any selection) */}
           {view === 'detail' && !activeCycle && (
             <div className="flex-1 flex items-center justify-center text-[12px] text-gray-400 text-center px-4">
-              {window.innerWidth < 768
-                ? 'Tap "Cycles" in the toolbar above to select a cycle'
-                : 'Select a cycle from the left panel or click a zone on the overview chart'}
+              <span className="md:hidden">Tap &ldquo;Cycles&rdquo; in the toolbar above to select a cycle</span>
+              <span className="hidden md:inline">Select a cycle from the left panel or click a zone on the overview chart</span>
             </div>
           )}
         </div>

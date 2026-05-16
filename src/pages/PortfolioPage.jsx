@@ -552,7 +552,7 @@ function DrawdownWidget({ equityCurve, currentDrawdown, maxDrawdown, peakEquity,
         </div>
       </div>
 
-      <div className="px-2 pt-3 pb-1">
+      <div className="px-2 pt-3 pb-3">
         {tab === 'equity' ? (
           <ResponsiveContainer width="100%" height={180}>
             <AreaChart data={equityCurve} margin={{ top: 4, right: 8, left: 4, bottom: 0 }}>
@@ -911,7 +911,7 @@ function PortfolioPage() {
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
 
         {/* Allocation pie */}
-        <div className="bg-white dark:bg-gray-900 rounded-2xl border border-gray-100 dark:border-gray-800 p-4">
+        <div className="bg-white dark:bg-gray-900 rounded-2xl border border-gray-100 dark:border-gray-800 p-4 flex flex-col">
           {openPositions.length > 0
             ? <AllocationDonut openPositions={openPositions.map(p => ({ ...p, entry_price: p.wacc, remaining_quantity: p.total_qty, quantity: p.total_qty }))} />
             : (
@@ -960,7 +960,7 @@ function PortfolioPage() {
               ].filter(Boolean),
             },
           ].map((s, i) => (
-            <div key={i} className={`bg-white dark:bg-gray-900 rounded-2xl border border-gray-100 dark:border-gray-800 border-t-2 ${s.accent} p-4 flex flex-col gap-3`}>
+            <div key={i} className={`bg-white dark:bg-gray-900 rounded-2xl border border-gray-100 dark:border-gray-800 border-t-2 ${s.accent} p-4 flex flex-col gap-3 min-h-[120px]`}>
               <div>
                 <p className="text-[9px] font-semibold uppercase tracking-widest text-gray-400 mb-1.5">{s.label}</p>
                 <p className={`text-[22px] font-black tracking-tight leading-none tabular-nums ${s.cls}`}>{s.value}</p>

@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef, useCallback, forwardRef, useImperativeHandle } from 'react'
+import { useState, useEffect, useRef, useCallback, useMemo, forwardRef, useImperativeHandle } from 'react'
 import { useTheme } from '../../context/ThemeContext'
 import { getPerformance } from '../../api'
 import { getMarketSymbols, gCache, TTL as CACHE_TTL } from '../../utils/globalCache'
@@ -96,7 +96,7 @@ function SymbolSearch({ value, onChange }) {
 
   return (
     <div className="relative">
-      <div className="flex items-center gap-2 bg-gray-50 dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-xl px-3 py-2 min-w-[200px]">
+      <div className="flex items-center gap-2 bg-gray-50 dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-xl px-3 py-2 w-[160px] sm:w-[200px]">
         <svg className="w-4 h-4 text-gray-400 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor">
           <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-4.35-4.35M17 11A6 6 0 1 1 5 11a6 6 0 0 1 12 0z" />
         </svg>
@@ -188,6 +188,7 @@ const MiniCandle = forwardRef(function MiniCandle({ data, height = 360 }, fwdRef
         chart.timeScale().fitContent()
       }
 
+      if (cancelled || !domRef.current) return
       const ro = new ResizeObserver(() => {
         if (domRef.current && chartR.current) chartR.current.applyOptions({ width: domRef.current.clientWidth })
       })
@@ -358,7 +359,7 @@ function CycleRow({ swing, nepse, stock, symbol, expanded, onToggle, maxAlpha })
   // Wire crosshair sync once charts mount (when expanded)
   useEffect(() => {
     if (!expanded) return
-    // Wait a tick for MiniCandle to build its chart
+    let unsubscribers = []
     const tid = setTimeout(() => {
       const nc = nepseRef.current?.getChart()
       const sc = stockRef.current?.getChart()
@@ -367,7 +368,7 @@ function CycleRow({ swing, nepse, stock, symbol, expanded, onToggle, maxAlpha })
       if (!nc || !sc) return
 
       function syncCursor(source, target, sourceSeries, targetSeries) {
-        source.subscribeCrosshairMove(param => {
+        const unsub = source.subscribeCrosshairMove(param => {
           if (syncingRef.current) return
           syncingRef.current = true
           try {
@@ -383,6 +384,7 @@ function CycleRow({ swing, nepse, stock, symbol, expanded, onToggle, maxAlpha })
           } catch (_) {}
           syncingRef.current = false
         })
+        if (unsub) unsubscribers.push(unsub)
       }
 
       if (ns && ss) {
@@ -391,21 +393,27 @@ function CycleRow({ swing, nepse, stock, symbol, expanded, onToggle, maxAlpha })
       }
 
       // Also sync time scale scroll/zoom
-      nc.timeScale().subscribeVisibleLogicalRangeChange(range => {
+      const unsubNR = nc.timeScale().subscribeVisibleLogicalRangeChange(range => {
         if (syncingRef.current || !range) return
         syncingRef.current = true
         sc.timeScale().setVisibleLogicalRange(range)
         syncingRef.current = false
       })
-      sc.timeScale().subscribeVisibleLogicalRangeChange(range => {
+      const unsubSR = sc.timeScale().subscribeVisibleLogicalRangeChange(range => {
         if (syncingRef.current || !range) return
         syncingRef.current = true
         nc.timeScale().setVisibleLogicalRange(range)
         syncingRef.current = false
       })
+      if (unsubNR) unsubscribers.push(unsubNR)
+      if (unsubSR) unsubscribers.push(unsubSR)
     }, 100)
 
-    return () => clearTimeout(tid)
+    return () => {
+      clearTimeout(tid)
+      unsubscribers.forEach(fn => { try { fn() } catch (_) {} })
+      unsubscribers = []
+    }
   }, [expanded])
 
   return (
@@ -582,8 +590,9 @@ export default function PerformanceChart() {
 
   useEffect(() => { fetch() }, [fetch])
 
-  // Max alpha across all swings for consistent bar scaling
-  const maxAlpha = Math.max(
+  // Max alpha across all swings for consistent bar scaling — memoized to avoid
+  // recalculating slice()+stats() on every hover/expand state change
+  const maxAlpha = useMemo(() => Math.max(
     50,
     ...swings.map(sw => {
       const ns = slice(nepse, sw.from, sw.to)
@@ -591,13 +600,13 @@ export default function PerformanceChart() {
       const a  = stats(ns, ss).alpha
       return a != null ? Math.abs(a) : 0
     })
-  )
+  ), [swings, nepse, stock])
 
   return (
     <div className="flex flex-col h-full overflow-hidden bg-white dark:bg-gray-950">
 
       {/* ── Top bar ── */}
-      <div className="shrink-0 flex items-center gap-3 px-4 py-2 border-b border-gray-200 dark:border-gray-800 bg-white dark:bg-gray-900">
+      <div className="shrink-0 flex items-center gap-3 px-4 py-2 border-b border-gray-200 dark:border-gray-800 bg-white dark:bg-gray-900 flex-wrap overflow-x-auto">
 
         <SymbolSearch value={symbol} onChange={(sym, name) => { setSymbol(sym); setCompany(name); setExpanded(null) }} />
 
