@@ -1,5 +1,37 @@
 // ── Shared number / string formatting utilities ────────────────────────────────
-// Used by: BacktestReport, BacktestActivePanel, BacktestControls, InsightPage, BreakdownPage, AuditTab, PortfolioPage, PerformanceDashboard
+// Used by: BacktestReport, BacktestActivePanel, BacktestControls, InsightPage, BreakdownPage, AuditTab, PortfolioPage, PerformanceDashboard, RiskLabPage
+
+// ── NEPSE Equity broker commission (SEBON-regulated, effective 2024) ──────────
+// Source: SEBON official fee schedule
+// Tiers apply per transaction side (buy or sell separately)
+export function nepseCommission(amount) {
+  if (amount <= 0)          return 0
+  if (amount <= 2500)       return 10                 // flat Rs.10
+  if (amount <= 50000)      return amount * 0.0036    // 0.36%
+  if (amount <= 500000)     return amount * 0.0033    // 0.33%
+  if (amount <= 2000000)    return amount * 0.0031    // 0.31%
+  if (amount <= 10000000)   return amount * 0.0027    // 0.27%
+  return                           amount * 0.0024    // 0.24%
+}
+
+// SEBON transaction fee (separate from broker commission)
+export const sebonFee = (amount) => amount * 0.00015  // 0.015%
+
+// DP charge per stock per transaction day (flat)
+export const dpCharge = () => 25
+
+// Total charges for one side of a trade (buy or sell)
+export function nepseCharges(amount) {
+  return nepseCommission(amount) + sebonFee(amount) + dpCharge()
+}
+
+// CGT on net capital gain (individual investor rates)
+// Nepal: CGT is on net gain AFTER all transaction charges
+export function nepseCGT(netGain, entryDateStr, exitDateStr) {
+  if (netGain <= 0) return 0
+  const days = Math.max(0, Math.floor((new Date(exitDateStr) - new Date(entryDateStr)) / 86400000))
+  return netGain * (days >= 365 ? 0.05 : 0.075)
+}
 
 /**
  * Format a number as Nepali Rupees (rounded integer, no decimals).

@@ -3,29 +3,7 @@ import { useTheme } from '../../context/ThemeContext'
 import { useAuth } from '../../context/AuthContext'
 import { getTradeActions } from '../../api'
 import TraderCard from './TraderCard'
-
-// ── NEPSE broker commission tiers ─────────────────────────────────────────────
-function calcBrokerFee(tradeValue) {
-  if (tradeValue <= 0) return 0
-  let rate
-  if      (tradeValue <= 50000)    rate = 0.0060
-  else if (tradeValue <= 500000)   rate = 0.0055
-  else if (tradeValue <= 2000000)  rate = 0.0050
-  else if (tradeValue <= 10000000) rate = 0.0045
-  else                             rate = 0.0040
-  return tradeValue * rate
-}
-
-// Nepal CGT: 7.5% short-term (<365 days), 5% long-term (>=365 days)
-// Fiscal year: Jul 16 – Jul 15
-function calcCGT(pnl, entryDateStr, exitDateStr) {
-  if (pnl <= 0) return 0
-  const entry = new Date(entryDateStr)
-  const exit  = new Date(exitDateStr)
-  const days  = Math.max(0, Math.floor((exit - entry) / 86400000))
-  const rate  = days >= 365 ? 0.05 : 0.075
-  return pnl * rate
-}
+import { nepseCharges, nepseCGT } from '../../utils/format'
 
 // ── KPI card ──────────────────────────────────────────────────────────────────
 function KpiCard({ label, value, valueClass = 'text-gray-900 dark:text-white', sub, icon }) {
@@ -308,12 +286,12 @@ export default function AuditTab() {
 
       const entryVal = entry * qty
       const exitVal  = exitP * qty
-      brokerFees   += calcBrokerFee(entryVal) + calcBrokerFee(exitVal)
+      brokerFees   += nepseCharges(entryVal) + nepseCharges(exitVal)
       totalTradedValue += entryVal
       // CGT: t.date = exit date (action date), entryDateMap = entry date from New Position row
       const entryDate = entryDateMap[t.trade_id] || t.date
       if (pnl > 0 && entryDate && t.date) {
-        cgt += calcCGT(pnl, entryDate, t.date)
+        cgt += nepseCGT(pnl, entryDate, t.date)
       }
     }
 

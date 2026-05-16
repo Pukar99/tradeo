@@ -5,18 +5,11 @@ import {
   Tooltip, ResponsiveContainer, PieChart, Pie,
   Cell, BarChart, Bar, Legend
 } from 'recharts'
+import { nepseCommission, sebonFee, dpCharge } from '../utils/format'
 
-// ─── NEPSE Broker Commission ───────────────────────────────
-const getBrokerCommission = (amount) => {
-  if (amount <= 50000) return Math.max(amount * 0.0036, 10)
-  if (amount <= 500000) return amount * 0.0025
-  if (amount <= 2000000) return amount * 0.003
-  if (amount <= 10000000) return amount * 0.0027
-  return amount * 0.0024
-}
-
-const getSEBON = (amount) => amount * 0.00015
-const getDP = () => 25
+const getBrokerCommission = nepseCommission
+const getSEBON = sebonFee
+const getDP = dpCharge
 const getCGT = (gain, isLongTerm) => gain > 0 ? gain * (isLongTerm ? 0.05 : 0.075) : 0
 
 const PIE_COLORS = ['#3b82f6', '#ef4444', '#f59e0b', '#22c55e', '#8b5cf6']
