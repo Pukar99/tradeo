@@ -288,7 +288,7 @@ function ShowTradesCard({ result }) {
             const unrealized = ltp && t.status !== 'CLOSED'
               ? (t.position === 'LONG' ? ltp - entry : entry - ltp) * qty
               : null
-            const realized = t.status === 'CLOSED' ? parseFloat(t.realized_pnl || 0) : null
+            const realized = (t.status === 'CLOSED' || t.status === 'PARTIAL') ? parseFloat(t.realized_pnl || 0) : null
             const pnl = realized ?? unrealized
             const statusColor = t.status === 'OPEN'
               ? 'text-green-500' : t.status === 'PARTIAL' ? 'text-yellow-500' : 'text-gray-400'

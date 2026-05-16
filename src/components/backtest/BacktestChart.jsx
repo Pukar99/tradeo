@@ -97,7 +97,7 @@ export default function BacktestChart({ candles, cursorIndex, positions }) {
         size:     1,
       })
 
-      if (p.status === 'CLOSED' && p.exit_date) {
+      if ((p.status === 'CLOSED' || p.status === 'PARTIAL') && p.exit_date) {
         const exitDate = p.exit_date.slice(0, 10)
         if (exitDate <= visibleUntil) {
           const pnl      = parseFloat(p.net_pnl) || 0

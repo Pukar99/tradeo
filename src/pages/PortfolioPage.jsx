@@ -104,11 +104,13 @@ function RiskHeatDashboard({ positions }) {
 
   const enriched = positions.map(t => {
     const ltp   = t.currentPrice
-    const entry = parseFloat(t.entry_price) || 0
-    const qty   = parseFloat(t.remaining_quantity ?? t.quantity) || 0
-    const risk  = riskLevel(t.position, ltp, entry, t.sl)
+    // position_view uses wacc + total_qty + direction (not entry_price/remaining_quantity/position)
+    const entry = parseFloat(t.wacc) || 0
+    const qty   = parseFloat(t.total_qty) || 0
+    const dir   = (t.direction || 'LONG').toUpperCase()
+    const risk  = riskLevel(dir, ltp, entry, t.sl)
     const meta  = RISK_META[risk]
-    const days  = daysHeld(t.date)
+    const days  = daysHeld(t.opened_at)
     const be    = breakEven(entry, qty)
 
     // Distance to SL as % for progress bar (capped 0–100)
@@ -116,7 +118,7 @@ function RiskHeatDashboard({ positions }) {
     if (ltp != null && t.sl != null) {
       const s = parseFloat(t.sl)
       const e = entry
-      const raw = t.position === 'LONG'
+      const raw = dir === 'LONG'
         ? ((parseFloat(ltp) - s) / (Math.abs(e - s) || 1)) * 100
         : ((s - parseFloat(ltp)) / (Math.abs(s - e) || 1)) * 100
       slDistPct = Math.max(0, Math.min(100, raw))
@@ -713,7 +715,7 @@ function PortfolioPage() {
   // ── Derived stats ─────────────────────────────────────────────────────────
 
   const openPositions   = positions.filter(p => p.status === 'OPEN' || p.status === 'PARTIAL')
-  const closedPositions = positions.filter(p => p.status === 'CLOSED')
+  const closedPositions = positions.filter(p => p.status === 'CLOSED' || p.status === 'PARTIAL')
 
   // Sum realized_pnl from all exit-type action rows (Close, Reversal, Partial Exit)
   const closedPnlByTrade = useMemo(() => {
@@ -1273,7 +1275,7 @@ function PortfolioPage() {
                         </div>
                       </td>
                       <td className="px-4 py-3 whitespace-nowrap">
-                        {p.status === 'CLOSED' ? (
+                        {(p.status === 'CLOSED' || p.status === 'PARTIAL') ? (
                           <span className={`text-[11px] font-bold tabular-nums ${signCls(pnl)}`}>
                             {pnl >= 0 ? '+' : ''}{fmtC(pnl)}
                           </span>
