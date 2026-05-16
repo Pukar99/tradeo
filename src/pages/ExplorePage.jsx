@@ -98,7 +98,7 @@ export default function ExplorePage() {
   }, [activeTab])
 
   return (
-    <div className="flex flex-col bg-white dark:bg-gray-950" style={{ height: 'calc(100vh - 56px)' }}>
+    <div className="flex flex-col bg-white dark:bg-gray-950" style={{ height: 'calc(100dvh - 56px)' }}>
 
       {/* ── Tab bar — fixed height, never scrolls away ── */}
       <div className="shrink-0 flex items-center gap-1 px-4 border-b border-gray-200 dark:border-gray-800 bg-white dark:bg-gray-900" style={{ height: 44 }}>
@@ -108,14 +108,14 @@ export default function ExplorePage() {
             <button
               key={tab.id}
               onClick={() => handleTab(tab.id)}
-              className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-[11px] font-semibold transition-all relative ${
+              className={`flex items-center gap-1.5 px-3 py-2.5 rounded-lg text-[11px] font-semibold transition-all relative min-h-[44px] ${
                 isActive
                   ? 'bg-blue-600 text-white shadow-sm'
                   : 'text-gray-500 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-gray-800 hover:text-gray-700 dark:hover:text-gray-200'
               }`}
             >
               {tab.icon}
-              <span className="hidden sm:inline">{tab.label}</span>
+              <span>{tab.label}</span>
               {tab.coming && (
                 <span className="absolute -top-1 -right-1 w-2 h-2 rounded-full bg-blue-400 border border-white dark:border-gray-900" />
               )}

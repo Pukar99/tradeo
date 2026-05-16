@@ -354,7 +354,7 @@ function ProfilePage() {
 
             <button
               onClick={() => editing ? handleCancelEdit() : setEditing(true)}
-              className={`px-4 py-2 rounded-xl text-sm font-medium transition-colors ${
+              className={`px-4 py-2.5 rounded-xl text-sm font-medium transition-colors min-h-[44px] ${
                 editing
                   ? 'bg-gray-700 text-gray-300 hover:bg-gray-600'
                   : 'bg-white bg-opacity-10 text-white hover:bg-opacity-20 border border-white border-opacity-20'
@@ -462,18 +462,18 @@ function ProfilePage() {
             </div>
           </div>
 
-          <div className="flex items-center gap-3">
+          <div className="flex flex-wrap items-center gap-3">
             <button
               onClick={handleSave}
               disabled={saving}
-              className="bg-blue-600 text-white px-6 py-2 rounded-xl text-sm font-medium hover:bg-blue-700 disabled:opacity-50 transition-colors"
+              className="bg-blue-600 text-white px-6 py-2.5 rounded-xl text-sm font-medium hover:bg-blue-700 disabled:opacity-50 transition-colors min-h-[44px]"
             >
               {saving ? 'Saving...' : 'Save Changes'}
             </button>
             <button
               type="button"
               onClick={() => setShowPasswordForm(!showPasswordForm)}
-              className="bg-gray-100 dark:bg-gray-700 text-gray-600 dark:text-gray-300 px-6 py-2 rounded-xl text-sm font-medium hover:bg-gray-200 dark:hover:bg-gray-600 transition-colors"
+              className="bg-gray-100 dark:bg-gray-700 text-gray-600 dark:text-gray-300 px-6 py-2.5 rounded-xl text-sm font-medium hover:bg-gray-200 dark:hover:bg-gray-600 transition-colors min-h-[44px]"
             >
               {showPasswordForm ? 'Cancel Password Change' : '🔒 Change Password'}
             </button>
@@ -551,7 +551,7 @@ function ProfilePage() {
           <button
             key={tab}
             onClick={() => setActiveTab(tab)}
-            className={`px-4 py-2 rounded-xl text-sm font-medium transition-colors capitalize ${
+            className={`px-4 py-2.5 rounded-xl text-sm font-medium transition-colors capitalize min-h-[44px] ${
               activeTab === tab
                 ? 'bg-blue-600 text-white'
                 : 'bg-white dark:bg-gray-800 text-gray-600 dark:text-gray-300 border border-gray-200 dark:border-gray-700 hover:bg-gray-50 dark:hover:bg-gray-700'

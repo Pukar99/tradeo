@@ -154,7 +154,7 @@ export default function PartialExitModal({ position, onClose, onSaved }) {
           </div>
         </div>
 
-        <form onSubmit={handleSubmit} className="overflow-y-auto flex-1 px-4 sm:px-6 py-5 space-y-4">
+        <form onSubmit={handleSubmit} className="overflow-y-auto flex-1 px-4 sm:px-6 py-5 space-y-4" style={{ paddingBottom: 'max(1.25rem, env(safe-area-inset-bottom))' }}>
 
           {/* ── REQUIRED ── */}
           <div className="grid grid-cols-2 gap-3">

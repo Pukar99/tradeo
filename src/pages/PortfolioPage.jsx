@@ -995,7 +995,7 @@ function PortfolioPage() {
             onAction={() => navigate('/logs')}
           />
         ) : (
-          <div className="overflow-x-auto no-scrollbar">
+          <div className="overflow-x-auto">
             <table className="w-full min-w-[520px]">
               <thead>
                 <tr className="border-b border-gray-50 dark:border-gray-800/60 bg-gray-50/30 dark:bg-gray-800/10">
@@ -1074,7 +1074,7 @@ function PortfolioPage() {
           />
         ) : (
           <>
-            <div className="overflow-x-auto no-scrollbar">
+            <div className="overflow-x-auto">
               <table className="w-full min-w-[600px]">
                 <thead>
                   <tr className="border-b border-gray-100 dark:border-gray-800">
@@ -1145,7 +1145,7 @@ function PortfolioPage() {
                         <td className="px-3 py-3">
                           <button
                             onClick={() => handleGoToChart(p)}
-                            className="opacity-0 group-hover:opacity-100 transition-opacity text-[9px] text-blue-500 hover:text-blue-400 font-semibold"
+                            className="opacity-100 lg:opacity-0 lg:group-hover:opacity-100 transition-opacity text-[9px] text-blue-500 hover:text-blue-400 font-semibold"
                           >
                             Chart →
                           </button>
@@ -1217,7 +1217,7 @@ function PortfolioPage() {
             onAction={() => { setFilterStatus('ALL'); setSearch('') }}
           />
         ) : (
-          <div className="overflow-x-auto no-scrollbar">
+          <div className="overflow-x-auto">
             <table className="w-full">
               <thead>
                 <tr className="border-b border-gray-100 dark:border-gray-800 bg-gray-50/40 dark:bg-gray-800/20">

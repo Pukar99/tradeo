@@ -144,7 +144,7 @@ function Navbar() {
         {/* Language toggle */}
         <button
           onClick={toggleLang}
-          className="flex items-center gap-1 px-2 py-1 rounded-lg text-xs text-gray-500 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors"
+          className="flex items-center gap-1 min-h-[44px] px-2.5 rounded-lg text-xs text-gray-500 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors"
           title={isNepali ? 'Switch to English' : 'नेपालीमा हेर्नुस्'}
           aria-label={isNepali ? 'Switch to English' : 'Switch to Nepali'}
         >
@@ -154,7 +154,7 @@ function Navbar() {
         {/* Theme toggle */}
         <button
           onClick={toggleTheme}
-          className="w-8 h-8 rounded-lg flex items-center justify-center text-gray-500 dark:text-gray-400 hover:text-gray-900 dark:hover:text-white hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors"
+          className="w-11 h-11 rounded-lg flex items-center justify-center text-gray-500 dark:text-gray-400 hover:text-gray-900 dark:hover:text-white hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors"
           title={isDark ? 'Switch to Light' : 'Switch to Dark'}
           aria-label={isDark ? 'Switch to light mode' : 'Switch to dark mode'}
         >
@@ -177,7 +177,7 @@ function Navbar() {
               aria-haspopup="true"
               aria-expanded={dropdownOpen}
               aria-label="Open user menu"
-              className="flex items-center gap-2 px-2 py-1.5 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors group"
+              className="flex items-center gap-2 px-2 min-h-[44px] rounded-lg hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors group"
             >
               <div className="w-7 h-7 rounded-full bg-green-500 flex items-center justify-center overflow-hidden flex-shrink-0">
                 {user.avatar_url && !avatarError ? (
@@ -270,15 +270,19 @@ function Navbar() {
           onClick={() => setMobileMenuOpen(prev => !prev)}
           aria-label={mobileMenuOpen ? 'Close menu' : 'Open menu'}
           aria-expanded={mobileMenuOpen}
-          className="lg:hidden w-8 h-8 flex items-center justify-center rounded-lg text-gray-500 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors"
+          className={`lg:hidden w-11 h-11 flex items-center justify-center rounded-xl transition-all ${
+            mobileMenuOpen
+              ? 'bg-green-500 text-white shadow-md shadow-green-500/30'
+              : 'text-gray-500 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-gray-800'
+          }`}
         >
           {mobileMenuOpen ? (
-            <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+            <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}>
+              <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" />
             </svg>
           ) : (
-            <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 6h16M4 12h16M4 18h16" />
+            <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+              <path strokeLinecap="round" strokeLinejoin="round" d="M4 6h16M4 12h16M4 18h16" />
             </svg>
           )}
         </button>
@@ -286,23 +290,41 @@ function Navbar() {
 
       {/* ── Mobile menu drawer ──────────────────────────────────────────────── */}
       {mobileMenuOpen && (
-        <div className="lg:hidden absolute top-full left-0 right-0 bg-white dark:bg-gray-950 border-b border-gray-200 dark:border-gray-800 shadow-lg z-50">
-          <div className="px-4 py-2 space-y-0.5">
+        <div className="lg:hidden absolute top-full left-0 right-0 bg-white/95 dark:bg-gray-950/95 backdrop-blur-md border-b border-gray-200/60 dark:border-gray-800/60 shadow-xl z-50">
+          {/* green accent bar at top */}
+          <div className="h-0.5 bg-gradient-to-r from-green-500 via-green-400 to-transparent" />
+          <div className="px-4 py-3 space-y-1">
             {NAV_LINKS.map(link => (
               <Link
                 key={link.path}
                 to={link.path}
                 onClick={() => setMobileMenuOpen(false)}
-                className={`flex items-center px-3 py-3 min-h-[44px] rounded-lg text-sm font-medium transition-colors ${
+                className={`flex items-center justify-between px-4 py-3 min-h-[48px] rounded-xl text-sm font-semibold transition-all ${
                   isActive(link.path)
-                    ? 'bg-green-50 dark:bg-green-900/30 text-green-600 dark:text-green-400'
-                    : 'text-gray-600 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-800 hover:text-gray-900 dark:hover:text-white'
+                    ? 'bg-green-500 text-white shadow-sm shadow-green-500/30'
+                    : 'text-gray-600 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-800/80 hover:text-gray-900 dark:hover:text-white'
                 }`}
               >
-                {link.label}
+                <span>{link.label}</span>
+                {isActive(link.path) && (
+                  <span className="w-1.5 h-1.5 rounded-full bg-white/80" />
+                )}
               </Link>
             ))}
           </div>
+          {user && (
+            <div className="px-4 pb-3 pt-1 border-t border-gray-100 dark:border-gray-800/60">
+              <button
+                onClick={handleLogout}
+                className="w-full flex items-center gap-2 px-4 py-3 min-h-[48px] rounded-xl text-sm font-semibold text-red-500 hover:bg-red-50 dark:hover:bg-red-900/20 transition-all"
+              >
+                <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                  <path strokeLinecap="round" strokeLinejoin="round" d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1" />
+                </svg>
+                {t('nav.logout')}
+              </button>
+            </div>
+          )}
         </div>
       )}
     </nav>

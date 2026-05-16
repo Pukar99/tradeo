@@ -338,7 +338,7 @@ export default function AddTradeModal({ onClose, onSaved, existingPosition }) {
         )}
 
         {/* scrollable body */}
-        <form onSubmit={handleSubmit} className="overflow-y-auto flex-1 px-4 sm:px-6 py-5 space-y-5">
+        <form onSubmit={handleSubmit} className="overflow-y-auto flex-1 px-4 sm:px-6 py-5 space-y-5" style={{ paddingBottom: 'max(1.25rem, env(safe-area-inset-bottom))' }}>
 
           {/* ── REQUIRED SECTION ── */}
           <section>
@@ -561,7 +561,7 @@ export default function AddTradeModal({ onClose, onSaved, existingPosition }) {
             <div className="text-center">
               <button type="button" disabled={saving}
                 onClick={e => handleSubmit(null, true)}
-                className="text-[11px] text-gray-400 dark:text-gray-600 hover:text-gray-500 dark:hover:text-gray-400 transition-colors disabled:opacity-50">
+                className="w-full py-2 text-[11px] text-gray-400 dark:text-gray-600 hover:text-gray-500 dark:hover:text-gray-400 transition-colors disabled:opacity-50 min-h-[36px]">
                 Save without journal →
               </button>
             </div>

@@ -188,7 +188,7 @@ export default function LogsPage() {
             {TABS.map(tab => (
               <button key={tab.key}
                 onClick={() => setActiveTab(tab.key)}
-                className={`px-3 sm:px-4 py-1.5 rounded-lg text-xs font-semibold transition-all ${
+                className={`px-3 sm:px-4 py-2.5 rounded-lg text-xs font-semibold transition-all min-h-[44px] ${
                   activeTab === tab.key
                     ? 'bg-white dark:bg-gray-900 text-gray-900 dark:text-white shadow-sm'
                     : 'text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-300'
@@ -203,7 +203,7 @@ export default function LogsPage() {
           {activeTab === 'trades' && (
             <button
               onClick={() => setAddModal(true)}
-              className="flex items-center gap-1.5 px-3.5 py-1.5 text-[11px] font-bold rounded-xl bg-blue-600 hover:bg-blue-500 active:bg-blue-700 text-white transition-all shadow-sm shadow-blue-500/30">
+              className="flex items-center gap-1.5 px-3.5 py-2.5 text-[11px] font-bold rounded-xl bg-blue-600 hover:bg-blue-500 active:bg-blue-700 text-white transition-all shadow-sm shadow-blue-500/30 min-h-[44px]">
               <span className="text-sm leading-none">+</span>
               <span className="hidden xs:inline">New Trade</span>
               <span className="xs:hidden">New</span>
@@ -252,7 +252,7 @@ export default function LogsPage() {
                 ))}
               </div>
 
-              <div className="relative">
+              <div className="relative flex-1 min-w-0">
                 <span className="absolute left-2.5 top-1/2 -translate-y-1/2 text-gray-400 dark:text-gray-500 text-[11px] pointer-events-none select-none">⌕</span>
                 <input
                   type="text"
@@ -260,7 +260,7 @@ export default function LogsPage() {
                   onChange={e => setSearch(e.target.value)}
                   placeholder="Symbol"
                   list="symbol-datalist"
-                  className="pl-6 pr-3 py-1 w-24 text-[11px] rounded-lg border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-900 text-gray-800 dark:text-gray-200 focus:outline-none focus:ring-1 focus:ring-blue-500 focus:w-32 transition-all"
+                  className="pl-6 pr-3 py-1 w-full min-w-[80px] text-[11px] rounded-lg border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-900 text-gray-800 dark:text-gray-200 focus:outline-none focus:ring-1 focus:ring-blue-500 transition-all"
                 />
                 <datalist id="symbol-datalist">
                   {allSymbols.map(s => <option key={s} value={s} />)}
