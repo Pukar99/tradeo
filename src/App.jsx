@@ -1,5 +1,5 @@
 import { BrowserRouter, Routes, Route, useLocation, useNavigate } from 'react-router-dom'
-import { Component, useEffect, useMemo, lazy, Suspense } from 'react'
+import { Component, useEffect, useMemo, lazy, Suspense, useRef } from 'react'
 import toast, { Toaster } from 'react-hot-toast'
 import { PriceAlertContainer, useAlertToasts } from './components/PriceAlertToast'
 import { usePriceAlerts } from './hooks/usePriceAlerts'
@@ -138,7 +138,7 @@ function AppContent() {
   }, [userId]) // eslint-disable-line react-hooks/exhaustive-deps
 
   return (
-    <div className="min-h-screen bg-gray-50 dark:bg-gray-900 transition-colors">
+    <div className="min-h-screen bg-gray-50 dark:bg-gray-900 transition-colors" translate="no">
       {!isAuthPage && <Navbar />}
       <Suspense fallback={<PageSpinner />}>
         <Routes>

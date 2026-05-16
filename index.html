@@ -53,41 +53,17 @@
           'google_translate_element'
         )
       }
-
-      // Intercept body.style.top before Google Translate can set it.
-      // Object.defineProperty overrides the setter so any JS write to
-      // document.body.style.top is silently ignored — the navbar never shifts.
-      function lockBodyTop() {
-        try {
-          var bodyStyle = document.body.style
-          var topDesc = Object.getOwnPropertyDescriptor(CSSStyleDeclaration.prototype, 'top')
-          if (!topDesc) return
-          var _set = topDesc.set.bind(bodyStyle)
-          Object.defineProperty(bodyStyle, 'top', {
-            get: topDesc.get.bind(bodyStyle),
-            set: function(val) {
-              // Always force 0 — ignore Google Translate's negative value
-              _set('0px')
-            },
-            configurable: true,
-          })
-        } catch(e) {}
-      }
-
-      // Run immediately and again after GT loads
-      document.addEventListener('DOMContentLoaded', lockBodyTop)
-      setTimeout(lockBodyTop, 500)
-      setTimeout(lockBodyTop, 1500)
     </script>
     <script type="text/javascript"
       src="//translate.google.com/translate_a/element.js?cb=googleTranslateElementInit">
     </script>
 
     <script>
-      // Belt-and-suspenders: MutationObserver watches body attribute changes
-      // and resets top if Google Translate somehow bypasses the setter override.
+      // Google Translate sets body.style.top to a negative value to make room
+      // for its toolbar. We reset it immediately via MutationObserver so the
+      // page layout never shifts and navbar click targets stay correct.
       var gtObserver = new MutationObserver(function() {
-        if (document.body.style.top && document.body.style.top !== '0px') {
+        if (document.body && document.body.style.top && document.body.style.top !== '0px') {
           document.body.style.top = '0px'
         }
         document.querySelectorAll('iframe.skiptranslate, .goog-te-banner-frame').forEach(function(el) {
@@ -103,7 +79,7 @@
     <!-- Google Translate mount — kept in DOM but hidden off-screen -->
     <div id="google_translate_element"></div>
 
-    <div id="root"></div>
+    <div id="root" translate="no"></div>
     <script type="module" src="/src/main.jsx"></script>
   </body>
 </html>
