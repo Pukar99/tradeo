@@ -105,7 +105,25 @@ export const safeFloat = (v, fallback = 0) => {
  * returns a clean, user-friendly string.
  * Pass a fallback string for when extraction fails.
  */
+/**
+ * Detects request cancellation across:
+ *  - Fetch `AbortError`
+ *  - Axios 1.x `CanceledError` (err.code === 'ERR_CANCELED')
+ *  - Axios legacy `Cancel` (err.__CANCEL__)
+ *  - String messages like 'canceled' / 'aborted'
+ * Use this before showing an error to the user — cancellations are intentional, not errors.
+ */
+export const isCanceled = (err) => {
+  if (!err) return false
+  if (err.name === 'AbortError' || err.name === 'CanceledError') return true
+  if (err.code === 'ERR_CANCELED' || err.__CANCEL__) return true
+  const msg = (err.message || '').toLowerCase()
+  if (msg === 'canceled' || msg === 'cancelled' || msg === 'aborted') return true
+  return false
+}
+
 export const apiError = (err, fallback = 'Something went wrong. Please try again.') => {
+  if (isCanceled(err)) return ''
   const msg = err?.response?.data?.message
            || err?.response?.data?.error
            || err?.message

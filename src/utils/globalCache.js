@@ -118,6 +118,17 @@ export async function getDashboardInit(fetchFn, force = false) {
   return result
 }
 
+// Registry for module-local caches that want to be flushed on login/logout
+// without globalCache having to import those modules (avoids pulling lazy
+// chunks like PerformanceChart into the auth code path).
+const _cleaners = new Set()
+export function registerCacheCleaner(fn) {
+  if (typeof fn === 'function') _cleaners.add(fn)
+}
+export function unregisterCacheCleaner(fn) {
+  _cleaners.delete(fn)
+}
+
 // Call this on login/logout to reset user-specific caches
 export function clearUserCache() {
   gCache.del('profile')
@@ -125,6 +136,8 @@ export function clearUserCache() {
   gCache.del('eligibility')
   gCache.delPrefix('tradelog')
   gCache.delPrefix('prices:')
+  // Drain any registered module-local caches
+  for (const fn of _cleaners) { try { fn() } catch {} }
 }
 
 // Call after closing a trade so the eligibility re-check picks up the new stats

@@ -54,8 +54,11 @@ export const sectorLabel = (sectorIndex, fallback) =>
   INDEX_BY_SI.get(sectorIndex)?.label ?? fallback ?? sectorIndex
 
 // English month abbreviations (0-indexed: MONTHS[0] = 'Jan')
-export const MONTHS    = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec']
-export const MONTHS_NP = ['Bai','Jes','Asa','Shr','Bha','Asw','Kar','Man','Pou','Mag','Fal','Cha']
+export const MONTHS      = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec']
+// Full English month names (0-indexed). Single source of truth — avoids drift
+// from inline arrays in component files.
+export const MONTHS_FULL = ['January','February','March','April','May','June','July','August','September','October','November','December']
+export const MONTHS_NP   = ['Bai','Jes','Asa','Shr','Bha','Asw','Kar','Man','Pou','Mag','Fal','Cha']
 
 // Sector IDs used in InsightPage heatmap and BreakdownPage cycle analysis
 // (excludes main market indices 12/16/17)

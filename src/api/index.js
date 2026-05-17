@@ -165,8 +165,8 @@ export const deleteChatSession  = (id)         => API.delete(`/api/chat/sessions
 // Market — new DB-backed endpoints
 export const getMarketSymbols  = ()             => API.get('/api/market/symbols')
 export const getIndexChart     = (params)       => API.get('/api/market/index-chart', { params })
-export const getStockChart     = (params)       => API.get('/api/market/stock-chart', { params })
-export const getPerformance    = (params)       => API.get('/api/market/performance', { params })
+export const getStockChart     = (params, cfg)  => API.get('/api/market/stock-chart', { params, ...cfg })
+export const getPerformance    = (params, cfg)  => API.get('/api/market/performance', { params, ...cfg })
 export const getTopVolume      = (params)       => API.get('/api/market/top-volume', { params })
 export const getLatestDate     = ()             => API.get('/api/market/latest-date')
 export const getMarketDates    = ()             => API.get('/api/market/dates')
@@ -195,19 +195,20 @@ export const saveSetupType            = (name)            => API.post('/api/trad
 
 // Complex Tab — Insight
 export const getInsightSignals      = (params) => API.get('/api/insight/signals',        { params })
-export const getMonthlyReturns      = (params) => API.get('/api/insight/monthly-returns', { params })
-export const getMonthDetail         = (params) => API.get('/api/insight/month-detail',    { params })
-export const getSectorMonth         = (params) => API.get('/api/insight/sector-month',    { params })
+export const getMonthlyReturns      = (params, cfg) => API.get('/api/insight/monthly-returns', { params, ...cfg })
+export const getMonthDetail         = (params, cfg) => API.get('/api/insight/month-detail',    { params, ...cfg })
+export const getSectorMonth         = (params, cfg) => API.get('/api/insight/sector-month',    { params, ...cfg })
 
 // Complex Tab — Breakdown
 export const scanBreakdown          = (data)   => API.post('/api/breakdown/scan',              data)
 export const getSectorYear          = (params, cfg)   => API.get('/api/breakdown/sector-year',        { params, ...cfg })
+export const getSectorCycles        = (data, cfg)     => API.post('/api/breakdown/sector-cycles',     data, cfg)
 export const getSectorHistory       = (params) => API.get('/api/breakdown/sector-history',     { params })
 export const getStockReturns        = (params) => API.get('/api/breakdown/stock-returns',      { params })
 export const getStockMonthDetail    = (params) => API.get('/api/breakdown/stock-month-detail', { params })
-export const getSectorMonthStocks   = (params) => API.get('/api/breakdown/sector-month-stocks',{ params })
-export const getMarketCycles        = (params)        => API.get('/api/breakdown/market-cycles',      { params })
-export const runDropAnalysis        = (data)          => API.post('/api/breakdown/drop-analysis',     data)
+export const getSectorMonthStocks   = (params, cfg) => API.get('/api/breakdown/sector-month-stocks',{ params, ...cfg })
+export const getMarketCycles        = (params, cfg)   => API.get('/api/breakdown/market-cycles',      { params, ...cfg })
+export const runDropAnalysis        = (data, cfg)     => API.post('/api/breakdown/drop-analysis',     data, cfg)
 export const getSectorStocks        = (params, cfg)   => API.get('/api/breakdown/sector-stocks',      { params, ...cfg })
 export const getSectorIndexChart    = (params, cfg)   => API.get('/api/breakdown/sector-index-chart', { params, ...cfg })
 export const getStockPriceRange     = (params, cfg)   => API.get('/api/breakdown/stock-price-range',  { params, ...cfg })

@@ -1,13 +1,38 @@
 import { useState, useEffect, useRef, useCallback, useMemo, forwardRef, useImperativeHandle } from 'react'
 import { useTheme } from '../../context/ThemeContext'
 import { getPerformance } from '../../api'
-import { getMarketSymbols, gCache, TTL as CACHE_TTL } from '../../utils/globalCache'
+import { isCanceled } from '../../utils/format'
+import { getMarketSymbols, registerCacheCleaner } from '../../utils/globalCache'
+import { useToolbarSlot } from '../../pages/DataLabPage'
 
-// ── Cache ─────────────────────────────────────────────────────────────────────
-const CACHE_VER = 'v3'
-const _cache    = {}
-const PERF_TTL  = 60 * 60_000
-const fresh     = ts => ts && Date.now() - ts < PERF_TTL
+// ── Cache — capped at 20 entries (LRU eviction) ───────────────────────────────
+const CACHE_VER  = 'v3'
+const PERF_TTL   = 60 * 60_000
+const fresh      = ts => ts && Date.now() - ts < PERF_TTL
+const _cache     = {}
+const _cacheKeys = []  // insertion-order list for LRU eviction
+
+function cacheSet(key, value) {
+  if (_cache[key]) {
+    _cacheKeys.splice(_cacheKeys.indexOf(key), 1)
+  } else if (_cacheKeys.length >= 20) {
+    const evict = _cacheKeys.shift()
+    delete _cache[evict]
+  }
+  _cache[key] = value
+  _cacheKeys.push(key)
+}
+
+// Called from globalCache.clearUserCache() on login/logout so swapping accounts
+// doesn't leave the previous user's cycle/swing data visible.
+export function clearPerformanceCache() {
+  for (const k of Object.keys(_cache)) delete _cache[k]
+  _cacheKeys.length = 0
+}
+// Module-load side effect: hook into the global logout flow.
+// PerformanceChart is lazy-loaded so this only runs once the user opens DataLab.
+// That's the right time — before then, there's no cache to clear anyway.
+registerCacheCleaner(clearPerformanceCache)
 
 // ── Constants ─────────────────────────────────────────────────────────────────
 const THRESHOLDS = [5, 10, 15, 20]
@@ -37,28 +62,46 @@ function slice(arr, from, to) {
   if (!arr?.length) return []
   return arr.filter(d => d.date >= from && d.date <= to)
 }
+function calcDD(slice) {
+  if (slice.length < 2) return null
+  let peak = slice[0].close, dd = 0
+  for (const d of slice) {
+    if (d.close > peak) peak = d.close
+    const cur = ((d.close - peak) / peak) * 100
+    if (cur < dd) dd = cur
+  }
+  return dd
+}
 function stats(nSlice, sSlice) {
   const nRet  = pct(nSlice[0]?.close, nSlice[nSlice.length - 1]?.close)
   const sRet  = pct(sSlice[0]?.close, sSlice[sSlice.length - 1]?.close)
   const alpha = (nRet != null && sRet != null) ? sRet - nRet : null
-  let maxDD   = null
-  if (sSlice.length > 1) {
-    let peak = sSlice[0].close, dd = 0
-    for (const d of sSlice) {
-      if (d.close > peak) peak = d.close
-      const cur = ((d.close - peak) / peak) * 100
-      if (cur < dd) dd = cur
-    }
-    maxDD = dd
-  }
-  return { nRet, sRet, alpha, maxDD }
+  return { nRet, sRet, alpha, maxDD: calcDD(sSlice), nepseDD: calcDD(nSlice) }
 }
 function nameSwings(raw) {
   let b = 1, be = 1
-  return raw.map((s, i) => ({
+  const named = raw.map((s, i) => ({
     ...s, id: i,
     name: s.type === 'bull' ? `Bull ${b++}` : `Bear ${be++}`,
   }))
+  return named.slice().reverse()
+}
+
+// ── Shared design tokens ──────────────────────────────────────────────────────
+const CARD   = 'bg-white dark:bg-gray-900 rounded-2xl border border-gray-100 dark:border-gray-800'
+const LABEL  = 'text-[9px] font-bold uppercase tracking-widest text-gray-400'
+const STITLE = 'text-[11px] font-semibold text-gray-700 dark:text-gray-200'
+const SVAL   = 'text-[13px] font-bold tabular-nums'
+
+// ── Skeleton ─────────────────────────────────────────────────────────────────
+function Skeleton() {
+  return (
+    <div className="space-y-2 px-4 py-6">
+      <div className="h-3 w-full bg-gray-100 dark:bg-gray-800 rounded animate-pulse" />
+      <div className="h-3 w-3/4 bg-gray-100 dark:bg-gray-800 rounded animate-pulse" />
+      <div className="h-3 w-1/2 bg-gray-100 dark:bg-gray-800 rounded animate-pulse" />
+    </div>
+  )
 }
 
 // ── Symbol Search ─────────────────────────────────────────────────────────────
@@ -67,76 +110,169 @@ function SymbolSearch({ value, onChange }) {
   const [open,   setOpen]   = useState(false)
   const [items,  setItems]  = useState([])
   const [cursor, setCursor] = useState(-1)
-  const ml   = useRef(false)
-  const list = useRef(null)
+  const [rect,   setRect]   = useState(null)
+  const wrapRef = useRef(null)
+  const ml      = useRef(false)
+  const list    = useRef(null)
 
   useEffect(() => {
-    getMarketSymbols().then(r => {
-      setItems(r.data.stocks || [])
-    }).catch(() => {})
+    getMarketSymbols().then(r => setItems(r.data.stocks || [])).catch(() => {})
   }, [])
 
   const lq  = q.toLowerCase()
   const flt = q.length < 1
     ? items.slice(0, 20)
-    : items.filter(s => s.symbol.toLowerCase().includes(lq) ||
-        (s.company_name && s.company_name.toLowerCase().includes(lq))).slice(0, 30)
+    : items.filter(s =>
+        s.symbol.toLowerCase().startsWith(lq) ||
+        s.symbol.toLowerCase().includes(lq) ||
+        (s.company_name && s.company_name.toLowerCase().includes(lq))
+      )
+      // symbols that start with the query float to top
+      .sort((a, b) => {
+        const as = a.symbol.toLowerCase().startsWith(lq) ? 0 : 1
+        const bs = b.symbol.toLowerCase().startsWith(lq) ? 0 : 1
+        return as - bs
+      })
+      .slice(0, 30)
 
+  function openDropdown() {
+    if (wrapRef.current) setRect(wrapRef.current.getBoundingClientRect())
+    setOpen(true)
+  }
   function pick(s) { setQ(s.symbol); setOpen(false); setCursor(-1); onChange(s.symbol, s.company_name || null) }
+  function clear()  { setQ(''); setOpen(false); onChange('', null) }
   function onKey(e) {
-    if (!open) { setOpen(true); return }
-    if (e.key === 'ArrowDown') { e.preventDefault(); setCursor(c => Math.min(c + 1, flt.length - 1)) }
-    if (e.key === 'ArrowUp')   { e.preventDefault(); setCursor(c => Math.max(c - 1, 0)) }
-    if (e.key === 'Enter' && cursor >= 0) pick(flt[cursor])
+    if (e.key === 'ArrowDown') { e.preventDefault(); openDropdown(); setCursor(c => Math.min(c + 1, flt.length - 1)); return }
+    if (e.key === 'ArrowUp')   { e.preventDefault(); setCursor(c => Math.max(c - 1, 0)); return }
+    if (e.key === 'Enter') {
+      e.preventDefault()
+      // Pick highlighted result first. If no highlight, only auto-pick when the
+      // top result is an EXACT prefix match — otherwise user may be mid-typing
+      // and we'd silently swap symbols on them.
+      if (cursor >= 0 && flt[cursor]) {
+        pick(flt[cursor])
+      } else if (flt[0]?.symbol?.toLowerCase() === q.toLowerCase()) {
+        pick(flt[0])
+      }
+      return
+    }
     if (e.key === 'Escape') { setOpen(false); setCursor(-1) }
   }
+
   useEffect(() => {
     if (cursor >= 0 && list.current) list.current.children[cursor]?.scrollIntoView({ block: 'nearest' })
   }, [cursor])
 
+  // Reposition the dropdown when the page scrolls / resizes — without this,
+  // any wheel scroll outside the search detaches the dropdown from its input.
+  useEffect(() => {
+    if (!open) return
+    function reposition() {
+      if (wrapRef.current) setRect(wrapRef.current.getBoundingClientRect())
+    }
+    window.addEventListener('scroll', reposition, true)
+    window.addEventListener('resize', reposition)
+    return () => {
+      window.removeEventListener('scroll', reposition, true)
+      window.removeEventListener('resize', reposition)
+    }
+  }, [open])
+
+  // Highlight matched portion of text
+  function highlight(text, query) {
+    if (!query || !text) return text
+    const idx = text.toLowerCase().indexOf(query.toLowerCase())
+    if (idx === -1) return text
+    return (
+      <>
+        {text.slice(0, idx)}
+        <mark className="bg-blue-100 dark:bg-blue-900/60 text-blue-700 dark:text-blue-300 rounded-sm px-px">{text.slice(idx, idx + query.length)}</mark>
+        {text.slice(idx + query.length)}
+      </>
+    )
+  }
+
   return (
-    <div className="relative">
-      <div className="flex items-center gap-2 bg-gray-50 dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-xl px-3 py-2 w-[160px] sm:w-[200px]">
-        <svg className="w-4 h-4 text-gray-400 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+    <>
+      {/* Input */}
+      <div ref={wrapRef}
+        className="flex items-center gap-1.5 px-2 py-0.5 rounded-lg border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-900 w-[160px] focus-within:border-blue-400 dark:focus-within:border-blue-600 focus-within:ring-1 focus-within:ring-blue-200 dark:focus-within:ring-blue-900 transition-all">
+        <svg className="w-3 h-3 text-gray-400 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor">
           <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-4.35-4.35M17 11A6 6 0 1 1 5 11a6 6 0 0 1 12 0z" />
         </svg>
-        <input value={q}
-          onChange={e => { setQ(e.target.value); setOpen(true); setCursor(-1) }}
-          onFocus={() => setOpen(true)}
+        <input
+          value={q}
+          onChange={e => { setQ(e.target.value); openDropdown(); setCursor(-1) }}
+          onFocus={openDropdown}
           onBlur={() => { if (!ml.current) setOpen(false) }}
           onKeyDown={onKey}
-          placeholder="Search symbol…"
-          className="bg-transparent text-sm font-semibold text-gray-800 dark:text-gray-100 placeholder-gray-400 outline-none w-full"
+          placeholder="Symbol / company…"
+          maxLength={20}
+          className="bg-transparent text-[10px] font-semibold text-gray-800 dark:text-gray-100 placeholder-gray-300 dark:placeholder-gray-600 outline-none w-full"
         />
-        {q && <button onClick={() => { setQ(''); onChange('', null) }}
-          className="text-gray-300 hover:text-gray-500 text-lg leading-none">×</button>}
+        {q && (
+          <button onClick={clear} className="text-gray-300 hover:text-gray-500 dark:hover:text-gray-300 text-[14px] leading-none shrink-0">×</button>
+        )}
       </div>
-      {open && flt.length > 0 && (
-        <div className="absolute top-full mt-1 left-0 z-50 w-64 bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-700 rounded-xl shadow-2xl max-h-60 overflow-y-auto">
-          <ul ref={list}>
+
+      {/* Dropdown — fixed so it escapes overflow:hidden parents */}
+      {open && flt.length > 0 && rect && (
+        <div
+          className="fixed z-[999] bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-700 rounded-xl shadow-2xl overflow-hidden"
+          style={{ top: rect.bottom + 6, left: rect.left, width: 260 }}
+          onMouseEnter={() => { ml.current = true }}
+          onMouseLeave={() => { ml.current = false }}
+        >
+          {/* Header hint */}
+          <div className="px-3 py-1.5 border-b border-gray-100 dark:border-gray-800 flex items-center justify-between">
+            <span className="text-[9px] text-gray-400 font-medium">{flt.length} result{flt.length !== 1 ? 's' : ''}</span>
+            <span className="text-[9px] text-gray-300 dark:text-gray-700">↑↓ navigate · Enter select</span>
+          </div>
+          <ul ref={list} className="max-h-56 overflow-y-auto overscroll-contain bg-white dark:bg-gray-900 [scrollbar-width:thin] [&::-webkit-scrollbar]:w-1 [&::-webkit-scrollbar-thumb]:bg-gray-300 dark:[&::-webkit-scrollbar-thumb]:bg-gray-700 [&::-webkit-scrollbar-thumb]:rounded-full">
             {flt.map((s, i) => (
               <li key={s.symbol}
-                onMouseDown={() => { ml.current = true; pick(s); ml.current = false }}
-                className={`px-3 py-2 cursor-pointer ${i === cursor ? 'bg-blue-50 dark:bg-blue-950' : 'hover:bg-gray-50 dark:hover:bg-gray-800'}`}>
-                <div className="text-sm font-semibold text-gray-800 dark:text-gray-100">{s.symbol}</div>
-                {s.company_name && <div className="text-xs text-gray-400 truncate">{s.company_name}</div>}
+                // onPointerDown unifies mouse + touch + pen.
+                // preventDefault() stops the input's onBlur from firing first,
+                // which would close the dropdown before pick() registers.
+                onPointerDown={e => {
+                  e.preventDefault()
+                  ml.current = true
+                  pick(s)
+                  ml.current = false
+                }}
+                className={`flex items-center gap-2.5 px-3 py-2 cursor-pointer transition-colors ${
+                  i === cursor
+                    ? 'bg-blue-50 dark:bg-blue-950/50'
+                    : 'hover:bg-gray-50 dark:hover:bg-gray-800/60'
+                }`}>
+                <div className="w-1.5 h-1.5 rounded-full bg-blue-400 shrink-0 opacity-60" />
+                <div className="min-w-0">
+                  <div className="text-[11px] font-bold text-gray-800 dark:text-gray-100 leading-tight">
+                    {highlight(s.symbol, q)}
+                  </div>
+                  {s.company_name && (
+                    <div className="text-[9px] text-gray-400 truncate leading-tight">
+                      {highlight(s.company_name, q)}
+                    </div>
+                  )}
+                </div>
               </li>
             ))}
           </ul>
         </div>
       )}
-    </div>
+    </>
   )
 }
 
 // ── Inline candlestick chart — exposes chart instance via ref for cursor sync ──
 const MiniCandle = forwardRef(function MiniCandle({ data, height = 360 }, fwdRef) {
+  const fillParent = false // always use explicit height; CycleDetail uses a wrapper
   const { isDark } = useTheme()
   const domRef  = useRef(null)
   const chartR  = useRef(null)
   const seriesR = useRef(null)
 
-  // Expose chart instance to parent for crosshair sync
   useImperativeHandle(fwdRef, () => ({
     getChart:  () => chartR.current,
     getSeries: () => seriesR.current,
@@ -151,9 +287,10 @@ const MiniCandle = forwardRef(function MiniCandle({ data, height = 360 }, fwdRef
       chartR.current = null; seriesR.current = null
     }
 
-    const bg = isDark ? '#0a0f1a' : '#f8fafc'
+    // Match card bg exactly
+    const bg = isDark ? '#111827' : '#ffffff'
     const tx = isDark ? '#64748b' : '#94a3b8'
-    const br = isDark ? '#1e293b' : '#e2e8f0'
+    const br = isDark ? '#1f2937' : '#e2e8f0'
     const w  = domRef.current.clientWidth || 400
 
     loadLC().then(({ createChart }) => {
@@ -185,6 +322,27 @@ const MiniCandle = forwardRef(function MiniCandle({ data, height = 360 }, fwdRef
         })
         s.setData(data.map(d => ({ time: d.date, open: +d.open, high: +d.high, low: +d.low, close: +d.close })))
         seriesR.current = s
+
+        // Volume bars — bottom 20% of chart, only if data has turnover
+        const hasTov = data.some(d => (d.turnover || 0) > 0)
+        if (hasTov) {
+          chart.applyOptions({
+            rightPriceScale: { borderColor: br, scaleMargins: { top: 0.08, bottom: 0.22 } },
+          })
+          const vol = chart.addHistogramSeries({
+            priceFormat:  { type: 'volume' },
+            priceScaleId: 'vol',
+          })
+          chart.priceScale('vol').applyOptions({ scaleMargins: { top: 0.82, bottom: 0 } })
+          vol.setData(data.map(d => ({
+            time:  d.date,
+            value: d.turnover || 0,
+            color: +d.close >= +d.open
+              ? (isDark ? 'rgba(16,185,129,0.18)' : 'rgba(16,185,129,0.15)')
+              : (isDark ? 'rgba(239,68,68,0.18)'  : 'rgba(239,68,68,0.15)'),
+          })))
+        }
+
         chart.timeScale().fitContent()
       }
 
@@ -208,7 +366,7 @@ const MiniCandle = forwardRef(function MiniCandle({ data, height = 360 }, fwdRef
   return (
     <div className="relative w-full" style={{ height }}>
       {!data?.length && (
-        <div className="absolute inset-0 flex items-center justify-center text-sm text-gray-300 dark:text-gray-700">
+        <div className="absolute inset-0 flex items-center justify-center text-[11px] text-gray-400">
           No data
         </div>
       )}
@@ -217,337 +375,666 @@ const MiniCandle = forwardRef(function MiniCandle({ data, height = 360 }, fwdRef
   )
 })
 
-// ── Sparkline (tiny inline chart for the table) ───────────────────────────────
-function Sparkline({ data, color, width = 80, height = 32 }) {
-  const ref = useRef(null)
-
+// ── Wrapper that measures its container height and passes px to MiniCandle ───
+const AutoMiniCandle = forwardRef(function AutoMiniCandle({ data }, ref) {
+  const wrapRef = useRef(null)
+  const [h, setH] = useState(300)
   useEffect(() => {
-    const canvas = ref.current
-    if (!canvas || !data?.length) return
-    canvas.width  = width * 2   // retina
-    canvas.height = height * 2
-    const ctx = canvas.getContext('2d')
-    ctx.scale(2, 2)
-    ctx.clearRect(0, 0, width, height)
-
-    const closes = data.map(d => d.close)
-    const min    = Math.min(...closes)
-    const max    = Math.max(...closes)
-    const range  = max - min || 1
-    const pad    = 3
-
-    ctx.beginPath()
-    ctx.strokeStyle = color
-    ctx.lineWidth   = 1.5
-    ctx.lineJoin    = 'round'
-    closes.forEach((v, i) => {
-      const x = pad + (i / (closes.length - 1)) * (width - pad * 2)
-      const y = height - pad - ((v - min) / range) * (height - pad * 2)
-      i === 0 ? ctx.moveTo(x, y) : ctx.lineTo(x, y)
+    const el = wrapRef.current
+    if (!el) return
+    const ro = new ResizeObserver(([e]) => {
+      const px = Math.floor(e.contentRect.height)
+      if (px > 0) setH(px)
     })
-    ctx.stroke()
-  }, [data, color, width, height])
-
-  if (!data?.length) return <div style={{ width, height }} className="flex items-center justify-center text-[9px] text-gray-300">—</div>
-
+    ro.observe(el)
+    const initial = Math.floor(el.clientHeight)
+    if (initial > 0) setH(initial)
+    return () => ro.disconnect()
+  }, [])
   return (
-    <canvas ref={ref}
-      style={{ width, height, display: 'block' }}
-      className="rounded"
-    />
-  )
-}
-
-// ── Alpha bar (inline in table) ───────────────────────────────────────────────
-function AlphaBar({ alpha, maxAlpha = 50 }) {
-  if (alpha == null) return <span className="text-xs text-gray-400">—</span>
-  const w     = Math.min(Math.abs(alpha) / maxAlpha * 100, 100)
-  const color = alpha >= 0 ? '#10b981' : '#ef4444'
-  return (
-    <div className="flex items-center gap-1.5 w-full">
-      <div className="relative flex-1 h-2 bg-gray-100 dark:bg-gray-800 rounded-full overflow-hidden">
-        <div className="absolute inset-y-0 left-1/2 w-px bg-gray-300 dark:bg-gray-600 z-10" />
-        <div className="absolute top-0 h-full rounded-full"
-          style={{
-            width:  `${w / 2}%`,
-            left:   alpha >= 0 ? '50%' : `${50 - w / 2}%`,
-            background: color,
-          }} />
-      </div>
-      <span className="text-[11px] font-bold tabular-nums w-14 text-right shrink-0" style={{ color }}>
-        {alpha >= 0 ? '+' : ''}{alpha.toFixed(1)}pp
-      </span>
+    <div ref={wrapRef} className="w-full h-full">
+      <MiniCandle ref={ref} data={data} height={h} />
     </div>
   )
-}
+})
 
-// ── Summary strip — compact inline stats ──────────────────────────────────────
-function SummaryStrip({ swings, nepse, stock, symbol }) {
-  if (!swings.length) return null
-
-  const allStats = swings.map(sw => {
-    const ns = slice(nepse, sw.from, sw.to)
-    const ss = stock ? slice(stock, sw.from, sw.to) : []
-    return { ...stats(ns, ss), type: sw.type }
-  })
-
-  const bulls    = allStats.filter(s => s.type === 'bull')
-  const bears    = allStats.filter(s => s.type === 'bear')
-  const alphas   = allStats.map(s => s.alpha).filter(v => v != null)
-  const bAlphas  = bulls.map(s => s.alpha).filter(v => v != null)
-  const beAlphas = bears.map(s => s.alpha).filter(v => v != null)
-  const avg      = arr => arr.length ? arr.reduce((a, b) => a + b, 0) / arr.length : null
-  const outRate  = alphas.length ? alphas.filter(v => v > 0).length / alphas.length * 100 : null
-  const bullAvg  = avg(bAlphas)
-  const bearAvg  = avg(beAlphas)
+// ── Left panel cycle item ─────────────────────────────────────────────────────
+function CycleItem({ swing, precomp, symbol, isActive, onClick, index }) {
+  const isBull     = swing.type === 'bull'
+  const nepseSlice = precomp?.ns || []
+  const stockSlice = precomp?.ss || []
+  const st         = precomp?.st || {}
 
   return (
-    <div className="shrink-0 flex items-center gap-1 px-4 py-1.5 border-b border-gray-200 dark:border-gray-800 bg-gray-50/60 dark:bg-gray-900/40 overflow-x-auto">
-      {/* Cycles */}
-      <div className="flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 shrink-0">
-        <span className="text-[9px] font-semibold text-gray-400 uppercase">Cycles</span>
-        <span className="text-[13px] font-black text-gray-800 dark:text-gray-100 tabular-nums">{swings.length}</span>
-        <span className="text-[9px] text-gray-400">{bulls.length}▲{bears.length}▼</span>
-      </div>
-
-      <div className="w-px h-4 bg-gray-200 dark:bg-gray-700 mx-1 shrink-0" />
-
-      {/* Bull avg alpha */}
-      <div className="flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 shrink-0">
-        <span className="text-[9px] font-semibold text-gray-400 uppercase">Bull α</span>
-        <span className={`text-[13px] font-black tabular-nums ${bullAvg == null ? 'text-gray-400' : bullAvg >= 0 ? 'text-emerald-600 dark:text-emerald-400' : 'text-red-500'}`}>
-          {bullAvg == null ? '—' : `${bullAvg >= 0 ? '+' : ''}${bullAvg.toFixed(1)}`}
+    <button
+      onClick={onClick}
+      className={`w-full text-left px-3 py-2 border-b border-gray-100 dark:border-gray-800 transition-colors ${
+        isActive
+          ? isBull ? 'bg-emerald-50 dark:bg-emerald-900/20' : 'bg-red-50 dark:bg-red-900/20'
+          : index % 2 === 1
+            ? 'bg-gray-50/60 dark:bg-gray-800/30 hover:bg-gray-100 dark:hover:bg-gray-800/60'
+            : 'bg-white dark:bg-gray-900 hover:bg-gray-50 dark:hover:bg-gray-900/60'
+      }`}
+    >
+      {/* Always visible: badge + name + NEPSE % */}
+      <div className="flex items-center justify-between">
+        <div className="flex items-center gap-1">
+          <span className={`text-[8px] font-black ${
+            isBull ? 'text-emerald-500' : 'text-red-400'
+          }`}>{isBull ? '▲' : '▼'}</span>
+          <span className="text-[10px] font-semibold text-gray-700 dark:text-gray-200">{swing.name}</span>
+          {swing.current && <span className="text-[7px] font-bold text-blue-500 uppercase">·Live</span>}
+        </div>
+        <span className={`text-[10px] font-bold tabular-nums ${(st.nRet ?? 0) >= 0 ? 'text-emerald-600 dark:text-emerald-400' : 'text-red-500'}`}>
+          {fmtPct(st.nRet)}
         </span>
-        <span className="text-[9px] text-gray-400">{bAlphas.length}sw</span>
       </div>
 
-      {/* Bear avg alpha */}
-      <div className="flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 shrink-0">
-        <span className="text-[9px] font-semibold text-gray-400 uppercase">Bear α</span>
-        <span className={`text-[13px] font-black tabular-nums ${bearAvg == null ? 'text-gray-400' : bearAvg >= 0 ? 'text-emerald-600 dark:text-emerald-400' : 'text-red-500'}`}>
-          {bearAvg == null ? '—' : `${bearAvg >= 0 ? '+' : ''}${bearAvg.toFixed(1)}`}
-        </span>
-        <span className="text-[9px] text-gray-400">{beAlphas.length}sw</span>
-      </div>
+      {/* Expanded details */}
+      {isActive && (
+        <div className="mt-2">
+          {/* Period */}
+          <div className="text-[9px] text-gray-400 mb-2">
+            {fmtMonth(swing.from)} → {fmtMonth(swing.to)} · {fmtDays(swing.from, swing.to)}
+          </div>
 
-      {/* Outperform rate */}
-      {symbol && outRate != null && (
-        <div className="flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 shrink-0">
-          <span className="text-[9px] font-semibold text-gray-400 uppercase">Win rate</span>
-          <span className={`text-[13px] font-black tabular-nums ${outRate >= 50 ? 'text-emerald-600 dark:text-emerald-400' : 'text-red-500'}`}>
-            {outRate.toFixed(0)}%
+          {/* Side-by-side: NEPSE | Stock */}
+          <div className={`grid gap-2 ${symbol && stockSlice.length > 0 ? 'grid-cols-2' : 'grid-cols-1'}`}>
+
+            {/* NEPSE column */}
+            {nepseSlice.length > 0 && (() => {
+              const high  = Math.max(...nepseSlice.map(d => +d.high || +d.close))
+              const low   = Math.min(...nepseSlice.map(d => +d.low  || +d.close))
+              const open  = +nepseSlice[0]?.open || +nepseSlice[0]?.close
+              const close = +nepseSlice[nepseSlice.length - 1]?.close
+              return (
+                <div className="bg-gray-50 dark:bg-gray-800/40 rounded-lg px-2 py-1.5 space-y-0.5">
+                  <div className="text-[8px] font-black uppercase tracking-widest text-blue-400 mb-1">NEPSE</div>
+                  {[
+                    ['Open',  open?.toFixed(0),  null],
+                    ['Close', close?.toFixed(0), (st.nRet ?? 0) >= 0 ? '#22c55e' : '#ef4444'],
+                    ['High',  high?.toFixed(0),  '#22c55e'],
+                    ['Low',   low?.toFixed(0),   '#ef4444'],
+                    ['Max DD', st.nepseDD != null ? fmtPct(st.nepseDD,1) : null, '#ef4444'],
+                  ].map(([l, v, c]) => v != null && (
+                    <div key={l} className="flex justify-between items-center gap-1">
+                      <span className="text-[8px] text-gray-400">{l}</span>
+                      <span className="text-[9px] font-bold tabular-nums" style={{ color: c || undefined }}>{v}</span>
+                    </div>
+                  ))}
+                </div>
+              )
+            })()}
+
+            {/* Stock column */}
+            {symbol && stockSlice.length > 0 && (() => {
+              const high  = Math.max(...stockSlice.map(d => +d.high || +d.close))
+              const low   = Math.min(...stockSlice.map(d => +d.low  || +d.close))
+              const open  = +stockSlice[0]?.open || +stockSlice[0]?.close
+              const close = +stockSlice[stockSlice.length - 1]?.close
+              return (
+                <div className="bg-gray-50 dark:bg-gray-800/40 rounded-lg px-2 py-1.5 space-y-0.5">
+                  <div className="text-[8px] font-black uppercase tracking-widest mb-1" style={{ color: STOCK_C }}>{symbol}</div>
+                  {[
+                    ['Open',  open?.toFixed(0),  null],
+                    ['Close', close?.toFixed(0), (st.sRet ?? 0) >= 0 ? '#22c55e' : '#ef4444'],
+                    ['High',  high?.toFixed(0),  '#22c55e'],
+                    ['Low',   low?.toFixed(0),   '#ef4444'],
+                    ['Ret',   fmtPct(st.sRet),   (st.sRet ?? 0) >= 0 ? '#22c55e' : '#ef4444'],
+                  ].map(([l, v, c]) => v != null && (
+                    <div key={l} className="flex justify-between items-center gap-1">
+                      <span className="text-[8px] text-gray-400">{l}</span>
+                      <span className="text-[9px] font-bold tabular-nums" style={{ color: c || undefined }}>{v}</span>
+                    </div>
+                  ))}
+                </div>
+              )
+            })()}
+
+            {/* Symbol selected but no data */}
+            {symbol && stockSlice.length === 0 && (
+              <div className="bg-gray-50 dark:bg-gray-800/40 rounded-lg px-2 py-1.5 flex items-center justify-center">
+                <span className="text-[8px] text-gray-300 dark:text-gray-700">No data</span>
+              </div>
+            )}
+          </div>
+        </div>
+      )}
+    </button>
+  )
+}
+
+// ── Right panel — side-by-side charts for selected cycle ─────────────────────
+function CycleDetail({ swing, precomp, nepse, stock, symbol }) {
+  // Always call hooks — use precomp values when available (avoids redundant slice+stats)
+  const _nepseSlice = useMemo(() => slice(nepse, swing.from, swing.to), [nepse, swing.from, swing.to])
+  const _stockSlice = useMemo(() => stock ? slice(stock, swing.from, swing.to) : [], [stock, swing.from, swing.to])
+  const _st         = useMemo(() => stats(_nepseSlice, _stockSlice), [_nepseSlice, _stockSlice])
+  const nepseSlice  = precomp?.ns ?? _nepseSlice
+  const stockSlice  = precomp?.ss ?? _stockSlice
+  const st          = precomp?.st ?? _st
+  const isBull     = swing.type === 'bull'
+
+  const nepseRef   = useRef(null)
+  const stockRef   = useRef(null)
+  const syncingRef = useRef(false)
+
+  // Wire crosshair + timescale sync — retries for 5s to handle AutoMiniCandle
+  // height settling (ResizeObserver causes MiniCandle to remount after first render)
+  useEffect(() => {
+    if (!symbol || !stock) return
+    let unsubs = []
+    let attempts = 0
+    let lastNc = null
+
+    function trySync() {
+      const nc = nepseRef.current?.getChart()
+      const sc = stockRef.current?.getChart()
+      const ns = nepseRef.current?.getSeries()
+      const ss = stockRef.current?.getSeries()
+
+      // If chart instances changed (remount), re-run even if max attempts reached
+      const chartChanged = nc && nc !== lastNc
+      if (!nc || !sc || !ns || !ss) {
+        if (++attempts < 40) { setTimeout(trySync, 150); return }
+        return
+      }
+      // Chart remounted — clear old subs and re-sync
+      if (chartChanged && lastNc) {
+        unsubs.forEach(fn => { try { fn() } catch (_) {} })
+        unsubs = []
+      }
+      lastNc = nc
+      if (unsubs.length) return  // already synced to this instance
+
+      function sub(src, tgt, srcS, tgtS) {
+        const u = src.subscribeCrosshairMove(p => {
+          if (syncingRef.current) return
+          syncingRef.current = true
+          try {
+            if (!p.time || !p.point) tgt.clearCrosshairPosition()
+            else {
+              const bar = p.seriesData?.get(srcS)
+              const price = bar?.close ?? bar?.value ?? null
+              if (price != null) tgt.setCrosshairPosition(price, p.time, tgtS)
+            }
+          } catch (_) {}
+          syncingRef.current = false
+        })
+        if (u) unsubs.push(u)
+      }
+      sub(nc, sc, ns, ss); sub(sc, nc, ss, ns)
+
+      const uN = nc.timeScale().subscribeVisibleLogicalRangeChange(r => {
+        if (syncingRef.current || !r) return
+        syncingRef.current = true; sc.timeScale().setVisibleLogicalRange(r); syncingRef.current = false
+      })
+      const uS = sc.timeScale().subscribeVisibleLogicalRangeChange(r => {
+        if (syncingRef.current || !r) return
+        syncingRef.current = true; nc.timeScale().setVisibleLogicalRange(r); syncingRef.current = false
+      })
+      if (uN) unsubs.push(uN); if (uS) unsubs.push(uS)
+    }
+    const tid = setTimeout(trySync, 300)
+    return () => {
+      clearTimeout(tid)
+      unsubs.forEach(fn => { try { fn() } catch (_) {} })
+      unsubs = []
+    }
+  }, [swing.id, symbol, stock])
+
+  const showStock = symbol && stock
+
+  // Below lg: stack vertically with scroll so each chart gets full width.
+  // At lg+: side-by-side flex row (the original layout).
+  // Fixed pixel min-height per chart at narrow widths so candles stay readable
+  // even after the parent's auto-height grants too little space.
+  return (
+    <div className="h-full flex flex-col lg:flex-row gap-3 overflow-y-auto lg:overflow-hidden">
+
+      {/* NEPSE chart */}
+      <div className={`${CARD} overflow-hidden flex flex-col shrink-0 lg:shrink min-h-[280px] lg:min-h-0 ${showStock ? 'flex-1' : 'w-full lg:w-full'}`}>
+        <div className="shrink-0 flex items-center justify-between px-3 py-2 border-b border-gray-100 dark:border-gray-800 gap-2">
+          <div className="flex items-center gap-1.5 min-w-0">
+            <span className="w-2 h-2 rounded-full shrink-0" style={{ background: NEPSE_C }} />
+            <span className={`${STITLE} shrink-0`}>NEPSE</span>
+            <span className={`text-[8px] font-black px-1.5 py-px rounded shrink-0 ${
+              isBull
+                ? 'bg-emerald-100 dark:bg-emerald-900/40 text-emerald-600 dark:text-emerald-400'
+                : 'bg-red-100 dark:bg-red-900/40 text-red-500'
+            }`}>{isBull ? '▲ Bull' : '▼ Bear'}</span>
+            <span className={`${LABEL} normal-case truncate`}>{fmtMonth(swing.from)} → {fmtMonth(swing.to)} · {fmtDays(swing.from, swing.to)}</span>
+          </div>
+          <span className={`${SVAL} shrink-0 ${(st.nRet ?? 0) >= 0 ? 'text-emerald-500' : 'text-red-500'}`}>
+            {fmtPct(st.nRet, 2)}
           </span>
-          <span className="text-[9px] text-gray-400">vs NEPSE</span>
+        </div>
+        <div className="flex-1 min-h-0">
+          <AutoMiniCandle ref={nepseRef} data={nepseSlice} />
+        </div>
+      </div>
+
+      {/* Stock chart */}
+      {showStock && (
+        <div className={`${CARD} overflow-hidden flex flex-col shrink-0 lg:shrink flex-1 min-h-[280px] lg:min-h-0`}>
+          <div className="shrink-0 flex items-center justify-between px-3 py-2 border-b border-gray-100 dark:border-gray-800 gap-2">
+            <div className="flex items-center gap-1.5 min-w-0">
+              <span className="w-2 h-2 rounded-full shrink-0" style={{ background: STOCK_C }} />
+              <span className={`${STITLE} truncate`}>{symbol}</span>
+              <span className={`${LABEL} normal-case truncate`}>{fmtMonth(swing.from)} → {fmtMonth(swing.to)}</span>
+            </div>
+            <div className="flex items-center gap-2 shrink-0">
+              {st.sRet != null && (
+                <span className={`${SVAL} ${st.sRet >= 0 ? 'text-emerald-500' : 'text-red-500'}`}>
+                  {fmtPct(st.sRet, 2)}
+                </span>
+              )}
+              {st.maxDD != null && (
+                <span className={`${LABEL} normal-case hidden sm:inline`}>DD {fmtPct(st.maxDD, 1)}</span>
+              )}
+            </div>
+          </div>
+          <div className="flex-1 min-h-0">
+            <AutoMiniCandle ref={stockRef} data={stockSlice} />
+          </div>
+        </div>
+      )}
+
+      {/* Symbol selected but no data */}
+      {symbol && !stock && (
+        <div className={`${CARD} flex-1 flex items-center justify-center min-h-[120px]`}>
+          <span className="text-[11px] text-gray-400">No data for {symbol} in this period</span>
         </div>
       )}
     </div>
   )
 }
 
-// ── Cycle row in the table ────────────────────────────────────────────────────
-function CycleRow({ swing, nepse, stock, symbol, expanded, onToggle, maxAlpha }) {
-  const isBull     = swing.type === 'bull'
-  const nepseSlice = slice(nepse, swing.from, swing.to)
-  const stockSlice = stock ? slice(stock, swing.from, swing.to) : []
-  const st         = stats(nepseSlice, stockSlice)
+// ─────────────────────────────────────────────────────────────────────────────
+// RIGHT PANEL — Compare Summary + Cycle Returns + Compound Ladder
+// ─────────────────────────────────────────────────────────────────────────────
+function NoSymbolEmptyState({ swings, bulls, bears }) {
+  if (!swings.length) return (
+    <div className="flex-1 flex items-center justify-center px-4 text-center">
+      <p className="text-[11px] text-gray-400">No data — adjust threshold</p>
+    </div>
+  )
 
-  // Refs to both chart instances for crosshair sync
-  const nepseRef = useRef(null)
-  const stockRef = useRef(null)
-  const syncingRef = useRef(false)  // prevent infinite sync loop
-
-  // Wire crosshair sync once charts mount (when expanded)
-  useEffect(() => {
-    if (!expanded) return
-    let unsubscribers = []
-    const tid = setTimeout(() => {
-      const nc = nepseRef.current?.getChart()
-      const sc = stockRef.current?.getChart()
-      const ns = nepseRef.current?.getSeries()
-      const ss = stockRef.current?.getSeries()
-      if (!nc || !sc) return
-
-      function syncCursor(source, target, sourceSeries, targetSeries) {
-        const unsub = source.subscribeCrosshairMove(param => {
-          if (syncingRef.current) return
-          syncingRef.current = true
-          try {
-            if (!param.time || !param.point || !targetSeries) {
-              target.clearCrosshairPosition()
-            } else {
-              const bar = param.seriesData?.get(sourceSeries)
-              const price = bar?.close ?? bar?.value ?? null
-              if (price != null) {
-                target.setCrosshairPosition(price, param.time, targetSeries)
-              }
-            }
-          } catch (_) {}
-          syncingRef.current = false
-        })
-        if (unsub) unsubscribers.push(unsub)
-      }
-
-      if (ns && ss) {
-        syncCursor(nc, sc, ns, ss)
-        syncCursor(sc, nc, ss, ns)
-      }
-
-      // Also sync time scale scroll/zoom
-      const unsubNR = nc.timeScale().subscribeVisibleLogicalRangeChange(range => {
-        if (syncingRef.current || !range) return
-        syncingRef.current = true
-        sc.timeScale().setVisibleLogicalRange(range)
-        syncingRef.current = false
-      })
-      const unsubSR = sc.timeScale().subscribeVisibleLogicalRangeChange(range => {
-        if (syncingRef.current || !range) return
-        syncingRef.current = true
-        nc.timeScale().setVisibleLogicalRange(range)
-        syncingRef.current = false
-      })
-      if (unsubNR) unsubscribers.push(unsubNR)
-      if (unsubSR) unsubscribers.push(unsubSR)
-    }, 100)
-
-    return () => {
-      clearTimeout(tid)
-      unsubscribers.forEach(fn => { try { fn() } catch (_) {} })
-      unsubscribers = []
+  const bullStats = bulls.length > 0 && (() => {
+    const gains = bulls.map(s => s.pct ?? 0)
+    return {
+      count: bulls.length,
+      avg:   gains.reduce((s, v) => s + v, 0) / gains.length,
+      best:  Math.max(...gains),
     }
-  }, [expanded])
+  })()
+  const bearStats = bears.length > 0 && (() => {
+    const drops = bears.map(s => s.pct ?? 0)
+    return {
+      count: bears.length,
+      avg:   drops.reduce((s, v) => s + v, 0) / drops.length,
+      worst: Math.min(...drops),
+    }
+  })()
 
   return (
-    <>
-      {/* ── Main row ── */}
-      <tr
-        onClick={onToggle}
-        className={`cursor-pointer border-b border-gray-100 dark:border-gray-800 transition-colors ${
-          expanded
-            ? 'bg-blue-50 dark:bg-blue-950/30'
-            : isBull
-              ? 'hover:bg-emerald-50/50 dark:hover:bg-emerald-900/10'
-              : 'hover:bg-red-50/50 dark:hover:bg-red-900/10'
+    <div className="space-y-3">
+      <div className={`${CARD} p-3`}>
+        <p className={`${LABEL} mb-1.5`}>Compare a stock</p>
+        <p className="text-[11px] text-gray-500 dark:text-gray-400 leading-snug">
+          Search a symbol in the toolbar to see how it performed against NEPSE across every cycle, plus a what-if investment calculator.
+        </p>
+      </div>
+
+      {bullStats && (
+        <div className="rounded-2xl border border-emerald-100 dark:border-emerald-900/40 bg-emerald-50 dark:bg-emerald-950/20 p-3">
+          <div className="flex items-baseline justify-between mb-2">
+            <p className={`${LABEL} text-emerald-400`}>Bull Cycles</p>
+            <p className="text-xl font-black text-emerald-500 tabular-nums leading-none">{bullStats.count}</p>
+          </div>
+          <div className="space-y-1">
+            <div className="flex justify-between text-[10px]"><span className="text-gray-400">Avg gain</span><span className="font-semibold text-emerald-500">+{bullStats.avg.toFixed(1)}%</span></div>
+            <div className="flex justify-between text-[10px]"><span className="text-gray-400">Best</span><span className="font-semibold text-emerald-500">+{bullStats.best.toFixed(1)}%</span></div>
+          </div>
+        </div>
+      )}
+
+      {bearStats && (
+        <div className="rounded-2xl border border-red-100 dark:border-red-900/40 bg-red-50 dark:bg-red-950/20 p-3">
+          <div className="flex items-baseline justify-between mb-2">
+            <p className={`${LABEL} text-red-400`}>Bear Cycles</p>
+            <p className="text-xl font-black text-red-500 tabular-nums leading-none">{bearStats.count}</p>
+          </div>
+          <div className="space-y-1">
+            <div className="flex justify-between text-[10px]"><span className="text-gray-400">Avg drop</span><span className="font-semibold text-red-500">{bearStats.avg.toFixed(1)}%</span></div>
+            <div className="flex justify-between text-[10px]"><span className="text-gray-400">Worst</span><span className="font-semibold text-red-500">{bearStats.worst.toFixed(1)}%</span></div>
+          </div>
+        </div>
+      )}
+    </div>
+  )
+}
+
+// Compact cycle chip — "▲1" / "▼1" — derived from cycle.name (e.g. "Bull 1", "Bear 2")
+function cycleChip(cycle) {
+  if (!cycle?.name) return ''
+  const num = cycle.name.match(/\d+/)?.[0] || ''
+  return (cycle.type === 'bull' ? '▲' : '▼') + num
+}
+
+// ─── Cycle row: dual mini-bar for NEPSE vs stock returns inside one cycle ─────
+function CycleRow({ cycle, nRet, sRet, symbol, max, isActive, isStart, onClick }) {
+  const isBull = cycle.type === 'bull'
+
+  const barFor = (v) => {
+    if (v == null) return { w: 0, color: '#9ca3af' }
+    const w = Math.min(Math.abs(v) / max * 50, 50)
+    const color = v >= 0 ? '#10b981' : '#ef4444'
+    return { w, color, left: v >= 0 ? 50 : 50 - w }
+  }
+  const nBar = barFor(nRet)
+  const sBar = barFor(sRet)
+
+  // Visual states (can stack):
+  //   isActive (blue ring + bg)   = "this cycle is the one in the center chart"
+  //   isStart  (amber left border) = "this cycle is the Compound Ladder investment anchor"
+  // Different semantics → different visual codes.
+  return (
+    <button
+      onClick={onClick}
+      title={`${cycle.name} · ${cycle.from} → ${cycle.to}`}
+      className={`w-full text-left px-2 py-1.5 border-b border-gray-50 dark:border-gray-800/60 last:border-b-0 transition-colors border-l-2
+        ${isStart ? 'border-l-amber-500' : 'border-l-transparent'}
+        ${isActive
+          ? 'bg-blue-50 dark:bg-blue-950/30 ring-1 ring-inset ring-blue-300 dark:ring-blue-700'
+          : 'hover:bg-gray-50 dark:hover:bg-gray-900/50'
         }`}
-      >
-        {/* Type */}
-        <td className="py-2.5 pl-5 pr-3 whitespace-nowrap">
-          <div className="flex items-center gap-2">
-            <div className={`w-6 h-6 rounded-md flex items-center justify-center text-[10px] font-black shrink-0 ${
-              isBull ? 'bg-emerald-100 dark:bg-emerald-900/40 text-emerald-600 dark:text-emerald-400'
-                     : 'bg-red-100 dark:bg-red-900/40 text-red-600 dark:text-red-400'
-            }`}>{isBull ? '▲' : '▼'}</div>
-            <div>
-              <div className="text-[11px] font-bold text-gray-800 dark:text-gray-100">{swing.name}</div>
-              {swing.current && <div className="text-[8px] font-bold text-blue-500 uppercase">Live</div>}
+    >
+      <div className="flex items-center gap-2">
+        {/* Cycle chip — ▲1 / ▼1 */}
+        <span className={`shrink-0 inline-flex items-center justify-center px-1 h-5 min-w-[28px] rounded text-[10px] font-black tabular-nums relative
+          ${isBull ? 'bg-emerald-100 dark:bg-emerald-900/40 text-emerald-600 dark:text-emerald-400'
+                   : 'bg-red-100   dark:bg-red-900/40   text-red-500   dark:text-red-400'}`}>
+          {cycleChip(cycle)}
+          {isStart && (
+            <span className="absolute -top-1 -right-1 text-[7px] font-black px-1 rounded-sm bg-amber-500 text-white leading-tight" title="Investment start">▶</span>
+          )}
+        </span>
+
+        {/* Diverging dual-bar */}
+        <div className="flex-1 min-w-0 space-y-0.5">
+          {/* NEPSE row */}
+          <div className="flex items-center gap-1.5">
+            <span className="w-6 shrink-0 text-[7px] font-bold uppercase tracking-wider text-blue-400">NEP</span>
+            <div className="relative flex-1 h-2 bg-gray-100 dark:bg-gray-800 rounded-sm overflow-hidden">
+              <div className="absolute inset-y-0 left-1/2 w-px bg-gray-300 dark:bg-gray-600" />
+              <div className="absolute top-0 h-full rounded-sm"
+                style={{ width: `${nBar.w}%`, left: `${nBar.left}%`, background: nBar.color }} />
             </div>
-          </div>
-        </td>
-
-        {/* Period */}
-        <td className="py-2.5 px-3 whitespace-nowrap">
-          <div className="text-[11px] text-gray-600 dark:text-gray-300 font-medium">
-            {fmtMonth(swing.from)} → {fmtMonth(swing.to)}
-          </div>
-          <div className="text-[9px] text-gray-400">{fmtDays(swing.from, swing.to)}</div>
-        </td>
-
-        {/* NEPSE return + sparkline */}
-        <td className="py-2.5 px-3">
-          <div className="flex items-center gap-2">
-            <Sparkline data={nepseSlice} color={NEPSE_C} />
-            <span className={`text-[12px] font-bold tabular-nums ${(st.nRet ?? 0) >= 0 ? 'text-emerald-600 dark:text-emerald-400' : 'text-red-500'}`}>
-              {fmtPct(st.nRet)}
+            <span className={`w-12 shrink-0 text-right text-[9px] font-bold tabular-nums ${(nRet ?? 0) >= 0 ? 'text-emerald-500' : 'text-red-500'}`}>
+              {nRet == null ? '—' : `${nRet >= 0 ? '+' : ''}${nRet.toFixed(1)}%`}
             </span>
           </div>
-        </td>
-
-        {/* Stock return + sparkline */}
-        <td className="py-2.5 px-3">
-          {symbol ? (
-            <div className="flex items-center gap-2">
-              <Sparkline data={stockSlice} color={STOCK_C} />
-              <span className={`text-[12px] font-bold tabular-nums ${
-                st.sRet == null ? 'text-gray-400' : st.sRet >= 0 ? 'text-emerald-600 dark:text-emerald-400' : 'text-red-500'
-              }`}>
-                {fmtPct(st.sRet)}
+          {/* Stock row */}
+          {symbol && (
+            <div className="flex items-center gap-1.5">
+              <span className="w-6 shrink-0 text-[7px] font-bold uppercase tracking-wider text-amber-500 truncate">{symbol.slice(0, 4)}</span>
+              <div className="relative flex-1 h-2 bg-gray-100 dark:bg-gray-800 rounded-sm overflow-hidden">
+                <div className="absolute inset-y-0 left-1/2 w-px bg-gray-300 dark:bg-gray-600" />
+                <div className="absolute top-0 h-full rounded-sm"
+                  style={{ width: `${sBar.w}%`, left: `${sBar.left}%`, background: sBar.color }} />
+              </div>
+              <span className={`w-12 shrink-0 text-right text-[9px] font-bold tabular-nums ${(sRet ?? 0) >= 0 ? 'text-emerald-500' : 'text-red-500'}`}>
+                {sRet == null ? '—' : `${sRet >= 0 ? '+' : ''}${sRet.toFixed(1)}%`}
               </span>
             </div>
-          ) : (
-            <span className="text-[11px] text-gray-300 dark:text-gray-600 italic">select stock</span>
           )}
-        </td>
+        </div>
+      </div>
+    </button>
+  )
+}
 
-        {/* Alpha bar */}
-        <td className="py-2.5 px-3 pr-5 min-w-[180px]">
-          <AlphaBar alpha={st.alpha} maxAlpha={maxAlpha} />
-        </td>
+function CompareRightPanel({ symbol, swings, allStats, statsById, expanded, setExpanded, winRateInfo, bulls, bears }) {
+  // Investment amount for ladder (default Rs.100 to match user's reference)
+  const [amount, setAmount] = useState(100)
+  // Start cycle id (chronological). null = oldest cycle.
+  const [startCycleId, setStartCycleId] = useState(null)
 
-        {/* Expand chevron */}
-        <td className="py-2.5 pr-4">
-          <svg className={`w-4 h-4 text-gray-400 transition-transform ${expanded ? 'rotate-180' : ''}`}
-            viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth={2}>
-            <polyline points="4 6 8 10 12 6" />
-          </svg>
-        </td>
-      </tr>
+  // Reset startCycleId when swings change (new symbol / threshold)
+  useEffect(() => { setStartCycleId(null) }, [swings])
 
-      {/* ── Expanded chart row ── */}
-      {expanded && (
-        <tr className="bg-gray-50 dark:bg-gray-900/40 border-b-2 border-gray-200 dark:border-gray-700">
-          <td colSpan={6} className="px-4 py-3">
-            <div className="grid grid-cols-2 gap-3">
+  // Empty state — no symbol entered
+  if (!symbol) return (
+    <NoSymbolEmptyState swings={swings} bulls={bulls} bears={bears} />
+  )
 
-              {/* NEPSE chart */}
-              <div className="bg-white dark:bg-gray-950 rounded-2xl border border-gray-200 dark:border-gray-800 overflow-hidden shadow-sm">
-                <div className="flex items-center justify-between px-4 py-2.5 border-b border-gray-100 dark:border-gray-800">
-                  <div className="flex items-center gap-2">
-                    <span className="w-2.5 h-2.5 rounded-full" style={{ background: NEPSE_C }} />
-                    <span className="text-sm font-bold text-gray-700 dark:text-gray-200">NEPSE</span>
-                    <span className="text-xs text-gray-400">{swing.from} → {swing.to}</span>
-                  </div>
-                  <span className={`text-base font-black tabular-nums ${(st.nRet ?? 0) >= 0 ? 'text-emerald-500' : 'text-red-500'}`}>
-                    {fmtPct(st.nRet, 2)}
+  // Chronological copy (allStats is most-recent-first via nameSwings.reverse())
+  const chrono = [...(allStats || [])].sort((a, b) => a.id - b.id)
+  const valid = chrono.filter(x => x.st.sRet != null && x.st.nRet != null)
+
+  if (!valid.length) return (
+    <div className="space-y-3">
+      <div className={`${CARD} p-3`}>
+        <p className={`${LABEL} mb-1.5`}>{symbol}</p>
+        <p className="text-[11px] text-gray-500 dark:text-gray-400">No price data for this symbol across the detected cycles.</p>
+      </div>
+    </div>
+  )
+
+  // Aggregate stats
+  const wins = valid.filter(x => x.st.alpha > 0).length
+  const losses = valid.length - wins
+  const avgAlpha = valid.reduce((s, x) => s + (x.st.alpha || 0), 0) / valid.length
+  const totalAlpha = valid.reduce((s, x) => s + (x.st.alpha || 0), 0)
+  const bestCycle  = valid.reduce((b, x) => (x.st.alpha > (b?.st.alpha ?? -Infinity) ? x : b), null)
+  const worstCycle = valid.reduce((b, x) => (x.st.alpha < (b?.st.alpha ?? +Infinity) ? x : b), null)
+
+  // Bar scaling: max of both NEPSE and stock returns in absolute terms
+  const maxAbs = Math.max(
+    ...chrono.flatMap(x => [Math.abs(x.st.nRet ?? 0), Math.abs(x.st.sRet ?? 0)]),
+    1
+  )
+
+  // Compound ladder rows: start from startCycleId (or first valid cycle) and ride every cycle
+  const startIdx = startCycleId == null
+    ? 0
+    : Math.max(0, chrono.findIndex(x => x.id === startCycleId))
+  const ladder = []
+  let nBal = amount, sBal = amount
+  for (let i = startIdx; i < chrono.length; i++) {
+    const x = chrono[i]
+    const nRet = x.st.nRet ?? 0
+    const sRet = x.st.sRet ?? 0
+    nBal = nBal * (1 + nRet / 100)
+    sBal = sBal * (1 + sRet / 100)
+    ladder.push({ id: x.id, cycle: swings.find(s => s.id === x.id), nRet, sRet, nBal, sBal })
+  }
+  const lastRow = ladder[ladder.length - 1]
+  const finalNepsePct = lastRow ? ((lastRow.nBal - amount) / amount) * 100 : 0
+  const finalStockPct = lastRow ? ((lastRow.sBal - amount) / amount) * 100 : 0
+  const finalAlphaPct = finalStockPct - finalNepsePct
+
+  const fmtRs = v => v == null ? '—' : `Rs.${v >= 1000 ? Math.round(v).toLocaleString() : v.toFixed(1)}`
+  const getCycleName = (id) => swings.find(s => s.id === id)?.name || `Cycle #${id}`
+
+  return (
+    <div className="space-y-3">
+
+      {/* ── 1. Win-rate summary ── */}
+      <div className={`${CARD} p-3`}>
+        <div className="flex items-baseline justify-between mb-1.5">
+          <p className={`${LABEL}`}>{symbol} vs NEPSE</p>
+          {winRateInfo && (
+            <span className={`text-[11px] font-bold tabular-nums ${winRateInfo.pct >= 50 ? 'text-emerald-500' : 'text-red-500'}`}>
+              {winRateInfo.wins}/{winRateInfo.total} ({winRateInfo.pct}%)
+            </span>
+          )}
+        </div>
+        <div className="grid grid-cols-2 gap-2 mt-2">
+          <div>
+            <p className={`${LABEL} mb-0.5`}>Wins</p>
+            <p className="text-[13px] font-bold tabular-nums text-emerald-500">{wins}</p>
+          </div>
+          <div>
+            <p className={`${LABEL} mb-0.5`}>Losses</p>
+            <p className="text-[13px] font-bold tabular-nums text-red-500">{losses}</p>
+          </div>
+          <div>
+            <p className={`${LABEL} mb-0.5`}>Avg α</p>
+            <p className={`text-[13px] font-bold tabular-nums ${avgAlpha >= 0 ? 'text-emerald-500' : 'text-red-500'}`}>
+              {avgAlpha >= 0 ? '+' : ''}{avgAlpha.toFixed(1)}pp
+            </p>
+          </div>
+          <div>
+            <p className={`${LABEL} mb-0.5`}>Total α</p>
+            <p className={`text-[13px] font-bold tabular-nums ${totalAlpha >= 0 ? 'text-emerald-500' : 'text-red-500'}`}>
+              {totalAlpha >= 0 ? '+' : ''}{totalAlpha.toFixed(1)}pp
+            </p>
+          </div>
+        </div>
+        {bestCycle && worstCycle && bestCycle.id !== worstCycle.id && (
+          <div className="mt-2 pt-2 border-t border-gray-100 dark:border-gray-800 flex flex-wrap gap-1.5">
+            <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded bg-emerald-50 dark:bg-emerald-950/30 text-[10px] font-semibold text-emerald-600 dark:text-emerald-400">
+              Best {swings.find(s => s.id === bestCycle.id)?.name || `Cycle ${bestCycle.id}`} · {bestCycle.st.alpha >= 0 ? '+' : ''}{bestCycle.st.alpha.toFixed(1)}pp
+            </span>
+            <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded bg-red-50 dark:bg-red-950/30 text-[10px] font-semibold text-red-500 dark:text-red-400">
+              Worst {swings.find(s => s.id === worstCycle.id)?.name || `Cycle ${worstCycle.id}`} · {worstCycle.st.alpha.toFixed(1)}pp
+            </span>
+          </div>
+        )}
+      </div>
+
+      {/* ── 2. Cycle Returns — diverging dual bars per cycle (NEPSE vs symbol) ── */}
+      <div className={`${CARD} overflow-hidden`}>
+        <div className="px-3 py-1.5 border-b border-gray-100 dark:border-gray-800 bg-gray-50/60 dark:bg-gray-800/30 flex items-center justify-between">
+          <p className={STITLE}>Cycle Returns</p>
+          <span className="text-[8px] text-gray-400 normal-case">oldest → latest</span>
+        </div>
+        <div className="max-h-[280px] overflow-y-auto bg-white dark:bg-gray-900">
+          {chrono.map(x => (
+            <CycleRow
+              key={x.id}
+              cycle={swings.find(s => s.id === x.id)}
+              nRet={x.st.nRet}
+              sRet={x.st.sRet}
+              symbol={symbol}
+              max={maxAbs}
+              isActive={expanded === x.id}
+              isStart={startCycleId === x.id}
+              onClick={() => setExpanded(prev => prev === x.id ? null : x.id)}
+            />
+          ))}
+        </div>
+      </div>
+
+      {/* ── 3. Compound Ladder (Rs.X across cycles) ── */}
+      <div className={`${CARD} overflow-hidden`}>
+        <div className="px-3 py-2 border-b border-gray-100 dark:border-gray-800 bg-gray-50/60 dark:bg-gray-800/30">
+          <div className="flex items-center justify-between mb-1.5">
+            <p className={STITLE}>Compound Ladder</p>
+            {startCycleId != null && (
+              <button onClick={() => setStartCycleId(null)}
+                className="text-[9px] text-blue-500 hover:underline">Reset</button>
+            )}
+          </div>
+          <div className="flex items-center gap-2">
+            <span className="text-[10px] text-gray-500 dark:text-gray-400">Invest</span>
+            <span className="text-[10px] text-gray-400">Rs.</span>
+            <input
+              type="number" min={1} step={100}
+              value={amount}
+              onChange={e => {
+                const v = parseFloat(e.target.value)
+                setAmount(isNaN(v) || v < 0 ? 0 : v)
+              }}
+              className="w-20 text-[11px] font-semibold tabular-nums text-gray-800 dark:text-gray-100 bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-700 rounded px-1.5 py-0.5 focus:outline-none focus:border-blue-400"
+            />
+            <span className="text-[9px] text-gray-400 ml-auto">
+              from {swings.find(s => s.id === ladder[0]?.id)?.name || 'start'} → {swings.find(s => s.id === lastRow?.id)?.name || 'end'}
+            </span>
+          </div>
+        </div>
+
+        {/* Header row */}
+        <div className="grid grid-cols-[40px_1fr_1fr] items-center gap-1 px-2 py-1.5 border-b border-gray-100 dark:border-gray-800 bg-gray-50/40 dark:bg-gray-800/20">
+          <span className="text-[8px] font-bold uppercase tracking-wider text-gray-400">Cycle</span>
+          <div className="text-right">
+            <p className="text-[8px] font-bold uppercase tracking-wider text-blue-400">NEPSE</p>
+          </div>
+          <div className="text-right">
+            <p className="text-[8px] font-bold uppercase tracking-wider text-amber-500 truncate">{symbol}</p>
+          </div>
+        </div>
+
+        <div className="max-h-[240px] overflow-y-auto bg-white dark:bg-gray-900">
+          {ladder.map(row => {
+            const isBull = row.cycle?.type === 'bull'
+            const isStart = startCycleId === row.id
+            return (
+              <button
+                key={row.id}
+                onClick={() => setStartCycleId(prev => prev === row.id ? null : row.id)}
+                title={isStart ? 'Investment starts here. Click to unset.' : `Anchor investment start at ${row.cycle?.name || 'this cycle'}`}
+                className={`w-full grid grid-cols-[40px_1fr_1fr] items-center gap-1 px-2 py-1 border-b border-gray-50 dark:border-gray-800/60 last:border-b-0 transition-colors relative
+                  ${isStart
+                    ? 'bg-amber-50/70 dark:bg-amber-950/20 border-l-2 border-l-amber-500'
+                    : 'hover:bg-gray-50 dark:hover:bg-gray-900/50 border-l-2 border-l-transparent'}`}
+              >
+                <span className={`inline-flex items-center justify-center px-1 h-5 min-w-[34px] rounded text-[10px] font-black tabular-nums relative
+                  ${isBull ? 'bg-emerald-100 dark:bg-emerald-900/40 text-emerald-600 dark:text-emerald-400'
+                           : 'bg-red-100   dark:bg-red-900/40   text-red-500   dark:text-red-400'}`}>
+                  {cycleChip(row.cycle)}
+                  {isStart && (
+                    <span className="absolute -top-1 -right-1 text-[7px] font-black px-1 rounded-sm bg-amber-500 text-white leading-tight" title="Investment start">▶</span>
+                  )}
+                </span>
+                <div className="text-right tabular-nums">
+                  <span className={`text-[9px] block ${row.nRet >= 0 ? 'text-emerald-500' : 'text-red-500'}`}>
+                    {row.nRet >= 0 ? '+' : ''}{row.nRet.toFixed(1)}%
                   </span>
+                  <span className="text-[10px] font-bold text-gray-700 dark:text-gray-200">{fmtRs(row.nBal)}</span>
                 </div>
-                <MiniCandle ref={nepseRef} data={nepseSlice} height={240} />
-              </div>
+                <div className="text-right tabular-nums">
+                  <span className={`text-[9px] block ${row.sRet >= 0 ? 'text-emerald-500' : 'text-red-500'}`}>
+                    {row.sRet >= 0 ? '+' : ''}{row.sRet.toFixed(1)}%
+                  </span>
+                  <span className="text-[10px] font-bold text-gray-700 dark:text-gray-200">{fmtRs(row.sBal)}</span>
+                </div>
+              </button>
+            )
+          })}
+        </div>
 
-              {/* Stock chart */}
-              <div className="bg-white dark:bg-gray-950 rounded-2xl border border-gray-200 dark:border-gray-800 overflow-hidden shadow-sm">
-                <div className="flex items-center justify-between px-4 py-2.5 border-b border-gray-100 dark:border-gray-800">
-                  <div className="flex items-center gap-2">
-                    <span className="w-2.5 h-2.5 rounded-full" style={{ background: STOCK_C }} />
-                    <span className="text-sm font-bold text-gray-700 dark:text-gray-200">{symbol || '—'}</span>
-                    <span className="text-xs text-gray-400">{swing.from} → {swing.to}</span>
-                  </div>
-                  <div className="flex items-center gap-3">
-                    {st.sRet != null && (
-                      <span className={`text-base font-black tabular-nums ${st.sRet >= 0 ? 'text-emerald-500' : 'text-red-500'}`}>
-                        {fmtPct(st.sRet, 2)}
-                      </span>
-                    )}
-                    {st.alpha != null && (
-                      <span className={`text-xs font-bold px-2 py-0.5 rounded-full ${
-                        st.alpha >= 0
-                          ? 'bg-emerald-100 dark:bg-emerald-900/30 text-emerald-700 dark:text-emerald-400'
-                          : 'bg-red-100 dark:bg-red-900/30 text-red-600 dark:text-red-400'
-                      }`}>
-                        α {st.alpha >= 0 ? '+' : ''}{st.alpha.toFixed(1)}pp
-                      </span>
-                    )}
-                    {st.maxDD != null && (
-                      <span className="text-[10px] text-gray-400 tabular-nums">DD {fmtPct(st.maxDD, 1)}</span>
-                    )}
-                  </div>
-                </div>
-                <MiniCandle ref={stockRef} data={stock ? stockSlice : []} height={240} />
+        {/* Final summary footer */}
+        {lastRow && (
+          <div className="px-2 py-2 border-t border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-800/40">
+            <div className="grid grid-cols-[40px_1fr_1fr] items-center gap-1">
+              <span className="text-[8px] font-bold uppercase tracking-wider text-gray-500">End</span>
+              <div className="text-right">
+                <p className={`text-[11px] font-black tabular-nums ${finalNepsePct >= 0 ? 'text-emerald-500' : 'text-red-500'}`}>
+                  {finalNepsePct >= 0 ? '+' : ''}{finalNepsePct.toFixed(1)}%
+                </p>
+                <p className="text-[9px] text-gray-500 tabular-nums">{fmtRs(lastRow.nBal)}</p>
+              </div>
+              <div className="text-right">
+                <p className={`text-[11px] font-black tabular-nums ${finalStockPct >= 0 ? 'text-emerald-500' : 'text-red-500'}`}>
+                  {finalStockPct >= 0 ? '+' : ''}{finalStockPct.toFixed(1)}%
+                </p>
+                <p className="text-[9px] text-gray-500 tabular-nums">{fmtRs(lastRow.sBal)}</p>
               </div>
             </div>
+            <div className="mt-1.5 text-center text-[10px] text-gray-500 dark:text-gray-400">
+              {symbol} alpha vs NEPSE:{' '}
+              <span className={`font-bold tabular-nums ${finalAlphaPct >= 0 ? 'text-emerald-500' : 'text-red-500'}`}>
+                {finalAlphaPct >= 0 ? '+' : ''}{finalAlphaPct.toFixed(1)}pp
+              </span>
+            </div>
+          </div>
+        )}
+      </div>
 
-          </td>
-        </tr>
-      )}
-    </>
+    </div>
   )
 }
 
@@ -557,14 +1044,17 @@ export default function PerformanceChart() {
   const [company,   setCompany]   = useState(null)
   const [threshold, setThreshold] = useState(10)
 
-  const [nepse,    setNepse]    = useState([])
-  const [swings,   setSwings]   = useState([])
-  const [stock,    setStock]    = useState(null)
-  const [loading,  setLoading]  = useState(false)
-  const [error,    setError]    = useState('')
-  const [expanded, setExpanded] = useState(null)  // swing id or null
+  const [nepse,       setNepse]       = useState([])
+  const [swings,      setSwings]      = useState([])
+  const [stock,       setStock]       = useState(null)
+  const [loading,     setLoading]     = useState(false)
+  const [error,       setError]       = useState('')
+  const [expanded,    setExpanded]    = useState(null)
+  const [cycleFilter, setCycleFilter] = useState('all')
 
-  const fetch = useCallback(() => {
+  const lastSwingRef = useRef(null)
+
+  const loadData = useCallback(() => {
     const key = `${symbol || '_'}:${threshold}:${CACHE_VER}`
     if (_cache[key] && fresh(_cache[key].ts)) {
       const named = nameSwings(_cache[key].swings || [])
@@ -573,134 +1063,285 @@ export default function PerformanceChart() {
       setStock(_cache[key].stock || null)
       return
     }
+
     setLoading(true)
     setError('')
     const params = symbol ? { symbol, threshold } : { threshold }
+    // No AbortController — the axios dedup interceptor already prevents
+    // duplicate requests in StrictMode. Aborting fights the dedup and breaks both.
     getPerformance(params)
       .then(r => {
         const named = nameSwings(r.data.swings || [])
-        _cache[key] = { nepse: r.data.nepse, swings: r.data.swings, stock: r.data.stock, ts: Date.now() }
+        cacheSet(key, { nepse: r.data.nepse, swings: r.data.swings, stock: r.data.stock, ts: Date.now() })
         setNepse(r.data.nepse  || [])
         setSwings(named)
         setStock(r.data.stock  || null)
-        setLoading(false)
       })
-      .catch(err => { setError(err.response?.data?.error || 'Failed to load'); setLoading(false) })
+      .catch(err => {
+        if (isCanceled(err)) return
+        setError('Failed to load data')
+      })
+      .finally(() => setLoading(false))
   }, [symbol, threshold])
 
-  useEffect(() => { fetch() }, [fetch])
+  useEffect(() => {
+    loadData()
+  }, [loadData])
 
-  // Max alpha across all swings for consistent bar scaling — memoized to avoid
-  // recalculating slice()+stats() on every hover/expand state change
-  const maxAlpha = useMemo(() => Math.max(
-    50,
-    ...swings.map(sw => {
-      const ns = slice(nepse, sw.from, sw.to)
-      const ss = stock ? slice(stock, sw.from, sw.to) : []
-      const a  = stats(ns, ss).alpha
-      return a != null ? Math.abs(a) : 0
-    })
-  ), [swings, nepse, stock])
+  // Pre-compute all slices + stats once per [swings, nepse, stock] change.
+  // Prevents O(N) slice() calls inside every CycleItem render.
+  const allStats = useMemo(() => swings.map(sw => {
+    const ns = slice(nepse, sw.from, sw.to)
+    const ss = stock ? slice(stock, sw.from, sw.to) : []
+    return { id: sw.id, ns, ss, st: stats(ns, ss) }
+  }), [swings, nepse, stock])
 
-  return (
-    <div className="flex flex-col h-full overflow-hidden bg-white dark:bg-gray-950">
+  const statsById = useMemo(() => {
+    const m = {}
+    allStats.forEach(x => { m[x.id] = x })
+    return m
+  }, [allStats])
 
-      {/* ── Top bar ── */}
-      <div className="shrink-0 flex items-center gap-3 px-4 py-2 border-b border-gray-200 dark:border-gray-800 bg-white dark:bg-gray-900 flex-wrap overflow-x-auto">
+  // Reset cycleFilter + lastSwingRef when new data arrives
+  useEffect(() => {
+    setCycleFilter('all')
+    lastSwingRef.current = null
+  }, [swings])
 
-        <SymbolSearch value={symbol} onChange={(sym, name) => { setSymbol(sym); setCompany(name); setExpanded(null) }} />
+  // Derived lists — declared BEFORE useToolbarSlot
+  const bulls          = useMemo(() => swings.filter(s => s.type === 'bull'), [swings])
+  const bears          = useMemo(() => swings.filter(s => s.type === 'bear'), [swings])
+  const filteredSwings = useMemo(() => cycleFilter === 'all' ? swings : swings.filter(s => s.type === cycleFilter), [swings, cycleFilter])
 
-        {symbol && (
-          <div className="flex items-center gap-1.5 shrink-0">
-            <span className="w-2 h-2 rounded-full" style={{ background: STOCK_C }} />
-            <span className="text-[11px] font-bold text-gray-800 dark:text-gray-100">{symbol}</span>
-            {company && <span className="text-[10px] text-gray-400 hidden lg:block truncate max-w-[180px]">{company}</span>}
-          </div>
-        )}
+  // Win rate with denominator (only cycles where stock data exists)
+  const winRateInfo = useMemo(() => {
+    if (!symbol || !allStats.length) return null
+    const withAlpha = allStats.filter(x => x.st.alpha != null)
+    if (!withAlpha.length) return null
+    const wins = withAlpha.filter(x => x.st.alpha > 0).length
+    return { wins, total: withAlpha.length, pct: Math.round(wins / withAlpha.length * 100) }
+  }, [allStats, symbol])
 
-        <div className="w-px h-4 bg-gray-200 dark:bg-gray-700 shrink-0" />
+  // Inject controls into the DataLab tab bar via portal
+  const toolbar = useToolbarSlot(
+    <div className="flex items-center gap-2 flex-nowrap whitespace-nowrap">
+      <SymbolSearch value={symbol} onChange={(sym, name) => { setSymbol(sym); setCompany(name); setExpanded(null) }} />
 
-        <div className="flex items-center gap-1.5 shrink-0">
-          <span className="text-[10px] text-gray-400">Swing ≥</span>
-          <div className="flex items-center bg-gray-100 dark:bg-gray-800 rounded-lg p-0.5">
-            {THRESHOLDS.map(t => (
-              <button key={t} onClick={() => { setThreshold(t); setExpanded(null) }}
-                className={`px-2.5 py-0.5 rounded-md text-[9px] font-semibold transition-colors ${
-                  threshold === t
-                    ? 'bg-white dark:bg-gray-700 text-gray-900 dark:text-white shadow-sm'
-                    : 'text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-300'
-                }`}>{t}%</button>
-            ))}
-          </div>
+      {symbol && (
+        <div className="flex items-center gap-1 shrink-0 px-2 py-0.5 rounded-lg border border-gray-200 dark:border-gray-700 bg-amber-50 dark:bg-amber-900/20">
+          <span className="w-1.5 h-1.5 rounded-full shrink-0" style={{ background: STOCK_C }} />
+          <span className="text-[10px] font-semibold text-gray-800 dark:text-gray-100">{symbol}</span>
         </div>
+      )}
 
-        <div className="ml-auto flex items-center gap-3 text-[10px] text-gray-400 shrink-0">
-          <span className="flex items-center gap-1"><span className="w-2.5 h-0.5 rounded" style={{ background: NEPSE_C }} />NEPSE</span>
-          <span className="flex items-center gap-1"><span className="w-2.5 h-0.5 rounded" style={{ background: STOCK_C }} />{symbol || 'Stock'}</span>
-          <span className="text-gray-300 dark:text-gray-700 hidden xl:block">α = outperform pp</span>
-          {loading && <div className="w-3.5 h-3.5 border-2 border-blue-600 border-t-transparent rounded-full animate-spin" />}
+      <div className="w-px h-3.5 bg-gray-200 dark:bg-gray-700 shrink-0" />
+
+      <div className="flex items-center gap-1 shrink-0">
+        <span className={`${LABEL} normal-case`}>Swing ≥</span>
+        <div className="flex items-center bg-gray-100 dark:bg-gray-800 rounded-md p-0.5">
+          {THRESHOLDS.map(t => (
+            <button key={t} onClick={() => { setThreshold(t); setExpanded(null) }}
+              className={`px-1.5 py-0.5 rounded text-[9px] font-semibold transition-colors ${
+                threshold === t
+                  ? 'bg-white dark:bg-gray-700 text-gray-900 dark:text-white shadow-sm'
+                  : 'text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-300'
+              }`}>{t}%</button>
+          ))}
         </div>
       </div>
 
-      {/* ── Summary strip ── */}
-      <SummaryStrip swings={swings} nepse={nepse} stock={stock} symbol={symbol} />
+      <div className="w-px h-3.5 bg-gray-200 dark:bg-gray-700 shrink-0" />
 
-      {/* ── Error ── */}
-      {error && (
-        <div className="shrink-0 px-5 py-2 text-sm text-red-500 bg-red-50 dark:bg-red-900/20 border-b border-red-200 dark:border-red-800">
-          {error}
-        </div>
-      )}
+      <div className="flex items-center gap-2 shrink-0">
+        <span className="flex items-center gap-1">
+          <span className="w-2 h-0.5 rounded" style={{ background: NEPSE_C }} />
+          <span className={`${LABEL} normal-case`}>NEPSE</span>
+        </span>
+        <span className="flex items-center gap-1">
+          <span className="w-2 h-0.5 rounded" style={{ background: STOCK_C }} />
+          <span className={`${LABEL} normal-case`}>{symbol || 'Stock'}</span>
+        </span>
+        {loading && <div className="w-3 h-3 border-2 border-blue-600 border-t-transparent rounded-full animate-spin" />}
+      </div>
 
-      {/* ── Empty state ── */}
-      {!loading && swings.length === 0 && !error && (
-        <div className="flex-1 flex flex-col items-center justify-center gap-3">
-          <svg className="w-12 h-12 text-gray-200 dark:text-gray-800" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1} d="M13 7h8m0 0v8m0-8l-8 8-4-4-6 6" />
-          </svg>
-          <p className="text-sm text-gray-400">No swings detected at {threshold}% — try a lower threshold</p>
-        </div>
-      )}
-
-      {/* ── Cycle table ── */}
+      {/* Cycle count + win rate — right side of toolbar */}
       {swings.length > 0 && (
-        <div className="flex-1 overflow-y-auto min-h-0">
-          <table className="w-full border-collapse">
-            <thead className="sticky top-0 z-20 bg-white dark:bg-gray-900 border-b border-gray-200 dark:border-gray-800">
-              <tr>
-                <th className="text-left py-2.5 pl-5 pr-3 text-[10px] font-semibold text-gray-400 uppercase tracking-wide">Cycle</th>
-                <th className="text-left py-2.5 px-3 text-[10px] font-semibold text-gray-400 uppercase tracking-wide">Period</th>
-                <th className="text-left py-2.5 px-3 text-[10px] font-semibold text-gray-400 uppercase tracking-wide">
-                  <span className="flex items-center gap-1">
-                    <span className="w-2 h-2 rounded-full" style={{ background: NEPSE_C }} /> NEPSE
-                  </span>
-                </th>
-                <th className="text-left py-2.5 px-3 text-[10px] font-semibold text-gray-400 uppercase tracking-wide">
-                  <span className="flex items-center gap-1">
-                    <span className="w-2 h-2 rounded-full" style={{ background: STOCK_C }} /> {symbol || 'Stock'}
-                  </span>
-                </th>
-                <th className="text-left py-2.5 px-3 pr-5 text-[10px] font-semibold text-gray-400 uppercase tracking-wide">Alpha vs NEPSE</th>
-                <th className="w-8" />
-              </tr>
-            </thead>
-            <tbody>
-              {swings.map(sw => (
-                <CycleRow
-                  key={sw.id}
-                  swing={sw}
-                  nepse={nepse}
-                  stock={stock}
-                  symbol={symbol}
-                  expanded={expanded === sw.id}
-                  onToggle={() => setExpanded(prev => prev === sw.id ? null : sw.id)}
-                  maxAlpha={maxAlpha}
-                />
-              ))}
-            </tbody>
-          </table>
-        </div>
+        <>
+          <div className="w-px h-3.5 bg-gray-200 dark:bg-gray-700 shrink-0" />
+          <span className={`${LABEL} normal-case`}>
+            <span className="text-emerald-500 font-bold">{bulls.length}▲</span>
+            {' '}
+            <span className="text-red-400 font-bold">{bears.length}▼</span>
+          </span>
+          {symbol && winRateInfo && (
+            <div className={`flex items-center gap-1 shrink-0 px-2 py-0.5 rounded-full text-[9px] font-bold ${
+              winRateInfo.pct >= 50
+                ? 'bg-emerald-50 dark:bg-emerald-900/20 text-emerald-600 dark:text-emerald-400'
+                : 'bg-red-50 dark:bg-red-900/20 text-red-500'
+            }`}>
+              {symbol} beat NEPSE {winRateInfo.wins}/{winRateInfo.total} ({winRateInfo.pct}%)
+            </div>
+          )}
+        </>
       )}
+    </div>
+  )
+
+  // Auto-select first cycle on load
+  useEffect(() => {
+    if (swings.length > 0 && expanded === null) setExpanded(swings[0].id)
+  }, [swings]) // eslint-disable-line react-hooks/exhaustive-deps
+
+  const activeSwing  = swings.find(sw => sw.id === expanded) || null
+  const activeIndex  = filteredSwings.findIndex(sw => sw.id === expanded)
+
+  // Always keep last non-null swing so chart stays visible when collapsed
+  if (activeSwing) lastSwingRef.current = activeSwing
+  const displaySwing = activeSwing || lastSwingRef.current
+
+  // Prev / Next navigation
+  const goTo = useCallback((dir) => {
+    const next = filteredSwings[activeIndex + dir]
+    if (next) setExpanded(next.id)
+  }, [filteredSwings, activeIndex])
+
+  // Keyboard: ↑ ↓ arrow keys navigate cycles
+  useEffect(() => {
+    function onKey(e) {
+      if (['INPUT','TEXTAREA','SELECT'].includes(e.target.tagName)) return
+      if (e.key === 'ArrowUp')   { e.preventDefault(); goTo(-1) }
+      if (e.key === 'ArrowDown') { e.preventDefault(); goTo(1) }
+    }
+    window.addEventListener('keydown', onKey)
+    return () => window.removeEventListener('keydown', onKey)
+  }, [goTo])
+
+  return (
+    <div className="flex h-full overflow-hidden bg-gray-50 dark:bg-gray-950">
+      {toolbar}
+
+      {/* ── LEFT RAIL — 160px @ md, 200px @ lg+ (matches Insight/Breakdown) ── */}
+      <div className="hidden md:flex w-[160px] lg:w-[200px] shrink-0 border-r border-gray-100 dark:border-gray-800 bg-white dark:bg-gray-900 flex-col overflow-hidden">
+
+        {/* Filter chips — All / Bull / Bear */}
+        {swings.length > 0 && (
+          <div className="shrink-0 flex border-b border-gray-100 dark:border-gray-800">
+            {[['all', `All ${swings.length}`], ['bull', `▲ ${bulls.length}`], ['bear', `▼ ${bears.length}`]].map(([v, lbl]) => (
+              <button key={v} onClick={() => setCycleFilter(v)}
+                className={`flex-1 py-1 text-[9px] font-bold transition-colors ${
+                  cycleFilter === v
+                    ? v === 'bull' ? 'text-emerald-500 border-b-2 border-emerald-500'
+                    : v === 'bear' ? 'text-red-400 border-b-2 border-red-400'
+                    : 'text-gray-700 dark:text-gray-200 border-b-2 border-gray-600 dark:border-gray-300'
+                    : 'text-gray-400 hover:text-gray-600 dark:hover:text-gray-300'
+                }`}>
+                {lbl}
+              </button>
+            ))}
+          </div>
+        )}
+
+        {/* Error */}
+        {error && <div className="px-3 py-2 text-[10px] text-red-500">{error}</div>}
+
+        {/* Loading */}
+        {loading && swings.length === 0 && <Skeleton />}
+
+        {/* Empty */}
+        {!loading && swings.length === 0 && !error && (
+          <div className="flex-1 flex flex-col items-center justify-center gap-2 px-3 text-center">
+            <svg className="w-8 h-8 text-gray-200 dark:text-gray-800" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1} d="M13 7h8m0 0v8m0-8l-8 8-4-4-6 6" />
+            </svg>
+            <p className="text-[9px] text-gray-400">No swings at {threshold}%</p>
+          </div>
+        )}
+
+        {/* Cycle list */}
+        <div className="flex-1 overflow-y-auto min-h-0 bg-white dark:bg-gray-900 [scrollbar-width:thin] [&::-webkit-scrollbar]:w-1.5 [&::-webkit-scrollbar-thumb]:bg-gray-300 dark:[&::-webkit-scrollbar-thumb]:bg-gray-700 [&::-webkit-scrollbar-thumb]:rounded-full">
+          {filteredSwings.map((sw, i) => (
+            <CycleItem
+              key={sw.id}
+              swing={sw}
+              precomp={statsById[sw.id]}
+              symbol={symbol}
+              isActive={expanded === sw.id}
+              onClick={() => setExpanded(prev => prev === sw.id ? null : sw.id)}
+              index={i}
+            />
+          ))}
+          {filteredSwings.length === 0 && swings.length > 0 && (
+            <div className="flex items-center justify-center py-8 text-[9px] text-gray-400">
+              No {cycleFilter} cycles
+            </div>
+          )}
+        </div>
+      </div>
+
+      {/* ── CENTER — chart area ── */}
+      <div className="flex-1 min-w-0 overflow-hidden flex flex-col">
+        <div className="flex-1 min-h-0 p-3">
+          {displaySwing ? (
+            <CycleDetail swing={displaySwing} precomp={statsById[displaySwing.id]} nepse={nepse} stock={stock} symbol={symbol} />
+          ) : loading ? (
+            // Loading: cycles being detected
+            <div className="h-full flex flex-col items-center justify-center gap-3 px-4 text-center">
+              <div className="w-6 h-6 border-2 border-blue-500 border-t-transparent rounded-full animate-spin" />
+              <p className="text-[11px] text-gray-500 dark:text-gray-400">Detecting cycles…</p>
+              <p className="text-[9px] text-gray-400 dark:text-gray-600">First load on Render free tier can take ~30s</p>
+            </div>
+          ) : error ? (
+            // Error
+            <div className="h-full flex flex-col items-center justify-center gap-3 px-4 text-center">
+              <svg className="w-8 h-8 text-red-300 dark:text-red-900" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M12 9v2m0 4h.01M5 19h14a2 2 0 0 0 1.84-2.75L13.74 4a2 2 0 0 0-3.48 0L3.16 16.25A2 2 0 0 0 5 19z" />
+              </svg>
+              <p className="text-[11px] text-red-500">{error}</p>
+              <button onClick={loadData}
+                className="px-3 py-1 rounded text-[10px] font-semibold border border-blue-300 dark:border-blue-700 text-blue-600 dark:text-blue-400 hover:bg-blue-50 dark:hover:bg-blue-950/30">
+                Retry
+              </button>
+            </div>
+          ) : swings.length === 0 ? (
+            // No cycles at this threshold
+            <div className="h-full flex flex-col items-center justify-center gap-3 px-4 text-center">
+              <svg className="w-8 h-8 text-gray-200 dark:text-gray-800" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1} d="M13 7h8m0 0v8m0-8l-8 8-4-4-6 6" />
+              </svg>
+              <p className="text-[11px] text-gray-500 dark:text-gray-400">No bull/bear cycles at <span className="font-bold tabular-nums">{threshold}%</span> threshold</p>
+              <p className="text-[9px] text-gray-400 dark:text-gray-600">Try a smaller threshold from the toolbar above</p>
+            </div>
+          ) : (
+            // Has cycles, none selected yet
+            <div className="h-full flex flex-col items-center justify-center gap-3 px-4 text-center">
+              <svg className="w-8 h-8 text-gray-200 dark:text-gray-800" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M9 5l7 7-7 7" />
+              </svg>
+              <p className="text-[11px] text-gray-500 dark:text-gray-400">
+                <span className="hidden md:inline">Select a cycle from the left panel</span>
+                <span className="md:hidden">Detected {swings.length} cycles</span>
+              </p>
+            </div>
+          )}
+        </div>
+      </div>
+
+      {/* ── RIGHT PANEL — 420px (≥ lg only; below lg, charts use full width) ── */}
+      <div className="hidden lg:flex w-[420px] shrink-0 border-l border-gray-100 dark:border-gray-800 flex-col min-h-0 bg-white dark:bg-gray-900">
+        <div className="flex-1 min-h-0 overflow-y-auto bg-white dark:bg-gray-900 p-3 [scrollbar-width:thin] [&::-webkit-scrollbar]:w-1.5 [&::-webkit-scrollbar-thumb]:bg-gray-300 dark:[&::-webkit-scrollbar-thumb]:bg-gray-700 [&::-webkit-scrollbar-thumb]:rounded-full">
+          <CompareRightPanel
+            symbol={symbol}
+            swings={swings}
+            allStats={allStats}
+            statsById={statsById}
+            expanded={expanded}
+            setExpanded={setExpanded}
+            winRateInfo={winRateInfo}
+            bulls={bulls}
+            bears={bears}
+          />
+        </div>
+      </div>
     </div>
   )
 }
