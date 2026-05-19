@@ -435,87 +435,82 @@ export default function MultiChartPage() {
     })
   }, [syncData, panelCount])
 
-  const wireCrosshair = useCallback((sourceIdx, chart, series) => {
-    const unsubs = []
-
-    // Crosshair position sync — price=0 lets LW Charts magnet snap to the correct bar.
-    // Never use p.seriesData.get(series): series ref changes on every chart rebuild,
-    // making the lookup return undefined after any symbol/timeframe change.
-    const crosshairHandler = (p) => {
-      if (syncingRef.current) return
-      syncingRef.current = true
-      chartRefs.current.forEach((tgtChart, i) => {
-        if (i === sourceIdx || !tgtChart || !seriesRefs.current[i]) return
-        try {
-          if (!p.time || !p.point) {
-            tgtChart.clearCrosshairPosition()
-          } else {
-            tgtChart.setCrosshairPosition(0, p.time, seriesRefs.current[i])
-          }
-        } catch {}
-      })
-      syncingRef.current = false
-    }
-
-    // Visible range sync — DataLab proven pattern. setVisibleLogicalRange is safe here:
-    // setCrosshairPosition (called above) does NOT fire subscribeVisibleLogicalRangeChange,
-    // so there is no ping-pong. Range sync only fires on actual user scroll/zoom.
-    const rangeHandler = (range) => {
-      if (syncingRef.current || !range) return
-      syncingRef.current = true
-      chartRefs.current.forEach((tgtChart, i) => {
-        if (i === sourceIdx || !tgtChart) return
-        try { tgtChart.timeScale().setVisibleLogicalRange(range) } catch {}
-      })
-      syncingRef.current = false
-    }
-
-    try {
-      chart.subscribeCrosshairMove(crosshairHandler)
-      unsubs.push(() => { try { chart.unsubscribeCrosshairMove(crosshairHandler) } catch {} })
-    } catch {}
-
-    try {
-      chart.timeScale().subscribeVisibleLogicalRangeChange(rangeHandler)
-      unsubs.push(() => { try { chart.timeScale().unsubscribeVisibleLogicalRangeChange(rangeHandler) } catch {} })
-    } catch {}
-
-    crosshairUnsubs.current[sourceIdx] = () => unsubs.forEach(fn => fn())
-  }, []) // stable — all state accessed via refs only
-
   const handleChartReady = useCallback((idx, chart, series) => {
-    if (crosshairUnsubs.current[idx]) {
-      try { crosshairUnsubs.current[idx]() } catch {}
-      crosshairUnsubs.current[idx] = null
-    }
     chartRefs.current[idx]  = chart
     seriesRefs.current[idx] = series
+  }, [])
 
-    if (chart && series && syncCrossRef.current) {
-      wireCrosshair(idx, chart, series)
-    }
-  }, [wireCrosshair])
-
-  // FIX MC08: cleanup return unsubscribes ALL handlers when MultiChartPage unmounts
-  // (e.g. user switches to General tab) — prevents ghost subscriptions + memory leak.
+  // Central crosshair sync — exact DataLab PerformanceChart pattern.
+  // Runs when syncCross toggles. Retries every 150ms (up to 40x = 6s) until
+  // all active panels have chart + series refs populated.
+  // Wires every unique panel pair bidirectionally — no duplicate subscriptions.
+  const allUnsubsRef = useRef([])
   useEffect(() => {
-    if (syncCross) {
-      chartRefs.current.forEach((chart, idx) => {
-        if (!chart || !seriesRefs.current[idx] || crosshairUnsubs.current[idx]) return
-        wireCrosshair(idx, chart, seriesRefs.current[idx])
-      })
-    } else {
-      Object.entries(crosshairUnsubs.current).forEach(([idx, unsub]) => {
-        if (unsub) { unsub(); crosshairUnsubs.current[idx] = null }
-      })
+    // Always clear previous subs first
+    allUnsubsRef.current.forEach(fn => { try { fn() } catch (_) {} })
+    allUnsubsRef.current = []
+    if (!syncCross) return
+
+    let attempts = 0
+    let tid
+
+    function tryWire() {
+      const n = panelCount
+      // Check all active panels have refs
+      for (let i = 0; i < n; i++) {
+        if (!chartRefs.current[i] || !seriesRefs.current[i]) {
+          if (++attempts < 40) { tid = setTimeout(tryWire, 150); return }
+          return // give up after 6s
+        }
+      }
+
+      // All ready — wire every unique pair (i, j) bidirectionally
+      function sub(src, srcS, tgt, tgtS) {
+        try {
+          const u = src.subscribeCrosshairMove(p => {
+            if (syncingRef.current) return
+            syncingRef.current = true
+            try {
+              if (!p.time || !p.point) {
+                tgt.clearCrosshairPosition()
+              } else {
+                const bar = p.seriesData?.get(srcS)
+                const price = bar?.close ?? bar?.value ?? null
+                if (price != null) tgt.setCrosshairPosition(price, p.time, tgtS)
+              }
+            } catch (_) {}
+            syncingRef.current = false
+          })
+          if (u) allUnsubsRef.current.push(u)
+        } catch (_) {}
+        try {
+          const uR = src.timeScale().subscribeVisibleLogicalRangeChange(r => {
+            if (syncingRef.current || !r) return
+            syncingRef.current = true
+            try { tgt.timeScale().setVisibleLogicalRange(r) } catch (_) {}
+            syncingRef.current = false
+          })
+          if (uR) allUnsubsRef.current.push(uR)
+        } catch (_) {}
+      }
+
+      for (let i = 0; i < n; i++) {
+        for (let j = i + 1; j < n; j++) {
+          const ci = chartRefs.current[i], si = seriesRefs.current[i]
+          const cj = chartRefs.current[j], sj = seriesRefs.current[j]
+          sub(ci, si, cj, sj)  // i → j
+          sub(cj, sj, ci, si)  // j → i
+        }
+      }
     }
+
+    tid = setTimeout(tryWire, 300) // initial delay matches DataLab
     return () => {
-      // Unmount cleanup — unsubscribe everything regardless of syncCross state
-      Object.entries(crosshairUnsubs.current).forEach(([idx, unsub]) => {
-        if (unsub) { try { unsub() } catch {} crosshairUnsubs.current[idx] = null }
-      })
+      clearTimeout(tid)
+      allUnsubsRef.current.forEach(fn => { try { fn() } catch (_) {} })
+      allUnsubsRef.current = []
     }
-  }, [syncCross, wireCrosshair]) // eslint-disable-line react-hooks/exhaustive-deps
+  }, [syncCross, panelCount]) // eslint-disable-line react-hooks/exhaustive-deps
 
   const gridStyle = useMemo(() => {
     if (layout === 3) return {
@@ -553,6 +548,9 @@ export default function MultiChartPage() {
     return parts.join(' ')
   }
 
+  // Stable no-op — mobile panel must not write to chartRefs/seriesRefs
+  const noopChartReady = useCallback(() => {}, [])
+
   return (
     <div className="flex-1 overflow-hidden min-h-0 flex flex-col">
 
@@ -562,7 +560,10 @@ export default function MultiChartPage() {
         syncCross={syncCross} setSyncCross={setSyncCross}
       />
 
-      {/* Mobile: single panel */}
+      {/* Mobile: single panel — uses a no-op onChartReady so it never writes to
+          chartRefs/seriesRefs (those are for the desktop grid only). Without this,
+          the mobile panel's cleanup call zeroes out chartRefs[0], breaking crosshair
+          sync for panel 0 on desktop. */}
       <div className="md:hidden flex-1 flex flex-col min-h-0">
         <ChartPanelWrapper
           panelIdx={0}
@@ -571,7 +572,7 @@ export default function MultiChartPage() {
           onActivate={() => {}}
           onExternalSymbolChange={handleExternalSymbolChange}
           onExternalTimeframeChange={handleExternalTimeframeChange}
-          onChartReady={handleChartReady}
+          onChartReady={noopChartReady}
           onSelectSymbolReady={handleSelectSymbolReady}
           onSetTimeframeReady={handleSetTimeframeReady}
         />
