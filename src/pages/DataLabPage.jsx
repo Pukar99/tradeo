@@ -262,9 +262,8 @@ export default function DataLabPage() {
 
   return (
     <ToolbarSlotCtx.Provider value={slotRef}>
-      {/* pt reserves space for fixed navbar; transitions smoothly with slide */}
       <div
-        className="flex flex-col overflow-hidden bg-gray-50 dark:bg-gray-950 transition-all duration-300"
+        className="flex flex-col overflow-hidden bg-gray-50 dark:bg-gray-950 transition-[padding] duration-300 ease-in-out"
         style={{ height: '100dvh', paddingTop: navHidden ? 0 : 56 }}
       >
 

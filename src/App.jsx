@@ -122,11 +122,11 @@ function AppContent() {
     }
   }, [])
 
-  // scheduleHide: short delay before hiding — prevents glitter when mouse crosses
-  // the tab-bar/content boundary (paddingTop shift moves the boundary under the mouse).
+  // scheduleHide: 300ms debounce — long enough for navbar slide + paddingTop
+  // transition to settle before mouse events can re-trigger show/hide.
   const scheduleHide = useCallback(() => {
     clearHideTimer()
-    hideTimerRef.current = setTimeout(() => setNavHidden(true), 400)
+    hideTimerRef.current = setTimeout(() => setNavHidden(true), 300)
   }, [clearHideTimer])
 
   const showNavbar = useCallback(() => {

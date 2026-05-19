@@ -283,9 +283,8 @@ function ScreenInner() {
 
   return (
     <ScreenToolbarSlotCtx.Provider value={toolbarSlotRef}>
-    {/* pt-[56px] reserves space for the fixed navbar. Transitions with navbar slide. */}
     <div
-      className="flex flex-col overflow-hidden bg-white dark:bg-gray-950 transition-all duration-300"
+      className="flex flex-col overflow-hidden bg-white dark:bg-gray-950 transition-[padding] duration-300 ease-in-out"
       style={{ height: '100dvh', paddingTop: navHidden ? 0 : 56 }}
     >
 
