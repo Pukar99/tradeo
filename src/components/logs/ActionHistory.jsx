@@ -139,7 +139,7 @@ function ActionCard({ action, onEdit, onDelete, isLast }) {
               {/* journal text fields */}
               {action.why_taking_trade && (
                 <p className="text-[11px] text-gray-600 dark:text-gray-300 mb-1 leading-relaxed">
-                  <span className="text-[9px] uppercase tracking-widest text-gray-400 dark:text-gray-500 mr-1.5">Thesis</span>
+                  <span className="text-[10px] uppercase tracking-widest text-gray-400 dark:text-gray-500 mr-1.5">Thesis</span>
                   {action.why_taking_trade}
                 </p>
               )}
@@ -150,13 +150,13 @@ function ActionCard({ action, onEdit, onDelete, isLast }) {
               )}
               {action.post_trade_evaluation && (
                 <p className="text-[11px] text-gray-600 dark:text-gray-300 mb-1 leading-relaxed">
-                  <span className="text-[9px] uppercase tracking-widest text-gray-400 dark:text-gray-500 mr-1.5">Reflection</span>
+                  <span className="text-[10px] uppercase tracking-widest text-gray-400 dark:text-gray-500 mr-1.5">Reflection</span>
                   {action.post_trade_evaluation}
                 </p>
               )}
               {action.lessons_notes && (
                 <p className="text-[11px] text-gray-500 dark:text-gray-400 italic leading-relaxed">
-                  <span className="text-[9px] uppercase tracking-widest text-gray-400 dark:text-gray-500 mr-1.5">Lessons</span>
+                  <span className="text-[10px] uppercase tracking-widest text-gray-400 dark:text-gray-500 mr-1.5">Lessons</span>
                   {action.lessons_notes}
                 </p>
               )}

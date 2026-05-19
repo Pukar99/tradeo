@@ -157,7 +157,7 @@ function InfoButton({ tab }) {
 
       {hovered && !open && rect && (
         <div
-          className="fixed z-[999] pointer-events-none px-2.5 py-1 rounded-full bg-gray-800 dark:bg-gray-700 text-gray-200 text-[9px] whitespace-nowrap shadow-md"
+          className="fixed z-[999] pointer-events-none px-2.5 py-1 rounded-full bg-gray-800 dark:bg-gray-700 text-gray-200 text-[10px] whitespace-nowrap shadow-md"
           style={{ top: rect.bottom + 5, right: window.innerWidth - rect.right }}
         >
           {tab.hint}
@@ -173,13 +173,13 @@ function InfoButton({ tab }) {
           style={{ top: rect.bottom + 5, right: window.innerWidth - rect.right }}
         >
           <div className="pt-3 pb-1 px-4">
-            <p className="text-[9px] font-bold uppercase tracking-widest text-blue-500">{tab.label}</p>
+            <p className="text-[10px] font-bold uppercase tracking-widest text-blue-500">{tab.label}</p>
             <p className="text-[10px] text-gray-400 dark:text-gray-500 mt-0.5">{tab.hint}</p>
           </div>
           <ul className="px-4 pb-3 pt-2 space-y-2">
             {tab.steps.map((step, i) => (
               <li key={i} className="flex items-start gap-2.5 border-l-2 border-gray-100 dark:border-gray-800 pl-2.5">
-                <span className="text-[9px] text-gray-400 dark:text-gray-500 leading-snug">{step}</span>
+                <span className="text-[10px] text-gray-400 dark:text-gray-500 leading-snug">{step}</span>
               </li>
             ))}
           </ul>

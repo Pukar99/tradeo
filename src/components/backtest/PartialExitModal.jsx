@@ -75,7 +75,7 @@ export default function PartialExitModal({ session, order, candle, onClose, onEx
 
         <div className="flex flex-col gap-2 text-[11px]">
           <div>
-            <label className="text-[9px] font-semibold text-gray-400 uppercase">Exit Qty (kittā)</label>
+            <label className="text-[10px] font-semibold text-gray-400 uppercase">Exit Qty (kittā)</label>
             <input
               type="number"
               value={exitQty}
@@ -86,12 +86,12 @@ export default function PartialExitModal({ session, order, candle, onClose, onEx
               className="mt-0.5 w-full px-2 py-1.5 rounded-md border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 dark:text-white outline-none focus:ring-1 focus:ring-yellow-400"
             />
             {xQty > remQty && (
-              <div className="text-[9px] text-red-500 mt-0.5">Cannot exceed {remQty}</div>
+              <div className="text-[10px] text-red-500 mt-0.5">Cannot exceed {remQty}</div>
             )}
           </div>
 
           <div>
-            <label className="text-[9px] font-semibold text-gray-400 uppercase">Exit Price (Rs.)</label>
+            <label className="text-[10px] font-semibold text-gray-400 uppercase">Exit Price (Rs.)</label>
             <input
               type="number"
               value={exitPrice}
@@ -101,7 +101,7 @@ export default function PartialExitModal({ session, order, candle, onClose, onEx
           </div>
 
           <div>
-            <label className="text-[9px] font-semibold text-gray-400 uppercase">Reason</label>
+            <label className="text-[10px] font-semibold text-gray-400 uppercase">Reason</label>
             <select
               value={reason}
               onChange={e => setReason(e.target.value)}

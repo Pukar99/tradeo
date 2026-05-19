@@ -394,10 +394,10 @@ function ChartSymbolSearch() {
                 <div className="flex flex-col min-w-0">
                   <span className="text-[11px] font-semibold text-gray-800 dark:text-gray-100 leading-tight">{item.label}</span>
                   {item.company_name && (
-                    <span className="text-[8px] text-gray-400 dark:text-gray-500 truncate leading-tight">{item.company_name}</span>
+                    <span className="text-[10px] text-gray-400 dark:text-gray-500 truncate leading-tight">{item.company_name}</span>
                   )}
                 </div>
-                <span className={`shrink-0 ml-2 text-[8px] font-medium px-1.5 py-0.5 rounded ${
+                <span className={`shrink-0 ml-2 text-[10px] font-medium px-1.5 py-0.5 rounded ${
                   item.sub === 'Index'
                     ? 'bg-blue-100 dark:bg-blue-900 text-blue-600 dark:text-blue-300'
                     : 'bg-gray-100 dark:bg-gray-800 text-gray-500'
@@ -445,7 +445,7 @@ function ChartIndicatorDropdown({ activeTool, setActiveTool, onClearDrawings, dr
       {/* Trigger */}
       <button
         onClick={() => setOpen(p => !p)}
-        className={`flex items-center gap-1 px-2 py-1 rounded-lg text-[9px] font-semibold border transition-all ${
+        className={`flex items-center gap-1 px-2 py-1 rounded-lg text-[10px] font-semibold border transition-all ${
           open || totalActive > 0
             ? 'bg-blue-500 border-blue-500 text-white shadow-sm'
             : 'bg-gray-50 dark:bg-gray-800 border-gray-200 dark:border-gray-700 text-gray-500 dark:text-gray-400 hover:border-blue-300 dark:hover:border-blue-600 hover:text-blue-500'
@@ -461,7 +461,7 @@ function ChartIndicatorDropdown({ activeTool, setActiveTool, onClearDrawings, dr
           <circle cx="5" cy="12" r="1.5" fill="currentColor" stroke="none" />
         </svg>
         {totalActive > 0 && (
-          <span className="min-w-[14px] h-[14px] flex items-center justify-center rounded-full bg-white/25 text-[8px] font-bold leading-none px-0.5">
+          <span className="min-w-[14px] h-[14px] flex items-center justify-center rounded-full bg-white/25 text-[10px] font-bold leading-none px-0.5">
             {totalActive}
           </span>
         )}
@@ -475,7 +475,7 @@ function ChartIndicatorDropdown({ activeTool, setActiveTool, onClearDrawings, dr
 
           {/* Indicators section */}
           <div className="px-3 pt-3 pb-2.5">
-            <p className="text-[8px] font-bold text-gray-400 dark:text-gray-500 uppercase tracking-widest mb-2">
+            <p className="text-[10px] font-bold text-gray-400 dark:text-gray-500 uppercase tracking-widest mb-2">
               Indicators
             </p>
             <div className="flex flex-wrap gap-1">
@@ -483,7 +483,7 @@ function ChartIndicatorDropdown({ activeTool, setActiveTool, onClearDrawings, dr
                 const on = activeIndicators.includes(ind)
                 return (
                   <button key={ind} onClick={() => toggleIndicator(ind)}
-                    className={`px-2 py-0.5 rounded-md text-[9px] font-semibold border transition-all ${
+                    className={`px-2 py-0.5 rounded-md text-[10px] font-semibold border transition-all ${
                       on
                         ? 'bg-blue-500 border-blue-500 text-white shadow-sm'
                         : 'border-gray-200 dark:border-gray-700 text-gray-500 dark:text-gray-400 hover:border-blue-300 hover:text-blue-500 dark:hover:border-blue-600 dark:hover:text-blue-400'
@@ -500,14 +500,14 @@ function ChartIndicatorDropdown({ activeTool, setActiveTool, onClearDrawings, dr
 
           {/* Drawing tools section */}
           <div className="px-3 pt-2.5 pb-3">
-            <p className="text-[8px] font-bold text-gray-400 dark:text-gray-500 uppercase tracking-widest mb-2">
+            <p className="text-[10px] font-bold text-gray-400 dark:text-gray-500 uppercase tracking-widest mb-2">
               Drawing Tools
             </p>
             <div className="flex flex-wrap gap-1">
               {DRAW_TOOLS.map(t => (
                 <button key={t.id} title={t.title}
                   onClick={() => setActiveTool(p => p === t.id ? null : t.id)}
-                  className={`px-2 py-0.5 rounded-md text-[9px] font-semibold border transition-all ${
+                  className={`px-2 py-0.5 rounded-md text-[10px] font-semibold border transition-all ${
                     activeTool === t.id
                       ? 'bg-amber-500 border-amber-500 text-white shadow-sm'
                       : 'border-gray-200 dark:border-gray-700 text-gray-500 dark:text-gray-400 hover:border-amber-400 hover:text-amber-500'
@@ -517,7 +517,7 @@ function ChartIndicatorDropdown({ activeTool, setActiveTool, onClearDrawings, dr
               ))}
               {drawCount > 0 && (
                 <button onClick={() => { onClearDrawings(); setOpen(false) }}
-                  className="px-2 py-0.5 rounded-md text-[9px] font-semibold border border-red-200 dark:border-red-900 text-red-400 hover:bg-red-50 dark:hover:bg-red-950/40 transition-all">
+                  className="px-2 py-0.5 rounded-md text-[10px] font-semibold border border-red-200 dark:border-red-900 text-red-400 hover:bg-red-50 dark:hover:bg-red-950/40 transition-all">
                   ✕ Clear {drawCount}
                 </button>
               )}
@@ -553,7 +553,7 @@ function ChartHUDControls() {
       <div className="flex items-center bg-gray-100 dark:bg-gray-800 rounded-md p-0.5 shrink-0">
         {TIMEFRAMES.map(tf => (
           <button key={tf} onClick={() => setTimeframe(tf)}
-            className={`px-1.5 py-0.5 rounded text-[9px] font-bold transition-colors ${
+            className={`px-1.5 py-0.5 rounded text-[10px] font-bold transition-colors ${
               timeframe === tf
                 ? 'bg-white dark:bg-gray-700 text-gray-900 dark:text-white shadow-sm'
                 : 'text-gray-400 dark:text-gray-500 hover:text-gray-700 dark:hover:text-gray-300'
@@ -594,7 +594,7 @@ function ChartHUDPrice({ latestClose, chartData }) {
         )}
       </div>
       {selectedCompanyName && (
-        <span className="text-[9px] text-gray-400 dark:text-gray-500 leading-tight mt-0.5">{selectedCompanyName}</span>
+        <span className="text-[10px] text-gray-400 dark:text-gray-500 leading-tight mt-0.5">{selectedCompanyName}</span>
       )}
     </div>
   )
@@ -632,7 +632,7 @@ function PositionBadge({ positions, latestClose }) {
         {/* Header */}
         <div className={`flex items-center justify-between px-3 py-1.5 ${isLong ? 'bg-blue-50 dark:bg-blue-950/40' : 'bg-red-50 dark:bg-red-950/40'}`}>
           <div className="flex items-center gap-1.5">
-            <span className={`text-[7px] font-bold uppercase px-1.5 py-0.5 rounded ${
+            <span className={`text-[9px] font-bold uppercase px-1.5 py-0.5 rounded ${
               isLong ? 'bg-blue-100 dark:bg-blue-900 text-blue-600' : 'bg-red-100 dark:bg-red-900 text-red-500'
             }`}>{positions[0]?.position}</span>
             <span className="text-[10px] font-bold text-gray-800 dark:text-gray-100">
@@ -649,17 +649,17 @@ function PositionBadge({ positions, latestClose }) {
         {/* Summary */}
         <div className="px-3 pt-2 pb-1 grid grid-cols-3 gap-x-2 gap-y-1 border-b border-gray-100 dark:border-gray-800">
           <div>
-            <p className="text-[7px] text-gray-400 uppercase tracking-widest mb-0.5">Avg Entry</p>
-            <p className="text-[9px] font-semibold text-blue-400 tabular-nums">{avgEntry.toFixed(2)}</p>
+            <p className="text-[9px] text-gray-400 uppercase tracking-widest mb-0.5">Avg Entry</p>
+            <p className="text-[10px] font-semibold text-blue-400 tabular-nums">{avgEntry.toFixed(2)}</p>
           </div>
           <div>
-            <p className="text-[7px] text-gray-400 uppercase tracking-widest mb-0.5">Qty</p>
-            <p className="text-[9px] font-semibold text-gray-700 dark:text-gray-300 tabular-nums">{totalQty}</p>
+            <p className="text-[9px] text-gray-400 uppercase tracking-widest mb-0.5">Qty</p>
+            <p className="text-[10px] font-semibold text-gray-700 dark:text-gray-300 tabular-nums">{totalQty}</p>
           </div>
           {close > 0 && (
             <div>
-              <p className="text-[7px] text-gray-400 uppercase tracking-widest mb-0.5">Unreal</p>
-              <p className={`text-[9px] font-semibold tabular-nums ${isPos ? 'text-emerald-500' : 'text-red-400'}`}>
+              <p className="text-[9px] text-gray-400 uppercase tracking-widest mb-0.5">Unreal</p>
+              <p className={`text-[10px] font-semibold tabular-nums ${isPos ? 'text-emerald-500' : 'text-red-400'}`}>
                 {isPos ? '+' : '−'}Rs.{Math.abs(Math.round(totalUnreal)).toLocaleString()}
               </p>
             </div>
@@ -681,24 +681,24 @@ function PositionBadge({ positions, latestClose }) {
                 <div className={`w-1.5 h-1.5 rounded-full mt-0.5 shrink-0 ${ENTRY_DOT_COLORS[idx % ENTRY_DOT_COLORS.length]}`} />
                 <div className="grid grid-cols-3 gap-x-2 gap-y-0.5 flex-1">
                   <div>
-                    <p className="text-[7px] text-gray-400 uppercase tracking-widest">Entry</p>
-                    <p className={`text-[9px] font-semibold tabular-nums ${ENTRY_TEXT_COLORS[idx % ENTRY_TEXT_COLORS.length]}`}>{e.toFixed(2)}</p>
+                    <p className="text-[9px] text-gray-400 uppercase tracking-widest">Entry</p>
+                    <p className={`text-[10px] font-semibold tabular-nums ${ENTRY_TEXT_COLORS[idx % ENTRY_TEXT_COLORS.length]}`}>{e.toFixed(2)}</p>
                   </div>
                   <div>
-                    <p className="text-[7px] text-gray-400 uppercase tracking-widest">Qty</p>
-                    <p className="text-[9px] font-semibold text-gray-600 dark:text-gray-400 tabular-nums">{qty}</p>
+                    <p className="text-[9px] text-gray-400 uppercase tracking-widest">Qty</p>
+                    <p className="text-[10px] font-semibold text-gray-600 dark:text-gray-400 tabular-nums">{qty}</p>
                   </div>
                   {u !== null && (
                     <div>
-                      <p className="text-[7px] text-gray-400 uppercase tracking-widest">P&L</p>
-                      <p className={`text-[9px] font-semibold tabular-nums ${u >= 0 ? 'text-emerald-500' : 'text-red-400'}`}>
+                      <p className="text-[9px] text-gray-400 uppercase tracking-widest">P&L</p>
+                      <p className={`text-[10px] font-semibold tabular-nums ${u >= 0 ? 'text-emerald-500' : 'text-red-400'}`}>
                         {u >= 0 ? '+' : '−'}{Math.abs(Math.round(u)).toLocaleString()}
                       </p>
                     </div>
                   )}
-                  {pos.sl && <div><p className="text-[7px] text-gray-400 uppercase tracking-widest">SL</p><p className="text-[9px] font-semibold text-red-400 tabular-nums">{parseFloat(pos.sl).toFixed(2)}</p></div>}
-                  {pos.tp && <div><p className="text-[7px] text-gray-400 uppercase tracking-widest">TP</p><p className="text-[9px] font-semibold text-emerald-400 tabular-nums">{parseFloat(pos.tp).toFixed(2)}</p></div>}
-                  {rr   && <div><p className="text-[7px] text-gray-400 uppercase tracking-widest">R:R</p><p className="text-[9px] font-semibold text-violet-400">1:{rr}</p></div>}
+                  {pos.sl && <div><p className="text-[9px] text-gray-400 uppercase tracking-widest">SL</p><p className="text-[10px] font-semibold text-red-400 tabular-nums">{parseFloat(pos.sl).toFixed(2)}</p></div>}
+                  {pos.tp && <div><p className="text-[9px] text-gray-400 uppercase tracking-widest">TP</p><p className="text-[10px] font-semibold text-emerald-400 tabular-nums">{parseFloat(pos.tp).toFixed(2)}</p></div>}
+                  {rr   && <div><p className="text-[9px] text-gray-400 uppercase tracking-widest">R:R</p><p className="text-[10px] font-semibold text-violet-400">1:{rr}</p></div>}
                 </div>
               </div>
             )
@@ -723,7 +723,7 @@ function PositionBadge({ positions, latestClose }) {
                 <div className={`absolute w-2.5 h-2.5 rounded-full border-2 border-white dark:border-gray-900 shadow ${isPos ? 'bg-emerald-400' : 'bg-red-400'}`}
                   style={{ left: `${closePct}%`, top: '50%', transform: 'translate(-50%,-50%)' }} />
               </div>
-              <div className="flex justify-between text-[7px]">
+              <div className="flex justify-between text-[9px]">
                 <span className="text-red-400">{sl.toFixed(2)}</span>
                 <span className={`font-semibold tabular-nums ${isPos ? 'text-emerald-400' : 'text-red-400'}`}>{close.toFixed(2)}</span>
                 <span className="text-emerald-400">{tp.toFixed(2)}</span>
@@ -749,18 +749,18 @@ function MoversOverlay({ movers, date, pinned, onClear }) {
         : 'bg-white/95 dark:bg-gray-900/95 border-gray-200 dark:border-gray-700'
       }`}>
       <div className="flex items-center justify-between px-3 py-1.5 border-b border-gray-100 dark:border-gray-800">
-        <span className="text-[9px] font-semibold text-gray-400 uppercase tracking-widest">{date}</span>
+        <span className="text-[10px] font-semibold text-gray-400 uppercase tracking-widest">{date}</span>
         {pinned ? (
-          <button onClick={onClear} className="text-[9px] text-blue-400 hover:text-blue-600 font-semibold flex items-center gap-0.5">
+          <button onClick={onClear} className="text-[10px] text-blue-400 hover:text-blue-600 font-semibold flex items-center gap-0.5">
             <span>📌</span> Pinned
           </button>
         ) : (
-          <span className="text-[8px] text-gray-300 dark:text-gray-600">Click to pin</span>
+          <span className="text-[10px] text-gray-300 dark:text-gray-600">Click to pin</span>
         )}
       </div>
       <div className="grid grid-cols-2 divide-x divide-gray-100 dark:divide-gray-800">
         <div className="px-2 py-2">
-          <p className="text-[8px] font-semibold text-emerald-500 uppercase tracking-widest mb-1">Gainers</p>
+          <p className="text-[10px] font-semibold text-emerald-500 uppercase tracking-widest mb-1">Gainers</p>
           {(movers.gainers || []).slice(0, 5).map((s, i) => (
             <div key={i}
               onClick={() => selectSymbol(s.s)}
@@ -772,7 +772,7 @@ function MoversOverlay({ movers, date, pinned, onClear }) {
           ))}
         </div>
         <div className="px-2 py-2">
-          <p className="text-[8px] font-semibold text-red-400 uppercase tracking-widest mb-1">Losers</p>
+          <p className="text-[10px] font-semibold text-red-400 uppercase tracking-widest mb-1">Losers</p>
           {(movers.losers || []).slice(0, 5).map((s, i) => (
             <div key={i}
               onClick={() => selectSymbol(s.s)}
@@ -796,7 +796,7 @@ function OHLCTooltip({ bar, change }) {
   return (
     <div className="absolute top-14 left-3 z-10 pointer-events-none" translate="no">
       <div className="bg-white/95 dark:bg-gray-900/95 border border-gray-200 dark:border-gray-700 rounded-xl px-3 py-2 shadow-sm">
-        <div className="text-[9px] text-gray-400 mb-1">{bar.time}</div>
+        <div className="text-[10px] text-gray-400 mb-1">{bar.time}</div>
         <div className="flex items-baseline gap-2 mb-1">
           <span className={`text-[15px] font-bold ${isUp ? 'text-emerald-500' : 'text-red-400'}`}>
             {(bar.close ?? bar.value)?.toLocaleString()}
@@ -808,7 +808,7 @@ function OHLCTooltip({ bar, change }) {
           )}
         </div>
         {bar.open != null && (
-          <div className="grid grid-cols-4 gap-x-3 text-[9px]">
+          <div className="grid grid-cols-4 gap-x-3 text-[10px]">
             {['O','H','L','C'].map(l => <span key={l} className="text-gray-400">{l}</span>)}
             <span className="text-gray-700 dark:text-gray-300">{bar.open?.toLocaleString()}</span>
             <span className="text-emerald-500">{bar.high?.toLocaleString()}</span>
@@ -841,12 +841,12 @@ function ChartSkeleton() {
 function SubPaneLabel({ title, sub, color, legend }) {
   return (
     <div className="flex items-center gap-2 px-3 pt-1 pb-0.5 shrink-0">
-      <span className={`text-[8px] font-bold uppercase tracking-widest`} style={{ color }}>{title}</span>
-      {sub && <span className="text-[8px] text-gray-400">{sub}</span>}
+      <span className={`text-[10px] font-bold uppercase tracking-widest`} style={{ color }}>{title}</span>
+      {sub && <span className="text-[10px] text-gray-400">{sub}</span>}
       {legend && legend.map((l, i) => (
         <span key={i} className="flex items-center gap-1">
           <span className="w-2 h-0.5 rounded inline-block" style={{ background: l.color }} />
-          <span className="text-[8px] text-gray-400">{l.label}</span>
+          <span className="text-[10px] text-gray-400">{l.label}</span>
         </span>
       ))}
     </div>
@@ -1706,7 +1706,7 @@ export default function StockChart() {
           {/* Pinned hint — only shown for index charts */}
           {overlayData?.pinned && isIndex?.() && (
             <div className="absolute bottom-2 left-1/2 -translate-x-1/2 z-10 pointer-events-none">
-              <span className="text-[9px] text-gray-400 bg-white/80 dark:bg-gray-900/80 px-2 py-0.5 rounded-full border border-gray-200 dark:border-gray-700">
+              <span className="text-[10px] text-gray-400 bg-white/80 dark:bg-gray-900/80 px-2 py-0.5 rounded-full border border-gray-200 dark:border-gray-700">
                 📌 Movers shown in right panel — click to unpin
               </span>
             </div>
@@ -1715,7 +1715,7 @@ export default function StockChart() {
           {/* Active drawing tool hint — bottom-center */}
           {activeTool && (
             <div className="absolute bottom-8 left-1/2 -translate-x-1/2 z-30 pointer-events-none">
-              <span className="text-[9px] text-white bg-amber-600/90 px-2.5 py-1 rounded-full shadow whitespace-nowrap">
+              <span className="text-[10px] text-white bg-amber-600/90 px-2.5 py-1 rounded-full shadow whitespace-nowrap">
                 {activeTool === 'horizontal' ? 'Click to place · Esc to exit · Right-click drawing to delete'
                 : activeTool === 'vertical'  ? 'Click to place · Esc to exit · Right-click drawing to delete'
                 : activeTool === 'path'      ? 'Click points · Double-click to finish · Right-click to cancel · Esc to exit'

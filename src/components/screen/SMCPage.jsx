@@ -79,7 +79,7 @@ function SMCSymbolSearch({ value, onChange }) {
               >
                 <div className="text-[12px] font-semibold text-gray-800 dark:text-gray-100 leading-tight">{s.symbol}</div>
                 {s.company_name && (
-                  <div className="text-[9px] text-gray-400 dark:text-gray-500 leading-tight truncate">{s.company_name}</div>
+                  <div className="text-[10px] text-gray-400 dark:text-gray-500 leading-tight truncate">{s.company_name}</div>
                 )}
               </li>
             ))}
@@ -97,17 +97,17 @@ function SectionHeader({ label, count, bullish, bearish }) {
     <div className="flex items-center gap-2 px-4 pt-4 pb-1.5">
       <span className="text-[11px] font-bold text-gray-700 dark:text-gray-200 uppercase tracking-wide">{label}</span>
       {count !== undefined && (
-        <span className="text-[9px] font-semibold px-1.5 py-0.5 rounded-full bg-gray-100 dark:bg-gray-800 text-gray-500 dark:text-gray-400">
+        <span className="text-[10px] font-semibold px-1.5 py-0.5 rounded-full bg-gray-100 dark:bg-gray-800 text-gray-500 dark:text-gray-400">
           {count}
         </span>
       )}
       {bullish !== undefined && (
-        <span className="text-[9px] font-semibold px-1.5 py-0.5 rounded-full bg-emerald-100 dark:bg-emerald-900/30 text-emerald-700 dark:text-emerald-400">
+        <span className="text-[10px] font-semibold px-1.5 py-0.5 rounded-full bg-emerald-100 dark:bg-emerald-900/30 text-emerald-700 dark:text-emerald-400">
           {bullish} bull
         </span>
       )}
       {bearish !== undefined && (
-        <span className="text-[9px] font-semibold px-1.5 py-0.5 rounded-full bg-red-100 dark:bg-red-900/30 text-red-700 dark:text-red-400">
+        <span className="text-[10px] font-semibold px-1.5 py-0.5 rounded-full bg-red-100 dark:bg-red-900/30 text-red-700 dark:text-red-400">
           {bearish} bear
         </span>
       )}
@@ -122,7 +122,7 @@ function typeBull(t) { return t === 'bullish' || t === 'buy_side' }
 function BullBear({ type }) {
   const bull = typeBull(type)
   return (
-    <span className={`px-1.5 py-0.5 text-[9px] font-semibold rounded-full ${
+    <span className={`px-1.5 py-0.5 text-[10px] font-semibold rounded-full ${
       bull
         ? 'bg-emerald-100 dark:bg-emerald-900/30 text-emerald-700 dark:text-emerald-400'
         : 'bg-red-100 dark:bg-red-900/30 text-red-700 dark:text-red-400'
@@ -140,11 +140,11 @@ function OBTable({ data }) {
     <table className="w-full text-[11px]">
       <thead>
         <tr className="border-b border-gray-100 dark:border-gray-800">
-          <th className="text-left py-1.5 px-4 text-[9px] font-semibold text-gray-400 uppercase">Date</th>
-          <th className="text-left py-1.5 px-2 text-[9px] font-semibold text-gray-400 uppercase">Type</th>
-          <th className="text-right py-1.5 px-2 text-[9px] font-semibold text-gray-400 uppercase">High</th>
-          <th className="text-right py-1.5 px-2 text-[9px] font-semibold text-gray-400 uppercase">Low</th>
-          <th className="text-right py-1.5 px-4 text-[9px] font-semibold text-gray-400 uppercase">Vol</th>
+          <th className="text-left py-1.5 px-4 text-[10px] font-semibold text-gray-400 uppercase">Date</th>
+          <th className="text-left py-1.5 px-2 text-[10px] font-semibold text-gray-400 uppercase">Type</th>
+          <th className="text-right py-1.5 px-2 text-[10px] font-semibold text-gray-400 uppercase">High</th>
+          <th className="text-right py-1.5 px-2 text-[10px] font-semibold text-gray-400 uppercase">Low</th>
+          <th className="text-right py-1.5 px-4 text-[10px] font-semibold text-gray-400 uppercase">Vol</th>
         </tr>
       </thead>
       <tbody className="divide-y divide-gray-50 dark:divide-gray-800/50">
@@ -169,10 +169,10 @@ function FVGTable({ data }) {
     <table className="w-full text-[11px]">
       <thead>
         <tr className="border-b border-gray-100 dark:border-gray-800">
-          <th className="text-left py-1.5 px-4 text-[9px] font-semibold text-gray-400 uppercase">Date</th>
-          <th className="text-left py-1.5 px-2 text-[9px] font-semibold text-gray-400 uppercase">Type</th>
-          <th className="text-right py-1.5 px-2 text-[9px] font-semibold text-gray-400 uppercase">Top</th>
-          <th className="text-right py-1.5 px-4 text-[9px] font-semibold text-gray-400 uppercase">Bottom</th>
+          <th className="text-left py-1.5 px-4 text-[10px] font-semibold text-gray-400 uppercase">Date</th>
+          <th className="text-left py-1.5 px-2 text-[10px] font-semibold text-gray-400 uppercase">Type</th>
+          <th className="text-right py-1.5 px-2 text-[10px] font-semibold text-gray-400 uppercase">Top</th>
+          <th className="text-right py-1.5 px-4 text-[10px] font-semibold text-gray-400 uppercase">Bottom</th>
         </tr>
       </thead>
       <tbody className="divide-y divide-gray-50 dark:divide-gray-800/50">
@@ -195,9 +195,9 @@ function BOSTable({ data }) {
     <table className="w-full text-[11px]">
       <thead>
         <tr className="border-b border-gray-100 dark:border-gray-800">
-          <th className="text-left py-1.5 px-4 text-[9px] font-semibold text-gray-400 uppercase">Date</th>
-          <th className="text-left py-1.5 px-2 text-[9px] font-semibold text-gray-400 uppercase">Direction</th>
-          <th className="text-right py-1.5 px-4 text-[9px] font-semibold text-gray-400 uppercase">Level</th>
+          <th className="text-left py-1.5 px-4 text-[10px] font-semibold text-gray-400 uppercase">Date</th>
+          <th className="text-left py-1.5 px-2 text-[10px] font-semibold text-gray-400 uppercase">Direction</th>
+          <th className="text-right py-1.5 px-4 text-[10px] font-semibold text-gray-400 uppercase">Level</th>
         </tr>
       </thead>
       <tbody className="divide-y divide-gray-50 dark:divide-gray-800/50">
@@ -219,9 +219,9 @@ function SweepsTable({ data }) {
     <table className="w-full text-[11px]">
       <thead>
         <tr className="border-b border-gray-100 dark:border-gray-800">
-          <th className="text-left py-1.5 px-4 text-[9px] font-semibold text-gray-400 uppercase">Date</th>
-          <th className="text-left py-1.5 px-2 text-[9px] font-semibold text-gray-400 uppercase">Side</th>
-          <th className="text-right py-1.5 px-4 text-[9px] font-semibold text-gray-400 uppercase">Level</th>
+          <th className="text-left py-1.5 px-4 text-[10px] font-semibold text-gray-400 uppercase">Date</th>
+          <th className="text-left py-1.5 px-2 text-[10px] font-semibold text-gray-400 uppercase">Side</th>
+          <th className="text-right py-1.5 px-4 text-[10px] font-semibold text-gray-400 uppercase">Level</th>
         </tr>
       </thead>
       <tbody className="divide-y divide-gray-50 dark:divide-gray-800/50">

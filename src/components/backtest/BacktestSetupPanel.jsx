@@ -86,7 +86,7 @@ export default function BacktestSetupPanel({ onSessionStarted }) {
 
       {/* Script */}
       <div className="relative" ref={dropdownRef}>
-        <label className="text-[9px] font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wider">Script</label>
+        <label className="text-[10px] font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wider">Script</label>
         <div
           className="mt-0.5 flex items-center gap-1 px-2 py-1.5 rounded-md border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 cursor-pointer text-[11px]"
           onClick={() => setShowSymbolList(v => !v)}
@@ -115,7 +115,7 @@ export default function BacktestSetupPanel({ onSessionStarted }) {
                   className="px-2 py-1 text-[11px] hover:bg-blue-50 dark:hover:bg-blue-900/20 cursor-pointer text-gray-800 dark:text-gray-200"
                 >
                   <span className="font-semibold">{s.symbol}</span>
-                  <span className="text-gray-400 ml-2 text-[9px]">{s.total_days}d</span>
+                  <span className="text-gray-400 ml-2 text-[10px]">{s.total_days}d</span>
                 </div>
               ))}
               {filteredSymbols.length === 0 && (
@@ -128,7 +128,7 @@ export default function BacktestSetupPanel({ onSessionStarted }) {
 
       {/* Start Date */}
       <div>
-        <label className="text-[9px] font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wider">Start Date</label>
+        <label className="text-[10px] font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wider">Start Date</label>
         <input
           type="date"
           value={startDate}
@@ -138,7 +138,7 @@ export default function BacktestSetupPanel({ onSessionStarted }) {
           className="mt-0.5 w-full px-2 py-1.5 text-[11px] rounded-md border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 dark:text-white outline-none focus:ring-1 focus:ring-blue-500"
         />
         {selectedSymbolData && (
-          <div className="text-[9px] text-gray-400 mt-0.5">
+          <div className="text-[10px] text-gray-400 mt-0.5">
             {selectedSymbolData.earliest_date} → {selectedSymbolData.latest_date}
           </div>
         )}
@@ -146,7 +146,7 @@ export default function BacktestSetupPanel({ onSessionStarted }) {
 
       {/* Initial Capital */}
       <div>
-        <label className="text-[9px] font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wider">Capital (NPR)</label>
+        <label className="text-[10px] font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wider">Capital (NPR)</label>
         <input
           type="number"
           value={capital}
@@ -160,7 +160,7 @@ export default function BacktestSetupPanel({ onSessionStarted }) {
 
       {/* Strategy Name */}
       <div>
-        <label className="text-[9px] font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wider">Strategy Name</label>
+        <label className="text-[10px] font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wider">Strategy Name</label>
         <input
           type="text"
           value={strategyName}
@@ -173,7 +173,7 @@ export default function BacktestSetupPanel({ onSessionStarted }) {
 
       {/* Run Mode */}
       <div>
-        <label className="text-[9px] font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wider">Run Mode</label>
+        <label className="text-[10px] font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wider">Run Mode</label>
         <div className="mt-0.5 flex gap-2">
           {['PLAY', 'MANUAL'].map(m => (
             <button
@@ -194,7 +194,7 @@ export default function BacktestSetupPanel({ onSessionStarted }) {
       {/* Play Speed — only if PLAY */}
       {runMode === 'PLAY' && (
         <div>
-          <label className="text-[9px] font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wider">Play Speed</label>
+          <label className="text-[10px] font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wider">Play Speed</label>
           <div className="mt-0.5 flex gap-1 flex-wrap">
             {SPEEDS.map(s => (
               <button
@@ -215,7 +215,7 @@ export default function BacktestSetupPanel({ onSessionStarted }) {
 
       {/* SL Validation Mode */}
       <div>
-        <label className="text-[9px] font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wider">
+        <label className="text-[10px] font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wider">
           SL Validation
         </label>
         <div className="mt-0.5 flex gap-2">
@@ -235,7 +235,7 @@ export default function BacktestSetupPanel({ onSessionStarted }) {
             </button>
           ))}
         </div>
-        <div className="text-[9px] text-gray-400 mt-0.5 leading-tight">
+        <div className="text-[10px] text-gray-400 mt-0.5 leading-tight">
           {slMode === 'AUTO'
             ? 'System auto-closes when SL is hit after T+2'
             : 'System asks you before closing on SL breach'}
@@ -256,7 +256,7 @@ export default function BacktestSetupPanel({ onSessionStarted }) {
         {loading ? 'Starting…' : 'Start Backtest'}
       </button>
 
-      <div className="text-[9px] text-gray-400 text-center leading-tight">
+      <div className="text-[10px] text-gray-400 text-center leading-tight">
         NEPSE · Long only · T+2 settlement · No intraday
       </div>
     </div>

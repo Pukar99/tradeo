@@ -11,11 +11,11 @@ function StatCard({ label, value, sub, color, hint }) {
   return (
     <div className="bg-white dark:bg-gray-900 rounded-xl border border-gray-100 dark:border-gray-800 p-3 flex flex-col gap-0.5">
       <div className="flex items-center gap-1">
-        <div className="text-[9px] text-gray-400 uppercase tracking-wider font-semibold">{label}</div>
+        <div className="text-[10px] text-gray-400 uppercase tracking-wider font-semibold">{label}</div>
         {hint && (
           <div className="relative group">
-            <span className="text-[8px] text-gray-300 dark:text-gray-600 cursor-default">ⓘ</span>
-            <div className="absolute bottom-4 left-0 z-10 bg-gray-800 text-white text-[9px] rounded px-2 py-1 w-40 opacity-0 group-hover:opacity-100 pointer-events-none transition-opacity leading-tight">
+            <span className="text-[10px] text-gray-300 dark:text-gray-600 cursor-default">ⓘ</span>
+            <div className="absolute bottom-4 left-0 z-10 bg-gray-800 text-white text-[10px] rounded px-2 py-1 w-40 opacity-0 group-hover:opacity-100 pointer-events-none transition-opacity leading-tight">
               {hint}
             </div>
           </div>
@@ -56,7 +56,7 @@ function BehaviorEntry({ e }) {
           <span className="text-gray-500 dark:text-gray-400">{e.event_date?.slice(0, 10)}</span>
           <span className="font-semibold dark:text-gray-300">{e.symbol}</span>
         </div>
-        {desc && <div className="text-gray-500 dark:text-gray-400 text-[9px] mt-0.5 leading-tight">{desc}</div>}
+        {desc && <div className="text-gray-500 dark:text-gray-400 text-[10px] mt-0.5 leading-tight">{desc}</div>}
       </div>
     </div>
   )
@@ -259,18 +259,18 @@ export default function BacktestReport({ sessionId, onClose }) {
         <div className="grid grid-cols-2 gap-2 mb-4">
           {s.best_trade && (
             <div className="bg-white dark:bg-gray-900 rounded-xl border border-green-200 dark:border-green-900 p-3">
-              <div className="text-[9px] text-green-500 font-bold uppercase mb-1">Best Trade</div>
+              <div className="text-[10px] text-green-500 font-bold uppercase mb-1">Best Trade</div>
               <div className="font-bold dark:text-white">{s.best_trade.symbol}</div>
               <div className="text-green-600 font-bold">+Rs.{fmt(s.best_trade.pnl)}</div>
-              <div className="text-[9px] text-gray-400">{s.best_trade.date}</div>
+              <div className="text-[10px] text-gray-400">{s.best_trade.date}</div>
             </div>
           )}
           {s.worst_trade && (
             <div className="bg-white dark:bg-gray-900 rounded-xl border border-red-200 dark:border-red-900 p-3">
-              <div className="text-[9px] text-red-500 font-bold uppercase mb-1">Worst Trade</div>
+              <div className="text-[10px] text-red-500 font-bold uppercase mb-1">Worst Trade</div>
               <div className="font-bold dark:text-white">{s.worst_trade.symbol}</div>
               <div className="text-red-500 font-bold">Rs.{fmt(s.worst_trade.pnl)}</div>
-              <div className="text-[9px] text-gray-400">{s.worst_trade.date}</div>
+              <div className="text-[10px] text-gray-400">{s.worst_trade.date}</div>
             </div>
           )}
         </div>
@@ -313,7 +313,7 @@ export default function BacktestReport({ sessionId, onClose }) {
                       </td>
                       <td className="py-1 px-1 text-gray-500 dark:text-gray-400">{t.hold_days || '—'}</td>
                       <td className="py-1 px-1">
-                        <span className={`px-1 py-0.5 rounded text-[9px] font-semibold whitespace-nowrap ${
+                        <span className={`px-1 py-0.5 rounded text-[10px] font-semibold whitespace-nowrap ${
                           t.exit_reason === 'TP_HIT'     ? 'bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400' :
                           t.exit_reason === 'SL_HIT'     ? 'bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-400' :
                           t.exit_reason === 'SL_IGNORED' ? 'bg-orange-100 text-orange-700 dark:bg-orange-900/30 dark:text-orange-400' :
@@ -342,7 +342,7 @@ export default function BacktestReport({ sessionId, onClose }) {
             ))}
           </div>
           {report.behavior_log.some(e => e.event_type === 'SL_IGNORED') && (
-            <div className="mt-2 text-[9px] text-orange-500 bg-orange-50 dark:bg-orange-900/10 rounded px-2 py-1 leading-tight">
+            <div className="mt-2 text-[10px] text-orange-500 bg-orange-50 dark:bg-orange-900/10 rounded px-2 py-1 leading-tight">
               ⚠ SL ignored trades are logged but not penalized. Review your discipline score on the Home page.
             </div>
           )}

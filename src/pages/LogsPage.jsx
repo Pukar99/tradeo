@@ -133,17 +133,16 @@ export default function LogsPage() {
 
   if (loading) return (
     <div className="w-full px-3 sm:px-5 pt-4 sm:pt-5 pb-16 max-w-7xl mx-auto animate-pulse">
-      {/* toolbar row 1 */}
-      <div className="flex items-center gap-2 mb-2">
-        <div className="h-8 w-56 bg-gray-100 dark:bg-gray-800 rounded-xl" />
+      {/* Single-row toolbar skeleton matching the live layout */}
+      <div className="flex items-center gap-1.5 mb-4 px-3 py-1 border border-gray-200 dark:border-gray-800 rounded-lg bg-white dark:bg-gray-900 h-9">
+        <div className="h-6 w-48 bg-gray-100 dark:bg-gray-800 rounded-lg shrink-0" />
+        <div className="w-px h-3.5 bg-gray-200 dark:bg-gray-700 shrink-0" />
+        <div className="h-6 w-44 bg-gray-100 dark:bg-gray-800 rounded-md shrink-0" />
+        <div className="w-px h-3.5 bg-gray-200 dark:bg-gray-700 shrink-0" />
+        <div className="h-6 w-20 bg-gray-100 dark:bg-gray-800 rounded-md shrink-0" />
+        <div className="h-6 w-[140px] bg-gray-100 dark:bg-gray-800 rounded shrink-0" />
         <div className="flex-1" />
-        <div className="h-8 w-24 bg-gray-100 dark:bg-gray-800 rounded-xl" />
-      </div>
-      {/* toolbar row 2 */}
-      <div className="flex items-center gap-2 mb-5">
-        <div className="h-7 w-52 bg-gray-100 dark:bg-gray-800 rounded-lg" />
-        <div className="h-7 w-24 bg-gray-100 dark:bg-gray-800 rounded-lg" />
-        <div className="h-7 w-36 bg-gray-100 dark:bg-gray-800 rounded-lg" />
+        <div className="h-6 w-20 bg-gray-100 dark:bg-gray-800 rounded-md shrink-0" />
       </div>
       {/* position rows */}
       {[1, 2, 3].map(i => (
@@ -179,95 +178,102 @@ export default function LogsPage() {
         </div>
       )}
 
-      {/* ── unified toolbar — row 1: tabs + New Trade; row 2 (trades only): view + filter + search ── */}
-      <div className="flex flex-col gap-2 mb-5">
+      {/* ── Unified compact toolbar — single row, DataLab-style ──
+          Tab chips + New Trade button are shrink-0 (fixed at edges).
+          The middle section (view/filter/search) scrolls horizontally on
+          narrow viewports. Visible thin scrollbar per Rule 51.            */}
+      <div className="flex items-center gap-1.5 mb-4 px-3 py-1 border border-gray-200 dark:border-gray-800 rounded-lg bg-white dark:bg-gray-900">
 
-        {/* Row 1: tabs left, New Trade right */}
-        <div className="flex items-center gap-2">
-          <div className="flex items-center bg-gray-100/80 dark:bg-gray-800/60 rounded-xl p-1 gap-0.5">
-            {TABS.map(tab => (
-              <button key={tab.key}
-                onClick={() => setActiveTab(tab.key)}
-                className={`px-3 sm:px-4 py-2.5 rounded-lg text-xs font-semibold transition-all min-h-[44px] ${
-                  activeTab === tab.key
-                    ? 'bg-white dark:bg-gray-900 text-gray-900 dark:text-white shadow-sm'
-                    : 'text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-300'
-                }`}>
-                {tab.label}
-              </button>
-            ))}
-          </div>
-
-          <div className="flex-1" />
-
-          {activeTab === 'trades' && (
-            <button
-              onClick={() => setAddModal(true)}
-              className="flex items-center gap-1.5 px-3.5 py-2.5 text-[11px] font-bold rounded-xl bg-blue-600 hover:bg-blue-500 active:bg-blue-700 text-white transition-all shadow-sm shadow-blue-500/30 min-h-[44px]">
-              <span className="text-sm leading-none">+</span>
-              <span className="hidden xs:inline">New Trade</span>
-              <span className="xs:hidden">New</span>
+        {/* Tab chips — compact, matches DataLab pattern exactly */}
+        <div className="flex items-center gap-0.5 bg-gray-100 dark:bg-gray-800 rounded-lg p-0.5 shrink-0">
+          {TABS.map(tab => (
+            <button key={tab.key}
+              onClick={() => setActiveTab(tab.key)}
+              className={`px-2 py-0.5 rounded-md text-[10px] font-semibold transition-all whitespace-nowrap ${
+                activeTab === tab.key
+                  ? 'bg-white dark:bg-gray-700 text-gray-900 dark:text-white shadow-sm'
+                  : 'text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-300'
+              }`}>
+              {tab.label}
             </button>
-          )}
+          ))}
         </div>
 
-        {/* Row 2: view toggle + trades controls — only for trades/market tabs */}
-        {(activeTab === 'trades' || activeTab === 'market') && (
-          <div className="flex items-center gap-2 flex-wrap">
+        {/* Middle: per-tab controls. Single source of horizontal scroll. */}
+        <div className="flex-1 min-w-0 flex items-center gap-1.5 overflow-x-auto overscroll-x-contain [scrollbar-width:thin] [&::-webkit-scrollbar]:h-1 [&::-webkit-scrollbar-thumb]:bg-gray-300 dark:[&::-webkit-scrollbar-thumb]:bg-gray-700 [&::-webkit-scrollbar-thumb]:rounded-full">
+          {(activeTab === 'trades' || activeTab === 'market') && (
+            <>
+              <div className="w-px h-3.5 bg-gray-200 dark:bg-gray-700 shrink-0" />
 
-            {/* view toggle */}
-            <div className="flex items-center bg-gray-100/80 dark:bg-gray-800/60 rounded-lg p-0.5 gap-0.5">
-              {[
-                { key: 'database', label: 'Database' },
-                { key: 'gallery',  label: 'Gallery'  },
-                { key: 'calendar', label: 'Calendar' },
-              ].map(v => (
-                <button key={v.key}
-                  onClick={() => setView(v.key)}
-                  className={`px-3 py-1 rounded-md text-[11px] font-semibold transition-all ${
-                    view === v.key
-                      ? 'bg-white dark:bg-gray-900 text-gray-900 dark:text-gray-100 shadow-sm'
-                      : 'text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-300'
-                  }`}>
-                  {v.label}
-                </button>
-              ))}
-            </div>
-
-            {/* trades-only filter + search */}
-            {activeTab === 'trades' && (view === 'database' || view === 'gallery') && <>
-              <div className="w-px h-4 bg-gray-200 dark:bg-gray-700 hidden sm:block" />
-
-              <div className="flex items-center bg-gray-100/80 dark:bg-gray-800/60 rounded-lg p-0.5 gap-0.5">
-                {['open', 'all'].map(f => (
-                  <button key={f}
-                    onClick={() => setFilter(f)}
-                    className={`px-3 py-1 rounded-md text-[11px] font-semibold transition-all ${
-                      filter === f
-                        ? 'bg-white dark:bg-gray-900 text-gray-900 dark:text-gray-100 shadow-sm'
+              {/* View toggle */}
+              <div className="flex items-center gap-0.5 bg-gray-100 dark:bg-gray-800 rounded-md p-0.5 shrink-0">
+                {[
+                  { key: 'database', label: 'Database' },
+                  { key: 'gallery',  label: 'Gallery'  },
+                  { key: 'calendar', label: 'Calendar' },
+                ].map(v => (
+                  <button key={v.key}
+                    onClick={() => setView(v.key)}
+                    className={`px-1.5 py-0.5 rounded text-[10px] font-semibold transition-colors whitespace-nowrap ${
+                      view === v.key
+                        ? 'bg-white dark:bg-gray-700 text-gray-900 dark:text-white shadow-sm'
                         : 'text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-300'
                     }`}>
-                    {f === 'open' ? 'Open' : 'All'}
+                    {v.label}
                   </button>
                 ))}
               </div>
 
-              <div className="relative flex-1 min-w-0">
-                <span className="absolute left-2.5 top-1/2 -translate-y-1/2 text-gray-400 dark:text-gray-500 text-[11px] pointer-events-none select-none">⌕</span>
-                <input
-                  type="text"
-                  value={search}
-                  onChange={e => setSearch(e.target.value)}
-                  placeholder="Symbol"
-                  list="symbol-datalist"
-                  className="pl-6 pr-3 py-1 w-full min-w-[80px] text-[11px] rounded-lg border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-900 text-gray-800 dark:text-gray-200 focus:outline-none focus:ring-1 focus:ring-blue-500 transition-all"
-                />
-                <datalist id="symbol-datalist">
-                  {allSymbols.map(s => <option key={s} value={s} />)}
-                </datalist>
-              </div>
-            </>}
-          </div>
+              {/* Trades-only: filter + search */}
+              {activeTab === 'trades' && (view === 'database' || view === 'gallery') && (
+                <>
+                  <div className="w-px h-3.5 bg-gray-200 dark:bg-gray-700 shrink-0" />
+
+                  <div className="flex items-center gap-0.5 bg-gray-100 dark:bg-gray-800 rounded-md p-0.5 shrink-0">
+                    {['open', 'all'].map(f => (
+                      <button key={f}
+                        onClick={() => setFilter(f)}
+                        className={`px-1.5 py-0.5 rounded text-[10px] font-semibold transition-colors ${
+                          filter === f
+                            ? 'bg-white dark:bg-gray-700 text-gray-900 dark:text-white shadow-sm'
+                            : 'text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-300'
+                        }`}>
+                        {f === 'open' ? 'Open' : 'All'}
+                      </button>
+                    ))}
+                  </div>
+
+                  <div className="relative shrink-0 w-[140px]">
+                    <span className="absolute left-2 top-1/2 -translate-y-1/2 text-gray-400 dark:text-gray-500 text-[10px] pointer-events-none select-none">⌕</span>
+                    <input
+                      type="text"
+                      value={search}
+                      onChange={e => setSearch(e.target.value)}
+                      placeholder="Symbol"
+                      list="symbol-datalist"
+                      maxLength={20}
+                      className="pl-5 pr-2 py-0.5 w-full h-6 text-[10px] font-semibold rounded border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-900 text-gray-800 dark:text-gray-200 placeholder-gray-300 dark:placeholder-gray-600 focus:outline-none focus:ring-1 focus:ring-blue-400 transition-all"
+                    />
+                    <datalist id="symbol-datalist">
+                      {allSymbols.map(s => <option key={s} value={s} />)}
+                    </datalist>
+                  </div>
+                </>
+              )}
+            </>
+          )}
+        </div>
+
+        {/* New Trade — shrink-0, never compresses. Trades tab only. */}
+        {activeTab === 'trades' && (
+          <button
+            onClick={() => setAddModal(true)}
+            aria-label="Add new trade"
+            className="shrink-0 flex items-center gap-1 px-2 py-0.5 text-[10px] font-bold rounded-md bg-blue-600 hover:bg-blue-500 active:bg-blue-700 text-white transition-colors whitespace-nowrap">
+            <span className="text-[12px] leading-none">+</span>
+            <span className="hidden xs:inline">New Trade</span>
+            <span className="xs:hidden">New</span>
+          </button>
         )}
       </div>
 

@@ -145,7 +145,7 @@ function DisambiguationCard({ result, onPick }) {
                 <p className="text-[11px] font-semibold text-gray-800 dark:text-white" translate="no">
                   {e.position} · Rs.{parseFloat(e.entry_price).toFixed(2)} · {e.quantity} kittas
                 </p>
-                <p className="text-[9px] text-gray-400">{e.date}</p>
+                <p className="text-[10px] text-gray-400">{e.date}</p>
               </div>
             </div>
             <svg className="w-3.5 h-3.5 text-gray-300 group-hover:text-amber-500 transition-colors" fill="none" viewBox="0 0 24 24" stroke="currentColor">
@@ -183,12 +183,12 @@ function BrokerFeeCard({ fee }) {
           />
         )}
         {fee.transaction === 'sell' && fee.capitalGainTax === 0 && fee.holdingDays !== null && (
-          <p className="text-[9px] text-gray-400 dark:text-gray-500 italic mt-0.5" translate="no">
+          <p className="text-[10px] text-gray-400 dark:text-gray-500 italic mt-0.5" translate="no">
             No CGT — no profit on this trade ({fee.holdingDays}d held)
           </p>
         )}
         {fee.transaction === 'sell' && fee.holdingDays === null && (
-          <p className="text-[9px] text-gray-400 dark:text-gray-500 italic mt-0.5">
+          <p className="text-[10px] text-gray-400 dark:text-gray-500 italic mt-0.5">
             CGT not estimated — trade entry not found
           </p>
         )}
@@ -295,9 +295,9 @@ function ShowTradesCard({ result }) {
             return (
               <div key={t.id} className="flex items-center justify-between bg-white dark:bg-gray-900 rounded-lg px-2 py-1.5 border border-gray-100 dark:border-gray-800">
                 <div className="flex items-center gap-1.5">
-                  <span className={`text-[9px] font-bold uppercase ${statusColor}`}>{t.status}</span>
+                  <span className={`text-[10px] font-bold uppercase ${statusColor}`}>{t.status}</span>
                   <span className="text-[11px] font-semibold text-gray-800 dark:text-white" translate="no">{t.symbol}</span>
-                  <span className="text-[9px] text-gray-400">{t.position} · {qty}@{entry}</span>
+                  <span className="text-[10px] text-gray-400">{t.position} · {qty}@{entry}</span>
                 </div>
                 {pnl !== null && (
                   <span className={`text-[10px] font-semibold ${pnl >= 0 ? 'text-green-500' : 'text-red-400'}`} translate="no">
@@ -365,14 +365,14 @@ function ShowJournalCard({ result }) {
             <div key={e.id} className="bg-white dark:bg-gray-900 rounded-lg px-2 py-1.5 border border-gray-100 dark:border-gray-800">
               <div className="flex items-center justify-between mb-0.5">
                 <span className="text-[10px] font-semibold text-gray-700 dark:text-gray-200" translate="no">{e.symbol}</span>
-                <span className="text-[9px] text-gray-400">{e.created_at?.slice(0, 10)}</span>
+                <span className="text-[10px] text-gray-400">{e.created_at?.slice(0, 10)}</span>
               </div>
               {e.notes && <p className="text-[10px] text-gray-500 dark:text-gray-400 leading-relaxed line-clamp-2">{e.notes}</p>}
               {e.pre_trade_reasoning && (
-                <p className="text-[9px] text-blue-400 mt-0.5 leading-snug line-clamp-1">Pre: {e.pre_trade_reasoning}</p>
+                <p className="text-[10px] text-blue-400 mt-0.5 leading-snug line-clamp-1">Pre: {e.pre_trade_reasoning}</p>
               )}
               {e.post_trade_evaluation && (
-                <p className="text-[9px] text-purple-400 mt-0.5 leading-snug line-clamp-1">Post: {e.post_trade_evaluation}</p>
+                <p className="text-[10px] text-purple-400 mt-0.5 leading-snug line-clamp-1">Post: {e.post_trade_evaluation}</p>
               )}
             </div>
           ))}
@@ -492,7 +492,7 @@ function BriefStat({ icon, label, value, color }) {
     <div className="bg-white dark:bg-gray-900 rounded-lg px-2 py-1.5 text-center">
       <p className="text-sm leading-none">{icon}</p>
       <p className={`text-sm font-bold ${color} mt-0.5`}>{value}</p>
-      <p className="text-[9px] text-gray-400 leading-tight mt-0.5">{label}</p>
+      <p className="text-[10px] text-gray-400 leading-tight mt-0.5">{label}</p>
     </div>
   )
 }
@@ -1359,7 +1359,7 @@ function AIChat({ isFullPage = false, onClose }) {
             {user?.avatar_url
               ? <img src={user.avatar_url} alt={user.name} className="w-full h-full object-cover" />
               : <div className="w-full h-full bg-green-500 flex items-center justify-center">
-                  <span className="text-white text-[9px] font-bold">{user?.name?.[0]?.toUpperCase() || '?'}</span>
+                  <span className="text-white text-[10px] font-bold">{user?.name?.[0]?.toUpperCase() || '?'}</span>
                 </div>
             }
           </div>
@@ -1448,7 +1448,7 @@ function AIChat({ isFullPage = false, onClose }) {
               >
                 <div className="min-w-0">
                   <p className="text-[11px] font-medium text-gray-700 dark:text-gray-200 truncate">{s.title}</p>
-                  <p className="text-[9px] text-gray-400">{new Date(s.updated_at).toLocaleDateString()}</p>
+                  <p className="text-[10px] text-gray-400">{new Date(s.updated_at).toLocaleDateString()}</p>
                 </div>
                 <button
                   onClick={e => handleDeleteSession(e, s.id)}
@@ -1608,7 +1608,7 @@ function AIChat({ isFullPage = false, onClose }) {
                 <span className="text-[10px] text-red-600 dark:text-red-400 font-medium flex-1">
                   Recording… {voiceSeconds}s
                 </span>
-                <span className="text-[9px] text-red-400 dark:text-red-500">
+                <span className="text-[10px] text-red-400 dark:text-red-500">
                   auto-sends after 4s silence
                 </span>
               </div>

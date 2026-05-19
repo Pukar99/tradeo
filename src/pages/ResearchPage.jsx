@@ -74,17 +74,17 @@ function ResearchCard({ post, onDelete, onVerify, onPin, isAdmin, currentUserId 
         {/* Badge row */}
         <div className="flex items-center gap-1.5 mb-3">
           {post.is_pinned && (
-            <span className="text-[9px] font-semibold px-2 py-0.5 rounded-full bg-emerald-50 dark:bg-emerald-900/30 text-emerald-600 dark:text-emerald-400 tracking-wide uppercase">
+            <span className="text-[10px] font-semibold px-2 py-0.5 rounded-full bg-emerald-50 dark:bg-emerald-900/30 text-emerald-600 dark:text-emerald-400 tracking-wide uppercase">
               Distinguished
             </span>
           )}
           {post.is_verified && !post.is_pinned && (
-            <span className="text-[9px] font-semibold px-2 py-0.5 rounded-full bg-blue-50 dark:bg-blue-900/30 text-blue-600 dark:text-blue-400 tracking-wide uppercase">
+            <span className="text-[10px] font-semibold px-2 py-0.5 rounded-full bg-blue-50 dark:bg-blue-900/30 text-blue-600 dark:text-blue-400 tracking-wide uppercase">
               Verified
             </span>
           )}
           {post.is_admin_post && (
-            <span className="text-[9px] font-semibold px-2 py-0.5 rounded-full bg-purple-50 dark:bg-purple-900/30 text-purple-600 dark:text-purple-400 tracking-wide uppercase">
+            <span className="text-[10px] font-semibold px-2 py-0.5 rounded-full bg-purple-50 dark:bg-purple-900/30 text-purple-600 dark:text-purple-400 tracking-wide uppercase">
               Admin
             </span>
           )}
@@ -106,13 +106,13 @@ function ResearchCard({ post, onDelete, onVerify, onPin, isAdmin, currentUserId 
             <Avatar person={post.author} />
             <div>
               <p className="text-[10px] font-medium text-gray-700 dark:text-gray-300 leading-none">{post.author?.name || 'Unknown'}</p>
-              <p className="text-[9px] text-gray-400 mt-0.5">{formatDate(post.created_at)}</p>
+              <p className="text-[10px] text-gray-400 mt-0.5">{formatDate(post.created_at)}</p>
             </div>
           </div>
 
 
           {!isAdmin && post.user_id !== currentUserId && (
-            <span className="text-[9px] text-blue-500 dark:text-blue-400 font-medium group-hover:underline">
+            <span className="text-[10px] text-blue-500 dark:text-blue-400 font-medium group-hover:underline">
               Read →
             </span>
           )}
@@ -151,7 +151,7 @@ function EligibilityBanner({ eligibility }) {
           return (
             <div key={label} className="space-y-1.5">
               <div className="flex items-baseline justify-between">
-                <span className="text-[9px] uppercase tracking-wider text-gray-400">{label}</span>
+                <span className="text-[10px] uppercase tracking-wider text-gray-400">{label}</span>
                 <span className={`text-[11px] font-bold ${met ? 'text-emerald-500' : 'text-gray-600 dark:text-gray-300'}`}>
                   {prefix}{val}{suffix}
                 </span>
@@ -319,7 +319,7 @@ function ResearchPage() {
               <button disabled className="bg-gray-100 dark:bg-gray-800 text-gray-400 px-4 py-1.5 rounded-xl text-[11px] font-semibold cursor-not-allowed">
                 + Post Research
               </button>
-              <p className="text-[9px] text-gray-400 mt-1">Not yet eligible</p>
+              <p className="text-[10px] text-gray-400 mt-1">Not yet eligible</p>
             </div>
           )}
         </div>

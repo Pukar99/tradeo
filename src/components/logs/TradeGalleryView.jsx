@@ -80,7 +80,7 @@ function TooltipBox({ tooltip, containerRef }) {
       style={{ left: pos.left, top: pos.top }}
     >
       <div className="bg-gray-900/95 border border-gray-700 rounded-lg px-2.5 py-2 shadow-xl backdrop-blur-sm whitespace-nowrap">
-        <div className="text-[9px] text-gray-400 font-mono mb-1.5 border-b border-gray-700 pb-1">{tooltip.date}</div>
+        <div className="text-[10px] text-gray-400 font-mono mb-1.5 border-b border-gray-700 pb-1">{tooltip.date}</div>
         {tooltip.lines.map((line, i) => (
           <div key={i} className="flex items-center gap-1.5" style={{ marginBottom: i < tooltip.lines.length - 1 ? 2 : 0 }}>
             <span className="w-1.5 h-1.5 rounded-full shrink-0" style={{ background: line.color }} />
@@ -570,7 +570,7 @@ function GalleryCard({ position, ltp, onAdd, onPartialExit, onClose, onDelete })
             <div className={`flex items-center justify-between px-3 py-2 rounded-xl ${
               pnlPos ? 'bg-emerald-50 dark:bg-emerald-500/10' : 'bg-red-50 dark:bg-red-500/10'
             }`}>
-              <span className="text-[9px] uppercase tracking-wide font-semibold text-gray-400 dark:text-gray-500">{pnlLabel}</span>
+              <span className="text-[10px] uppercase tracking-wide font-semibold text-gray-400 dark:text-gray-500">{pnlLabel}</span>
               <span className={`text-[13px] font-bold font-mono ${pnlPos ? 'text-emerald-600 dark:text-emerald-400' : 'text-red-600 dark:text-red-400'}`}>
                 {pnlPos ? '+' : ''}Rs.{fmt(pnlValue)}
               </span>
@@ -578,7 +578,7 @@ function GalleryCard({ position, ltp, onAdd, onPartialExit, onClose, onDelete })
           )}
 
           {/* right-click hint */}
-          <p className="text-[9px] text-gray-300 dark:text-gray-700 text-center mt-auto pt-1 select-none">
+          <p className="text-[10px] text-gray-300 dark:text-gray-700 text-center mt-auto pt-1 select-none">
             Right-click for actions
           </p>
         </div>
@@ -592,7 +592,7 @@ function GalleryCard({ position, ltp, onAdd, onPartialExit, onClose, onDelete })
 function StatBox({ label, value, mono, color }) {
   return (
     <div className="bg-gray-50 dark:bg-gray-800/50 rounded-xl px-2.5 py-2">
-      <div className="text-[9px] text-gray-400 dark:text-gray-500 uppercase tracking-wide mb-0.5 truncate">{label}</div>
+      <div className="text-[10px] text-gray-400 dark:text-gray-500 uppercase tracking-wide mb-0.5 truncate">{label}</div>
       <div className={`text-[12px] ${mono ? 'font-mono' : 'font-semibold'} truncate ${color || 'text-gray-900 dark:text-gray-200'}`}>{value}</div>
     </div>
   )

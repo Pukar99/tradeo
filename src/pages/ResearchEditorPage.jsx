@@ -339,7 +339,7 @@ function ResearchEditorPage() {
       <div className="flex items-center justify-between">
         <p className="text-[10px] text-gray-400">
           {postType === 'editor'
-            ? <>Type <kbd className="bg-gray-100 dark:bg-gray-800 px-1 rounded text-[9px]">/</kbd> for headings, tables, code blocks · paste images directly</>
+            ? <>Type <kbd className="bg-gray-100 dark:bg-gray-800 px-1 rounded text-[10px]">/</kbd> for headings, tables, code blocks · paste images directly</>
             : 'Upload a pre-made PDF research document'}
         </p>
         <span className={`text-[10px] font-medium ${status === 'published' ? 'text-emerald-500' : 'text-amber-400'}`}>

@@ -112,7 +112,7 @@ export default function BuyOrderModal({ session, script, candle, onClose, onOrde
         <div className="flex flex-col gap-2 text-[11px]">
           {/* Price */}
           <div>
-            <label className="text-[9px] font-semibold text-gray-400 uppercase">Price (Rs.)</label>
+            <label className="text-[10px] font-semibold text-gray-400 uppercase">Price (Rs.)</label>
             <input
               type="number"
               value={price}
@@ -123,7 +123,7 @@ export default function BuyOrderModal({ session, script, candle, onClose, onOrde
 
           {/* Quantity */}
           <div>
-            <label className="text-[9px] font-semibold text-gray-400 uppercase">Quantity (kittā)</label>
+            <label className="text-[10px] font-semibold text-gray-400 uppercase">Quantity (kittā)</label>
             <input
               type="number"
               value={qty}
@@ -136,7 +136,7 @@ export default function BuyOrderModal({ session, script, candle, onClose, onOrde
 
           {/* SL */}
           <div>
-            <label className="text-[9px] font-semibold text-gray-400 uppercase">Stop-Loss (Rs.) <span className="text-gray-400 normal-case font-normal">optional</span></label>
+            <label className="text-[10px] font-semibold text-gray-400 uppercase">Stop-Loss (Rs.) <span className="text-gray-400 normal-case font-normal">optional</span></label>
             <input
               type="number"
               value={sl}
@@ -144,12 +144,12 @@ export default function BuyOrderModal({ session, script, candle, onClose, onOrde
               placeholder="e.g. 1200"
               className="mt-0.5 w-full px-2 py-1.5 rounded-md border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 dark:text-white outline-none focus:ring-1 focus:ring-red-400"
             />
-            {!sl && <div className="text-[9px] text-orange-500 mt-0.5">⚠ No SL — high risk</div>}
+            {!sl && <div className="text-[10px] text-orange-500 mt-0.5">⚠ No SL — high risk</div>}
           </div>
 
           {/* TP */}
           <div>
-            <label className="text-[9px] font-semibold text-gray-400 uppercase">Take-Profit (Rs.) <span className="text-gray-400 normal-case font-normal">optional</span></label>
+            <label className="text-[10px] font-semibold text-gray-400 uppercase">Take-Profit (Rs.) <span className="text-gray-400 normal-case font-normal">optional</span></label>
             <input
               type="number"
               value={tp}

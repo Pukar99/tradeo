@@ -184,7 +184,7 @@ function FloatingChat() {
                 <div className="w-3 h-0.5 rounded-full bg-gray-300 dark:bg-gray-600" />
                 <div className="w-3 h-0.5 rounded-full bg-gray-300 dark:bg-gray-600" />
               </div>
-              <span className="text-[9px] text-gray-400 font-semibold select-none">drag to move</span>
+              <span className="text-[10px] text-gray-400 font-semibold select-none">drag to move</span>
             </div>
             <button
               onClick={() => setIsOpen(false)}

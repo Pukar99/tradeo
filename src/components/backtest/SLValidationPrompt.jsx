@@ -110,7 +110,7 @@ export default function SLValidationPrompt({ prompt, onClose }) {
         </div>
 
         {options.some(o => o.label.toLowerCase().includes('ignore')) && (
-          <div className="text-[9px] text-gray-400 text-center mt-2">
+          <div className="text-[10px] text-gray-400 text-center mt-2">
             ⚠ Ignoring is logged in your behavior report
           </div>
         )}

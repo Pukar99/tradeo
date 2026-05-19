@@ -103,7 +103,7 @@ export default function MarketJournalModal({ entry, onClose, onSaved }) {
           <div>
             <div className="flex items-center gap-2">
               <p className="text-[13px] font-semibold text-gray-900 dark:text-white">Market Journal</p>
-              <span className="text-[9px] font-bold px-2 py-0.5 rounded-full bg-amber-100 dark:bg-amber-900/30 text-amber-600 dark:text-amber-400 border border-amber-200 dark:border-amber-800/40">
+              <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-amber-100 dark:bg-amber-900/30 text-amber-600 dark:text-amber-400 border border-amber-200 dark:border-amber-800/40">
                 Market
               </span>
             </div>
@@ -122,14 +122,14 @@ export default function MarketJournalModal({ entry, onClose, onSaved }) {
         {/* Auto-populated section */}
         {entry && (
           <div className="px-5 pt-4 pb-3 bg-gray-50/60 dark:bg-gray-800/20 border-b border-gray-100 dark:border-gray-800">
-            <p className="text-[9px] uppercase tracking-widest font-bold text-gray-400 mb-3">Market Data (Auto-populated)</p>
+            <p className="text-[10px] uppercase tracking-widest font-bold text-gray-400 mb-3">Market Data (Auto-populated)</p>
 
             {/* NEPSE 3-month chart */}
             <div className="mb-3">
               <div className="flex items-center justify-between mb-1">
-                <p className="text-[8px] uppercase tracking-widest text-gray-400">NEPSE All-Share — 3 Month</p>
+                <p className="text-[10px] uppercase tracking-widest text-gray-400">NEPSE All-Share — 3 Month</p>
                 {nepseClose != null && (
-                  <span className={`text-[9px] font-bold tabular-nums ${nepseChange != null && nepseChange >= 0 ? 'text-emerald-500' : 'text-red-400'}`}>
+                  <span className={`text-[10px] font-bold tabular-nums ${nepseChange != null && nepseChange >= 0 ? 'text-emerald-500' : 'text-red-400'}`}>
                     {nepseClose.toLocaleString()} {nepseChange != null ? `${nepseChange >= 0 ? '+' : ''}${nepseChange.toFixed(2)}%` : ''}
                   </span>
                 )}
@@ -140,7 +140,7 @@ export default function MarketJournalModal({ entry, onClose, onSaved }) {
             <div className="grid grid-cols-2 sm:grid-cols-3 gap-2.5 mb-3">
               {/* NEPSE */}
               <div className="bg-white dark:bg-gray-900 rounded-lg border border-gray-100 dark:border-gray-800 px-3 py-2">
-                <p className="text-[8px] uppercase tracking-widest text-gray-400">NEPSE Close</p>
+                <p className="text-[10px] uppercase tracking-widest text-gray-400">NEPSE Close</p>
                 <p className="text-[13px] font-bold text-gray-900 dark:text-white mt-0.5 tabular-nums">
                   {nepseClose != null ? nepseClose.toLocaleString() : '—'}
                 </p>
@@ -154,7 +154,7 @@ export default function MarketJournalModal({ entry, onClose, onSaved }) {
               {/* Breadth */}
               {(entry.advancing != null || entry.declining != null) && (
                 <div className="bg-white dark:bg-gray-900 rounded-lg border border-gray-100 dark:border-gray-800 px-3 py-2">
-                  <p className="text-[8px] uppercase tracking-widest text-gray-400">Breadth</p>
+                  <p className="text-[10px] uppercase tracking-widest text-gray-400">Breadth</p>
                   <div className="flex items-center gap-2 mt-1 flex-wrap">
                     {entry.advancing != null && (
                       <span className="text-[10px] font-semibold text-emerald-500">{entry.advancing}↑</span>
@@ -172,7 +172,7 @@ export default function MarketJournalModal({ entry, onClose, onSaved }) {
               {/* Volume */}
               {entry.total_volume != null && (
                 <div className="bg-white dark:bg-gray-900 rounded-lg border border-gray-100 dark:border-gray-800 px-3 py-2">
-                  <p className="text-[8px] uppercase tracking-widest text-gray-400">Volume</p>
+                  <p className="text-[10px] uppercase tracking-widest text-gray-400">Volume</p>
                   <p className="text-[11px] font-semibold text-gray-700 dark:text-gray-300 mt-1 tabular-nums">
                     Rs.{(parseFloat(entry.total_volume) / 1e7).toFixed(1)}Cr
                   </p>
@@ -181,7 +181,7 @@ export default function MarketJournalModal({ entry, onClose, onSaved }) {
 
               {/* Active trades badge */}
               <div className="bg-white dark:bg-gray-900 rounded-lg border border-gray-100 dark:border-gray-800 px-3 py-2">
-                <p className="text-[8px] uppercase tracking-widest text-gray-400">Your Trades</p>
+                <p className="text-[10px] uppercase tracking-widest text-gray-400">Your Trades</p>
                 <span className={`text-[10px] font-semibold mt-1 inline-block px-2 py-0.5 rounded-full ${
                   entry.has_active_trades
                     ? 'bg-blue-100 dark:bg-blue-900/30 text-blue-600 dark:text-blue-400'
@@ -197,7 +197,7 @@ export default function MarketJournalModal({ entry, onClose, onSaved }) {
               <div className="grid grid-cols-2 gap-2">
                 {entry.top_gainers?.length > 0 && (
                   <div>
-                    <p className="text-[8px] uppercase tracking-widest text-gray-400 mb-1.5">Top Gainers</p>
+                    <p className="text-[10px] uppercase tracking-widest text-gray-400 mb-1.5">Top Gainers</p>
                     <div className="space-y-1">
                       {entry.top_gainers.map(g => (
                         <div key={g.symbol} className="flex items-center justify-between">
@@ -210,7 +210,7 @@ export default function MarketJournalModal({ entry, onClose, onSaved }) {
                 )}
                 {entry.top_losers?.length > 0 && (
                   <div>
-                    <p className="text-[8px] uppercase tracking-widest text-gray-400 mb-1.5">Top Losers</p>
+                    <p className="text-[10px] uppercase tracking-widest text-gray-400 mb-1.5">Top Losers</p>
                     <div className="space-y-1">
                       {entry.top_losers.map(l => (
                         <div key={l.symbol} className="flex items-center justify-between">
@@ -227,10 +227,10 @@ export default function MarketJournalModal({ entry, onClose, onSaved }) {
             {/* Sector data */}
             {entry.sector_data?.length > 0 && (
               <div className="mt-3">
-                <p className="text-[8px] uppercase tracking-widest text-gray-400 mb-1.5">Sector Performance</p>
+                <p className="text-[10px] uppercase tracking-widest text-gray-400 mb-1.5">Sector Performance</p>
                 <div className="flex flex-wrap gap-1.5">
                   {entry.sector_data.map(s => (
-                    <div key={s.index_id} className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-lg text-[9px] font-semibold border ${
+                    <div key={s.index_id} className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-lg text-[10px] font-semibold border ${
                       parseFloat(s.per_change) > 0
                         ? 'bg-emerald-50 dark:bg-emerald-900/20 border-emerald-200 dark:border-emerald-800/40 text-emerald-600 dark:text-emerald-400'
                         : parseFloat(s.per_change) < 0

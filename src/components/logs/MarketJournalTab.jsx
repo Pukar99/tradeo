@@ -232,7 +232,7 @@ function GalleryCard({ entry, onOpen }) {
           <span className="text-[12px] font-black text-gray-900 dark:text-white leading-none">
             {dateObj.getDate()} {dateObj.toLocaleDateString('en-US', { month: 'short' })}
           </span>
-          <span className="text-[9px] font-semibold text-gray-400 uppercase tracking-wide">
+          <span className="text-[10px] font-semibold text-gray-400 uppercase tracking-wide">
             {dateObj.toLocaleDateString('en-US', { weekday: 'short' })}
           </span>
         </div>
@@ -269,7 +269,7 @@ function GalleryCard({ entry, onOpen }) {
             { label: 'L', value: ohlc.low,   color: 'text-red-400'                             },
             { label: 'C', value: ohlc.close, color: isUp ? 'text-emerald-500' : 'text-red-400' },
           ].map(({ label, value, color }) => (
-            <p key={label} className="text-[9px] font-mono tabular-nums leading-none">
+            <p key={label} className="text-[10px] font-mono tabular-nums leading-none">
               <span className="text-gray-400 dark:text-gray-600 font-bold">{label} </span>
               <span className={`font-semibold ${color}`}>
                 {value?.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
@@ -277,7 +277,7 @@ function GalleryCard({ entry, onOpen }) {
             </p>
           ))}
           {mood && (
-            <span className={`inline-flex items-center gap-0.5 text-[8px] font-bold px-1.5 py-0.5 rounded-full border mt-1 ${mood.pill}`}>
+            <span className={`inline-flex items-center gap-0.5 text-[10px] font-bold px-1.5 py-0.5 rounded-full border mt-1 ${mood.pill}`}>
               {mood.icon} {entry.mood}
             </span>
           )}
@@ -293,7 +293,7 @@ function GalleryCard({ entry, onOpen }) {
         {/* breadth progress bar */}
         {(adv + dec + unch) > 0 && (
           <div>
-            <div className="flex justify-between text-[9px] font-semibold mb-1">
+            <div className="flex justify-between text-[10px] font-semibold mb-1">
               <span className="text-emerald-500">{adv}↑ {advPct}%</span>
               <span className="text-gray-400">{unch}→</span>
               <span className="text-red-400">{decPct}% {dec}↓</span>
@@ -310,13 +310,13 @@ function GalleryCard({ entry, onOpen }) {
         <div className="flex items-center gap-2">
           {entry.total_volume != null && (
             <div className="flex-1 bg-gray-50 dark:bg-gray-800/60 rounded-lg px-2 py-1.5">
-              <p className="text-[8px] text-gray-400 uppercase tracking-wide">Vol</p>
+              <p className="text-[10px] text-gray-400 uppercase tracking-wide">Vol</p>
               <p className="text-[11px] font-bold font-mono text-gray-800 dark:text-gray-200">{fmtVol(entry.total_volume)}</p>
             </div>
           )}
           {topGainer && (
             <div className="flex-1 bg-emerald-50 dark:bg-emerald-900/20 rounded-lg px-2 py-1.5">
-              <p className="text-[8px] text-emerald-500 uppercase tracking-wide">Best</p>
+              <p className="text-[10px] text-emerald-500 uppercase tracking-wide">Best</p>
               <p className="text-[11px] font-bold text-emerald-600 dark:text-emerald-400 truncate">
                 {topGainer.symbol} <span className="font-mono">+{parseFloat(topGainer.diff_pct).toFixed(1)}%</span>
               </p>
@@ -324,7 +324,7 @@ function GalleryCard({ entry, onOpen }) {
           )}
           {topLoser && (
             <div className="flex-1 bg-red-50 dark:bg-red-900/20 rounded-lg px-2 py-1.5">
-              <p className="text-[8px] text-red-400 uppercase tracking-wide">Worst</p>
+              <p className="text-[10px] text-red-400 uppercase tracking-wide">Worst</p>
               <p className="text-[11px] font-bold text-red-500 dark:text-red-400 truncate">
                 {topLoser.symbol} <span className="font-mono">{parseFloat(topLoser.diff_pct).toFixed(1)}%</span>
               </p>
@@ -350,8 +350,8 @@ function GalleryCard({ entry, onOpen }) {
                   className="rounded px-1 py-1 text-center"
                   style={{ background: bg }}
                 >
-                  <p className="text-[7px] text-gray-500 dark:text-gray-400 truncate leading-none mb-0.5">{s.name}</p>
-                  <p className={`text-[8px] font-bold leading-none ${
+                  <p className="text-[9px] text-gray-500 dark:text-gray-400 truncate leading-none mb-0.5">{s.name}</p>
+                  <p className={`text-[10px] font-bold leading-none ${
                     pc > 0 ? 'text-emerald-600 dark:text-emerald-400'
                     : pc < 0 ? 'text-red-500 dark:text-red-400'
                     : 'text-gray-400'
@@ -370,11 +370,11 @@ function GalleryCard({ entry, onOpen }) {
             {journalLabels.map((label, i) => (
               <div key={label} className="flex flex-col items-center gap-0.5">
                 <div className={`w-1.5 h-1.5 rounded-full ${filledFields[i]?.trim() ? 'bg-amber-400' : 'bg-gray-200 dark:bg-gray-700'}`} />
-                <span className="text-[7px] text-gray-400 font-medium">{label}</span>
+                <span className="text-[9px] text-gray-400 font-medium">{label}</span>
               </div>
             ))}
           </div>
-          <p className="text-[8px] text-gray-300 dark:text-gray-700 group-hover:text-gray-400 transition-colors select-none">
+          <p className="text-[10px] text-gray-300 dark:text-gray-700 group-hover:text-gray-400 transition-colors select-none">
             Click to edit
           </p>
         </div>
@@ -422,7 +422,7 @@ function EntryCard({ entry, news, onOpen }) {
   const filledCount = [entry.pre_market, entry.during_market, entry.post_market, entry.market_surprise]
     .filter(v => v?.trim()).length
 
-  const LABEL = 'text-[9px] font-bold uppercase tracking-widest text-gray-400 dark:text-gray-500 mb-1'
+  const LABEL = 'text-[10px] font-bold uppercase tracking-widest text-gray-400 dark:text-gray-500 mb-1'
   const NOTE  = 'text-[11px] text-gray-700 dark:text-gray-300 leading-relaxed whitespace-pre-wrap'
 
   return (
@@ -435,13 +435,13 @@ function EntryCard({ entry, news, onOpen }) {
       >
         {/* date column */}
         <div className="flex-shrink-0 w-14 text-center">
-          <p className="text-[9px] uppercase tracking-widest text-gray-400 font-semibold">
+          <p className="text-[10px] uppercase tracking-widest text-gray-400 font-semibold">
             {dateObj.toLocaleDateString('en-US', { month: 'short' })}
           </p>
           <p className="text-[22px] font-black text-gray-800 dark:text-white leading-none mt-0.5">
             {dateObj.getDate()}
           </p>
-          <p className="text-[9px] text-gray-400 mt-0.5">
+          <p className="text-[10px] text-gray-400 mt-0.5">
             {dateObj.toLocaleDateString('en-US', { weekday: 'short' })}
           </p>
         </div>
@@ -460,12 +460,12 @@ function EntryCard({ entry, news, onOpen }) {
               <span className="text-[12px] text-gray-400 italic">No market data</span>
             )}
             {mood && (
-              <span className={`inline-flex items-center gap-1 text-[9px] font-semibold px-2 py-0.5 rounded-full border ${mood.pill}`}>
+              <span className={`inline-flex items-center gap-1 text-[10px] font-semibold px-2 py-0.5 rounded-full border ${mood.pill}`}>
                 {mood.icon} {entry.mood}
               </span>
             )}
             {entry.has_active_trades && (
-              <span className="text-[9px] font-semibold px-2 py-0.5 rounded-full bg-blue-100 text-blue-600 dark:bg-blue-900/30 dark:text-blue-400 border border-blue-200 dark:border-blue-800/40">
+              <span className="text-[10px] font-semibold px-2 py-0.5 rounded-full bg-blue-100 text-blue-600 dark:bg-blue-900/30 dark:text-blue-400 border border-blue-200 dark:border-blue-800/40">
                 Active Trades
               </span>
             )}
@@ -509,7 +509,7 @@ function EntryCard({ entry, news, onOpen }) {
               { label: 'Breadth',     value: entry.advancing != null ? `${entry.advancing}↑  ${entry.declining}↓  ${entry.unchanged}→` : '—', color: 'text-gray-800 dark:text-gray-200' },
             ].map(({ label, value, color }) => (
               <div key={label} className="bg-gray-50 dark:bg-gray-800/50 rounded-lg px-3 py-2">
-                <p className="text-[9px] text-gray-400 uppercase tracking-wide mb-0.5">{label}</p>
+                <p className="text-[10px] text-gray-400 uppercase tracking-wide mb-0.5">{label}</p>
                 <p className={`text-[12px] font-bold tabular-nums ${color}`}>{value}</p>
               </div>
             ))}
@@ -555,7 +555,7 @@ function EntryCard({ entry, news, onOpen }) {
                 {entry.sector_data.map(s => {
                   const pc = parseFloat(s.per_change)
                   return (
-                    <span key={s.index_id} className={`text-[9px] font-semibold px-2 py-0.5 rounded-lg border ${
+                    <span key={s.index_id} className={`text-[10px] font-semibold px-2 py-0.5 rounded-lg border ${
                       pc > 0 ? 'bg-emerald-50 dark:bg-emerald-900/20 border-emerald-200 dark:border-emerald-800/40 text-emerald-600 dark:text-emerald-400'
                       : pc < 0 ? 'bg-red-50 dark:bg-red-900/20 border-red-200 dark:border-red-800/40 text-red-500 dark:text-red-400'
                       : 'bg-gray-50 dark:bg-gray-800 border-gray-200 dark:border-gray-700 text-gray-500'
@@ -597,11 +597,11 @@ function EntryCard({ entry, news, onOpen }) {
                   >
                     <div className="flex-1 min-w-0">
                       <div className="flex items-center gap-1.5 mb-0.5 flex-wrap">
-                        <span className={`text-[8px] font-bold px-1.5 py-0.5 rounded uppercase tracking-wide ${TYPE_COLOR[item.type] || TYPE_COLOR.news}`}>
+                        <span className={`text-[10px] font-bold px-1.5 py-0.5 rounded uppercase tracking-wide ${TYPE_COLOR[item.type] || TYPE_COLOR.news}`}>
                           {item.type}
                         </span>
                         {item.symbol && (
-                          <span className="text-[8px] font-bold text-blue-500 dark:text-blue-400">{item.symbol}</span>
+                          <span className="text-[10px] font-bold text-blue-500 dark:text-blue-400">{item.symbol}</span>
                         )}
                       </div>
                       <p className="text-[11px] font-semibold leading-snug">{item.title}</p>

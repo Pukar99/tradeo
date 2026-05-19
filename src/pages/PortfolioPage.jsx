@@ -136,12 +136,12 @@ function RiskHeatDashboard({ positions }) {
         <div className="flex items-center gap-2">
           <p className="text-[11px] font-semibold uppercase tracking-widest text-gray-400">Risk Heat</p>
           {['breached','critical','warning','safe'].map(r => counts[r] ? (
-            <span key={r} className={`text-[9px] font-bold px-1.5 py-0.5 rounded-full border ${RISK_META[r].card} ${RISK_META[r].text}`}>
+            <span key={r} className={`text-[10px] font-bold px-1.5 py-0.5 rounded-full border ${RISK_META[r].card} ${RISK_META[r].text}`}>
               {counts[r]} {RISK_META[r].label}
             </span>
           ) : null)}
         </div>
-        <p className="text-[9px] text-gray-300 dark:text-gray-700">sorted by risk · click row to chart</p>
+        <p className="text-[10px] text-gray-300 dark:text-gray-700">sorted by risk · click row to chart</p>
       </div>
 
       {/* Cards */}
@@ -153,39 +153,39 @@ function RiskHeatDashboard({ positions }) {
               <div className="flex items-center gap-1.5">
                 <div className={`w-2 h-2 rounded-full flex-shrink-0 ${t.meta.dot}`} />
                 <span className="text-[12px] font-bold text-gray-900 dark:text-white tracking-tight">{t.symbol}</span>
-                <span className={`text-[8px] font-semibold px-1.5 py-0.5 rounded-full border ${t.meta.card} ${t.meta.text}`}>
+                <span className={`text-[10px] font-semibold px-1.5 py-0.5 rounded-full border ${t.meta.card} ${t.meta.text}`}>
                   {t.position === 'LONG' ? '↑L' : '↓S'}
                 </span>
               </div>
               <div className="flex items-center gap-1.5">
                 {t.days != null && (
-                  <span className="text-[8px] text-gray-400 tabular-nums">{t.days}d</span>
+                  <span className="text-[10px] text-gray-400 tabular-nums">{t.days}d</span>
                 )}
-                <span className={`text-[9px] font-bold ${t.meta.text}`}>{t.meta.label}</span>
+                <span className={`text-[10px] font-bold ${t.meta.text}`}>{t.meta.label}</span>
               </div>
             </div>
 
             {/* Price row */}
             <div className="flex items-center gap-3 mb-2">
               <div>
-                <p className="text-[8px] text-gray-400">Entry</p>
+                <p className="text-[10px] text-gray-400">Entry</p>
                 <p className="text-[10px] font-semibold text-gray-700 dark:text-gray-200 tabular-nums">Rs.{t.entry.toFixed(2)}</p>
               </div>
               {t.currentPrice != null && (
                 <div>
-                  <p className="text-[8px] text-gray-400">LTP</p>
+                  <p className="text-[10px] text-gray-400">LTP</p>
                   <p className="text-[10px] font-semibold text-gray-700 dark:text-gray-200 tabular-nums">Rs.{Number(t.currentPrice).toLocaleString()}</p>
                 </div>
               )}
               {t.sl && (
                 <div>
-                  <p className="text-[8px] text-gray-400">SL</p>
+                  <p className="text-[10px] text-gray-400">SL</p>
                   <p className="text-[10px] font-semibold text-red-400 tabular-nums">{t.sl}</p>
                 </div>
               )}
               {t.be && (
                 <div className="ml-auto">
-                  <p className="text-[8px] text-gray-400">Break-even</p>
+                  <p className="text-[10px] text-gray-400">Break-even</p>
                   <p className="text-[10px] font-semibold text-gray-500 dark:text-gray-400 tabular-nums">Rs.{t.be}</p>
                 </div>
               )}
@@ -195,15 +195,15 @@ function RiskHeatDashboard({ positions }) {
             {t.slDistPct != null ? (
               <div>
                 <div className="flex justify-between mb-0.5">
-                  <span className="text-[8px] text-gray-400">SL proximity</span>
-                  <span className={`text-[8px] font-semibold tabular-nums ${t.meta.text}`}>{t.slDistPct.toFixed(0)}% away</span>
+                  <span className="text-[10px] text-gray-400">SL proximity</span>
+                  <span className={`text-[10px] font-semibold tabular-nums ${t.meta.text}`}>{t.slDistPct.toFixed(0)}% away</span>
                 </div>
                 <div className="h-[3px] bg-gray-200 dark:bg-gray-700 rounded-full overflow-hidden">
                   <div className={`h-full rounded-full transition-all duration-700 ${t.meta.bar}`} style={{ width: `${t.slDistPct}%` }} />
                 </div>
               </div>
             ) : (
-              <p className="text-[8px] text-gray-300 dark:text-gray-700 italic">No stop-loss set</p>
+              <p className="text-[10px] text-gray-300 dark:text-gray-700 italic">No stop-loss set</p>
             )}
           </div>
         ))}
@@ -242,9 +242,9 @@ function RiskGauge({ entry, sl, tp, ltp, position, pnlPct }) {
           <div className={`absolute top-1/2 -translate-y-1/2 w-2.5 h-2.5 rounded-full shadow-sm transition-all duration-500 ${dotColor}`} style={{ left: `calc(${ltpPct}% - 5px)` }} />
         </div>
         <div className="flex justify-between">
-          <span className="text-[8px] text-red-400">SL {sl}</span>
-          {danger && <span className="text-[8px] text-red-400 font-semibold animate-pulse">⚠ Near SL</span>}
-          <span className="text-[8px] text-emerald-500">TP {tp}</span>
+          <span className="text-[10px] text-red-400">SL {sl}</span>
+          {danger && <span className="text-[10px] text-red-400 font-semibold animate-pulse">⚠ Near SL</span>}
+          <span className="text-[10px] text-emerald-500">TP {tp}</span>
         </div>
       </div>
     )
@@ -313,7 +313,7 @@ function AllocationDonut({ openPositions }) {
                 return (
                   <div className="bg-white dark:bg-gray-900 border border-gray-100 dark:border-gray-800 rounded-xl px-2.5 py-1.5 shadow-lg">
                     <p className="text-[10px] font-bold text-gray-900 dark:text-white">{d.symbol}</p>
-                    <p className="text-[9px] text-blue-500 font-semibold">{d.pct}%</p>
+                    <p className="text-[10px] text-blue-500 font-semibold">{d.pct}%</p>
                   </div>
                 )
               }} />
@@ -322,12 +322,12 @@ function AllocationDonut({ openPositions }) {
           <div className="absolute inset-0 flex flex-col items-center justify-center pointer-events-none">
             {activeEntry ? (
               <>
-                <span className="text-[9px] font-bold text-gray-900 dark:text-white">{activeEntry.symbol}</span>
+                <span className="text-[10px] font-bold text-gray-900 dark:text-white">{activeEntry.symbol}</span>
                 <span className="text-[10px] font-bold text-blue-500">{activeEntry.pct}%</span>
               </>
             ) : (
               <>
-                <span className="text-[8px] text-gray-400">invested</span>
+                <span className="text-[10px] text-gray-400">invested</span>
                 <span className="text-[10px] font-bold text-gray-700 dark:text-gray-200">Rs.{Math.round(total / 1000)}k</span>
               </>
             )}
@@ -342,7 +342,7 @@ function AllocationDonut({ openPositions }) {
             >
               <div className="w-1.5 h-1.5 rounded-full flex-shrink-0" style={{ background: donutColor(i) }} />
               <span className="text-[10px] font-semibold text-gray-700 dark:text-gray-300 truncate flex-1">{d.symbol}</span>
-              <span className="text-[9px] text-gray-400 flex-shrink-0">{d.pct}%</span>
+              <span className="text-[10px] text-gray-400 flex-shrink-0">{d.pct}%</span>
             </div>
           ))}
         </div>
@@ -350,7 +350,7 @@ function AllocationDonut({ openPositions }) {
       {data[0] && parseFloat(data[0].pct) > 40 && (
         <div className="mt-2.5 flex items-center gap-1.5">
           <div className="w-1.5 h-1.5 rounded-full bg-amber-400 flex-shrink-0" />
-          <p className="text-[9px] text-amber-500">
+          <p className="text-[10px] text-amber-500">
             <span className="font-semibold">{data[0].symbol}</span> is {data[0].pct}% — high concentration
           </p>
         </div>
@@ -388,7 +388,7 @@ function MonthlyPnlChart({ closedTrades }) {
       <div className="flex items-center justify-between mb-2">
         <div>
           <p className="text-[10px] font-semibold uppercase tracking-widest text-gray-400">Monthly P&L</p>
-          <p className="text-[9px] text-gray-400 mt-0.5">
+          <p className="text-[10px] text-gray-400 mt-0.5">
             <span className="text-emerald-500 font-semibold">{posMonths}↑</span>
             {' '}<span className="text-red-400 font-semibold">{negMonths}↓</span>
             {' '}over 12 months
@@ -414,7 +414,7 @@ function MonthlyPnlChart({ closedTrades }) {
                 const val = payload[0].value
                 return (
                   <div className="bg-white dark:bg-gray-900 border border-gray-100 dark:border-gray-800 rounded-lg px-2.5 py-1.5 shadow-lg">
-                    <p className="text-[9px] text-gray-400">{label}</p>
+                    <p className="text-[10px] text-gray-400">{label}</p>
                     <p className={`text-[11px] font-bold ${val >= 0 ? 'text-emerald-500' : 'text-red-400'}`}>
                       {val >= 0 ? '+' : ''}{fmtRs(val, fx)}
                     </p>
@@ -469,7 +469,7 @@ function EquityCurve({ closedTrades }) {
       <div className="flex items-center justify-between mb-2">
         <div>
           <p className="text-[10px] font-semibold uppercase tracking-widest text-gray-400">Equity Curve</p>
-          <p className="text-[9px] text-gray-400 mt-0.5">{sorted.length} closed trades · max DD: <span className="text-amber-500 font-medium">{fmtRs(maxDD, fx)}</span></p>
+          <p className="text-[10px] text-gray-400 mt-0.5">{sorted.length} closed trades · max DD: <span className="text-amber-500 font-medium">{fmtRs(maxDD, fx)}</span></p>
         </div>
         <span className={`text-[13px] font-bold ${signCls(finalPnl)}`}>
           {finalPnl >= 0 ? '+' : ''}{fmtRs(finalPnl, fx)}
@@ -492,7 +492,7 @@ function EquityCurve({ closedTrades }) {
               const d = payload[0].payload
               return (
                 <div className="bg-white dark:bg-gray-900 border border-gray-100 dark:border-gray-800 rounded-lg px-2.5 py-1.5 shadow-lg">
-                  <p className="text-[8px] text-gray-400">Trade #{d.tradeNum} · {d.date}</p>
+                  <p className="text-[10px] text-gray-400">Trade #{d.tradeNum} · {d.date}</p>
                   <p className={`text-[11px] font-bold ${signCls(d.cumulative)}`}>
                     {d.cumulative >= 0 ? '+' : ''}{fmtRs(d.cumulative, fx)}
                   </p>
@@ -606,21 +606,21 @@ function DrawdownWidget({ equityCurve, currentDrawdown, maxDrawdown, peakEquity,
       {/* Daily streak dots */}
       {dailyStreak.length > 0 && (
         <div className="px-4 pb-3 pt-1">
-          <p className="text-[9px] font-semibold uppercase tracking-widest text-gray-400 mb-2">Last {dailyStreak.length} trading days</p>
+          <p className="text-[10px] font-semibold uppercase tracking-widest text-gray-400 mb-2">Last {dailyStreak.length} trading days</p>
           <div className="flex items-center gap-1.5 flex-wrap">
             {dailyStreak.map((d, i) => (
               <div key={i} title={`${d.date}: ${d.pnl >= 0 ? '+' : ''}Rs.${d.pnl.toLocaleString()}`}
                 className={`relative group w-5 h-5 rounded-md flex-shrink-0 ${d.win ? 'bg-emerald-400' : 'bg-red-400'}`}>
                 {/* tooltip on hover */}
                 <div className="absolute bottom-full left-1/2 -translate-x-1/2 mb-1.5 hidden group-hover:flex flex-col items-center z-10 pointer-events-none">
-                  <div className="bg-gray-900 text-white text-[9px] px-2 py-1 rounded-lg whitespace-nowrap">
+                  <div className="bg-gray-900 text-white text-[10px] px-2 py-1 rounded-lg whitespace-nowrap">
                     {d.date.slice(5)}: {d.pnl >= 0 ? '+' : ''}Rs.{Math.abs(d.pnl).toLocaleString()}
                   </div>
                   <div className="w-1.5 h-1.5 bg-gray-900 rotate-45 -mt-1" />
                 </div>
               </div>
             ))}
-            <div className="ml-1 flex items-center gap-2 text-[9px] text-gray-400">
+            <div className="ml-1 flex items-center gap-2 text-[10px] text-gray-400">
               <span className="flex items-center gap-1"><span className="w-2 h-2 rounded-sm bg-emerald-400 inline-block" />Win</span>
               <span className="flex items-center gap-1"><span className="w-2 h-2 rounded-sm bg-red-400 inline-block" />Loss</span>
             </div>
@@ -962,15 +962,15 @@ function PortfolioPage() {
           ].map((s, i) => (
             <div key={i} className={`bg-white dark:bg-gray-900 rounded-2xl border border-gray-100 dark:border-gray-800 border-t-2 ${s.accent} p-4 flex flex-col gap-3 min-h-[120px]`}>
               <div>
-                <p className="text-[9px] font-semibold uppercase tracking-widest text-gray-400 mb-1.5">{s.label}</p>
+                <p className="text-[10px] font-semibold uppercase tracking-widest text-gray-400 mb-1.5">{s.label}</p>
                 <p className={`text-[22px] font-black tracking-tight leading-none tabular-nums ${s.cls}`}>{s.value}</p>
-                <p className="text-[9px] text-gray-400 mt-1.5">{s.sub}</p>
+                <p className="text-[10px] text-gray-400 mt-1.5">{s.sub}</p>
               </div>
               {s.detail.length > 0 && (
                 <div className="flex items-center gap-3 border-t border-gray-50 dark:border-gray-800 pt-2.5">
                   {s.detail.map((d, j) => (
                     <div key={j}>
-                      <p className="text-[8px] text-gray-400 uppercase tracking-widest">{d.label}</p>
+                      <p className="text-[10px] text-gray-400 uppercase tracking-widest">{d.label}</p>
                       <p className={`text-[11px] font-bold tabular-nums ${d.cls}`}>{d.value}</p>
                     </div>
                   ))}
@@ -985,7 +985,7 @@ function PortfolioPage() {
       <div className="bg-white dark:bg-gray-900 rounded-2xl border border-gray-100 dark:border-gray-800 overflow-hidden">
         <div className="px-5 py-3.5 border-b border-gray-100 dark:border-gray-800 flex items-center justify-between">
           <p className="text-[11px] font-semibold uppercase tracking-widest text-gray-400">Recent Trades</p>
-          <span className="text-[9px] text-gray-400">last {Math.min(top10Recent.length, 10)} entries</span>
+          <span className="text-[10px] text-gray-400">last {Math.min(top10Recent.length, 10)} entries</span>
         </div>
         {top10Recent.length === 0 ? (
           <EmptySlate
@@ -1000,7 +1000,7 @@ function PortfolioPage() {
               <thead>
                 <tr className="border-b border-gray-50 dark:border-gray-800/60 bg-gray-50/30 dark:bg-gray-800/10">
                   {['Date', 'Symbol', 'Action', 'Qty', 'Price', 'P&L', 'Setup'].map((h, i) => (
-                    <th key={i} className="px-4 py-2 text-left text-[9px] font-bold text-gray-400 uppercase tracking-widest">{h}</th>
+                    <th key={i} className="px-4 py-2 text-left text-[10px] font-bold text-gray-400 uppercase tracking-widest">{h}</th>
                   ))}
                 </tr>
               </thead>
@@ -1014,12 +1014,12 @@ function PortfolioPage() {
                       <td className="px-4 py-2.5 text-[10px] text-gray-400 tabular-nums whitespace-nowrap">{row.date}</td>
                       <td className="px-4 py-2.5">
                         <div className="flex items-center gap-1.5">
-                          <SymAvatar symbol={row.symbol} size="w-5 h-5" text="text-[8px]" />
+                          <SymAvatar symbol={row.symbol} size="w-5 h-5" text="text-[10px]" />
                           <span className="text-[12px] font-bold text-gray-900 dark:text-white">{row.symbol}</span>
                         </div>
                       </td>
                       <td className="px-4 py-2.5">
-                        <span className={`text-[9px] font-semibold px-1.5 py-0.5 rounded-full ${
+                        <span className={`text-[10px] font-semibold px-1.5 py-0.5 rounded-full ${
                           isNew   ? 'text-blue-600 bg-blue-50 dark:bg-blue-900/20' :
                           isClose ? 'text-gray-500 bg-gray-100 dark:bg-gray-800' :
                           'text-amber-500 bg-amber-50 dark:bg-amber-900/20'
@@ -1038,7 +1038,7 @@ function PortfolioPage() {
                           </span>
                         ) : <span className="text-[10px] text-gray-300 dark:text-gray-700">—</span>}
                       </td>
-                      <td className="px-4 py-2.5 text-[9px] text-gray-400 truncate max-w-[100px]">
+                      <td className="px-4 py-2.5 text-[10px] text-gray-400 truncate max-w-[100px]">
                         {row.setup_type || '—'}
                       </td>
                     </tr>
@@ -1079,7 +1079,7 @@ function PortfolioPage() {
                 <thead>
                   <tr className="border-b border-gray-100 dark:border-gray-800">
                     {['Symbol', 'Dir', 'Qty / WACC', 'LTP', 'P&L', 'Invested', 'SL / TP', ''].map((h, i) => (
-                      <th key={i} className="px-3 py-2.5 text-left text-[9px] font-bold text-gray-400 uppercase tracking-widest first:px-4">
+                      <th key={i} className="px-3 py-2.5 text-left text-[10px] font-bold text-gray-400 uppercase tracking-widest first:px-4">
                         {h}
                       </th>
                     ))}
@@ -1100,19 +1100,19 @@ function PortfolioPage() {
                             <SymAvatar symbol={p.symbol} size="w-7 h-7" text="text-[10px]" />
                             <div>
                               <p className="text-[12px] font-bold text-gray-900 dark:text-white tracking-tight">{p.symbol}</p>
-                              <p className="text-[9px] text-gray-400">{p.last_action_at?.slice(0, 10)}</p>
+                              <p className="text-[10px] text-gray-400">{p.last_action_at?.slice(0, 10)}</p>
                             </div>
                           </div>
                         </td>
                         <td className="px-3 py-3">
                           <div className="flex flex-col gap-1">
-                            <span className={`inline-flex text-[8px] font-semibold px-1.5 py-0.5 rounded-full w-fit ${
+                            <span className={`inline-flex text-[10px] font-semibold px-1.5 py-0.5 rounded-full w-fit ${
                               dir === 'LONG' ? 'text-emerald-600 bg-emerald-50 dark:bg-emerald-900/20' : 'text-red-500 bg-red-50 dark:bg-red-900/20'
                             }`}>
                               {dir === 'LONG' ? '↑ L' : '↓ S'}
                             </span>
                             {p.status === 'PARTIAL' && (
-                              <span className="inline-flex text-[8px] font-semibold px-1.5 py-0.5 rounded-full w-fit text-amber-500 bg-amber-50 dark:bg-amber-900/20">Partial</span>
+                              <span className="inline-flex text-[10px] font-semibold px-1.5 py-0.5 rounded-full w-fit text-amber-500 bg-amber-50 dark:bg-amber-900/20">Partial</span>
                             )}
                           </div>
                         </td>
@@ -1131,13 +1131,13 @@ function PortfolioPage() {
                               <p className={`text-[11px] font-bold tabular-nums ${signCls(pnl)}`}>
                                 {pnl >= 0 ? '+' : ''}{fmtC(pnl)}
                               </p>
-                              <p className={`text-[9px] font-medium ${signCls(pnlPct)}`}>{fmtPct(pnlPct)}</p>
+                              <p className={`text-[10px] font-medium ${signCls(pnlPct)}`}>{fmtPct(pnlPct)}</p>
                             </div>
                           ) : <span className="text-[10px] text-gray-300 dark:text-gray-700">—</span>}
                         </td>
                         <td className="px-3 py-3 text-[10px] text-gray-400 tabular-nums">{fmtC(invested)}</td>
                         <td className="px-3 py-3">
-                          <div className="text-[9px] space-y-0.5">
+                          <div className="text-[10px] space-y-0.5">
                             {p.sl ? <p className="text-red-400">SL {p.sl}</p> : <p className="text-gray-300 dark:text-gray-700">No SL</p>}
                             {p.tp ? <p className="text-emerald-500">TP {p.tp}</p> : null}
                           </div>
@@ -1145,7 +1145,7 @@ function PortfolioPage() {
                         <td className="px-3 py-3">
                           <button
                             onClick={() => handleGoToChart(p)}
-                            className="opacity-100 lg:opacity-0 lg:group-hover:opacity-100 transition-opacity text-[9px] text-blue-500 hover:text-blue-400 font-semibold"
+                            className="opacity-100 lg:opacity-0 lg:group-hover:opacity-100 transition-opacity text-[10px] text-blue-500 hover:text-blue-400 font-semibold"
                           >
                             Chart →
                           </button>
@@ -1190,7 +1190,7 @@ function PortfolioPage() {
                 <button
                   key={s}
                   onClick={() => setFilterStatus(s)}
-                  className={`px-2 py-1 rounded-lg text-[9px] font-semibold transition-colors ${
+                  className={`px-2 py-1 rounded-lg text-[10px] font-semibold transition-colors ${
                     filterStatus === s ? 'bg-blue-600 text-white' : 'text-gray-400 hover:bg-gray-100 dark:hover:bg-gray-800'
                   }`}
                 >
@@ -1234,7 +1234,7 @@ function PortfolioPage() {
                     <th
                       key={i}
                       onClick={() => c.key && toggleSort(c.key)}
-                      className={`px-4 py-2.5 text-left text-[9px] font-bold text-gray-400 uppercase tracking-widest select-none whitespace-nowrap ${c.sortable ? 'cursor-pointer hover:text-gray-600 dark:hover:text-gray-300 transition-colors' : ''}`}
+                      className={`px-4 py-2.5 text-left text-[10px] font-bold text-gray-400 uppercase tracking-widest select-none whitespace-nowrap ${c.sortable ? 'cursor-pointer hover:text-gray-600 dark:hover:text-gray-300 transition-colors' : ''}`}
                     >
                       {c.label}{c.key && <SortIcon col={c.key} sort={sort} />}
                     </th>
@@ -1250,12 +1250,12 @@ function PortfolioPage() {
                       <td className="px-4 py-3 text-[10px] text-gray-400 tabular-nums whitespace-nowrap">{p.last_action_at?.slice(0, 10)}</td>
                       <td className="px-4 py-3">
                         <div className="flex items-center gap-2">
-                          <SymAvatar symbol={p.symbol} size="w-5 h-5" text="text-[8px]" />
+                          <SymAvatar symbol={p.symbol} size="w-5 h-5" text="text-[10px]" />
                           <span className="text-[12px] font-bold text-gray-900 dark:text-white tracking-tight">{p.symbol}</span>
                         </div>
                       </td>
                       <td className="px-4 py-3">
-                        <span className={`text-[9px] font-semibold px-1.5 py-0.5 rounded-full ${
+                        <span className={`text-[10px] font-semibold px-1.5 py-0.5 rounded-full ${
                           dir === 'LONG' ? 'text-emerald-600 bg-emerald-50 dark:bg-emerald-900/20' : 'text-red-500 bg-red-50 dark:bg-red-900/20'
                         }`}>
                           {dir === 'LONG' ? '↑ L' : '↓ S'}
@@ -1266,7 +1266,7 @@ function PortfolioPage() {
                         {fmtC(parseFloat(p.wacc) || 0)}
                       </td>
                       <td className="px-4 py-3">
-                        <div className="text-[9px] space-y-0.5">
+                        <div className="text-[10px] space-y-0.5">
                           {p.sl ? <div className="text-red-400">SL {p.sl}</div> : null}
                           {p.tp ? <div className="text-emerald-500">TP {p.tp}</div> : null}
                           {!p.sl && !p.tp && <span className="text-gray-300 dark:text-gray-700">—</span>}
@@ -1280,7 +1280,7 @@ function PortfolioPage() {
                         ) : <span className="text-[10px] text-gray-300 dark:text-gray-700">—</span>}
                       </td>
                       <td className="px-4 py-3">
-                        <span className={`text-[9px] font-semibold px-1.5 py-0.5 rounded-full ${
+                        <span className={`text-[10px] font-semibold px-1.5 py-0.5 rounded-full ${
                           p.status === 'OPEN'    ? 'text-blue-500 bg-blue-50 dark:bg-blue-900/20' :
                           p.status === 'PARTIAL' ? 'text-amber-500 bg-amber-50 dark:bg-amber-900/20' :
                           'text-gray-400 bg-gray-100 dark:bg-gray-800'

@@ -78,13 +78,13 @@ function TopMovers() {
         <div className="grid grid-cols-2 gap-4">
           {/* Gainers */}
           <div>
-            <p className="text-[9px] font-semibold uppercase tracking-widest text-emerald-500 mb-2">Top Gainers</p>
+            <p className="text-[10px] font-semibold uppercase tracking-widest text-emerald-500 mb-2">Top Gainers</p>
             <table className="w-full">
               <thead>
                 <tr>
-                  <th className="text-left text-[9px] font-semibold uppercase tracking-wider text-gray-400 pb-1.5">Symbol</th>
-                  <th className="text-right text-[9px] font-semibold uppercase tracking-wider text-gray-400 pb-1.5">Price</th>
-                  <th className="text-right text-[9px] font-semibold uppercase tracking-wider text-gray-400 pb-1.5">Chg%</th>
+                  <th className="text-left text-[10px] font-semibold uppercase tracking-wider text-gray-400 pb-1.5">Symbol</th>
+                  <th className="text-right text-[10px] font-semibold uppercase tracking-wider text-gray-400 pb-1.5">Price</th>
+                  <th className="text-right text-[10px] font-semibold uppercase tracking-wider text-gray-400 pb-1.5">Chg%</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-gray-50 dark:divide-gray-800">
@@ -103,13 +103,13 @@ function TopMovers() {
 
           {/* Losers */}
           <div>
-            <p className="text-[9px] font-semibold uppercase tracking-widest text-red-400 mb-2">Top Losers</p>
+            <p className="text-[10px] font-semibold uppercase tracking-widest text-red-400 mb-2">Top Losers</p>
             <table className="w-full">
               <thead>
                 <tr>
-                  <th className="text-left text-[9px] font-semibold uppercase tracking-wider text-gray-400 pb-1.5">Symbol</th>
-                  <th className="text-right text-[9px] font-semibold uppercase tracking-wider text-gray-400 pb-1.5">Price</th>
-                  <th className="text-right text-[9px] font-semibold uppercase tracking-wider text-gray-400 pb-1.5">Chg%</th>
+                  <th className="text-left text-[10px] font-semibold uppercase tracking-wider text-gray-400 pb-1.5">Symbol</th>
+                  <th className="text-right text-[10px] font-semibold uppercase tracking-wider text-gray-400 pb-1.5">Price</th>
+                  <th className="text-right text-[10px] font-semibold uppercase tracking-wider text-gray-400 pb-1.5">Chg%</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-gray-50 dark:divide-gray-800">

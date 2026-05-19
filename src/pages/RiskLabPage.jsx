@@ -27,7 +27,7 @@ const LABEL = "block text-[10px] font-semibold uppercase tracking-wider text-gra
 function StatCard({ label, value, color = 'text-gray-800 dark:text-gray-100' }) {
   return (
     <div className="bg-gray-50 dark:bg-gray-800/60 rounded-xl p-3 text-center border border-gray-100 dark:border-gray-800">
-      <p className="text-[9px] uppercase tracking-wider text-gray-400 mb-0.5">{label}</p>
+      <p className="text-[10px] uppercase tracking-wider text-gray-400 mb-0.5">{label}</p>
       <p className={`text-[13px] font-bold ${color}`}>{value}</p>
     </div>
   )
@@ -239,7 +239,7 @@ function NEPSECalculator() {
                   </p>
                 </div>
                 <div className="text-right">
-                  <p className="text-[9px] uppercase tracking-wider text-gray-400">Break-even</p>
+                  <p className="text-[10px] uppercase tracking-wider text-gray-400">Break-even</p>
                   <p className="text-base font-bold text-gray-800 dark:text-gray-100 mt-0.5">Rs.{result.breakEven}</p>
                   {result.bonusShares > 0 && (
                     <p className="text-[10px] text-blue-400">Adj. Rs.{result.adjustedCostPerShare}</p>
@@ -253,7 +253,7 @@ function NEPSECalculator() {
                   { label: 'Charges', value: `Rs.${Math.round(result.totalCharges).toLocaleString()}`, red: true },
                 ].map((s, i) => (
                   <div key={i} className="bg-white/60 dark:bg-gray-900/60 rounded-xl p-2 text-center border border-white/50 dark:border-gray-800/50">
-                    <p className="text-[9px] text-gray-400 uppercase tracking-wider">{s.label}</p>
+                    <p className="text-[10px] text-gray-400 uppercase tracking-wider">{s.label}</p>
                     <p className={`text-[11px] font-bold mt-0.5 ${s.red ? 'text-red-400' : 'text-gray-700 dark:text-gray-200'}`}>{s.value}</p>
                   </div>
                 ))}
@@ -284,7 +284,7 @@ function NEPSECalculator() {
               </div>
 
               <div>
-                <p className="text-[9px] font-semibold uppercase tracking-widest text-gray-400 mb-2">Charges Distribution</p>
+                <p className="text-[10px] font-semibold uppercase tracking-widest text-gray-400 mb-2">Charges Distribution</p>
                 <div className="flex items-center gap-4">
                   <ResponsiveContainer width={100} height={100}>
                     <PieChart>
@@ -372,7 +372,7 @@ function PositionCalculator() {
           <div>
             <label className={LABEL}>Risk % per Trade</label>
             <input type="number" value={form.riskPct} onChange={e => setForm(p => ({ ...p, riskPct: e.target.value }))} placeholder="2" className={INPUT} />
-            <p className="text-[9px] text-gray-400 mt-1">Recommended: 1–2%</p>
+            <p className="text-[10px] text-gray-400 mt-1">Recommended: 1–2%</p>
           </div>
           <div>
             <label className={LABEL}>Entry Price (Rs.)</label>
@@ -413,7 +413,7 @@ function PositionCalculator() {
             </div>
 
             <div>
-              <p className="text-[9px] font-semibold uppercase tracking-widest text-gray-400 mb-2">Gain vs Risk at Different R:R</p>
+              <p className="text-[10px] font-semibold uppercase tracking-widest text-gray-400 mb-2">Gain vs Risk at Different R:R</p>
               <ResponsiveContainer width="100%" height={140}>
                 <BarChart data={result.chartData} margin={{ top: 0, right: 0, left: -20, bottom: 0 }}>
                   <XAxis dataKey="rr" tick={{ fontSize: 9 }} tickLine={false} axisLine={false} />
@@ -529,7 +529,7 @@ function SIPCalculator() {
             </div>
 
             <div>
-              <p className="text-[9px] font-semibold uppercase tracking-widest text-gray-400 mb-2">Growth Projection</p>
+              <p className="text-[10px] font-semibold uppercase tracking-widest text-gray-400 mb-2">Growth Projection</p>
               <ResponsiveContainer width="100%" height={160}>
                 <LineChart data={result.chartData} margin={{ top: 0, right: 0, left: -10, bottom: 0 }}>
                   <XAxis dataKey="year" tick={{ fontSize: 9 }} tickLine={false} axisLine={false} />
@@ -577,7 +577,7 @@ function RiskLabPage() {
             <span className={`text-[11px] font-semibold leading-tight ${activeTab === tab.id ? 'text-gray-800 dark:text-white' : 'text-gray-400'}`}>
               {tab.label}
             </span>
-            <span className={`text-[9px] mt-0.5 hidden sm:block ${activeTab === tab.id ? 'text-gray-400' : 'text-gray-300 dark:text-gray-600'}`}>
+            <span className={`text-[10px] mt-0.5 hidden sm:block ${activeTab === tab.id ? 'text-gray-400' : 'text-gray-300 dark:text-gray-600'}`}>
               {tab.desc}
             </span>
           </button>

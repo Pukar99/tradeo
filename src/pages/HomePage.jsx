@@ -92,7 +92,7 @@ function LoggedOutHome() {
                   </svg>
                   <div className="absolute inset-0 flex flex-col items-center justify-center">
                     <span className="text-xl font-bold text-gray-900 dark:text-white">68</span>
-                    <span className="text-[9px] text-gray-400">/ 100</span>
+                    <span className="text-[10px] text-gray-400">/ 100</span>
                   </div>
                 </div>
               </div>
@@ -157,7 +157,7 @@ function LoggedOutHome() {
                 {dummyWatchlist.map((sym, i) => (
                   <div key={i} className="bg-gray-50 dark:bg-gray-700 rounded-xl px-3 py-2">
                     <div className="flex items-center gap-1.5 mb-1">
-                      <StockAvatar symbol={sym} size="w-6 h-6" textSize="text-[9px]" />
+                      <StockAvatar symbol={sym} size="w-6 h-6" textSize="text-[10px]" />
                       <p className="text-xs font-semibold text-gray-900 dark:text-white">{sym}</p>
                     </div>
                     <p className="text-[10px] text-gray-400">Rs.{[1240,890,3100,1560,420,760,980,640][i]}</p>

@@ -80,7 +80,7 @@ function ReplaySymbolSearch({ value, onChange }) {
               >
                 <div className="text-[12px] font-semibold text-gray-800 dark:text-gray-100 leading-tight">{s.symbol}</div>
                 {s.company_name && (
-                  <div className="text-[9px] text-gray-400 dark:text-gray-500 leading-tight truncate">{s.company_name}</div>
+                  <div className="text-[10px] text-gray-400 dark:text-gray-500 leading-tight truncate">{s.company_name}</div>
                 )}
               </li>
             ))}

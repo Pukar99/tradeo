@@ -20,7 +20,7 @@ function StatPill({ label, value, color = 'text-gray-700 dark:text-gray-200' }) 
   return (
     <div className="flex flex-col items-center bg-gray-50 dark:bg-gray-800/60 rounded-xl px-3 py-2 border border-gray-100 dark:border-gray-800">
       <span className={`text-[13px] font-bold ${color}`}>{value}</span>
-      <span className="text-[9px] text-gray-400 uppercase tracking-widest mt-0.5">{label}</span>
+      <span className="text-[10px] text-gray-400 uppercase tracking-widest mt-0.5">{label}</span>
     </div>
   )
 }
@@ -65,7 +65,7 @@ export default function TraderProfile() {
           </div>
           <div className="text-left">
             <p className="text-[11px] font-semibold text-gray-800 dark:text-white">Trader Profile</p>
-            <p className="text-[9px] text-gray-400">
+            <p className="text-[10px] text-gray-400">
               {loading ? 'Analyzing your trades…' : profile ? `${s?.totalTrades} trades · ${s?.winRate}% WR · updated` : 'AI behavioral analysis'}
             </p>
           </div>
@@ -165,7 +165,7 @@ export default function TraderProfile() {
               {(profile.bestSymbols?.length > 0 || profile.worstSymbols?.length > 0) && (
                 <div className="grid grid-cols-2 gap-3">
                   <div>
-                    <p className="text-[9px] font-semibold uppercase tracking-widest text-gray-400 mb-1.5">Best Symbols</p>
+                    <p className="text-[10px] font-semibold uppercase tracking-widest text-gray-400 mb-1.5">Best Symbols</p>
                     <div className="space-y-1">
                       {profile.bestSymbols.map(s => (
                         <div key={s.symbol} className="flex items-center justify-between text-[10px]">
@@ -176,7 +176,7 @@ export default function TraderProfile() {
                     </div>
                   </div>
                   <div>
-                    <p className="text-[9px] font-semibold uppercase tracking-widest text-gray-400 mb-1.5">Worst Symbols</p>
+                    <p className="text-[10px] font-semibold uppercase tracking-widest text-gray-400 mb-1.5">Worst Symbols</p>
                     <div className="space-y-1">
                       {profile.worstSymbols.map(s => (
                         <div key={s.symbol} className="flex items-center justify-between text-[10px]">
@@ -192,7 +192,7 @@ export default function TraderProfile() {
               {/* Tag breakdown */}
               {profile.tagStats && Object.keys(profile.tagStats).length > 0 && (
                 <div>
-                  <p className="text-[9px] font-semibold uppercase tracking-widest text-gray-400 mb-2">Setup Performance</p>
+                  <p className="text-[10px] font-semibold uppercase tracking-widest text-gray-400 mb-2">Setup Performance</p>
                   <div className="flex flex-wrap gap-2">
                     {Object.entries(profile.tagStats).map(([tag, s]) => {
                       const wr = Math.round((s.wins / s.total) * 100)
@@ -209,10 +209,10 @@ export default function TraderProfile() {
               )}
 
               <div className="flex items-center justify-between">
-                <p className="text-[9px] text-gray-300 dark:text-gray-600">
+                <p className="text-[10px] text-gray-300 dark:text-gray-600">
                   Generated {profile.generatedAt ? new Date(profile.generatedAt).toLocaleTimeString() : ''} · cached 1hr
                 </p>
-                <button onClick={fetch} className="text-[9px] text-gray-400 hover:text-violet-500 transition-colors">
+                <button onClick={fetch} className="text-[10px] text-gray-400 hover:text-violet-500 transition-colors">
                   Refresh
                 </button>
               </div>

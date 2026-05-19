@@ -60,12 +60,12 @@ export default function BacktestControls({
 
       {/* ── Speed ─────────────────────────────────────────────── */}
       <div className="flex items-center gap-1 shrink-0">
-        <span className="text-[9px] text-gray-400 dark:text-gray-500 font-medium">Speed</span>
+        <span className="text-[10px] text-gray-400 dark:text-gray-500 font-medium">Speed</span>
         {SPEEDS.map(s => (
           <button
             key={s}
             onClick={() => onSpeedChange(s)}
-            className={`px-1.5 py-0.5 text-[9px] font-bold rounded transition-colors ${
+            className={`px-1.5 py-0.5 text-[10px] font-bold rounded transition-colors ${
               speed === s
                 ? 'bg-blue-600 text-white'
                 : 'text-gray-500 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-gray-800'
@@ -87,7 +87,7 @@ export default function BacktestControls({
             style={{ width: `${progress}%` }}
           />
         </div>
-        <span className="text-[9px] text-gray-400 dark:text-gray-500 tabular-nums whitespace-nowrap shrink-0">
+        <span className="text-[10px] text-gray-400 dark:text-gray-500 tabular-nums whitespace-nowrap shrink-0">
           {cursorIndex}/{totalCandles}
         </span>
       </div>
@@ -98,13 +98,13 @@ export default function BacktestControls({
       </div>
 
       {atEnd && (
-        <span className="text-[9px] font-bold text-orange-500 whitespace-nowrap animate-pulse shrink-0">
+        <span className="text-[10px] font-bold text-orange-500 whitespace-nowrap animate-pulse shrink-0">
           END
         </span>
       )}
 
       {/* ── Keyboard hint ─────────────────────────────────────── */}
-      <div className="hidden lg:flex items-center gap-1 text-[8px] text-gray-300 dark:text-gray-600 shrink-0 ml-1">
+      <div className="hidden lg:flex items-center gap-1 text-[10px] text-gray-300 dark:text-gray-600 shrink-0 ml-1">
         <kbd className="px-1 py-0.5 rounded border border-gray-200 dark:border-gray-700">Space</kbd>
         <kbd className="px-1 py-0.5 rounded border border-gray-200 dark:border-gray-700">←</kbd>
         <kbd className="px-1 py-0.5 rounded border border-gray-200 dark:border-gray-700">→</kbd>

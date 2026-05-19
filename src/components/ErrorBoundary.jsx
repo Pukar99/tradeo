@@ -63,7 +63,7 @@ export default class ErrorBoundary extends Component {
             <summary className="px-3 py-2 text-[10px] font-semibold text-gray-400 cursor-pointer hover:bg-gray-50 dark:hover:bg-gray-800/50 select-none">
               Error details
             </summary>
-            <pre className="px-3 py-2 text-[9px] text-red-500 bg-red-50 dark:bg-red-900/10 overflow-x-auto whitespace-pre-wrap break-all">
+            <pre className="px-3 py-2 text-[10px] text-red-500 bg-red-50 dark:bg-red-900/10 overflow-x-auto whitespace-pre-wrap break-all">
               {error.toString()}
             </pre>
           </details>

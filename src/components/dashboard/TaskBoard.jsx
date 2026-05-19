@@ -165,7 +165,7 @@ function ExternalLinkModal({ task, onClose, onDone }) {
           </div>
           <div>
             <p className="text-[12px] font-semibold text-gray-800 dark:text-gray-200">{task.title}</p>
-            <p className="text-[9px] text-gray-400 truncate max-w-[220px]">{task.url}</p>
+            <p className="text-[10px] text-gray-400 truncate max-w-[220px]">{task.url}</p>
           </div>
         </div>
       </div>
@@ -429,7 +429,7 @@ function TaskBoard({ initData, mindsetContent }) {
           {/* Left: circular gauge */}
           <div className="flex flex-col items-center gap-1 flex-shrink-0">
             <ProgressRing progress={progress} />
-            <span className="text-[9px] text-gray-400 text-center leading-tight">
+            <span className="text-[10px] text-gray-400 text-center leading-tight">
               daily<br/>progress
             </span>
           </div>
@@ -444,7 +444,7 @@ function TaskBoard({ initData, mindsetContent }) {
             ))}
             {(completedFixed.length > 0 || doneCustom.length > 0) && (
               <>
-                <p className="text-[9px] font-semibold uppercase tracking-widest text-gray-300 dark:text-gray-700 px-2 pt-1">Done</p>
+                <p className="text-[10px] font-semibold uppercase tracking-widest text-gray-300 dark:text-gray-700 px-2 pt-1">Done</p>
                 {completedFixed.map(task => <TaskRow key={task.id} done label={task.title} />)}
                 {doneCustom.map(task => (
                   <TaskRow key={task.id} done label={task.title} onClick={() => handleToggleCustom(task)} onDelete={() => handleDeleteCustom(task.id)} />

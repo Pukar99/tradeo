@@ -88,10 +88,10 @@ export default function SymbolSearch() {
                 <div className="flex flex-col min-w-0">
                   <span className="text-[12px] font-semibold text-gray-800 dark:text-gray-100 leading-tight">{item.label}</span>
                   {item.company_name && (
-                    <span className="text-[9px] text-gray-400 dark:text-gray-500 truncate leading-tight">{item.company_name}</span>
+                    <span className="text-[10px] text-gray-400 dark:text-gray-500 truncate leading-tight">{item.company_name}</span>
                   )}
                 </div>
-                <span className={`shrink-0 ml-2 text-[9px] font-medium px-1.5 py-0.5 rounded-md ${
+                <span className={`shrink-0 ml-2 text-[10px] font-medium px-1.5 py-0.5 rounded-md ${
                   item.sub === 'Index'
                     ? 'bg-blue-100 dark:bg-blue-900 text-blue-600 dark:text-blue-300'
                     : 'bg-gray-100 dark:bg-gray-800 text-gray-500'

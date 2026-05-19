@@ -10,7 +10,7 @@ async function loadLC() { return import('lightweight-charts') }
 
 // ─── Shared design tokens (match Performance tab) ─────────────────────────────
 const CARD   = 'bg-white dark:bg-gray-900 rounded-2xl border border-gray-100 dark:border-gray-800'
-const LABEL  = 'text-[9px] font-bold uppercase tracking-widest text-gray-400'
+const LABEL  = 'text-[10px] font-bold uppercase tracking-widest text-gray-400'
 const STITLE = 'text-[11px] font-semibold text-gray-700 dark:text-gray-200'
 const SVAL   = 'text-[13px] font-bold tabular-nums'
 
@@ -104,11 +104,11 @@ function WinBar({ label, rate }) {
   const color = rate == null ? '#9ca3af' : `hsl(${hue}, 75%, 48%)`
   return (
     <div className="flex items-center gap-1.5">
-      <span className="w-6 text-[9px] text-gray-500 dark:text-gray-500 shrink-0">{label}</span>
+      <span className="w-6 text-[10px] text-gray-500 dark:text-gray-500 shrink-0">{label}</span>
       <div className="flex-1 h-1 rounded-full bg-gray-100 dark:bg-gray-800 overflow-hidden">
         <div className="h-full rounded-full" style={{ width: `${rate || 0}%`, background: color }} />
       </div>
-      <span className="w-8 text-[9px] font-bold text-right shrink-0" style={{ color }}>
+      <span className="w-8 text-[10px] font-bold text-right shrink-0" style={{ color }}>
         {rate != null ? rate + '%' : '—'}
       </span>
     </div>
@@ -135,7 +135,7 @@ const LeftInsightPanel = memo(function LeftInsightPanel({ data, wAvg, wWinRate, 
         <div className="flex flex-wrap gap-1">
           {INDEX_OPTIONS.map(opt => (
             <button key={opt.id} onClick={() => setSelectedIndexId(opt.id)}
-              className={`px-1.5 py-0.5 rounded text-[9px] font-bold transition-colors min-w-[40px] text-center ${
+              className={`px-1.5 py-0.5 rounded text-[10px] font-bold transition-colors min-w-[40px] text-center ${
                 selectedIndexId === opt.id
                   ? 'bg-blue-600 text-white'
                   : 'bg-gray-100 dark:bg-gray-800 text-gray-500 dark:text-gray-400 hover:bg-gray-200 dark:hover:bg-gray-700'
@@ -152,16 +152,16 @@ const LeftInsightPanel = memo(function LeftInsightPanel({ data, wAvg, wWinRate, 
           <div className={`${LABEL} mb-2`}>Seasonal Edge</div>
           <div className="flex gap-2">
             <div className="flex-1 rounded-lg bg-green-50 dark:bg-green-900/10 border border-green-100 dark:border-green-900 p-2">
-              <div className="text-[8px] text-green-500 font-bold uppercase mb-0.5">Best</div>
+              <div className="text-[10px] text-green-500 font-bold uppercase mb-0.5">Best</div>
               <div className="text-[12px] font-black text-green-600">{MONTHS_EN[bestMi]}</div>
               <div className="text-[10px] font-bold text-green-500">{fmtPct(wAvg[bestMi])}</div>
-              <div className="text-[8px] text-gray-400 mt-0.5">{wWinRate[bestMi]}% win</div>
+              <div className="text-[10px] text-gray-400 mt-0.5">{wWinRate[bestMi]}% win</div>
             </div>
             <div className="flex-1 rounded-lg bg-red-50 dark:bg-red-900/10 border border-red-100 dark:border-red-900 p-2">
-              <div className="text-[8px] text-red-400 font-bold uppercase mb-0.5">Worst</div>
+              <div className="text-[10px] text-red-400 font-bold uppercase mb-0.5">Worst</div>
               <div className="text-[12px] font-black text-red-500">{MONTHS_EN[worstMi]}</div>
               <div className="text-[10px] font-bold text-red-400">{fmtPct(wAvg[worstMi])}</div>
-              <div className="text-[8px] text-gray-400 mt-0.5">{wWinRate[worstMi]}% win</div>
+              <div className="text-[10px] text-gray-400 mt-0.5">{wWinRate[worstMi]}% win</div>
             </div>
           </div>
         </div>
@@ -187,8 +187,8 @@ const LeftInsightPanel = memo(function LeftInsightPanel({ data, wAvg, wWinRate, 
                 <div key={y.year} className={`flex items-center justify-between mb-0.5 px-1 py-0.5 rounded ${
                   i % 2 === 1 ? 'bg-gray-50 dark:bg-gray-800/60' : ''
                 }`}>
-                  <span className="text-[9px] text-gray-500 dark:text-gray-500">{i+1}. {y.year}</span>
-                  <span className="text-[9px] font-bold text-green-500">{fmtPct(y.annual)}</span>
+                  <span className="text-[10px] text-gray-500 dark:text-gray-500">{i+1}. {y.year}</span>
+                  <span className="text-[10px] font-bold text-green-500">{fmtPct(y.annual)}</span>
                 </div>
               ))}
             </div>
@@ -198,8 +198,8 @@ const LeftInsightPanel = memo(function LeftInsightPanel({ data, wAvg, wWinRate, 
                 <div key={y.year} className={`flex items-center justify-between mb-0.5 px-1 py-0.5 rounded ${
                   i % 2 === 1 ? 'bg-gray-50 dark:bg-gray-800/60' : ''
                 }`}>
-                  <span className="text-[9px] text-gray-500 dark:text-gray-500">{i+1}. {y.year}</span>
-                  <span className="text-[9px] font-bold text-red-400">{fmtPct(y.annual)}</span>
+                  <span className="text-[10px] text-gray-500 dark:text-gray-500">{i+1}. {y.year}</span>
+                  <span className="text-[10px] font-bold text-red-400">{fmtPct(y.annual)}</span>
                 </div>
               ))}
             </div>
@@ -319,7 +319,7 @@ function MonthChart({ candles, dark }) {
     const isUp = c.close >= c.open
     return (
       <div className="w-full h-full flex flex-col items-center justify-center text-center gap-1.5 px-3">
-        <div className="text-[9px] font-bold uppercase tracking-widest text-gray-400 dark:text-gray-500">
+        <div className="text-[10px] font-bold uppercase tracking-widest text-gray-400 dark:text-gray-500">
           {c.date} · single trading day
         </div>
         <div className={`text-[20px] font-black tabular-nums ${isUp ? 'text-emerald-500' : 'text-red-500'}`}>
@@ -345,7 +345,7 @@ function SectorBar({ name, ret, maxAbs }) {
   const short = name.replace(' Sub-Index','').replace(' Index','')
   return (
     <div className="flex items-center gap-1.5">
-      <span className="text-[9px] text-gray-500 dark:text-gray-400 w-20 shrink-0 truncate">{short}</span>
+      <span className="text-[10px] text-gray-500 dark:text-gray-400 w-20 shrink-0 truncate">{short}</span>
       <div className="flex flex-1 items-center" style={{ height: 10 }}>
         <div className="flex-1 flex justify-end">
           {!isPos && <div className="h-2 rounded-l-sm" style={{ width: `${w}%`, background: color }} />}
@@ -355,7 +355,7 @@ function SectorBar({ name, ret, maxAbs }) {
           {isPos && <div className="h-2 rounded-r-sm" style={{ width: `${w}%`, background: color }} />}
         </div>
       </div>
-      <span className="text-[9px] font-bold w-11 text-right shrink-0" style={{ color }}>
+      <span className="text-[10px] font-bold w-11 text-right shrink-0" style={{ color }}>
         {fmtPct(ret)}
       </span>
     </div>
@@ -380,7 +380,7 @@ function HistoricalRank({ value, allYears, month }) {
   return (
     <div>
       <div className={`${LABEL} mb-1.5`}>Historical Rank ({MONTHS_FULL[month - 1]})</div>
-      <div className="text-[9px] text-gray-500 dark:text-gray-400 mb-1">
+      <div className="text-[10px] text-gray-500 dark:text-gray-400 mb-1">
         Ranks <span className="font-bold" style={{ color }}>{rank}/{hist.length}</span>
         {' '}({pct}th pct) · better than {Math.max(0, rank - 1)} of {hist.length} past years
       </div>
@@ -388,7 +388,7 @@ function HistoricalRank({ value, allYears, month }) {
         <div className="absolute inset-y-0 left-0 rounded-full" style={{ width: `${pos}%`, background: color, opacity: 0.3 }} />
         <div className="absolute top-1/2 -translate-y-1/2 w-1.5 h-3 rounded-sm" style={{ left: `${pos}%`, background: color }} />
       </div>
-      <div className="flex justify-between text-[8px] text-gray-400">
+      <div className="flex justify-between text-[10px] text-gray-400">
         <span>{fmtPct(min)}</span>
         <span className="font-bold" style={{ color }}>{fmtPct(value)}</span>
         <span>{fmtPct(max)}</span>
@@ -494,7 +494,7 @@ function StockMiniChartPopover({ symbol, anchorRect, onClose, dark }) {
       <div className="flex items-center justify-between px-3 py-2 border-b border-gray-100 dark:border-gray-800">
         <div className="flex items-baseline gap-2">
           <span className="text-[12px] font-black text-gray-800 dark:text-gray-100">{symbol}</span>
-          <span className="text-[9px] text-gray-400 uppercase tracking-widest">3-Mo</span>
+          <span className="text-[10px] text-gray-400 uppercase tracking-widest">3-Mo</span>
           {change != null && (
             <span className="text-[10px] font-bold tabular-nums" style={{ color: changeColor }}>
               {change >= 0 ? '+' : ''}{change.toFixed(2)}%
@@ -572,7 +572,7 @@ function SectorsColumn({ sectors, sectorHistory, activeSector, onSectorClick, ye
       <div className="shrink-0 px-3 pt-2 pb-2 border-b border-gray-100 dark:border-gray-800 space-y-1.5">
         <div className="flex items-center justify-between">
           <span className={LABEL}>Sectors · {sectors.length}</span>
-          <span className="text-[9px] text-gray-500 dark:text-gray-500">click for stocks</span>
+          <span className="text-[10px] text-gray-500 dark:text-gray-500">click for stocks</span>
         </div>
 
         {best && worst && (
@@ -580,8 +580,8 @@ function SectorsColumn({ sectors, sectorHistory, activeSector, onSectorClick, ye
             <button onClick={() => best.name && onSectorClick({ name: best.name, label: best.label })}
               className="flex-1 flex items-center justify-between gap-1 px-2 py-1 rounded-lg bg-emerald-50 dark:bg-emerald-900/15 border border-emerald-100 dark:border-emerald-900/40 hover:bg-emerald-100 dark:hover:bg-emerald-900/30 transition-colors">
               <div className="min-w-0 text-left">
-                <div className="text-[7px] text-emerald-500 font-bold uppercase tracking-wider leading-none">Top</div>
-                <div className="text-[9px] font-bold text-emerald-700 dark:text-emerald-400 truncate leading-tight">
+                <div className="text-[9px] text-emerald-500 font-bold uppercase tracking-wider leading-none">Top</div>
+                <div className="text-[10px] font-bold text-emerald-700 dark:text-emerald-400 truncate leading-tight">
                   {(best.label || best.name || '').replace(' Sub-Index','').replace(' Index','')}
                 </div>
               </div>
@@ -590,8 +590,8 @@ function SectorsColumn({ sectors, sectorHistory, activeSector, onSectorClick, ye
             <button onClick={() => worst.name && onSectorClick({ name: worst.name, label: worst.label })}
               className="flex-1 flex items-center justify-between gap-1 px-2 py-1 rounded-lg bg-red-50 dark:bg-red-900/15 border border-red-100 dark:border-red-900/40 hover:bg-red-100 dark:hover:bg-red-900/30 transition-colors">
               <div className="min-w-0 text-left">
-                <div className="text-[7px] text-red-400 font-bold uppercase tracking-wider leading-none">Bottom</div>
-                <div className="text-[9px] font-bold text-red-700 dark:text-red-400 truncate leading-tight">
+                <div className="text-[9px] text-red-400 font-bold uppercase tracking-wider leading-none">Bottom</div>
+                <div className="text-[10px] font-bold text-red-700 dark:text-red-400 truncate leading-tight">
                   {(worst.label || worst.name || '').replace(' Sub-Index','').replace(' Index','')}
                 </div>
               </div>
@@ -626,7 +626,7 @@ function SectorsColumn({ sectors, sectorHistory, activeSector, onSectorClick, ye
               </div>
               <SectorMomentumSpark values={history} />
               {(isBest || isWorst) && (
-                <span className={`text-[7px] font-black px-1 py-px rounded shrink-0 ${
+                <span className={`text-[9px] font-black px-1 py-px rounded shrink-0 ${
                   isBest
                     ? 'bg-emerald-100 dark:bg-emerald-900/40 text-emerald-600 dark:text-emerald-400'
                     : 'bg-red-100 dark:bg-red-900/40 text-red-500'
@@ -683,7 +683,7 @@ function StocksColumn({ sector, year, month, dark, onStockClick, activeStockSymb
         <div className="text-[11px] text-gray-400 dark:text-gray-600">
           Click a sector to see<br />its stocks here
         </div>
-        <div className="text-[9px] text-gray-500 dark:text-gray-500 mt-1">
+        <div className="text-[10px] text-gray-500 dark:text-gray-500 mt-1">
           Then click any stock for a<br />3-month price chart
         </div>
       </div>
@@ -698,17 +698,17 @@ function StocksColumn({ sector, year, month, dark, onStockClick, activeStockSymb
           <div className="min-w-0 flex-1">
             <div className={LABEL}>Stocks · {shortName}</div>
             {stocks && (
-              <div className="text-[8px] text-gray-400">
+              <div className="text-[10px] text-gray-400">
                 {stocks.length} symbol{stocks.length !== 1 ? 's' : ''} · {MONTHS_FULL[month - 1]} {year}
               </div>
             )}
           </div>
           {stocks?.length > 0 && (
             <div className="flex items-center gap-1 shrink-0">
-              <span className="px-1.5 py-0.5 rounded text-[8px] font-bold bg-emerald-50 dark:bg-emerald-900/20 text-emerald-600 dark:text-emerald-400">
+              <span className="px-1.5 py-0.5 rounded text-[10px] font-bold bg-emerald-50 dark:bg-emerald-900/20 text-emerald-600 dark:text-emerald-400">
                 ▲ {winners}
               </span>
-              <span className="px-1.5 py-0.5 rounded text-[8px] font-bold bg-red-50 dark:bg-red-900/20 text-red-500">
+              <span className="px-1.5 py-0.5 rounded text-[10px] font-bold bg-red-50 dark:bg-red-900/20 text-red-500">
                 ▼ {losers}
               </span>
             </div>
@@ -729,7 +729,7 @@ function StocksColumn({ sector, year, month, dark, onStockClick, activeStockSymb
             <div className="flex items-center bg-gray-100 dark:bg-gray-800 rounded p-0.5">
               {[['return','%'],['symbol','A-Z']].map(([v, lbl]) => (
                 <button key={v} onClick={() => setSort(v)}
-                  className={`px-1.5 py-0.5 rounded text-[9px] font-bold transition-colors ${
+                  className={`px-1.5 py-0.5 rounded text-[10px] font-bold transition-colors ${
                     sort === v ? 'bg-white dark:bg-gray-700 text-gray-900 dark:text-white shadow-sm' : 'text-gray-500 dark:text-gray-400 hover:text-gray-700'
                   }`}>{lbl}</button>
               ))}
@@ -770,11 +770,11 @@ function StocksColumn({ sector, year, month, dark, onStockClick, activeStockSymb
                         : 'bg-white dark:bg-gray-900 hover:bg-blue-50/60 dark:hover:bg-blue-950/20'
                   }`}
                 >
-                  <span className="text-[9px] text-gray-400 dark:text-gray-600 w-5 shrink-0 tabular-nums">{i + 1}</span>
+                  <span className="text-[10px] text-gray-400 dark:text-gray-600 w-5 shrink-0 tabular-nums">{i + 1}</span>
                   <div className="min-w-0 w-20 shrink-0">
                     <div className="text-[10px] font-black text-gray-800 dark:text-gray-100 leading-tight truncate">{s.symbol}</div>
                     {s.company_name && (
-                      <div className="text-[8px] text-gray-400 truncate leading-tight">{s.company_name}</div>
+                      <div className="text-[10px] text-gray-400 truncate leading-tight">{s.company_name}</div>
                     )}
                   </div>
                   <div className="flex flex-1 items-center min-w-0" style={{ height: 10 }}>
@@ -796,7 +796,7 @@ function StocksColumn({ sector, year, month, dark, onStockClick, activeStockSymb
         )}
       </div>
       <div className="shrink-0 px-3 py-1 border-t border-gray-100 dark:border-gray-800">
-        <span className="text-[9px] text-gray-500 dark:text-gray-500">Click any stock → 3-month chart</span>
+        <span className="text-[10px] text-gray-500 dark:text-gray-500">Click any stock → 3-month chart</span>
       </div>
     </div>
   )
@@ -836,7 +836,7 @@ function ChartStatsColumn({ cell, candles, stats, available, dark, allYears, loa
         <div className="flex items-center justify-between px-3 py-1.5 border-b border-gray-50 dark:border-gray-800/60">
           <span className={LABEL}>Daily Candles</span>
           {stats?.trading_days && (
-            <span className="text-[9px] text-gray-400">{stats.trading_days} days</span>
+            <span className="text-[10px] text-gray-400">{stats.trading_days} days</span>
           )}
         </div>
         <div style={{ height: 360 }}>
@@ -858,7 +858,7 @@ function ChartStatsColumn({ cell, candles, stats, available, dark, allYears, loa
               ['Low',   stats.month_low?.toFixed(1),   '#ef4444'],
             ].map(([l, v, c]) => (
               <div key={l} className="rounded-lg bg-gray-50 dark:bg-gray-800/60 px-2.5 py-1.5">
-                <div className="text-[8px] text-gray-400 uppercase tracking-wide">{l}</div>
+                <div className="text-[10px] text-gray-400 uppercase tracking-wide">{l}</div>
                 <div className="text-[13px] font-black tabular-nums" style={{ color: c || (dark ? '#e2e8f0' : '#1e293b') }}>
                   {v ?? '—'}
                 </div>
@@ -1021,7 +1021,7 @@ function InlineRightPanel({
       <div className="shrink-0 flex items-center gap-2 px-3 py-2 border-b border-gray-100 dark:border-gray-800 bg-white dark:bg-gray-900">
         <div className="w-4 h-4 rounded-sm shrink-0 border border-gray-200 dark:border-gray-700" style={{ background: bg }} />
         <div className="min-w-0 flex-1">
-          <div className="text-[9px] font-bold text-gray-500 dark:text-gray-400 uppercase tracking-widest leading-none">
+          <div className="text-[10px] font-bold text-gray-500 dark:text-gray-400 uppercase tracking-widest leading-none">
             {MONTHS_FULL[cell.month - 1]} {cell.year}
           </div>
           <div className="text-lg font-black leading-tight" style={{ color: fg }}>
@@ -1084,7 +1084,7 @@ function InlineRightPanel({
             <div className="bg-white dark:bg-gray-900 rounded-xl border border-gray-100 dark:border-gray-800/80 overflow-hidden shadow-sm">
               <div className="flex items-center justify-between px-3 py-1.5 border-b border-gray-100 dark:border-gray-800">
                 <span className={LABEL}>Daily Candles</span>
-                {stats?.trading_days && <span className="text-[9px] text-gray-400">{stats.trading_days} days</span>}
+                {stats?.trading_days && <span className="text-[10px] text-gray-400">{stats.trading_days} days</span>}
               </div>
               <div style={{ height: 220 }}>
                 {candles?.length
@@ -1105,7 +1105,7 @@ function InlineRightPanel({
                   ['Days',  stats.trading_days ?? '—', null],
                 ].map(([l, v, c]) => (
                   <div key={l} className="px-1.5 py-1.5 flex flex-col items-center justify-center">
-                    <div className="text-[7px] text-gray-400 dark:text-gray-500 font-bold uppercase tracking-wider leading-none">{l}</div>
+                    <div className="text-[9px] text-gray-400 dark:text-gray-500 font-bold uppercase tracking-wider leading-none">{l}</div>
                     <div className="text-[10px] font-black tabular-nums leading-tight mt-0.5" style={{ color: c || (dark ? '#e2e8f0' : '#1e293b') }}>
                       {v ?? '—'}
                     </div>
@@ -1127,13 +1127,13 @@ function InlineRightPanel({
                   <div className={LABEL}>Day extremes</div>
                   <div className="flex flex-col gap-0.5 mt-0.5">
                     {stats.best_day && (
-                      <div className="flex justify-between text-[9px]">
+                      <div className="flex justify-between text-[10px]">
                         <span className="text-gray-500">▲</span>
                         <span className="font-bold text-green-500 tabular-nums">{stats.best_day.date.slice(5)} {fmtPct(stats.best_day.pct)}</span>
                       </div>
                     )}
                     {stats.worst_day && (
-                      <div className="flex justify-between text-[9px]">
+                      <div className="flex justify-between text-[10px]">
                         <span className="text-gray-500">▼</span>
                         <span className="font-bold text-red-400 tabular-nums">{stats.worst_day.date.slice(5)} {fmtPct(stats.worst_day.pct)}</span>
                       </div>
@@ -1155,7 +1155,7 @@ function InlineRightPanel({
               <div className="rounded-xl bg-white dark:bg-gray-900 border border-gray-100 dark:border-gray-800/80 p-2.5 shadow-sm">
                 <div className="flex items-center justify-between mb-1.5">
                   <span className={LABEL}>Sectors · {sectors.length}</span>
-                  <span className="text-[8px] text-gray-400 dark:text-gray-500">click to expand stocks</span>
+                  <span className="text-[10px] text-gray-400 dark:text-gray-500">click to expand stocks</span>
                 </div>
 
                 <div className="rounded-lg overflow-hidden">
@@ -1182,7 +1182,7 @@ function InlineRightPanel({
                           </div>
                           <SectorMomentumSpark values={history} width={44} />
                           {(isBest || isWorst) && (
-                            <span className={`text-[7px] font-black px-1 py-px rounded shrink-0 ${
+                            <span className={`text-[9px] font-black px-1 py-px rounded shrink-0 ${
                               isBest
                                 ? 'bg-emerald-100 dark:bg-emerald-900/40 text-emerald-600 dark:text-emerald-400'
                                 : 'bg-red-100 dark:bg-red-900/40 text-red-500'
@@ -1212,7 +1212,7 @@ function InlineRightPanel({
 
       {/* Footer */}
       <div className="shrink-0 px-3 py-1 border-t border-gray-100 dark:border-gray-800 bg-white dark:bg-gray-900">
-        <span className="text-[9px] text-gray-500 dark:text-gray-500">← → navigate · ⤢ maximize · Esc clear</span>
+        <span className="text-[10px] text-gray-500 dark:text-gray-500">← → navigate · ⤢ maximize · Esc clear</span>
       </div>
 
       {/* Stock mini-chart popover */}
@@ -1298,9 +1298,9 @@ function InlineSectorStocks({ sectorIndex, label, year, month, onStockClick, act
           <div className="w-3 h-3 border-2 border-blue-400 border-t-transparent rounded-full animate-spin" />
         </div>
       )}
-      {error && <div className="px-2 py-2 text-[9px] text-red-400">{error}</div>}
+      {error && <div className="px-2 py-2 text-[10px] text-red-400">{error}</div>}
       {!loading && !error && stocks !== null && stocks.length === 0 && (
-        <div className="px-2 py-2 text-[9px] text-gray-400">No stock data</div>
+        <div className="px-2 py-2 text-[10px] text-gray-400">No stock data</div>
       )}
       {!loading && !error && stocks?.length > 0 && (
         <div className="max-h-56 overflow-y-auto overscroll-contain [scrollbar-width:thin] [&::-webkit-scrollbar]:w-1 [&::-webkit-scrollbar-thumb]:bg-gray-300 dark:[&::-webkit-scrollbar-thumb]:bg-gray-700 [&::-webkit-scrollbar-thumb]:rounded-full">
@@ -1317,8 +1317,8 @@ function InlineSectorStocks({ sectorIndex, label, year, month, onStockClick, act
                   isActive ? 'bg-blue-100 dark:bg-blue-900/30' : 'hover:bg-blue-100/60 dark:hover:bg-blue-900/20'
                 } transition-colors`}
               >
-                <span className="text-[8px] text-gray-400 w-4 shrink-0 tabular-nums">{i + 1}</span>
-                <span className="text-[9px] font-bold dark:text-gray-100 w-14 shrink-0 truncate">{s.symbol}</span>
+                <span className="text-[10px] text-gray-400 w-4 shrink-0 tabular-nums">{i + 1}</span>
+                <span className="text-[10px] font-bold dark:text-gray-100 w-14 shrink-0 truncate">{s.symbol}</span>
                 <div className="flex flex-1 items-center min-w-0" style={{ height: 8 }}>
                   <div className="flex-1 flex justify-end">
                     {!isPos && <div className="h-1.5 rounded-l-sm" style={{ width: `${barW}%`, background: color }} />}
@@ -1328,7 +1328,7 @@ function InlineSectorStocks({ sectorIndex, label, year, month, onStockClick, act
                     {isPos && <div className="h-1.5 rounded-r-sm" style={{ width: `${barW}%`, background: color }} />}
                   </div>
                 </div>
-                <span className="text-[9px] font-bold tabular-nums w-11 text-right shrink-0" style={{ color }}>
+                <span className="text-[10px] font-bold tabular-nums w-11 text-right shrink-0" style={{ color }}>
                   {fmtPct(s.return_pct)}
                 </span>
               </button>
@@ -1472,7 +1472,7 @@ function InspectOverlay({ cell, onClose, onNavigate, onJump, dark, allYears, ind
       {/* ── Year + Month jumper strip ── */}
       {onJump && allYears?.length > 0 && (
         <div className="shrink-0 flex items-center gap-3 px-4 py-1.5 border-b border-gray-100 dark:border-gray-800 bg-gray-50/60 dark:bg-gray-950/40 overflow-x-auto">
-          <span className="text-[9px] font-bold uppercase tracking-widest text-gray-400 dark:text-gray-500 shrink-0">Year</span>
+          <span className="text-[10px] font-bold uppercase tracking-widest text-gray-400 dark:text-gray-500 shrink-0">Year</span>
           <div className="flex items-center gap-1 shrink-0">
             {[...allYears].sort((a, b) => b.year - a.year).map(y => (
               <button key={y.year}
@@ -1492,7 +1492,7 @@ function InspectOverlay({ cell, onClose, onNavigate, onJump, dark, allYears, ind
             ))}
           </div>
           <div className="w-px h-4 bg-gray-200 dark:bg-gray-700 shrink-0" />
-          <span className="text-[9px] font-bold uppercase tracking-widest text-gray-400 dark:text-gray-500 shrink-0">Month</span>
+          <span className="text-[10px] font-bold uppercase tracking-widest text-gray-400 dark:text-gray-500 shrink-0">Month</span>
           <div className="flex items-center gap-0.5 shrink-0">
             {MONTHS_EN.map((m, i) => {
               const yr = allYears.find(y => y.year === cell.year)
@@ -1558,7 +1558,7 @@ function InspectOverlay({ cell, onClose, onNavigate, onJump, dark, allYears, ind
 
       {/* Footer hint */}
       <div className="shrink-0 px-4 py-1.5 border-t border-gray-100 dark:border-gray-800 bg-white dark:bg-gray-900">
-        <span className="text-[9px] text-gray-500 dark:text-gray-500">
+        <span className="text-[10px] text-gray-500 dark:text-gray-500">
           ← → navigate months · Esc close · click sector → stocks · click stock → 3-mo chart
         </span>
       </div>
@@ -1589,7 +1589,7 @@ function AnnualBar({ year, annual, isRecent, isLatest }) {
   const opacity = isLatest ? 1 : isRecent ? 0.9 : 0.65
   return (
     <div className="flex items-center gap-1.5" style={{ opacity }}>
-      <span className={`text-[9px] font-bold w-8 shrink-0 text-right ${
+      <span className={`text-[10px] font-bold w-8 shrink-0 text-right ${
         isLatest ? 'text-blue-500' : isRecent ? 'text-gray-700 dark:text-gray-300' : 'text-gray-400 dark:text-gray-600'}`}>
         {year}
       </span>
@@ -1600,7 +1600,7 @@ function AnnualBar({ year, annual, isRecent, isLatest }) {
           : <div className="absolute right-1/2 h-2 rounded-l-sm" style={{ width: `${w / 2}%`, background: color }} />
         }
       </div>
-      <span className="text-[9px] font-bold w-11 text-right shrink-0" style={{ color }}>
+      <span className="text-[10px] font-bold w-11 text-right shrink-0" style={{ color }}>
         {fmtPct(annual)}
       </span>
     </div>
@@ -1744,7 +1744,7 @@ export default function InsightPage() {
     <div className="flex items-center gap-2 flex-nowrap whitespace-nowrap">
       {/* Mobile: index trigger */}
       <button
-        className="md:hidden flex items-center gap-1 px-2 py-0.5 rounded-md text-[9px] font-semibold border border-gray-200 dark:border-gray-700 text-gray-600 dark:text-gray-300"
+        className="md:hidden flex items-center gap-1 px-2 py-0.5 rounded-md text-[10px] font-semibold border border-gray-200 dark:border-gray-700 text-gray-600 dark:text-gray-300"
         onClick={() => setMobileLeftOpen(true)}
       >
         {INDEX_OPTIONS.find(o => o.id === selectedIndexId)?.label ?? 'Index'}
@@ -1763,7 +1763,7 @@ export default function InsightPage() {
       <div className="w-px h-3.5 bg-gray-200 dark:bg-gray-700 shrink-0 hidden sm:block" />
 
       {/* Year filter */}
-      <div className="flex rounded overflow-hidden border border-gray-200 dark:border-gray-700 text-[9px] font-bold">
+      <div className="flex rounded overflow-hidden border border-gray-200 dark:border-gray-700 text-[10px] font-bold">
         {[['all','All'],['10','10yr'],['5','5yr']].map(([v, lbl]) => (
           <button key={v} onClick={() => setYearFilter(v)}
             className={`px-1.5 py-0.5 transition-colors ${
@@ -1806,7 +1806,7 @@ export default function InsightPage() {
               <div className="flex items-center gap-1.5 bg-white/80 dark:bg-gray-900/80 backdrop-blur-sm
                               px-2.5 py-1 rounded-full border border-gray-200 dark:border-gray-700 shadow-sm">
                 <div className="w-3 h-3 border-[1.5px] border-blue-500 border-t-transparent rounded-full animate-spin" />
-                <span className="text-[9px] text-gray-500 dark:text-gray-400 font-medium">Updating…</span>
+                <span className="text-[10px] text-gray-500 dark:text-gray-400 font-medium">Updating…</span>
               </div>
             </div>
           )}
@@ -1845,16 +1845,16 @@ export default function InsightPage() {
                   <thead>
                     <tr>
                       <th className="text-left pb-1.5 pr-2 sticky left-0 z-20 bg-white dark:bg-gray-900 translate-x-0
-                        text-[9px] font-bold text-gray-500 dark:text-gray-400 uppercase tracking-wide w-10">
+                        text-[10px] font-bold text-gray-500 dark:text-gray-400 uppercase tracking-wide w-10">
                         Year
                       </th>
                       {LABELS.map((m, i) => (
-                        <th key={i} className="pb-1.5 text-center text-[9px] font-bold
+                        <th key={i} className="pb-1.5 text-center text-[10px] font-bold
                           text-gray-500 dark:text-gray-400 uppercase tracking-wide px-px min-w-[36px]">
                           {m}
                         </th>
                       ))}
-                      <th className="pb-1.5 text-right text-[9px] font-bold text-gray-500 dark:text-gray-400 uppercase tracking-wide pl-2 pr-1 min-w-[44px] border-l-2 border-gray-200 dark:border-gray-700">
+                      <th className="pb-1.5 text-right text-[10px] font-bold text-gray-500 dark:text-gray-400 uppercase tracking-wide pl-2 pr-1 min-w-[44px] border-l-2 border-gray-200 dark:border-gray-700">
                         YTD
                       </th>
                     </tr>
@@ -1875,7 +1875,7 @@ export default function InsightPage() {
                               ) : isRecent ? (
                                 <span className="text-[10px] font-bold text-gray-700 dark:text-gray-200 leading-none">{row.year}</span>
                               ) : (
-                                <span className="text-[9px] font-semibold text-gray-500 dark:text-gray-500 leading-none">{row.year}</span>
+                                <span className="text-[10px] font-semibold text-gray-500 dark:text-gray-500 leading-none">{row.year}</span>
                               )}
                               {isLatest && <span className="w-1 h-1 rounded-full bg-blue-400 shrink-0" />}
                             </div>
@@ -1921,7 +1921,7 @@ export default function InsightPage() {
                           })}
                           {/* YTD column */}
                           <td className="py-0.5 pl-2 pr-1 border-l-2 border-gray-200 dark:border-gray-700">
-                            <div className="text-right text-[9px] font-black tabular-nums"
+                            <div className="text-right text-[10px] font-black tabular-nums"
                               style={{ color: (row.annual ?? 0) >= 0 ? '#22c55e' : '#ef4444' }}>
                               {row.annual != null ? fmtPct(row.annual) : '—'}
                             </div>
@@ -1934,11 +1934,11 @@ export default function InsightPage() {
                     {wAvg.some(v => v != null) && (
                       <tr className="border-t-2 border-gray-200 dark:border-gray-700 bg-gray-100 dark:bg-gray-800">
                         <td className="py-1 pr-2 sticky left-0 z-10 bg-gray-100 dark:bg-gray-800 translate-x-0">
-                          <span className="text-[8px] font-black text-gray-500 dark:text-gray-400 uppercase tracking-widest whitespace-nowrap">Wtd Avg</span>
+                          <span className="text-[10px] font-black text-gray-500 dark:text-gray-400 uppercase tracking-widest whitespace-nowrap">Wtd Avg</span>
                         </td>
                         {wAvg.map((v, i) => (
                           <td key={i} className="py-0.5 px-px">
-                            <div className="w-full rounded text-center text-[9px] font-black tabular-nums"
+                            <div className="w-full rounded text-center text-[10px] font-black tabular-nums"
                               style={{ background: cellBg(v, dark), color: cellFg(v, dark), padding: '2px 1px', minWidth: 36 }}>
                               {v != null ? fmtPct(v) : '—'}
                             </div>
@@ -1952,7 +1952,7 @@ export default function InsightPage() {
                     {wWinRate.some(v => v != null) && (
                       <tr>
                         <td className="py-0.5 pr-2 sticky left-0 z-10 bg-white dark:bg-gray-900 translate-x-0">
-                          <span className="text-[8px] font-black text-gray-400 dark:text-gray-500 uppercase tracking-wide">Win%</span>
+                          <span className="text-[10px] font-black text-gray-400 dark:text-gray-500 uppercase tracking-wide">Win%</span>
                         </td>
                         {wWinRate.map((v, i) => {
                           const color = v >= 60 ? '#22c55e' : v >= 45 ? '#f59e0b' : '#ef4444'
@@ -1963,7 +1963,7 @@ export default function InsightPage() {
                               : (dark ? 'rgba(239,68,68,0.12)' : 'rgba(239,68,68,0.10)')
                           return (
                             <td key={i} className="py-0.5 px-px">
-                              <div className="w-full rounded text-center text-[9px] font-black"
+                              <div className="w-full rounded text-center text-[10px] font-black"
                                 style={{ background: bg, color, padding: '2px 1px' }}>
                                 {v != null ? v + '%' : '—'}
                               </div>
@@ -1978,11 +1978,11 @@ export default function InsightPage() {
                     {wStdDev.some(v => v != null) && (
                       <tr>
                         <td className="py-0.5 pr-2 sticky left-0 z-10 bg-white dark:bg-gray-900 translate-x-0">
-                          <span className="text-[8px] font-black text-gray-400 dark:text-gray-500 uppercase tracking-wide" title="Standard deviation">σ</span>
+                          <span className="text-[10px] font-black text-gray-400 dark:text-gray-500 uppercase tracking-wide" title="Standard deviation">σ</span>
                         </td>
                         {wStdDev.map((v, i) => (
                           <td key={i} className="py-0.5 px-px">
-                            <div className="w-full text-center text-[8px] font-bold tabular-nums text-gray-500 dark:text-gray-400"
+                            <div className="w-full text-center text-[10px] font-bold tabular-nums text-gray-500 dark:text-gray-400"
                               style={{ padding: '2px 1px' }}>
                               {v != null ? v.toFixed(1) : '—'}
                             </div>
@@ -1995,7 +1995,7 @@ export default function InsightPage() {
                 </table>
 
                 {/* Legend */}
-                <div className="flex items-center gap-3 mt-1.5 mb-3 text-[9px] text-gray-500 dark:text-gray-500 px-0.5 flex-wrap">
+                <div className="flex items-center gap-3 mt-1.5 mb-3 text-[10px] text-gray-500 dark:text-gray-500 px-0.5 flex-wrap">
                   <span className="flex items-center gap-1">
                     <span className="w-1 h-1 rounded-full bg-blue-400 inline-block" />
                     <span className="text-blue-400 font-bold">{curYear}</span> = live
@@ -2012,11 +2012,11 @@ export default function InsightPage() {
               <div className="mt-3 space-y-2">
                 <div className="flex items-center gap-2">
                   <div className="h-px flex-1 bg-gray-100 dark:bg-gray-800" />
-                  <span className="text-[8px] font-black text-gray-300 dark:text-gray-700 uppercase tracking-widest px-2">Annual Performance</span>
+                  <span className="text-[10px] font-black text-gray-300 dark:text-gray-700 uppercase tracking-widest px-2">Annual Performance</span>
                   <div className="h-px flex-1 bg-gray-100 dark:bg-gray-800" />
                 </div>
                 <div className="bg-gray-50/70 dark:bg-gray-800/40 rounded-xl p-3 border border-gray-100 dark:border-gray-800/60">
-                  <div className="text-[9px] text-gray-400 dark:text-gray-600 mb-2">
+                  <div className="text-[10px] text-gray-400 dark:text-gray-600 mb-2">
                     Brighter = more recent · dimmed = historical
                   </div>
                   <div className="space-y-px">

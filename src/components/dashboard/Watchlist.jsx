@@ -64,7 +64,7 @@ function EditWatchlistModal({ item, onClose, onSaved }) {
               ['Alert Date', 'alert_date', 'date'],
             ].map(([label, key, type]) => (
               <div key={key}>
-                <label className="block text-[9px] font-bold uppercase tracking-widest text-gray-400 mb-1">{label}</label>
+                <label className="block text-[10px] font-bold uppercase tracking-widest text-gray-400 mb-1">{label}</label>
                 <input
                   type={type}
                   value={form[key]}
@@ -75,7 +75,7 @@ function EditWatchlistModal({ item, onClose, onSaved }) {
             ))}
           </div>
           <div>
-            <label className="block text-[9px] font-bold uppercase tracking-widest text-gray-400 mb-1">Notes</label>
+            <label className="block text-[10px] font-bold uppercase tracking-widest text-gray-400 mb-1">Notes</label>
             <input
               type="text"
               value={form.notes}
@@ -85,7 +85,7 @@ function EditWatchlistModal({ item, onClose, onSaved }) {
             />
           </div>
           <div>
-            <label className="block text-[9px] font-bold uppercase tracking-widest text-gray-400 mb-1">Category</label>
+            <label className="block text-[10px] font-bold uppercase tracking-widest text-gray-400 mb-1">Category</label>
             <select
               value={form.category}
               onChange={e => setForm(f => ({ ...f, category: e.target.value }))}

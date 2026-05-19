@@ -10,11 +10,11 @@ function KpiCard({ label, value, valueClass = 'text-gray-900 dark:text-white', s
   return (
     <div className="bg-white dark:bg-gray-900 rounded-xl border border-gray-100 dark:border-gray-800 px-4 py-3.5 flex flex-col gap-0.5">
       <div className="flex items-center justify-between mb-1">
-        <p className="text-[9px] uppercase tracking-widest font-bold text-gray-400">{label}</p>
+        <p className="text-[10px] uppercase tracking-widest font-bold text-gray-400">{label}</p>
         {icon && <span className="text-[13px]">{icon}</span>}
       </div>
       <p className={`text-[15px] font-black tracking-tight tabular-nums leading-tight ${valueClass}`}>{value}</p>
-      {sub && <p className="text-[9px] text-gray-400 mt-0.5">{sub}</p>}
+      {sub && <p className="text-[10px] text-gray-400 mt-0.5">{sub}</p>}
     </div>
   )
 }
@@ -455,7 +455,7 @@ export default function AuditTab() {
         <>
           {/* ── KPI Grid Row 1: Core ── */}
           <div>
-            <p className="text-[9px] uppercase tracking-widest font-bold text-gray-400 mb-2">Performance</p>
+            <p className="text-[10px] uppercase tracking-widest font-bold text-gray-400 mb-2">Performance</p>
             <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
               <KpiCard
                 label="Total Trades"
@@ -489,7 +489,7 @@ export default function AuditTab() {
 
           {/* ── KPI Grid Row 2: P&L Breakdown ── */}
           <div>
-            <p className="text-[9px] uppercase tracking-widest font-bold text-gray-400 mb-2">P&L Breakdown</p>
+            <p className="text-[10px] uppercase tracking-widest font-bold text-gray-400 mb-2">P&L Breakdown</p>
             <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
               <KpiCard
                 label="Gross Profit"
@@ -515,7 +515,7 @@ export default function AuditTab() {
           {/* ── KPI Grid Row 3: Tax & Fees ── */}
           {!isForex && (
             <div>
-              <p className="text-[9px] uppercase tracking-widest font-bold text-gray-400 mb-2">Tax & Fees (Nepal)</p>
+              <p className="text-[10px] uppercase tracking-widest font-bold text-gray-400 mb-2">Tax & Fees (Nepal)</p>
               <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
                 <KpiCard
                   label="Est. Broker Fees"
@@ -536,7 +536,7 @@ export default function AuditTab() {
                   sub="P&L − fees − CGT"
                 />
               </div>
-              <p className="text-[9px] text-gray-400 mt-1.5 px-0.5">
+              <p className="text-[10px] text-gray-400 mt-1.5 px-0.5">
                 Estimates only. Nepal CGT: short-term (&lt;365d) 7.5%, long-term (≥365d) 5%. Fiscal year Jul 16–Jul 15. Consult a tax advisor.
               </p>
             </div>
@@ -544,7 +544,7 @@ export default function AuditTab() {
 
           {/* ── KPI Grid Row 4: Risk & Timing ── */}
           <div>
-            <p className="text-[9px] uppercase tracking-widest font-bold text-gray-400 mb-2">Risk & Timing</p>
+            <p className="text-[10px] uppercase tracking-widest font-bold text-gray-400 mb-2">Risk & Timing</p>
             <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
               <KpiCard
                 label="Avg R:R"
@@ -575,16 +575,16 @@ export default function AuditTab() {
           {/* ── Best / Worst ── */}
           {(kpis.bestTrade || kpis.worstTrade) && (
             <div>
-              <p className="text-[9px] uppercase tracking-widest font-bold text-gray-400 mb-2">Best & Worst Trade</p>
+              <p className="text-[10px] uppercase tracking-widest font-bold text-gray-400 mb-2">Best & Worst Trade</p>
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
                 {kpis.bestTrade && (
                   <div className="bg-white dark:bg-gray-900 rounded-xl border border-emerald-100 dark:border-emerald-800/30 px-4 py-3 flex items-center justify-between">
                     <div className="flex items-center gap-3">
                       <div className="w-1.5 h-8 rounded-full bg-emerald-400 flex-shrink-0" />
                       <div>
-                        <p className="text-[9px] uppercase tracking-widest font-bold text-gray-400">Best Trade</p>
+                        <p className="text-[10px] uppercase tracking-widest font-bold text-gray-400">Best Trade</p>
                         <p className="text-[13px] font-bold text-gray-900 dark:text-white mt-0.5">{kpis.bestTrade.symbol}</p>
-                        <p className="text-[9px] text-gray-400">{kpis.bestTrade.date} · {kpis.bestTrade.position}</p>
+                        <p className="text-[10px] text-gray-400">{kpis.bestTrade.date} · {kpis.bestTrade.position}</p>
                       </div>
                     </div>
                     <p className="text-[15px] font-black text-emerald-500 tabular-nums">{fmtPnl(parseFloat(kpis.bestTrade.realized_pnl) || 0)}</p>
@@ -595,9 +595,9 @@ export default function AuditTab() {
                     <div className="flex items-center gap-3">
                       <div className="w-1.5 h-8 rounded-full bg-red-400 flex-shrink-0" />
                       <div>
-                        <p className="text-[9px] uppercase tracking-widest font-bold text-gray-400">Worst Trade</p>
+                        <p className="text-[10px] uppercase tracking-widest font-bold text-gray-400">Worst Trade</p>
                         <p className="text-[13px] font-bold text-gray-900 dark:text-white mt-0.5">{kpis.worstTrade.symbol}</p>
-                        <p className="text-[9px] text-gray-400">{kpis.worstTrade.date} · {kpis.worstTrade.position}</p>
+                        <p className="text-[10px] text-gray-400">{kpis.worstTrade.date} · {kpis.worstTrade.position}</p>
                       </div>
                     </div>
                     <p className="text-[15px] font-black text-red-400 tabular-nums">{fmtPnl(parseFloat(kpis.worstTrade.realized_pnl) || 0)}</p>
@@ -610,7 +610,7 @@ export default function AuditTab() {
           {/* ── Equity sparkline ── */}
           {kpis.equityCurve.length > 1 && (
             <div>
-              <p className="text-[9px] uppercase tracking-widest font-bold text-gray-400 mb-2">Cumulative Equity Curve</p>
+              <p className="text-[10px] uppercase tracking-widest font-bold text-gray-400 mb-2">Cumulative Equity Curve</p>
               <div className="bg-white dark:bg-gray-900 rounded-xl border border-gray-100 dark:border-gray-800 p-4">
                 {(() => {
                   const pts  = kpis.equityCurve
@@ -650,9 +650,9 @@ export default function AuditTab() {
                   )
                 })()}
                 <div className="flex items-center justify-between mt-2">
-                  <span className="text-[9px] text-gray-400">{applied.from}</span>
+                  <span className="text-[10px] text-gray-400">{applied.from}</span>
                   <span className={`text-[11px] font-bold tabular-nums ${pnlColor(kpis.netPnl)}`}>{fmtPnl(kpis.netPnl)}</span>
-                  <span className="text-[9px] text-gray-400">{applied.to}</span>
+                  <span className="text-[10px] text-gray-400">{applied.to}</span>
                 </div>
               </div>
             </div>

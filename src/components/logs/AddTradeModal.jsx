@@ -397,7 +397,7 @@ export default function AddTradeModal({ onClose, onSaved, existingPosition }) {
                 <label className={LABEL}>
                   SL
                   {!slManual && form.sl && (
-                    <span className="ml-1.5 normal-case font-normal text-[9px] text-blue-400 dark:text-blue-500">auto</span>
+                    <span className="ml-1.5 normal-case font-normal text-[10px] text-blue-400 dark:text-blue-500">auto</span>
                   )}
                 </label>
                 <input type="number" value={form.sl}
@@ -413,7 +413,7 @@ export default function AddTradeModal({ onClose, onSaved, existingPosition }) {
                 <label className={LABEL}>
                   TP
                   {!tpManual && form.tp && (
-                    <span className="ml-1.5 normal-case font-normal text-[9px] text-blue-400 dark:text-blue-500">auto</span>
+                    <span className="ml-1.5 normal-case font-normal text-[10px] text-blue-400 dark:text-blue-500">auto</span>
                   )}
                 </label>
                 <input type="number" value={form.tp}

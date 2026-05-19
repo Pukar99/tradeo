@@ -112,7 +112,7 @@ function MiniSymbolSearch({ symbol, isIdx, onSelect }) {
               >
                 <div className="text-[11px] font-semibold text-gray-800 dark:text-gray-100 leading-tight">{item.label}</div>
                 {item.company_name && (
-                  <div className="text-[8px] text-gray-400 dark:text-gray-500 truncate leading-tight">{item.company_name}</div>
+                  <div className="text-[10px] text-gray-400 dark:text-gray-500 truncate leading-tight">{item.company_name}</div>
                 )}
               </li>
             ))}
@@ -310,7 +310,7 @@ const MiniChart = forwardRef(function MiniChart({ defaultSymbol = 'NEPSE', defau
               {parseFloat(close).toLocaleString('en-NP', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
             </span>
             {change != null && (
-              <span className={`text-[9px] font-bold whitespace-nowrap ${isPos ? 'text-emerald-500' : 'text-red-400'}`}>
+              <span className={`text-[10px] font-bold whitespace-nowrap ${isPos ? 'text-emerald-500' : 'text-red-400'}`}>
                 {isPos ? '▲' : '▼'}{Math.abs(parseFloat(change)).toFixed(2)}%
               </span>
             )}
@@ -324,7 +324,7 @@ const MiniChart = forwardRef(function MiniChart({ defaultSymbol = 'NEPSE', defau
           {[['candlestick', '≡'], ['line', '╱']].map(([type, icon]) => (
             <button key={type} onClick={() => setChartType(type)}
               title={type}
-              className={`px-1.5 py-0.5 rounded text-[9px] font-bold transition-colors ${
+              className={`px-1.5 py-0.5 rounded text-[10px] font-bold transition-colors ${
                 chartType === type
                   ? 'bg-white dark:bg-gray-700 text-gray-900 dark:text-white shadow-sm'
                   : 'text-gray-400 dark:text-gray-500'
@@ -338,7 +338,7 @@ const MiniChart = forwardRef(function MiniChart({ defaultSymbol = 'NEPSE', defau
         <div className="flex items-center gap-0.5">
           {TIMEFRAMES.map(tf => (
             <button key={tf} onClick={() => setTimeframe(tf)}
-              className={`px-1 py-0.5 rounded text-[8px] font-semibold transition-colors ${
+              className={`px-1 py-0.5 rounded text-[10px] font-semibold transition-colors ${
                 timeframe === tf
                   ? 'bg-blue-600 text-white'
                   : 'text-gray-400 dark:text-gray-500 hover:text-gray-600 dark:hover:text-gray-300'

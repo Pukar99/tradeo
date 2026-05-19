@@ -29,7 +29,7 @@ function Toast({ alert, onDismiss }) {
           </span>
         </p>
         {alert.pct_change != null && (
-          <p className={`text-[9px] font-semibold mt-0.5 ${alert.pct_change >= 0 ? 'text-emerald-500' : 'text-red-400'}`}>
+          <p className={`text-[10px] font-semibold mt-0.5 ${alert.pct_change >= 0 ? 'text-emerald-500' : 'text-red-400'}`}>
             {alert.pct_change >= 0 ? '+' : ''}{alert.pct_change.toFixed(2)}% today
           </p>
         )}

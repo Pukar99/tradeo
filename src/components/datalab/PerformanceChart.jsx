@@ -89,7 +89,7 @@ function nameSwings(raw) {
 
 // ── Shared design tokens ──────────────────────────────────────────────────────
 const CARD   = 'bg-white dark:bg-gray-900 rounded-2xl border border-gray-100 dark:border-gray-800'
-const LABEL  = 'text-[9px] font-bold uppercase tracking-widest text-gray-400'
+const LABEL  = 'text-[10px] font-bold uppercase tracking-widest text-gray-400'
 const STITLE = 'text-[11px] font-semibold text-gray-700 dark:text-gray-200'
 const SVAL   = 'text-[13px] font-bold tabular-nums'
 
@@ -225,8 +225,8 @@ function SymbolSearch({ value, onChange }) {
         >
           {/* Header hint */}
           <div className="px-3 py-1.5 border-b border-gray-100 dark:border-gray-800 flex items-center justify-between">
-            <span className="text-[9px] text-gray-400 font-medium">{flt.length} result{flt.length !== 1 ? 's' : ''}</span>
-            <span className="text-[9px] text-gray-300 dark:text-gray-700">↑↓ navigate · Enter select</span>
+            <span className="text-[10px] text-gray-400 font-medium">{flt.length} result{flt.length !== 1 ? 's' : ''}</span>
+            <span className="text-[10px] text-gray-300 dark:text-gray-700">↑↓ navigate · Enter select</span>
           </div>
           <ul ref={list} className="max-h-56 overflow-y-auto overscroll-contain bg-white dark:bg-gray-900 [scrollbar-width:thin] [&::-webkit-scrollbar]:w-1 [&::-webkit-scrollbar-thumb]:bg-gray-300 dark:[&::-webkit-scrollbar-thumb]:bg-gray-700 [&::-webkit-scrollbar-thumb]:rounded-full">
             {flt.map((s, i) => (
@@ -251,7 +251,7 @@ function SymbolSearch({ value, onChange }) {
                     {highlight(s.symbol, q)}
                   </div>
                   {s.company_name && (
-                    <div className="text-[9px] text-gray-400 truncate leading-tight">
+                    <div className="text-[10px] text-gray-400 truncate leading-tight">
                       {highlight(s.company_name, q)}
                     </div>
                   )}
@@ -419,11 +419,11 @@ function CycleItem({ swing, precomp, symbol, isActive, onClick, index }) {
       {/* Always visible: badge + name + NEPSE % */}
       <div className="flex items-center justify-between">
         <div className="flex items-center gap-1">
-          <span className={`text-[8px] font-black ${
+          <span className={`text-[10px] font-black ${
             isBull ? 'text-emerald-500' : 'text-red-400'
           }`}>{isBull ? '▲' : '▼'}</span>
           <span className="text-[10px] font-semibold text-gray-700 dark:text-gray-200">{swing.name}</span>
-          {swing.current && <span className="text-[7px] font-bold text-blue-500 uppercase">·Live</span>}
+          {swing.current && <span className="text-[9px] font-bold text-blue-500 uppercase">·Live</span>}
         </div>
         <span className={`text-[10px] font-bold tabular-nums ${(st.nRet ?? 0) >= 0 ? 'text-emerald-600 dark:text-emerald-400' : 'text-red-500'}`}>
           {fmtPct(st.nRet)}
@@ -434,7 +434,7 @@ function CycleItem({ swing, precomp, symbol, isActive, onClick, index }) {
       {isActive && (
         <div className="mt-2">
           {/* Period */}
-          <div className="text-[9px] text-gray-400 mb-2">
+          <div className="text-[10px] text-gray-400 mb-2">
             {fmtMonth(swing.from)} → {fmtMonth(swing.to)} · {fmtDays(swing.from, swing.to)}
           </div>
 
@@ -449,7 +449,7 @@ function CycleItem({ swing, precomp, symbol, isActive, onClick, index }) {
               const close = +nepseSlice[nepseSlice.length - 1]?.close
               return (
                 <div className="bg-gray-50 dark:bg-gray-800/40 rounded-lg px-2 py-1.5 space-y-0.5">
-                  <div className="text-[8px] font-black uppercase tracking-widest text-blue-400 mb-1">NEPSE</div>
+                  <div className="text-[10px] font-black uppercase tracking-widest text-blue-400 mb-1">NEPSE</div>
                   {[
                     ['Open',  open?.toFixed(0),  null],
                     ['Close', close?.toFixed(0), (st.nRet ?? 0) >= 0 ? '#22c55e' : '#ef4444'],
@@ -458,8 +458,8 @@ function CycleItem({ swing, precomp, symbol, isActive, onClick, index }) {
                     ['Max DD', st.nepseDD != null ? fmtPct(st.nepseDD,1) : null, '#ef4444'],
                   ].map(([l, v, c]) => v != null && (
                     <div key={l} className="flex justify-between items-center gap-1">
-                      <span className="text-[8px] text-gray-400">{l}</span>
-                      <span className="text-[9px] font-bold tabular-nums" style={{ color: c || undefined }}>{v}</span>
+                      <span className="text-[10px] text-gray-400">{l}</span>
+                      <span className="text-[10px] font-bold tabular-nums" style={{ color: c || undefined }}>{v}</span>
                     </div>
                   ))}
                 </div>
@@ -474,7 +474,7 @@ function CycleItem({ swing, precomp, symbol, isActive, onClick, index }) {
               const close = +stockSlice[stockSlice.length - 1]?.close
               return (
                 <div className="bg-gray-50 dark:bg-gray-800/40 rounded-lg px-2 py-1.5 space-y-0.5">
-                  <div className="text-[8px] font-black uppercase tracking-widest mb-1" style={{ color: STOCK_C }}>{symbol}</div>
+                  <div className="text-[10px] font-black uppercase tracking-widest mb-1" style={{ color: STOCK_C }}>{symbol}</div>
                   {[
                     ['Open',  open?.toFixed(0),  null],
                     ['Close', close?.toFixed(0), (st.sRet ?? 0) >= 0 ? '#22c55e' : '#ef4444'],
@@ -483,8 +483,8 @@ function CycleItem({ swing, precomp, symbol, isActive, onClick, index }) {
                     ['Ret',   fmtPct(st.sRet),   (st.sRet ?? 0) >= 0 ? '#22c55e' : '#ef4444'],
                   ].map(([l, v, c]) => v != null && (
                     <div key={l} className="flex justify-between items-center gap-1">
-                      <span className="text-[8px] text-gray-400">{l}</span>
-                      <span className="text-[9px] font-bold tabular-nums" style={{ color: c || undefined }}>{v}</span>
+                      <span className="text-[10px] text-gray-400">{l}</span>
+                      <span className="text-[10px] font-bold tabular-nums" style={{ color: c || undefined }}>{v}</span>
                     </div>
                   ))}
                 </div>
@@ -494,7 +494,7 @@ function CycleItem({ swing, precomp, symbol, isActive, onClick, index }) {
             {/* Symbol selected but no data */}
             {symbol && stockSlice.length === 0 && (
               <div className="bg-gray-50 dark:bg-gray-800/40 rounded-lg px-2 py-1.5 flex items-center justify-center">
-                <span className="text-[8px] text-gray-300 dark:text-gray-700">No data</span>
+                <span className="text-[10px] text-gray-300 dark:text-gray-700">No data</span>
               </div>
             )}
           </div>
@@ -598,7 +598,7 @@ function CycleDetail({ swing, precomp, nepse, stock, symbol }) {
           <div className="flex items-center gap-1.5 min-w-0">
             <span className="w-2 h-2 rounded-full shrink-0" style={{ background: NEPSE_C }} />
             <span className={`${STITLE} shrink-0`}>NEPSE</span>
-            <span className={`text-[8px] font-black px-1.5 py-px rounded shrink-0 ${
+            <span className={`text-[10px] font-black px-1.5 py-px rounded shrink-0 ${
               isBull
                 ? 'bg-emerald-100 dark:bg-emerald-900/40 text-emerald-600 dark:text-emerald-400'
                 : 'bg-red-100 dark:bg-red-900/40 text-red-500'
@@ -757,7 +757,7 @@ function CycleRow({ cycle, nRet, sRet, symbol, max, isActive, isStart, onClick }
                    : 'bg-red-100   dark:bg-red-900/40   text-red-500   dark:text-red-400'}`}>
           {cycleChip(cycle)}
           {isStart && (
-            <span className="absolute -top-1 -right-1 text-[7px] font-black px-1 rounded-sm bg-amber-500 text-white leading-tight" title="Investment start">▶</span>
+            <span className="absolute -top-1 -right-1 text-[9px] font-black px-1 rounded-sm bg-amber-500 text-white leading-tight" title="Investment start">▶</span>
           )}
         </span>
 
@@ -765,26 +765,26 @@ function CycleRow({ cycle, nRet, sRet, symbol, max, isActive, isStart, onClick }
         <div className="flex-1 min-w-0 space-y-0.5">
           {/* NEPSE row */}
           <div className="flex items-center gap-1.5">
-            <span className="w-6 shrink-0 text-[7px] font-bold uppercase tracking-wider text-blue-400">NEP</span>
+            <span className="w-6 shrink-0 text-[9px] font-bold uppercase tracking-wider text-blue-400">NEP</span>
             <div className="relative flex-1 h-2 bg-gray-100 dark:bg-gray-800 rounded-sm overflow-hidden">
               <div className="absolute inset-y-0 left-1/2 w-px bg-gray-300 dark:bg-gray-600" />
               <div className="absolute top-0 h-full rounded-sm"
                 style={{ width: `${nBar.w}%`, left: `${nBar.left}%`, background: nBar.color }} />
             </div>
-            <span className={`w-12 shrink-0 text-right text-[9px] font-bold tabular-nums ${(nRet ?? 0) >= 0 ? 'text-emerald-500' : 'text-red-500'}`}>
+            <span className={`w-12 shrink-0 text-right text-[10px] font-bold tabular-nums ${(nRet ?? 0) >= 0 ? 'text-emerald-500' : 'text-red-500'}`}>
               {nRet == null ? '—' : `${nRet >= 0 ? '+' : ''}${nRet.toFixed(1)}%`}
             </span>
           </div>
           {/* Stock row */}
           {symbol && (
             <div className="flex items-center gap-1.5">
-              <span className="w-6 shrink-0 text-[7px] font-bold uppercase tracking-wider text-amber-500 truncate">{symbol.slice(0, 4)}</span>
+              <span className="w-6 shrink-0 text-[9px] font-bold uppercase tracking-wider text-amber-500 truncate">{symbol.slice(0, 4)}</span>
               <div className="relative flex-1 h-2 bg-gray-100 dark:bg-gray-800 rounded-sm overflow-hidden">
                 <div className="absolute inset-y-0 left-1/2 w-px bg-gray-300 dark:bg-gray-600" />
                 <div className="absolute top-0 h-full rounded-sm"
                   style={{ width: `${sBar.w}%`, left: `${sBar.left}%`, background: sBar.color }} />
               </div>
-              <span className={`w-12 shrink-0 text-right text-[9px] font-bold tabular-nums ${(sRet ?? 0) >= 0 ? 'text-emerald-500' : 'text-red-500'}`}>
+              <span className={`w-12 shrink-0 text-right text-[10px] font-bold tabular-nums ${(sRet ?? 0) >= 0 ? 'text-emerald-500' : 'text-red-500'}`}>
                 {sRet == null ? '—' : `${sRet >= 0 ? '+' : ''}${sRet.toFixed(1)}%`}
               </span>
             </div>
@@ -909,7 +909,7 @@ function CompareRightPanel({ symbol, swings, allStats, statsById, expanded, setE
       <div className={`${CARD} overflow-hidden`}>
         <div className="px-3 py-1.5 border-b border-gray-100 dark:border-gray-800 bg-gray-50/60 dark:bg-gray-800/30 flex items-center justify-between">
           <p className={STITLE}>Cycle Returns</p>
-          <span className="text-[8px] text-gray-400 normal-case">oldest → latest</span>
+          <span className="text-[10px] text-gray-400 normal-case">oldest → latest</span>
         </div>
         <div className="max-h-[280px] overflow-y-auto bg-white dark:bg-gray-900">
           {chrono.map(x => (
@@ -935,7 +935,7 @@ function CompareRightPanel({ symbol, swings, allStats, statsById, expanded, setE
             <p className={STITLE}>Compound Ladder</p>
             {startCycleId != null && (
               <button onClick={() => setStartCycleId(null)}
-                className="text-[9px] text-blue-500 hover:underline">Reset</button>
+                className="text-[10px] text-blue-500 hover:underline">Reset</button>
             )}
           </div>
           <div className="flex items-center gap-2">
@@ -950,7 +950,7 @@ function CompareRightPanel({ symbol, swings, allStats, statsById, expanded, setE
               }}
               className="w-20 text-[11px] font-semibold tabular-nums text-gray-800 dark:text-gray-100 bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-700 rounded px-1.5 py-0.5 focus:outline-none focus:border-blue-400"
             />
-            <span className="text-[9px] text-gray-400 ml-auto">
+            <span className="text-[10px] text-gray-400 ml-auto">
               from {swings.find(s => s.id === ladder[0]?.id)?.name || 'start'} → {swings.find(s => s.id === lastRow?.id)?.name || 'end'}
             </span>
           </div>
@@ -958,12 +958,12 @@ function CompareRightPanel({ symbol, swings, allStats, statsById, expanded, setE
 
         {/* Header row */}
         <div className="grid grid-cols-[40px_1fr_1fr] items-center gap-1 px-2 py-1.5 border-b border-gray-100 dark:border-gray-800 bg-gray-50/40 dark:bg-gray-800/20">
-          <span className="text-[8px] font-bold uppercase tracking-wider text-gray-400">Cycle</span>
+          <span className="text-[10px] font-bold uppercase tracking-wider text-gray-400">Cycle</span>
           <div className="text-right">
-            <p className="text-[8px] font-bold uppercase tracking-wider text-blue-400">NEPSE</p>
+            <p className="text-[10px] font-bold uppercase tracking-wider text-blue-400">NEPSE</p>
           </div>
           <div className="text-right">
-            <p className="text-[8px] font-bold uppercase tracking-wider text-amber-500 truncate">{symbol}</p>
+            <p className="text-[10px] font-bold uppercase tracking-wider text-amber-500 truncate">{symbol}</p>
           </div>
         </div>
 
@@ -986,17 +986,17 @@ function CompareRightPanel({ symbol, swings, allStats, statsById, expanded, setE
                            : 'bg-red-100   dark:bg-red-900/40   text-red-500   dark:text-red-400'}`}>
                   {cycleChip(row.cycle)}
                   {isStart && (
-                    <span className="absolute -top-1 -right-1 text-[7px] font-black px-1 rounded-sm bg-amber-500 text-white leading-tight" title="Investment start">▶</span>
+                    <span className="absolute -top-1 -right-1 text-[9px] font-black px-1 rounded-sm bg-amber-500 text-white leading-tight" title="Investment start">▶</span>
                   )}
                 </span>
                 <div className="text-right tabular-nums">
-                  <span className={`text-[9px] block ${row.nRet >= 0 ? 'text-emerald-500' : 'text-red-500'}`}>
+                  <span className={`text-[10px] block ${row.nRet >= 0 ? 'text-emerald-500' : 'text-red-500'}`}>
                     {row.nRet >= 0 ? '+' : ''}{row.nRet.toFixed(1)}%
                   </span>
                   <span className="text-[10px] font-bold text-gray-700 dark:text-gray-200">{fmtRs(row.nBal)}</span>
                 </div>
                 <div className="text-right tabular-nums">
-                  <span className={`text-[9px] block ${row.sRet >= 0 ? 'text-emerald-500' : 'text-red-500'}`}>
+                  <span className={`text-[10px] block ${row.sRet >= 0 ? 'text-emerald-500' : 'text-red-500'}`}>
                     {row.sRet >= 0 ? '+' : ''}{row.sRet.toFixed(1)}%
                   </span>
                   <span className="text-[10px] font-bold text-gray-700 dark:text-gray-200">{fmtRs(row.sBal)}</span>
@@ -1010,18 +1010,18 @@ function CompareRightPanel({ symbol, swings, allStats, statsById, expanded, setE
         {lastRow && (
           <div className="px-2 py-2 border-t border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-800/40">
             <div className="grid grid-cols-[40px_1fr_1fr] items-center gap-1">
-              <span className="text-[8px] font-bold uppercase tracking-wider text-gray-500">End</span>
+              <span className="text-[10px] font-bold uppercase tracking-wider text-gray-500">End</span>
               <div className="text-right">
                 <p className={`text-[11px] font-black tabular-nums ${finalNepsePct >= 0 ? 'text-emerald-500' : 'text-red-500'}`}>
                   {finalNepsePct >= 0 ? '+' : ''}{finalNepsePct.toFixed(1)}%
                 </p>
-                <p className="text-[9px] text-gray-500 tabular-nums">{fmtRs(lastRow.nBal)}</p>
+                <p className="text-[10px] text-gray-500 tabular-nums">{fmtRs(lastRow.nBal)}</p>
               </div>
               <div className="text-right">
                 <p className={`text-[11px] font-black tabular-nums ${finalStockPct >= 0 ? 'text-emerald-500' : 'text-red-500'}`}>
                   {finalStockPct >= 0 ? '+' : ''}{finalStockPct.toFixed(1)}%
                 </p>
-                <p className="text-[9px] text-gray-500 tabular-nums">{fmtRs(lastRow.sBal)}</p>
+                <p className="text-[10px] text-gray-500 tabular-nums">{fmtRs(lastRow.sBal)}</p>
               </div>
             </div>
             <div className="mt-1.5 text-center text-[10px] text-gray-500 dark:text-gray-400">
@@ -1141,7 +1141,7 @@ export default function PerformanceChart() {
         <div className="flex items-center bg-gray-100 dark:bg-gray-800 rounded-md p-0.5">
           {THRESHOLDS.map(t => (
             <button key={t} onClick={() => { setThreshold(t); setExpanded(null) }}
-              className={`px-1.5 py-0.5 rounded text-[9px] font-semibold transition-colors ${
+              className={`px-1.5 py-0.5 rounded text-[10px] font-semibold transition-colors ${
                 threshold === t
                   ? 'bg-white dark:bg-gray-700 text-gray-900 dark:text-white shadow-sm'
                   : 'text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-300'
@@ -1174,7 +1174,7 @@ export default function PerformanceChart() {
             <span className="text-red-400 font-bold">{bears.length}▼</span>
           </span>
           {symbol && winRateInfo && (
-            <div className={`flex items-center gap-1 shrink-0 px-2 py-0.5 rounded-full text-[9px] font-bold ${
+            <div className={`flex items-center gap-1 shrink-0 px-2 py-0.5 rounded-full text-[10px] font-bold ${
               winRateInfo.pct >= 50
                 ? 'bg-emerald-50 dark:bg-emerald-900/20 text-emerald-600 dark:text-emerald-400'
                 : 'bg-red-50 dark:bg-red-900/20 text-red-500'
@@ -1228,7 +1228,7 @@ export default function PerformanceChart() {
           <div className="shrink-0 flex border-b border-gray-100 dark:border-gray-800">
             {[['all', `All ${swings.length}`], ['bull', `▲ ${bulls.length}`], ['bear', `▼ ${bears.length}`]].map(([v, lbl]) => (
               <button key={v} onClick={() => setCycleFilter(v)}
-                className={`flex-1 py-1 text-[9px] font-bold transition-colors ${
+                className={`flex-1 py-1 text-[10px] font-bold transition-colors ${
                   cycleFilter === v
                     ? v === 'bull' ? 'text-emerald-500 border-b-2 border-emerald-500'
                     : v === 'bear' ? 'text-red-400 border-b-2 border-red-400'
@@ -1253,7 +1253,7 @@ export default function PerformanceChart() {
             <svg className="w-8 h-8 text-gray-200 dark:text-gray-800" fill="none" viewBox="0 0 24 24" stroke="currentColor">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1} d="M13 7h8m0 0v8m0-8l-8 8-4-4-6 6" />
             </svg>
-            <p className="text-[9px] text-gray-400">No swings at {threshold}%</p>
+            <p className="text-[10px] text-gray-400">No swings at {threshold}%</p>
           </div>
         )}
 
@@ -1271,7 +1271,7 @@ export default function PerformanceChart() {
             />
           ))}
           {filteredSwings.length === 0 && swings.length > 0 && (
-            <div className="flex items-center justify-center py-8 text-[9px] text-gray-400">
+            <div className="flex items-center justify-center py-8 text-[10px] text-gray-400">
               No {cycleFilter} cycles
             </div>
           )}
@@ -1288,7 +1288,7 @@ export default function PerformanceChart() {
             <div className="h-full flex flex-col items-center justify-center gap-3 px-4 text-center">
               <div className="w-6 h-6 border-2 border-blue-500 border-t-transparent rounded-full animate-spin" />
               <p className="text-[11px] text-gray-500 dark:text-gray-400">Detecting cycles…</p>
-              <p className="text-[9px] text-gray-400 dark:text-gray-600">First load on Render free tier can take ~30s</p>
+              <p className="text-[10px] text-gray-400 dark:text-gray-600">First load on Render free tier can take ~30s</p>
             </div>
           ) : error ? (
             // Error
@@ -1309,7 +1309,7 @@ export default function PerformanceChart() {
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1} d="M13 7h8m0 0v8m0-8l-8 8-4-4-6 6" />
               </svg>
               <p className="text-[11px] text-gray-500 dark:text-gray-400">No bull/bear cycles at <span className="font-bold tabular-nums">{threshold}%</span> threshold</p>
-              <p className="text-[9px] text-gray-400 dark:text-gray-600">Try a smaller threshold from the toolbar above</p>
+              <p className="text-[10px] text-gray-400 dark:text-gray-600">Try a smaller threshold from the toolbar above</p>
             </div>
           ) : (
             // Has cycles, none selected yet

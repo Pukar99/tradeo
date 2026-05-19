@@ -54,7 +54,7 @@ export default function SLTPUpdateModal({ session, order, onClose, onUpdated }) 
 
         <div className="flex flex-col gap-2 text-[11px]">
           <div>
-            <label className="text-[9px] font-semibold text-gray-400 uppercase">Stop-Loss (Rs.)</label>
+            <label className="text-[10px] font-semibold text-gray-400 uppercase">Stop-Loss (Rs.)</label>
             <input
               type="number"
               value={sl}
@@ -64,11 +64,11 @@ export default function SLTPUpdateModal({ session, order, onClose, onUpdated }) 
                 slValid ? 'border-gray-200 dark:border-gray-700 focus:ring-red-400' : 'border-red-400 focus:ring-red-500'
               }`}
             />
-            {!slValid && <div className="text-[9px] text-red-500 mt-0.5">Must be below Rs.{ep}</div>}
+            {!slValid && <div className="text-[10px] text-red-500 mt-0.5">Must be below Rs.{ep}</div>}
           </div>
 
           <div>
-            <label className="text-[9px] font-semibold text-gray-400 uppercase">Take-Profit (Rs.)</label>
+            <label className="text-[10px] font-semibold text-gray-400 uppercase">Take-Profit (Rs.)</label>
             <input
               type="number"
               value={tp}
@@ -78,11 +78,11 @@ export default function SLTPUpdateModal({ session, order, onClose, onUpdated }) 
                 tpValid ? 'border-gray-200 dark:border-gray-700 focus:ring-green-400' : 'border-red-400 focus:ring-red-500'
               }`}
             />
-            {!tpValid && <div className="text-[9px] text-red-500 mt-0.5">Must be above Rs.{ep}</div>}
+            {!tpValid && <div className="text-[10px] text-red-500 mt-0.5">Must be above Rs.{ep}</div>}
           </div>
         </div>
 
-        {!bothNeq && <div className="text-[9px] text-red-500 mt-1">SL and TP cannot be equal</div>}
+        {!bothNeq && <div className="text-[10px] text-red-500 mt-1">SL and TP cannot be equal</div>}
 
         {error && (
           <div className="mt-2 text-[10px] text-red-500 bg-red-50 dark:bg-red-900/20 rounded px-2 py-1.5">{error}</div>

@@ -305,7 +305,7 @@ export default function BacktestChart({ candles, cursorIndex, positions }) {
       )}
 
       {/* Legend for SL/TP/Entry lines */}
-      <div className="absolute top-1.5 right-2 z-10 pointer-events-none select-none flex gap-2 text-[9px]">
+      <div className="absolute top-1.5 right-2 z-10 pointer-events-none select-none flex gap-2 text-[10px]">
         <span className="flex items-center gap-1"><span className="inline-block w-3 h-0.5 bg-blue-500" /> Entry</span>
         <span className="flex items-center gap-1"><span className="inline-block w-3 h-0.5 bg-red-500" style={{ borderTop: '1px dashed #ef4444', background: 'none' }} /> SL</span>
         <span className="flex items-center gap-1"><span className="inline-block w-3 h-0.5 bg-green-500" style={{ borderTop: '1px dashed #22c55e', background: 'none' }} /> TP</span>

@@ -209,17 +209,17 @@ function ResearchViewPage() {
           {/* Badges */}
           <div className="flex items-center gap-1.5 mb-4">
             {post.is_pinned && (
-              <span className="text-[9px] font-semibold px-2 py-0.5 rounded-full bg-emerald-50 dark:bg-emerald-900/30 text-emerald-600 dark:text-emerald-400 uppercase tracking-wide">
+              <span className="text-[10px] font-semibold px-2 py-0.5 rounded-full bg-emerald-50 dark:bg-emerald-900/30 text-emerald-600 dark:text-emerald-400 uppercase tracking-wide">
                 Distinguished
               </span>
             )}
             {post.is_verified && !post.is_pinned && (
-              <span className="text-[9px] font-semibold px-2 py-0.5 rounded-full bg-blue-50 dark:bg-blue-900/30 text-blue-600 dark:text-blue-400 uppercase tracking-wide">
+              <span className="text-[10px] font-semibold px-2 py-0.5 rounded-full bg-blue-50 dark:bg-blue-900/30 text-blue-600 dark:text-blue-400 uppercase tracking-wide">
                 Verified
               </span>
             )}
             {post.is_admin_post && (
-              <span className="text-[9px] font-semibold px-2 py-0.5 rounded-full bg-purple-50 dark:bg-purple-900/30 text-purple-600 dark:text-purple-400 uppercase tracking-wide">
+              <span className="text-[10px] font-semibold px-2 py-0.5 rounded-full bg-purple-50 dark:bg-purple-900/30 text-purple-600 dark:text-purple-400 uppercase tracking-wide">
                 Admin
               </span>
             )}
@@ -346,14 +346,14 @@ function ResearchViewPage() {
                 <div className="flex-1">
                   <div className="flex items-baseline gap-2 mb-1">
                     <span className="text-[11px] font-semibold text-gray-800 dark:text-gray-200">{c.author?.name || 'Unknown'}</span>
-                    <span className="text-[9px] text-gray-400">{formatDate(c.created_at)}</span>
+                    <span className="text-[10px] text-gray-400">{formatDate(c.created_at)}</span>
                   </div>
                   <p className="text-[11px] text-gray-600 dark:text-gray-300 leading-relaxed">{c.content}</p>
                 </div>
                 {(isAdmin || c.user_id === user?.id) && (
                   <button
                     onClick={() => handleDeleteComment(c.id)}
-                    className="opacity-0 group-hover:opacity-100 text-[9px] text-red-400 hover:text-red-500 transition-all self-start mt-1"
+                    className="opacity-0 group-hover:opacity-100 text-[10px] text-red-400 hover:text-red-500 transition-all self-start mt-1"
                   >
                     Delete
                   </button>

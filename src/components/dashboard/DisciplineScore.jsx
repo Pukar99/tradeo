@@ -47,7 +47,7 @@ function DimBar({ label, score, extra }) {
       <div className="flex items-center justify-between">
         <div className="flex items-center gap-1.5">
           <span className="text-[10px] text-gray-500 dark:text-gray-400">{label}</span>
-          {extra && <span className="text-[9px] text-gray-400 dark:text-gray-600">({extra})</span>}
+          {extra && <span className="text-[10px] text-gray-400 dark:text-gray-600">({extra})</span>}
         </div>
         <div className="flex items-center gap-1.5">
           <span className="text-[10px] font-semibold text-gray-700 dark:text-gray-200">{score}%</span>
@@ -135,7 +135,7 @@ function DisciplineScore({ initData }) {
       <div className="flex items-start gap-4">
         <div className="flex flex-col items-center gap-1">
           <Ring score={score} />
-          <span className="text-[9px] text-gray-400 text-center leading-tight">
+          <span className="text-[10px] text-gray-400 text-center leading-tight">
             composite<br/>score
           </span>
         </div>

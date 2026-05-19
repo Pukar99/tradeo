@@ -12,7 +12,7 @@ import { useToolbarSlot } from '../../pages/DataLabPage'
 // DESIGN TOKENS
 // ─────────────────────────────────────────────────────────────────────────────
 const CARD   = 'bg-white dark:bg-gray-900 rounded-2xl border border-gray-100 dark:border-gray-800'
-const LABEL  = 'text-[9px] font-bold uppercase tracking-widest text-gray-400'
+const LABEL  = 'text-[10px] font-bold uppercase tracking-widest text-gray-400'
 const STITLE = 'text-[11px] font-semibold text-gray-700 dark:text-gray-200'
 const SVAL   = 'text-[13px] font-bold tabular-nums'
 
@@ -251,7 +251,7 @@ function PriceChart({ candles, startDate, endDate, type = 'bear', dark, label = 
             borderColor: dark ? '#334155' : '#e5e7eb',
             color: dark ? '#f1f5f9' : '#1e293b',
           }}>
-          <div className="font-semibold mb-1 text-[9px]" style={{ color: dark ? '#94a3b8' : '#64748b' }}>
+          <div className="font-semibold mb-1 text-[10px]" style={{ color: dark ? '#94a3b8' : '#64748b' }}>
             {hoverCandle.date}
           </div>
           <div className="flex gap-2.5">
@@ -259,12 +259,12 @@ function PriceChart({ candles, startDate, endDate, type = 'bear', dark, label = 
             <span className="text-gray-400">C <span className="font-bold text-[11px]">{(+hoverCandle.close).toLocaleString()}</span></span>
           </div>
           {hover >= zoneStart && hover <= zoneEnd && (
-            <div style={{ color: zoneColor }} className="text-[9px] mt-0.5 font-medium">
+            <div style={{ color: zoneColor }} className="text-[10px] mt-0.5 font-medium">
               {type === 'bear' ? 'Drop' : 'Run'} day {hover - zoneStart + 1}
             </div>
           )}
           {hover > zoneEnd && (
-            <div className="text-[9px] mt-0.5 text-emerald-500">Recovery day {hover - zoneEnd}</div>
+            <div className="text-[10px] mt-0.5 text-emerald-500">Recovery day {hover - zoneEnd}</div>
           )}
         </div>
       )}
@@ -492,7 +492,7 @@ function SectorCycleMatrix({ cycles, activeCycle, onCycleSelect, dark }) {
         <thead>
           <tr>
             {/* Sticky left: Sector name column. z-30 so it covers both the regular cycle cells AND the active-cycle inset rings. */}
-            <th className="px-2 py-1.5 text-left text-[9px] font-semibold text-gray-400 whitespace-nowrap sticky left-0 bg-white dark:bg-gray-900 z-30 shadow-[1px_0_0_0_rgba(0,0,0,0.04)] dark:shadow-[1px_0_0_0_rgba(255,255,255,0.04)]">Sector</th>
+            <th className="px-2 py-1.5 text-left text-[10px] font-semibold text-gray-400 whitespace-nowrap sticky left-0 bg-white dark:bg-gray-900 z-30 shadow-[1px_0_0_0_rgba(0,0,0,0.04)] dark:shadow-[1px_0_0_0_rgba(255,255,255,0.04)]">Sector</th>
             {cycles.map((c, ci) => {
               const isBull   = c.type === 'bull'
               const isActive = ci === activeIdx
@@ -502,7 +502,7 @@ function SectorCycleMatrix({ cycles, activeCycle, onCycleSelect, dark }) {
                   key={ci}
                   onClick={() => onCycleSelect?.(c)}
                   title={`${c.name || (isBull ? '▲' : '▼')} · ${c.start_date} → ${c.end_date} (${c.pct >= 0 ? '+' : ''}${c.pct?.toFixed(1)}%)`}
-                  className={`px-1.5 py-1 text-center text-[9px] font-bold tabular-nums cursor-pointer transition-colors min-w-[52px]
+                  className={`px-1.5 py-1 text-center text-[10px] font-bold tabular-nums cursor-pointer transition-colors min-w-[52px]
                     ${isActive
                       ? isBull
                         ? 'bg-emerald-100 dark:bg-emerald-900/40 text-emerald-700 dark:text-emerald-300'
@@ -512,12 +512,12 @@ function SectorCycleMatrix({ cycles, activeCycle, onCycleSelect, dark }) {
                         : 'text-red-400 hover:bg-red-50 dark:hover:bg-red-950/30'
                     }`}>
                   <div className="whitespace-nowrap">{isBull ? '▲' : '▼'} {isBull ? 'Bull' : 'Bear'} {num}</div>
-                  <div className="text-[7px] font-normal opacity-70">{c.start_date?.slice(0, 7)}</div>
+                  <div className="text-[9px] font-normal opacity-70">{c.start_date?.slice(0, 7)}</div>
                 </th>
               )
             })}
             {/* Sticky right: Total column. Same z-30 so it stays above active rings. */}
-            <th className="px-2 py-1.5 text-center text-[9px] font-semibold text-gray-400 whitespace-nowrap sticky right-0 bg-white dark:bg-gray-900 z-30 border-l border-gray-200 dark:border-gray-700 shadow-[-1px_0_0_0_rgba(0,0,0,0.04)] dark:shadow-[-1px_0_0_0_rgba(255,255,255,0.04)]">Total</th>
+            <th className="px-2 py-1.5 text-center text-[10px] font-semibold text-gray-400 whitespace-nowrap sticky right-0 bg-white dark:bg-gray-900 z-30 border-l border-gray-200 dark:border-gray-700 shadow-[-1px_0_0_0_rgba(0,0,0,0.04)] dark:shadow-[-1px_0_0_0_rgba(255,255,255,0.04)]">Total</th>
           </tr>
         </thead>
         <tbody>
@@ -534,7 +534,7 @@ function SectorCycleMatrix({ cycles, activeCycle, onCycleSelect, dark }) {
                   const isActive = ci === activeIdx
                   return (
                     <td key={ci} className="px-0.5 py-0.5 text-center">
-                      <div className="rounded text-[9px] font-semibold tabular-nums py-0.5 mx-0.5"
+                      <div className="rounded text-[10px] font-semibold tabular-nums py-0.5 mx-0.5"
                         style={{
                           background: heatColor(pct, dark),
                           color: pct == null ? (dark ? '#4b5563' : '#d1d5db') : (dark ? '#f1f5f9' : '#1e293b'),
@@ -574,7 +574,7 @@ function SectorMatrix({ rows, activeSectorName, onRowClick, cycleType, sortBy, s
       style={{ width: w }}
     >
       <span>{label}</span>
-      <span className="text-[8px] opacity-60">
+      <span className="text-[10px] opacity-60">
         {sortBy === col ? (sortAsc ? '▲' : '▼') : '·'}
       </span>
     </button>
@@ -721,7 +721,7 @@ function StockList({ stocks, loading, onSelect, selected }) {
 
   const SortTh = ({ col, label, right }) => (
     <th onClick={() => toggleSort(col)}
-      className={`px-2 py-1.5 text-[9px] font-semibold uppercase tracking-wide text-gray-400 cursor-pointer hover:text-gray-600 dark:hover:text-gray-300 select-none whitespace-nowrap ${right ? 'text-right' : 'text-left'}`}>
+      className={`px-2 py-1.5 text-[10px] font-semibold uppercase tracking-wide text-gray-400 cursor-pointer hover:text-gray-600 dark:hover:text-gray-300 select-none whitespace-nowrap ${right ? 'text-right' : 'text-left'}`}>
       {label}{sortBy === col ? (sortAsc ? ' ↑' : ' ↓') : ''}
     </th>
   )
@@ -751,7 +751,7 @@ function StockList({ stocks, loading, onSelect, selected }) {
             >
               <td className="px-2 py-1.5">
                 <span className={STITLE}>{s.symbol}</span>
-                <div className="text-[9px] text-gray-400 truncate max-w-[120px]">{s.company_name}</div>
+                <div className="text-[10px] text-gray-400 truncate max-w-[120px]">{s.company_name}</div>
               </td>
               <td className="px-2 py-1.5 text-right">
                 <span className={`text-[11px] font-bold tabular-nums ${pctTextCls(s.drop_pct)}`}>
@@ -765,8 +765,8 @@ function StockList({ stocks, loading, onSelect, selected }) {
               </td>
               <td className="px-2 py-1.5 text-right">
                 {s.fully_recovered
-                  ? <span className="text-[9px] text-emerald-500 font-semibold tabular-nums">{s.recovery_days}d</span>
-                  : <span className="text-[9px] text-gray-300 dark:text-gray-600">—</span>
+                  ? <span className="text-[10px] text-emerald-500 font-semibold tabular-nums">{s.recovery_days}d</span>
+                  : <span className="text-[10px] text-gray-300 dark:text-gray-600">—</span>
                 }
               </td>
             </tr>
@@ -970,14 +970,14 @@ function CyclePill({ cycle, active, onClick }) {
         }`}
     >
       <div className="flex items-center justify-between mb-0.5">
-        <span className={`text-[9px] font-bold ${isBear ? 'text-red-500' : 'text-emerald-500'}`}>
+        <span className={`text-[10px] font-bold ${isBear ? 'text-red-500' : 'text-emerald-500'}`}>
           {isBear ? '▼' : '▲'} {cycle.name || (isBear ? 'Bear' : 'Bull')}
         </span>
         <span className={`text-[10px] font-black tabular-nums ${isBear ? 'text-red-500' : 'text-emerald-500'}`}>
           {cycle.pct >= 0 ? '+' : ''}{cycle.pct?.toFixed(1)}%
         </span>
       </div>
-      <div className="flex items-center justify-between text-[9px]">
+      <div className="flex items-center justify-between text-[10px]">
         <span className="text-gray-500 dark:text-gray-400">
           <span className="font-mono text-gray-400">{cycle.start_date?.slice(0, 4)}</span> · {cycle.duration_days}d
           {isBear && (
@@ -986,7 +986,7 @@ function CyclePill({ cycle, active, onClick }) {
               : <span className="text-amber-500"> · Open</span>
           )}
         </span>
-        <span className={`px-1 rounded-sm text-[8px] font-semibold ${phaseTone}`}>{cycle.phase}</span>
+        <span className={`px-1 rounded-sm text-[10px] font-semibold ${phaseTone}`}>{cycle.phase}</span>
       </div>
     </button>
   )
@@ -998,7 +998,7 @@ const IndexSelector = memo(function IndexSelector({ options, activeId, onSelect 
     <div className="flex items-center gap-1 flex-nowrap">
       {options.map(opt => (
         <button key={opt.id} onClick={() => onSelect(opt.id)}
-          className={`px-2 py-0.5 rounded text-[9px] font-semibold transition-colors ${
+          className={`px-2 py-0.5 rounded text-[10px] font-semibold transition-colors ${
             opt.id === activeId
               ? 'bg-gray-900 dark:bg-white text-white dark:text-gray-900'
               : 'text-gray-500 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-gray-800'
@@ -1264,7 +1264,7 @@ export default function BreakdownPage() {
           className="w-10 text-[10px] font-semibold text-center border border-gray-200 dark:border-gray-700 rounded px-1 py-0.5 dark:bg-gray-900 dark:text-gray-100 focus:outline-none focus:ring-1 focus:ring-gray-400" />
         <span className={`${LABEL} normal-case`}>%</span>
         <button onClick={() => detectCycles(threshold, indexId)} disabled={detecting}
-          className="px-2 py-0.5 rounded text-[9px] font-semibold bg-gray-900 dark:bg-gray-100 text-white dark:text-gray-900 hover:opacity-80 disabled:opacity-40 transition-opacity">
+          className="px-2 py-0.5 rounded text-[10px] font-semibold bg-gray-900 dark:bg-gray-100 text-white dark:text-gray-900 hover:opacity-80 disabled:opacity-40 transition-opacity">
           {detecting ? '…' : 'Detect'}
         </button>
       </div>
@@ -1276,7 +1276,7 @@ export default function BreakdownPage() {
       )}
 
       {cycles.length > 0 && (
-        <button className="lg:hidden flex items-center gap-1 px-2 py-0.5 rounded text-[9px] font-semibold border border-gray-200 dark:border-gray-700 text-gray-600 dark:text-gray-300"
+        <button className="lg:hidden flex items-center gap-1 px-2 py-0.5 rounded text-[10px] font-semibold border border-gray-200 dark:border-gray-700 text-gray-600 dark:text-gray-300"
           onClick={() => setMobileCycles(true)}>
           {activeCycle ? `${activeCycle.type === 'bear' ? '▼' : '▲'} ${activeCycle.name || activeCycle.start_date?.slice(0,7)}` : `Cycles (${cycles.length})`}
         </button>
@@ -1303,7 +1303,7 @@ export default function BreakdownPage() {
           <div className="shrink-0 flex border-b border-gray-100 dark:border-gray-800">
             {[['all','All'], ['bear','Bear'], ['bull','Bull']].map(([v, l]) => (
               <button key={v} onClick={() => setCycleFilter(v)}
-                className={`flex-1 py-1.5 text-[9px] font-semibold transition-colors
+                className={`flex-1 py-1.5 text-[10px] font-semibold transition-colors
                   ${cycleFilter === v
                     ? v === 'bear' ? 'text-red-500 border-b-2 border-red-500'
                     : v === 'bull' ? 'text-emerald-500 border-b-2 border-emerald-500'
@@ -1389,7 +1389,7 @@ export default function BreakdownPage() {
                   <span className={`text-[11px] font-black ${activeCycle.type === 'bull' ? 'text-emerald-600 dark:text-emerald-400' : 'text-red-600 dark:text-red-400'}`}>
                     {activeCycle.type === 'bull' ? '▲' : '▼'} {activeCycle.name || (activeCycle.type === 'bull' ? 'Bull' : 'Bear')}
                   </span>
-                  <span className={`text-[9px] font-bold px-1.5 py-0.5 rounded-full ${phaseCls(activeCycle.phase)}`}>{activeCycle.phase}</span>
+                  <span className={`text-[10px] font-bold px-1.5 py-0.5 rounded-full ${phaseCls(activeCycle.phase)}`}>{activeCycle.phase}</span>
                   <span className={`text-[15px] font-black tabular-nums ml-auto
                     ${activeCycle.type === 'bull' ? 'text-emerald-600 dark:text-emerald-400' : 'text-red-600 dark:text-red-400'}`}>
                     {activeCycle.pct >= 0 ? '+' : ''}{activeCycle.pct?.toFixed(1)}%
@@ -1399,7 +1399,7 @@ export default function BreakdownPage() {
                   <>
                     <div className="flex items-center gap-2 mb-1">
                       <button onClick={() => handleStockSelect(selectedStock)}
-                        className="text-[9px] text-gray-400">← back</button>
+                        className="text-[10px] text-gray-400">← back</button>
                       <span className="text-[11px] font-bold text-gray-800 dark:text-gray-100">{selectedStock.symbol}</span>
                     </div>
                     {stockLoading
@@ -1473,7 +1473,7 @@ export default function BreakdownPage() {
                   <span className={`text-[11px] font-black ${activeCycle.type === 'bull' ? 'text-emerald-700 dark:text-emerald-300' : 'text-red-700 dark:text-red-300'}`}>
                     {activeCycle.type === 'bull' ? '▲' : '▼'} {activeCycle.name || (activeCycle.type === 'bull' ? 'Bull' : 'Bear')}
                   </span>
-                  <span className={`text-[9px] font-bold px-1.5 py-0.5 rounded-full ${phaseCls(activeCycle.phase)}`}>
+                  <span className={`text-[10px] font-bold px-1.5 py-0.5 rounded-full ${phaseCls(activeCycle.phase)}`}>
                     {activeCycle.phase}
                   </span>
                   <span className={`text-[18px] font-black tabular-nums ml-auto
@@ -1527,7 +1527,7 @@ export default function BreakdownPage() {
                     <div>
                       <div className="flex items-center gap-2 mb-1">
                         <button onClick={() => handleStockSelect(selectedStock)}
-                          className="text-[9px] text-gray-400 hover:text-gray-600">← back</button>
+                          className="text-[10px] text-gray-400 hover:text-gray-600">← back</button>
                         <span className="text-[11px] font-bold text-gray-800 dark:text-gray-100">{selectedStock.symbol}</span>
                         <span className={`text-[10px] font-bold ml-auto ${pctTextCls(selectedStock.drop_pct)}`}>
                           {selectedStock.drop_pct != null ? `${selectedStock.drop_pct >= 0 ? '+' : ''}${selectedStock.drop_pct.toFixed(1)}%` : ''}
@@ -1583,7 +1583,7 @@ export default function BreakdownPage() {
                       <span className={STITLE}>
                         {activeSector.index_name.replace(' Sub-Index','').replace(' Index','')}
                       </span>
-                      <span className="text-[9px] text-gray-400 ml-auto">click to chart</span>
+                      <span className="text-[10px] text-gray-400 ml-auto">click to chart</span>
                       <button onClick={() => handleSectorClick(activeSector)}
                         className="text-gray-300 hover:text-gray-500 text-[14px] leading-none">×</button>
                     </div>
@@ -1628,7 +1628,7 @@ export default function BreakdownPage() {
             <div className="shrink-0 flex border-b border-gray-100 dark:border-gray-800">
               {[['all','All'], ['bear','Bear'], ['bull','Bull']].map(([v, l]) => (
                 <button key={v} onClick={() => setCycleFilter(v)}
-                  className={`flex-1 py-2 text-[9px] font-semibold transition-colors
+                  className={`flex-1 py-2 text-[10px] font-semibold transition-colors
                     ${cycleFilter === v
                       ? v === 'bear' ? 'text-red-500 border-b-2 border-red-500'
                       : v === 'bull' ? 'text-emerald-500 border-b-2 border-emerald-500'
@@ -1657,7 +1657,7 @@ export default function BreakdownPage() {
 // ─────────────────────────────────────────────────────────────────────────────
 function PhaseChip({ label, n, cls }) {
   return (
-    <span className={`flex-1 inline-flex items-center justify-between px-1.5 py-0.5 rounded text-[9px] font-semibold ${cls}`}>
+    <span className={`flex-1 inline-flex items-center justify-between px-1.5 py-0.5 rounded text-[10px] font-semibold ${cls}`}>
       <span>{label}</span>
       <span className="tabular-nums">{n}</span>
     </span>
