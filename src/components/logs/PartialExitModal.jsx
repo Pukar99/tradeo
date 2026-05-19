@@ -84,6 +84,7 @@ export default function PartialExitModal({ position, onClose, onSaved }) {
     e.preventDefault()
     setError(null)
     if (!form.exit_quantity) return setError('Exit quantity is required')
+    if (!Number.isInteger(Number(form.exit_quantity)) || Number(form.exit_quantity) <= 0) return setError('Exit quantity must be a whole number')
     if (!form.exit_price)    return setError('Exit price is required')
     if (!form.date)          return setError('Date is required')
     if (exitQty >= totalQty) return setError('For a full close use "Close Position". Partial exit must leave some quantity.')
@@ -169,7 +170,7 @@ export default function PartialExitModal({ position, onClose, onSaved }) {
               <label className={LABEL}>Exit Qty (units)</label>
               <input type="number" value={form.exit_quantity}
                 onChange={e => set('exit_quantity', e.target.value)}
-                placeholder={`max ${totalQty - 1}`} min="1" max={totalQty - 1}
+                placeholder={`max ${totalQty - 1}`} min="1" step="1" max={totalQty - 1}
                 autoComplete="off" className={INPUT} />
             </div>
             <div className="col-span-2">

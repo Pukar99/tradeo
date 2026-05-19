@@ -252,6 +252,7 @@ export default function AddTradeModal({ onClose, onSaved, existingPosition }) {
     if (mode === 'new' && !symbol.trim()) return setError('Symbol is required')
     if (!date)        return setError('Date is required')
     if (!quantity)    return setError('Quantity is required')
+    if (!Number.isInteger(Number(quantity)) || Number(quantity) <= 0) return setError('Quantity must be a whole number (e.g. 100)')
     if (!entry_price) return setError('Entry price is required')
 
     setSaving(true)
@@ -385,7 +386,7 @@ export default function AddTradeModal({ onClose, onSaved, existingPosition }) {
                 <label className={LABEL}>Quantity (units)</label>
                 <input type="number" value={form.quantity}
                   onChange={e => set('quantity', e.target.value)}
-                  placeholder="100" min="1" autoComplete="off" className={INPUT} />
+                  placeholder="100" min="1" step="1" autoComplete="off" className={INPUT} />
               </div>
               <div className="col-span-2">
                 <label className={LABEL}>Entry Price (Rs.)</label>

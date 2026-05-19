@@ -6,7 +6,8 @@ import { getBatchPrices, getPositions, clearEligibilityCache } from '../utils/gl
 import { useChatRefresh } from '../utils/chatEvents'
 
 import TradeActionsTab  from '../components/logs/TradeActionsTab'
-const AuditTab         = lazy(() => import('../components/logs/AuditTab'))
+import StatsTab, { STAT_RANGES } from '../components/logs/StatsTab'
+import AuditTab         from '../components/logs/AuditTab'
 const MarketJournalTab = lazy(() => import('../components/logs/MarketJournalTab'))
 
 function TabSpinner() {
@@ -39,6 +40,15 @@ export default function LogsPage() {
   const [filter, setFilter] = useState('open')
   const [search, setSearch] = useState('')
   const [addModal, setAddModal] = useState(false)
+
+  // Stats tab range filter
+  const [statsRange, setStatsRange] = useState('1M')
+
+  // Audit tab filters
+  const [auditRange,      setAuditRange]      = useState('1M')
+  const [auditSymbol,     setAuditSymbol]     = useState('all')
+  const [auditSymbols,    setAuditSymbols]    = useState([])
+  const [auditShareOpen,  setAuditShareOpen]  = useState(false)
 
   // Market-tab state — only loaded when user first opens the Market tab
   const [marketJournals,      setMarketJournals]      = useState([])
@@ -131,9 +141,9 @@ export default function LogsPage() {
   )
 
   if (loading) return (
-    <div className="w-full px-3 sm:px-5 pt-4 sm:pt-5 pb-16 max-w-7xl mx-auto animate-pulse">
-      {/* Single-row toolbar skeleton matching the live layout */}
-      <div className="flex items-center gap-1.5 mb-4 px-3 py-1 border border-gray-200 dark:border-gray-800 rounded-lg bg-white dark:bg-gray-900 h-9">
+    <div className="flex flex-col h-[calc(100dvh-56px)] overflow-hidden bg-gray-50 dark:bg-gray-950 animate-pulse">
+      {/* Toolbar skeleton */}
+      <div className="shrink-0 flex items-center gap-1.5 px-3 py-1 border-b border-gray-200 dark:border-gray-800 bg-white dark:bg-gray-900 h-9">
         <div className="h-6 w-48 bg-gray-100 dark:bg-gray-800 rounded-lg shrink-0" />
         <div className="w-px h-3.5 bg-gray-200 dark:bg-gray-700 shrink-0" />
         <div className="h-6 w-44 bg-gray-100 dark:bg-gray-800 rounded-md shrink-0" />
@@ -143,47 +153,39 @@ export default function LogsPage() {
         <div className="flex-1" />
         <div className="h-6 w-20 bg-gray-100 dark:bg-gray-800 rounded-md shrink-0" />
       </div>
-      {/* position rows */}
-      {[1, 2, 3].map(i => (
-        <div key={i} className="mb-3 bg-white dark:bg-gray-900 border border-gray-100 dark:border-gray-800 rounded-2xl p-4">
-          <div className="flex items-center justify-between mb-3">
-            <div className="flex items-center gap-3">
-              <div className="h-4 w-16 bg-gray-100 dark:bg-gray-800 rounded" />
-              <div className="h-4 w-10 bg-gray-100 dark:bg-gray-800 rounded-full" />
-              <div className="h-4 w-12 bg-gray-100 dark:bg-gray-800 rounded-full" />
-            </div>
-            <div className="h-6 w-20 bg-gray-100 dark:bg-gray-800 rounded-lg" />
-          </div>
-          <div className="grid grid-cols-4 gap-3">
-            {[1, 2, 3, 4].map(j => (
-              <div key={j}>
-                <div className="h-3 w-12 bg-gray-100 dark:bg-gray-800 rounded mb-1" />
+      {/* Position row skeletons */}
+      <div className="flex-1 overflow-y-auto px-3 sm:px-5 py-4">
+        {[1, 2, 3].map(i => (
+          <div key={i} className="mb-3 bg-white dark:bg-gray-900 border border-gray-100 dark:border-gray-800 rounded-2xl p-4">
+            <div className="flex items-center justify-between mb-3">
+              <div className="flex items-center gap-3">
                 <div className="h-4 w-16 bg-gray-100 dark:bg-gray-800 rounded" />
+                <div className="h-4 w-10 bg-gray-100 dark:bg-gray-800 rounded-full" />
+                <div className="h-4 w-12 bg-gray-100 dark:bg-gray-800 rounded-full" />
               </div>
-            ))}
+              <div className="h-6 w-20 bg-gray-100 dark:bg-gray-800 rounded-lg" />
+            </div>
+            <div className="grid grid-cols-4 gap-3">
+              {[1, 2, 3, 4].map(j => (
+                <div key={j}>
+                  <div className="h-3 w-12 bg-gray-100 dark:bg-gray-800 rounded mb-1" />
+                  <div className="h-4 w-16 bg-gray-100 dark:bg-gray-800 rounded" />
+                </div>
+              ))}
+            </div>
           </div>
-        </div>
-      ))}
+        ))}
+      </div>
     </div>
   )
 
   return (
-    <div className="w-full px-3 sm:px-5 pt-4 sm:pt-5 pb-16 max-w-7xl mx-auto">
+    <div className="flex flex-col h-[calc(100dvh-56px)] overflow-hidden bg-gray-50 dark:bg-gray-950">
 
-      {error && (
-        <div className="mb-4 flex items-center justify-between gap-3 px-4 py-3 bg-red-50 dark:bg-red-900/15 border border-red-100 dark:border-red-800/30 rounded-xl">
-          <p className="text-xs text-red-600 dark:text-red-400 font-medium">{error}</p>
-          <button onClick={() => setError(null)} className="text-red-400 hover:text-red-600 text-sm leading-none">×</button>
-        </div>
-      )}
+      {/* ── Sticky toolbar — full-width border-b, DataLab pattern exactly ── */}
+      <div className="shrink-0 flex items-center gap-1.5 px-3 py-1 border-b border-gray-200 dark:border-gray-800 bg-white dark:bg-gray-900">
 
-      {/* ── Unified compact toolbar — single row, DataLab-style ──
-          Tab chips + New Trade button are shrink-0 (fixed at edges).
-          The middle section (view/filter/search) scrolls horizontally on
-          narrow viewports. Visible thin scrollbar per Rule 51.            */}
-      <div className="flex items-center gap-1.5 mb-4 px-3 py-1 border border-gray-200 dark:border-gray-800 rounded-lg bg-white dark:bg-gray-900">
-
-        {/* Tab chips — compact, matches DataLab pattern exactly */}
+        {/* Tab chips */}
         <div className="flex items-center gap-0.5 bg-gray-100 dark:bg-gray-800 rounded-lg p-0.5 shrink-0">
           {TABS.map(tab => (
             <button key={tab.key}
@@ -198,13 +200,70 @@ export default function LogsPage() {
           ))}
         </div>
 
-        {/* Middle: per-tab controls. Single source of horizontal scroll. */}
+        {/* Divider */}
+        <div className="w-px h-4 bg-gray-200 dark:bg-gray-700 shrink-0" />
+
+        {/* Middle slot — scrolls horizontally on narrow viewports */}
         <div className="flex-1 min-w-0 flex items-center gap-1.5 overflow-x-auto overscroll-x-contain [scrollbar-width:thin] [&::-webkit-scrollbar]:h-1 [&::-webkit-scrollbar-thumb]:bg-gray-300 dark:[&::-webkit-scrollbar-thumb]:bg-gray-700 [&::-webkit-scrollbar-thumb]:rounded-full">
+
+          {/* Audit: range chips + symbol select + share trigger */}
+          {activeTab === 'audit' && (
+            <>
+              <div className="flex items-center gap-0.5 bg-gray-100 dark:bg-gray-800 rounded-md p-0.5 shrink-0">
+                {[
+                  { key: '1M', label: 'This Month' },
+                  { key: '3M', label: '3M' },
+                  { key: '6M', label: '6M' },
+                  { key: '1Y', label: '1Y' },
+                  { key: 'all', label: 'All Time' },
+                ].map(r => (
+                  <button key={r.key}
+                    onClick={() => setAuditRange(r.key)}
+                    className={`px-1.5 py-0.5 rounded text-[10px] font-semibold transition-colors whitespace-nowrap ${
+                      auditRange === r.key
+                        ? 'bg-white dark:bg-gray-700 text-gray-900 dark:text-white shadow-sm'
+                        : 'text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-300'
+                    }`}>
+                    {r.label}
+                  </button>
+                ))}
+              </div>
+              {auditSymbols.length > 0 && (
+                <>
+                  <div className="w-px h-3.5 bg-gray-200 dark:bg-gray-700 shrink-0" />
+                  <select
+                    value={auditSymbol}
+                    onChange={e => setAuditSymbol(e.target.value)}
+                    className="h-6 px-1.5 rounded text-[10px] font-semibold border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 text-gray-700 dark:text-gray-200 focus:outline-none focus:ring-1 focus:ring-blue-400 shrink-0 max-w-[110px]"
+                  >
+                    <option value="all">All Scripts</option>
+                    {auditSymbols.map(s => <option key={s} value={s}>{s}</option>)}
+                  </select>
+                </>
+              )}
+            </>
+          )}
+
+          {/* Stats: range filter chips */}
+          {activeTab === 'stats' && (
+            <div className="flex items-center gap-0.5 bg-gray-100 dark:bg-gray-800 rounded-md p-0.5 shrink-0">
+              {STAT_RANGES.map(r => (
+                <button key={r.key}
+                  onClick={() => setStatsRange(r.key)}
+                  className={`px-1.5 py-0.5 rounded text-[10px] font-semibold transition-colors whitespace-nowrap ${
+                    statsRange === r.key
+                      ? 'bg-white dark:bg-gray-700 text-gray-900 dark:text-white shadow-sm'
+                      : 'text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-300'
+                  }`}>
+                  {r.label}
+                </button>
+              ))}
+            </div>
+          )}
+
+          {/* Trades + Market: view toggle */}
           {(activeTab === 'trades' || activeTab === 'market') && (
             <>
-              <div className="w-px h-3.5 bg-gray-200 dark:bg-gray-700 shrink-0" />
-
-              {/* View toggle */}
               <div className="flex items-center gap-0.5 bg-gray-100 dark:bg-gray-800 rounded-md p-0.5 shrink-0">
                 {[
                   { key: 'database', label: 'Database' },
@@ -223,7 +282,7 @@ export default function LogsPage() {
                 ))}
               </div>
 
-              {/* Trades-only: filter + search */}
+              {/* Trades only: open/all filter + symbol search */}
               {activeTab === 'trades' && (view === 'database' || view === 'gallery') && (
                 <>
                   <div className="w-px h-3.5 bg-gray-200 dark:bg-gray-700 shrink-0" />
@@ -263,7 +322,19 @@ export default function LogsPage() {
           )}
         </div>
 
-        {/* New Trade — shrink-0, never compresses. Trades tab only. */}
+        {/* Audit: Share My Stats button — right side of toolbar */}
+        {activeTab === 'audit' && (
+          <button
+            onClick={() => setAuditShareOpen(true)}
+            className="shrink-0 flex items-center gap-1 px-2 py-0.5 text-[10px] font-bold rounded-md bg-gradient-to-r from-blue-600 to-violet-600 hover:from-blue-700 hover:to-violet-700 text-white transition-all whitespace-nowrap">
+            <svg className="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+              <path strokeLinecap="round" strokeLinejoin="round" d="M8.684 13.342C8.886 12.938 9 12.482 9 12c0-.482-.114-.938-.316-1.342m0 2.684a3 3 0 110-2.684m0 2.684l6.632 3.316m-6.632-6l6.632-3.316m0 0a3 3 0 105.367-2.684 3 3 0 00-5.367 2.684zm0 9.316a3 3 0 105.368 2.684 3 3 0 00-5.368-2.684z" />
+            </svg>
+            <span className="hidden xs:inline">Share</span>
+          </button>
+        )}
+
+        {/* New Trade button — Trades tab only, never compresses */}
         {activeTab === 'trades' && (
           <button
             onClick={() => setAddModal(true)}
@@ -276,38 +347,52 @@ export default function LogsPage() {
         )}
       </div>
 
-      {/* ── tab content ── */}
-      {activeTab === 'trades' && (
-        <TradeActionsTab
-          positions={positions}
-          ltpMap={ltpMap}
-          view={view}
-          filter={filter}
-          search={search}
-          addModal={addModal}
-          setAddModal={setAddModal}
-          onRefresh={handleRefresh}
-        />
-      )}
-      {activeTab === 'market' && (
-        <Suspense fallback={<TabSpinner />}>
-          <MarketJournalTab
-            view={view}
-            marketJournals={marketJournals}
-            onMarketJournalSaved={handleMarketJournalSaved}
-          />
-        </Suspense>
-      )}
-      {activeTab === 'audit'  && (
-        <Suspense fallback={<TabSpinner />}>
-          <AuditTab />
-        </Suspense>
-      )}
-      {activeTab === 'stats'  && (
-        <div className="flex items-center justify-center min-h-[50vh] text-gray-400 dark:text-gray-500 text-sm">
-          Stats tab — coming soon
+      {/* ── Scrollable content area ── */}
+      <div className="flex-1 overflow-y-auto bg-gray-50 dark:bg-gray-950">
+
+        {error && (
+          <div className="mx-3 sm:mx-5 mt-3 flex items-center justify-between gap-3 px-4 py-3 bg-red-50 dark:bg-red-900/15 border border-red-100 dark:border-red-800/30 rounded-xl">
+            <p className="text-xs text-red-600 dark:text-red-400 font-medium">{error}</p>
+            <button onClick={() => setError(null)} className="text-red-400 hover:text-red-600 text-sm leading-none">×</button>
+          </div>
+        )}
+
+        <div className="px-3 sm:px-5 py-4 pb-16 max-w-7xl mx-auto">
+          {activeTab === 'trades' && (
+            <TradeActionsTab
+              positions={positions}
+              ltpMap={ltpMap}
+              view={view}
+              filter={filter}
+              search={search}
+              addModal={addModal}
+              setAddModal={setAddModal}
+              onRefresh={handleRefresh}
+            />
+          )}
+          {activeTab === 'market' && (
+            <Suspense fallback={<TabSpinner />}>
+              <MarketJournalTab
+                view={view}
+                marketJournals={marketJournals}
+                onMarketJournalSaved={handleMarketJournalSaved}
+              />
+            </Suspense>
+          )}
+          {activeTab === 'audit' && (
+            <AuditTab
+              range={auditRange}
+              symbol={auditSymbol}
+              onSymbolsLoaded={setAuditSymbols}
+              shareOpen={auditShareOpen}
+              onShareClose={() => setAuditShareOpen(false)}
+            />
+          )}
+          {activeTab === 'stats' && (
+            <StatsTab positions={positions} loading={loading} range={statsRange} />
+          )}
         </div>
-      )}
+      </div>
     </div>
   )
 }

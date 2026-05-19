@@ -209,14 +209,25 @@ ${cardDataUrl ? `<img src="${cardDataUrl}" class="card-img" alt="Trader Card"/>`
   )
 }
 
+// ── Range → from/to ──────────────────────────────────────────────────────────
+function rangeToFromTo(range) {
+  const today = new Date().toISOString().slice(0, 10)
+  if (range === '1M') return { from: today.slice(0, 7) + '-01', to: today }
+  if (range === '3M') { const d = new Date(); d.setMonth(d.getMonth() - 3); return { from: d.toISOString().slice(0, 10), to: today } }
+  if (range === '6M') { const d = new Date(); d.setMonth(d.getMonth() - 6); return { from: d.toISOString().slice(0, 10), to: today } }
+  if (range === '1Y') { const d = new Date(); d.setFullYear(d.getFullYear() - 1); return { from: d.toISOString().slice(0, 10), to: today } }
+  return { from: null, to: today }
+}
+
 // ── Main AuditTab ─────────────────────────────────────────────────────────────
-export default function AuditTab() {
+export default function AuditTab({ range = '1M', symbol = 'all', onSymbolsLoaded, shareOpen = false, onShareClose }) {
   const { isDark } = useTheme()
   const { user }   = useAuth()
   const isForex    = false
 
-  const [trades,   setTrades]   = useState([])
-  const [loading,  setLoading]  = useState(true)
+  const [trades,    setTrades]    = useState([])
+  const [loading,   setLoading]   = useState(true)
+  const [showShare, setShowShare] = useState(false)
 
   const fetchTrades = useCallback(async () => {
     try {
@@ -231,28 +242,37 @@ export default function AuditTab() {
 
   useEffect(() => { fetchTrades() }, [fetchTrades])
 
-  // Default date range: current month start → today
-  const today     = new Date().toISOString().slice(0, 10)
-  const monthStart = today.slice(0, 7) + '-01'
+  // Derive from/to from range prop — recalculates whenever range changes
+  const { from: appliedFrom, to: appliedTo } = useMemo(() => rangeToFromTo(range), [range])
 
-  const [fromDate, setFromDate]     = useState(monthStart)
-  const [toDate,   setToDate]       = useState(today)
-  const [applied,  setApplied]      = useState({ from: monthStart, to: today })
-  const [showShare, setShowShare]   = useState(false)
+  // Sync share modal open state with parent toolbar button
+  useEffect(() => {
+    if (shareOpen) setShowShare(true)
+  }, [shareOpen])
 
-  const handleApply = () => setApplied({ from: fromDate, to: toDate })
+  // Expose unique symbols to parent so it can populate the select
+  useEffect(() => {
+    if (!onSymbolsLoaded || !trades.length) return
+    const syms = [...new Set(
+      trades
+        .filter(t => t.action_type === 'Close Position' || t.action_type === 'Partial Exit')
+        .map(t => t.symbol)
+    )].sort()
+    onSymbolsLoaded(syms)
+  }, [trades, onSymbolsLoaded])
 
-  // Filter action rows by date range — use only Close/Partial Exit actions for P&L
+  // Filter by date range + symbol
   const rangedTrades = useMemo(() => {
     return trades.filter(t => {
-      if (applied.from && t.date < applied.from) return false
-      if (applied.to   && t.date > applied.to)   return false
+      if (appliedFrom && t.date < appliedFrom) return false
+      if (appliedTo   && t.date > appliedTo)   return false
+      if (symbol !== 'all' && t.symbol !== symbol) return false
       return true
     })
-  }, [trades, applied])
+  }, [trades, appliedFrom, appliedTo, symbol])
 
-  // Include both Close Position and Partial Exit rows — both carry realized_pnl
-  const closed = rangedTrades.filter(t => t.status === 'CLOSED' || t.status === 'PARTIAL')
+  // Only action rows that actually realised P&L — not open-position rows that happen to have PARTIAL status
+  const closed = rangedTrades.filter(t => t.action_type === 'Close Position' || t.action_type === 'Partial Exit')
 
   // Entry date map: trade_id → date from the New Position action row
   const entryDateMap = useMemo(() => {
@@ -389,9 +409,33 @@ export default function AuditTab() {
 
   const pnlColor = (n) => n > 0 ? 'text-emerald-500' : n < 0 ? 'text-red-400' : 'text-gray-400'
 
-  const dateLabel = applied.from === applied.to
-    ? applied.from
-    : `${applied.from} – ${applied.to}`
+  const dateLabel = !appliedFrom
+    ? `All Time – ${appliedTo}`
+    : appliedFrom === appliedTo
+      ? appliedFrom
+      : `${appliedFrom} – ${appliedTo}`
+
+  // Script audit rows — all exit actions for the selected symbol in range
+  // MUST be above the early return — hooks cannot be conditional
+  const scriptAuditRows = useMemo(() => {
+    if (symbol === 'all') return []
+    return rangedTrades
+      .filter(t => (t.action_type === 'Close Position' || t.action_type === 'Partial Exit') && t.symbol === symbol)
+      .sort((a, b) => (b.date || '') > (a.date || '') ? 1 : -1)
+  }, [rangedTrades, symbol])
+
+  const scriptKpis = useMemo(() => {
+    if (!scriptAuditRows.length) return null
+    const pnls  = scriptAuditRows.map(t => parseFloat(t.realized_pnl) || 0)
+    const wins  = pnls.filter(p => p > 0)
+    const total = pnls.reduce((a, b) => a + b, 0)
+    return {
+      total,
+      winRate: scriptAuditRows.length > 0 ? (wins.length / scriptAuditRows.length * 100) : 0,
+      count: scriptAuditRows.length,
+      winCount: wins.length,
+    }
+  }, [scriptAuditRows])
 
   if (loading) return (
     <div className="flex items-center justify-center py-16">
@@ -402,44 +446,85 @@ export default function AuditTab() {
   return (
     <div className="space-y-5">
 
-      {/* ── Date range selector ── */}
-      <div className="bg-white dark:bg-gray-900 rounded-xl border border-gray-100 dark:border-gray-800 px-4 py-3 flex flex-wrap items-center gap-3">
-        <p className="text-[11px] font-semibold text-gray-700 dark:text-gray-200 flex-shrink-0">Date Range</p>
-        <div className="flex items-center gap-2 flex-1">
-          <input
-            type="date"
-            value={fromDate}
-            onChange={e => setFromDate(e.target.value)}
-            className="bg-gray-50 dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg px-2.5 py-1.5 text-[11px] text-gray-700 dark:text-gray-200 focus:outline-none focus:border-blue-400 transition-colors"
-          />
-          <span className="text-[10px] text-gray-400">—</span>
-          <input
-            type="date"
-            value={toDate}
-            onChange={e => setToDate(e.target.value)}
-            className="bg-gray-50 dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg px-2.5 py-1.5 text-[11px] text-gray-700 dark:text-gray-200 focus:outline-none focus:border-blue-400 transition-colors"
-          />
-          <button
-            onClick={handleApply}
-            className="px-4 py-1.5 bg-blue-600 hover:bg-blue-700 text-white text-[11px] font-semibold rounded-lg transition-colors"
-          >
-            Apply
-          </button>
-        </div>
-        <div className="flex items-center gap-2 ml-auto">
-          <span className="text-[10px] text-gray-400">{kpis.closedCount} closed trades in range</span>
-          {/* Share button */}
-          <button
-            onClick={() => setShowShare(true)}
-            className="flex items-center gap-1.5 px-3.5 py-1.5 bg-gradient-to-r from-blue-600 to-violet-600 hover:from-blue-700 hover:to-violet-700 text-white text-[11px] font-semibold rounded-lg transition-all shadow-sm"
-          >
-            <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8.684 13.342C8.886 12.938 9 12.482 9 12c0-.482-.114-.938-.316-1.342m0 2.684a3 3 0 110-2.684m0 2.684l6.632 3.316m-6.632-6l6.632-3.316m0 0a3 3 0 105.367-2.684 3 3 0 00-5.367 2.684zm0 9.316a3 3 0 105.368 2.684 3 3 0 00-5.368-2.684z" />
-            </svg>
-            Share My Stats
-          </button>
-        </div>
+      {/* Active filter banner */}
+      <div className="flex items-center gap-2 text-[10px] text-gray-400 px-0.5">
+        <span>{kpis.closedCount} closed trade{kpis.closedCount !== 1 ? 's' : ''} in range</span>
+        {symbol !== 'all' && (
+          <span className="px-1.5 py-0.5 bg-blue-100 dark:bg-blue-900/30 text-blue-700 dark:text-blue-300 rounded font-semibold">
+            {symbol}
+          </span>
+        )}
+        <span className="ml-auto text-gray-300 dark:text-gray-700">{dateLabel}</span>
       </div>
+
+      {/* Script audit — shown when a specific symbol is selected */}
+      {symbol !== 'all' && (
+        <div className="bg-white dark:bg-gray-900 rounded-xl border border-blue-100 dark:border-blue-800/30 overflow-hidden">
+          <div className="px-4 py-3 border-b border-gray-100 dark:border-gray-800 flex items-center justify-between">
+            <div>
+              <p className="text-[10px] uppercase tracking-widest font-bold text-blue-500">Script Audit</p>
+              <p className="text-[13px] font-bold text-gray-900 dark:text-white mt-0.5">{symbol}</p>
+            </div>
+            {scriptKpis && (
+              <div className="flex items-center gap-4">
+                <div className="text-right">
+                  <p className="text-[9px] uppercase tracking-widest font-bold text-gray-400">Win Rate</p>
+                  <p className={`text-[13px] font-bold tabular-nums ${scriptKpis.winRate >= 50 ? 'text-emerald-500' : 'text-red-400'}`}>
+                    {scriptKpis.winRate.toFixed(0)}% ({scriptKpis.winCount}/{scriptKpis.count})
+                  </p>
+                </div>
+                <div className="text-right">
+                  <p className="text-[9px] uppercase tracking-widest font-bold text-gray-400">Net P&L</p>
+                  <p className={`text-[13px] font-bold tabular-nums ${scriptKpis.total >= 0 ? 'text-emerald-500' : 'text-red-400'}`}>
+                    {scriptKpis.total >= 0 ? '+' : '−'}Rs.{Math.abs(Math.round(scriptKpis.total)).toLocaleString()}
+                  </p>
+                </div>
+              </div>
+            )}
+          </div>
+          {scriptAuditRows.length === 0 ? (
+            <div className="py-8 text-center">
+              <p className="text-[11px] text-gray-400">No closed trades for {symbol} in this range.</p>
+            </div>
+          ) : (
+            <div className="overflow-x-auto">
+              <table className="w-full text-[11px]">
+                <thead>
+                  <tr className="border-b border-gray-100 dark:border-gray-800">
+                    {['Date', 'Action', 'Qty', 'Entry', 'Exit', 'Hold', 'P&L'].map(h => (
+                      <th key={h} className="text-left px-4 py-2 text-[9px] uppercase tracking-widest font-bold text-gray-400">{h}</th>
+                    ))}
+                  </tr>
+                </thead>
+                <tbody>
+                  {scriptAuditRows.map((t, i) => {
+                    const pnl      = parseFloat(t.realized_pnl) || 0
+                    const entryDt  = entryDateMap[t.trade_id] || t.date
+                    const holdDays = entryDt && t.date
+                      ? Math.max(0, Math.floor((new Date(t.date) - new Date(entryDt)) / 86400000))
+                      : null
+                    return (
+                      <tr key={t.id} className={i % 2 === 1
+                        ? 'bg-gray-50/80 dark:bg-gray-800/40'
+                        : 'bg-white dark:bg-gray-900'}>
+                        <td className="px-4 py-2 text-gray-600 dark:text-gray-400 whitespace-nowrap">{t.date}</td>
+                        <td className="px-4 py-2 text-gray-700 dark:text-gray-300 whitespace-nowrap">{t.action_type}</td>
+                        <td className="px-4 py-2 tabular-nums text-gray-700 dark:text-gray-300">{Math.abs(parseFloat(t.quantity) || 0)}</td>
+                        <td className="px-4 py-2 tabular-nums text-gray-700 dark:text-gray-300">Rs.{parseFloat(t.entry_price || 0).toFixed(2)}</td>
+                        <td className="px-4 py-2 tabular-nums text-gray-700 dark:text-gray-300">{t.exit_price ? `Rs.${parseFloat(t.exit_price).toFixed(2)}` : '—'}</td>
+                        <td className="px-4 py-2 tabular-nums text-gray-500">{holdDays !== null ? `${holdDays}d` : '—'}</td>
+                        <td className={`px-4 py-2 tabular-nums font-bold whitespace-nowrap ${pnl >= 0 ? 'text-emerald-500' : 'text-red-400'}`}>
+                          {pnl >= 0 ? '+' : '−'}Rs.{Math.abs(Math.round(pnl)).toLocaleString()}
+                        </td>
+                      </tr>
+                    )
+                  })}
+                </tbody>
+              </table>
+            </div>
+          )}
+        </div>
+      )}
 
       {kpis.closedCount === 0 ? (
         <div className="bg-white dark:bg-gray-900 rounded-2xl border border-gray-100 dark:border-gray-800 py-20 text-center">
@@ -650,9 +735,9 @@ export default function AuditTab() {
                   )
                 })()}
                 <div className="flex items-center justify-between mt-2">
-                  <span className="text-[10px] text-gray-400">{applied.from}</span>
+                  <span className="text-[10px] text-gray-400">{appliedFrom || 'All time'}</span>
                   <span className={`text-[11px] font-bold tabular-nums ${pnlColor(kpis.netPnl)}`}>{fmtPnl(kpis.netPnl)}</span>
-                  <span className="text-[10px] text-gray-400">{applied.to}</span>
+                  <span className="text-[10px] text-gray-400">{appliedTo}</span>
                 </div>
               </div>
             </div>
@@ -663,7 +748,7 @@ export default function AuditTab() {
       {/* Share modal */}
       {showShare && (
         <ShareModal
-          onClose={() => setShowShare(false)}
+          onClose={() => { setShowShare(false); onShareClose?.() }}
           kpis={kpis}
           trades={closed}
           dateLabel={dateLabel}
