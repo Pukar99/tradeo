@@ -284,9 +284,8 @@ function ScreenInner() {
   return (
     <ScreenToolbarSlotCtx.Provider value={toolbarSlotRef}>
     <div
-      className="flex flex-col overflow-hidden bg-white dark:bg-gray-950 transition-[padding] duration-300 ease-in-out"
+      className="flex flex-col overflow-hidden bg-white dark:bg-gray-950"
       style={{ height: '100dvh', paddingTop: navHidden ? 0 : 56 }}
-      onMouseMove={scheduleHide}
     >
 
       {/* ── Top strip ── */}
@@ -330,7 +329,7 @@ function ScreenInner() {
       </div>
 
       {/* ── Content — mouse entering chart area triggers navbar hide ── */}
-      <div className="flex-1 overflow-hidden min-h-0 flex flex-col">
+      <div className="flex-1 overflow-hidden min-h-0 flex flex-col" onMouseEnter={navHidden ? undefined : scheduleHide}>
       {isSimple ? (
         <SimpleContent
           activeTab={simpleTab}

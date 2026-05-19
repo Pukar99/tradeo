@@ -122,17 +122,15 @@ function AppContent() {
     }
   }, [])
 
-  // scheduleHide: hides after 2s of no mouse movement.
+  // 1s delay — gives time to click tabs before navbar hides.
   const scheduleHide = useCallback(() => {
     clearHideTimer()
-    hideTimerRef.current = setTimeout(() => setNavHidden(true), 2000)
+    hideTimerRef.current = setTimeout(() => setNavHidden(true), 1000)
   }, [clearHideTimer])
 
   const showNavbar = useCallback(() => {
     clearHideTimer()
     setNavHidden(false)
-    // Restart 2s idle timer after showing
-    hideTimerRef.current = setTimeout(() => setNavHidden(true), 2000)
   }, [clearHideTimer])
 
   const activate = useCallback(() => {

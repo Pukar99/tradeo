@@ -263,9 +263,8 @@ export default function DataLabPage() {
   return (
     <ToolbarSlotCtx.Provider value={slotRef}>
       <div
-        className="flex flex-col overflow-hidden bg-gray-50 dark:bg-gray-950 transition-[padding] duration-300 ease-in-out"
+        className="flex flex-col overflow-hidden bg-gray-50 dark:bg-gray-950"
         style={{ height: '100dvh', paddingTop: navHidden ? 0 : 56 }}
-        onMouseMove={scheduleHide}
       >
 
         {/* ── Tab bar + inline toolbar ──
@@ -312,7 +311,7 @@ export default function DataLabPage() {
         </div>
 
         {/* ── Content — mouse entering chart area triggers navbar hide ── */}
-        <div className="flex-1 overflow-hidden min-h-0">
+        <div className="flex-1 overflow-hidden min-h-0" onMouseEnter={navHidden ? undefined : scheduleHide}>
           <TabContent activeTab={activeTab} />
         </div>
       </div>
