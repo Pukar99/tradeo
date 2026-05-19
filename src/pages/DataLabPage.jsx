@@ -265,6 +265,7 @@ export default function DataLabPage() {
       <div
         className="flex flex-col overflow-hidden bg-gray-50 dark:bg-gray-950 transition-[padding] duration-300 ease-in-out"
         style={{ height: '100dvh', paddingTop: navHidden ? 0 : 56 }}
+        onMouseMove={scheduleHide}
       >
 
         {/* ── Tab bar + inline toolbar ──
@@ -311,7 +312,7 @@ export default function DataLabPage() {
         </div>
 
         {/* ── Content — mouse entering chart area triggers navbar hide ── */}
-        <div className="flex-1 overflow-hidden min-h-0" onMouseEnter={navHidden ? undefined : scheduleHide}>
+        <div className="flex-1 overflow-hidden min-h-0">
           <TabContent activeTab={activeTab} />
         </div>
       </div>

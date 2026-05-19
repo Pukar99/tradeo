@@ -122,16 +122,17 @@ function AppContent() {
     }
   }, [])
 
-  // scheduleHide: 300ms debounce — long enough for navbar slide + paddingTop
-  // transition to settle before mouse events can re-trigger show/hide.
+  // scheduleHide: hides after 2s of no mouse movement.
   const scheduleHide = useCallback(() => {
     clearHideTimer()
-    hideTimerRef.current = setTimeout(() => setNavHidden(true), 300)
+    hideTimerRef.current = setTimeout(() => setNavHidden(true), 2000)
   }, [clearHideTimer])
 
   const showNavbar = useCallback(() => {
     clearHideTimer()
     setNavHidden(false)
+    // Restart 2s idle timer after showing
+    hideTimerRef.current = setTimeout(() => setNavHidden(true), 2000)
   }, [clearHideTimer])
 
   const activate = useCallback(() => {
