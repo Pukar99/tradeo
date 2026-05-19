@@ -266,7 +266,7 @@ function ScreenInner() {
 
   // Opt into navbar auto-hide — activates on mount, restores on unmount
   useNavbarAutoHide()
-  const { hidden: navHidden } = useNavbarState()
+  const { hidden: navHidden, scheduleHide } = useNavbarState()
 
   const handleMode       = (m) => { setMode(m);       sessionStorage.setItem('screen_mode', m) }
   const handleSimpleTab  = (t) => { setSimpleTab(t);  sessionStorage.setItem('screen_simpleTab', t) }
@@ -329,7 +329,8 @@ function ScreenInner() {
         <MarketStatusBadge />
       </div>
 
-      {/* ── Content ── */}
+      {/* ── Content — mouse entering chart area triggers navbar hide ── */}
+      <div className="flex-1 overflow-hidden min-h-0 flex flex-col" onMouseEnter={scheduleHide}>
       {isSimple ? (
         <SimpleContent
           activeTab={simpleTab}
@@ -341,6 +342,7 @@ function ScreenInner() {
           <ComplexContent activeTab={complexTab} />
         </ComplexTabProvider>
       )}
+      </div>
     </div>
     </ScreenToolbarSlotCtx.Provider>
   )

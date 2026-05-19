@@ -117,7 +117,6 @@ function Navbar({ autoHide = false, hidden = false, onMouseEnter, onMouseLeave }
         autoHide && hidden ? '-translate-y-full' : 'translate-y-0',
       ].join(' ')}
       onMouseEnter={autoHide ? onMouseEnter : undefined}
-      onMouseLeave={autoHide ? onMouseLeave : undefined}
     >
 
       {/* ── Left: Logo + Desktop nav links ─────────────────────────────────── */}

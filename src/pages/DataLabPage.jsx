@@ -253,7 +253,7 @@ export default function DataLabPage() {
 
   // Opt into navbar auto-hide — activates on mount, restores on unmount
   useNavbarAutoHide()
-  const { hidden: navHidden } = useNavbarState()
+  const { hidden: navHidden, scheduleHide } = useNavbarState()
 
   function handleTab(id) {
     setActiveTab(id)
@@ -311,8 +311,8 @@ export default function DataLabPage() {
           <InfoButton tab={TABS.find(t => t.id === activeTab)} />
         </div>
 
-        {/* ── Content ── */}
-        <div className="flex-1 overflow-hidden min-h-0">
+        {/* ── Content — mouse entering chart area triggers navbar hide ── */}
+        <div className="flex-1 overflow-hidden min-h-0" onMouseEnter={scheduleHide}>
           <TabContent activeTab={activeTab} />
         </div>
       </div>

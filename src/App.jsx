@@ -224,7 +224,6 @@ function AppContent() {
             autoHide={autoHideActive}
             hidden={navHidden}
             onMouseEnter={showNavbar}
-            onMouseLeave={scheduleHide}
           />
         )}
 
