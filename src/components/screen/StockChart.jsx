@@ -1,8 +1,69 @@
 import { useEffect, useRef, useState, useCallback } from 'react'
+import { createPortal } from 'react-dom'
 import { useTheme } from '../../context/ThemeContext'
 import { useScreen } from '../../context/ScreenContext'
 import { getIndexChart, getStockChart, getTopMovers, triggerBackfill, getTradeHistory } from '../../api'
 import { getMarketSymbols } from '../../utils/globalCache'
+import { useScreenToolbarSlot } from '../../pages/ScreenPage'
+
+// ── useFixedDropdown ──────────────────────────────────────────────────────────
+// Reusable hook for any toolbar dropdown that must escape overflow clipping.
+// Returns { triggerRef, open, setOpen, portal(content) }.
+// The dropdown is portalled to document.body via fixed positioning — works
+// regardless of how many overflow:auto/hidden ancestors the trigger sits inside.
+// align: 'left' | 'right' — which edge of the trigger to align the dropdown to.
+function useFixedDropdown(align = 'right') {
+  const [open, setOpen]     = useState(false)
+  const [rect, setRect]     = useState(null)
+  const triggerRef          = useRef(null)
+
+  const updateRect = useCallback(() => {
+    if (triggerRef.current) setRect(triggerRef.current.getBoundingClientRect())
+  }, [])
+
+  // Reposition on open, resize, scroll
+  useEffect(() => {
+    if (!open) return
+    updateRect()
+    window.addEventListener('resize', updateRect)
+    window.addEventListener('scroll', updateRect, true)
+    return () => {
+      window.removeEventListener('resize', updateRect)
+      window.removeEventListener('scroll', updateRect, true)
+    }
+  }, [open, updateRect])
+
+  // Close on outside click
+  useEffect(() => {
+    if (!open) return
+    const fn = (e) => {
+      if (triggerRef.current && !triggerRef.current.contains(e.target)) setOpen(false)
+    }
+    document.addEventListener('mousedown', fn)
+    return () => document.removeEventListener('mousedown', fn)
+  }, [open])
+
+  // Compute drop position from latest rect
+  const dropStyle = rect ? {
+    position: 'fixed',
+    top:  rect.bottom + 4,
+    ...(align === 'right'
+      ? { right: window.innerWidth - rect.right }
+      : { left: rect.left }),
+    zIndex: 9999,
+  } : {}
+
+  // Wrap content in a portal — call this in JSX: {portal(<div>...</div>)}
+  const portal = useCallback((content) => {
+    if (!open || !rect) return null
+    return createPortal(
+      <div style={dropStyle}>{content}</div>,
+      document.body
+    )
+  }, [open, rect, dropStyle]) // eslint-disable-line react-hooks/exhaustive-deps
+
+  return { triggerRef, open, setOpen, portal, updateRect }
+}
 
 // ── Module-level caches (survive re-renders, shared across StockChart instances) ─
 const _chartCache   = new Map()  // `sym:tf` or `idx:id:tf` → { data, latest, ts }
@@ -314,7 +375,6 @@ async function loadLC() { return import('lightweight-charts') }
 function ChartSymbolSearch() {
   const { selectedSymbol, selectSymbol } = useScreen()
   const [query,  setQuery]  = useState('')
-  const [open,   setOpen]   = useState(false)
   const [symbols,setSymbols]= useState({ stocks: [], indexes: [] })
   const [cursor, setCursor] = useState(-1)
   const [loadErr,setLoadErr]= useState(null)
@@ -322,11 +382,14 @@ function ChartSymbolSearch() {
   const listRef         = useRef(null)
   const mouseDownInList = useRef(false)
 
+  // useFixedDropdown handles open state, positioning, outside-click, and portal
+  const { triggerRef, open, setOpen, portal, updateRect } = useFixedDropdown('left')
+
   useEffect(() => {
     getMarketSymbols()
       .then(r => { if (r.data?.stocks?.length) { setSymbols(r.data); setLoadErr(null) } })
       .catch(() => setLoadErr('Symbols unavailable'))
-  }, []) // uses globalCache — at most 1 DB call/hour across whole app
+  }, [])
 
   const allItems = [
     ...symbols.indexes.map(i => ({ label: i.name, sub: 'Index', indexId: i.index_id, company_name: null })),
@@ -336,21 +399,32 @@ function ChartSymbolSearch() {
   const q = query.toLowerCase()
   const filtered = query.length < 1
     ? allItems.slice(0, 20)
-    : allItems.filter(i =>
-        i.label.toLowerCase().includes(q) ||
-        (i.company_name && i.company_name.toLowerCase().includes(q))
-      ).slice(0, 30)
+    : allItems
+        .filter(i =>
+          i.label.toLowerCase().startsWith(q) ||
+          i.label.toLowerCase().includes(q) ||
+          (i.company_name && i.company_name.toLowerCase().includes(q))
+        )
+        // prefix matches first
+        .sort((a, b) =>
+          (a.label.toLowerCase().startsWith(q) ? 0 : 1) -
+          (b.label.toLowerCase().startsWith(q) ? 0 : 1)
+        )
+        .slice(0, 30)
 
   const handleSelect = useCallback((item) => {
     selectSymbol(item.label, item.indexId || null, null, item.company_name || null)
     setQuery(''); setOpen(false); setCursor(-1)
-  }, [selectSymbol])
+  }, [selectSymbol, setOpen])
 
   function handleKey(e) {
-    if (!open) { setOpen(true); return }
+    if (!open) { setOpen(true); updateRect(); return }
     if (e.key === 'ArrowDown') { e.preventDefault(); setCursor(c => Math.min(c + 1, filtered.length - 1)) }
     if (e.key === 'ArrowUp')   { e.preventDefault(); setCursor(c => Math.max(c - 1, 0)) }
-    if (e.key === 'Enter' && cursor >= 0) handleSelect(filtered[cursor])
+    if (e.key === 'Enter') {
+      const target = cursor >= 0 ? filtered[cursor] : filtered[0]
+      if (target) handleSelect(target)
+    }
     if (e.key === 'Escape') { setOpen(false); setCursor(-1) }
   }
 
@@ -358,11 +432,15 @@ function ChartSymbolSearch() {
     if (cursor >= 0 && listRef.current) listRef.current.children[cursor]?.scrollIntoView({ block: 'nearest' })
   }, [cursor])
 
+  const showList  = filtered.length > 0
+  const showEmpty = filtered.length === 0 && query.length > 0
+
   return (
-    <div className="relative w-[88px] sm:w-full sm:max-w-[200px] shrink-0">
+    <div className="w-[88px] sm:w-full sm:max-w-[200px] shrink-0">
       <div
+        ref={triggerRef}
         className="flex items-center gap-1 bg-gray-50 dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg px-1.5 py-1 cursor-pointer"
-        onClick={() => { setOpen(true); setTimeout(() => inputRef.current?.focus(), 40) }}
+        onClick={() => { setOpen(true); updateRect(); setTimeout(() => inputRef.current?.focus(), 40) }}
       >
         <svg className="w-3 h-3 text-gray-400 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor">
           <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-4.35-4.35M17 11A6 6 0 1 1 5 11a6 6 0 0 1 12 0z" />
@@ -371,46 +449,52 @@ function ChartSymbolSearch() {
           ref={inputRef}
           data-chart-search
           value={query}
-          onChange={e => { setQuery(e.target.value); setOpen(true); setCursor(-1) }}
-          onFocus={() => setOpen(true)}
+          onChange={e => { setQuery(e.target.value.toUpperCase()); setOpen(true); updateRect(); setCursor(-1) }}
+          onFocus={() => { setOpen(true); updateRect() }}
           onBlur={() => { if (!mouseDownInList.current) setOpen(false) }}
           onKeyDown={handleKey}
           placeholder={selectedSymbol}
           autoComplete="off"
-          className="bg-transparent text-[10px] font-bold text-gray-700 dark:text-gray-200 placeholder-gray-600 dark:placeholder-gray-300 outline-none w-full min-w-0"
+          autoCapitalize="characters"
+          spellCheck={false}
+          className="bg-transparent text-[10px] font-bold text-gray-700 dark:text-gray-200 placeholder-gray-600 dark:placeholder-gray-300 outline-none w-full min-w-0 uppercase"
         />
       </div>
 
-      {open && filtered.length > 0 && (
-        <div className="absolute top-full mt-1 left-0 z-50 min-w-[220px] bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-700 rounded-xl shadow-xl max-h-60 overflow-y-auto">
-          <ul ref={listRef}>
-            {filtered.map((item, i) => (
-              <li key={item.label}
-                onMouseDown={() => { mouseDownInList.current = true; handleSelect(item); mouseDownInList.current = false }}
-                className={`flex items-center justify-between px-3 py-1.5 cursor-pointer transition-colors ${
-                  i === cursor ? 'bg-blue-50 dark:bg-blue-950' : 'hover:bg-gray-50 dark:hover:bg-gray-800'
-                }`}
-              >
-                <div className="flex flex-col min-w-0">
-                  <span className="text-[11px] font-semibold text-gray-800 dark:text-gray-100 leading-tight">{item.label}</span>
-                  {item.company_name && (
-                    <span className="text-[10px] text-gray-400 dark:text-gray-500 truncate leading-tight">{item.company_name}</span>
-                  )}
-                </div>
-                <span className={`shrink-0 ml-2 text-[10px] font-medium px-1.5 py-0.5 rounded ${
-                  item.sub === 'Index'
-                    ? 'bg-blue-100 dark:bg-blue-900 text-blue-600 dark:text-blue-300'
-                    : 'bg-gray-100 dark:bg-gray-800 text-gray-500'
-                }`}>{item.sub}</span>
-              </li>
-            ))}
-          </ul>
-        </div>
-      )}
-
-      {open && filtered.length === 0 && query.length > 0 && (
-        <div className="absolute top-full mt-1 left-0 z-50 min-w-[200px] bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-700 rounded-xl shadow-lg px-3 py-2 text-[10px] text-gray-400">
-          {loadErr || `No results for "${query}"`}
+      {/* Dropdown — portalled to body via useFixedDropdown */}
+      {portal(
+        <div className="bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-700 rounded-xl shadow-2xl max-h-64 overflow-y-auto" style={{ minWidth: 240 }}>
+          {showList ? (
+            <ul ref={listRef}>
+              {filtered.map((item, i) => {
+                const isActive = i === cursor || (cursor === -1 && i === 0 && query.length > 0)
+                return (
+                  <li key={item.label}
+                    onMouseDown={() => { mouseDownInList.current = true; handleSelect(item); mouseDownInList.current = false }}
+                    className={`flex items-center justify-between px-3 py-1.5 cursor-pointer transition-colors ${
+                      isActive ? 'bg-blue-50 dark:bg-blue-950/60' : 'hover:bg-gray-50 dark:hover:bg-gray-800'
+                    }`}
+                  >
+                    <div className="flex flex-col min-w-0">
+                      <span className="text-[11px] font-semibold text-gray-800 dark:text-gray-100 leading-tight">{item.label}</span>
+                      {item.company_name && (
+                        <span className="text-[10px] text-gray-400 dark:text-gray-500 truncate leading-tight">{item.company_name}</span>
+                      )}
+                    </div>
+                    <span className={`shrink-0 ml-2 text-[10px] font-medium px-1.5 py-0.5 rounded ${
+                      item.sub === 'Index'
+                        ? 'bg-blue-100 dark:bg-blue-900 text-blue-600 dark:text-blue-300'
+                        : 'bg-gray-100 dark:bg-gray-800 text-gray-500'
+                    }`}>{item.sub}</span>
+                  </li>
+                )
+              })}
+            </ul>
+          ) : showEmpty ? (
+            <div className="px-3 py-2 text-[10px] text-gray-400">
+              {loadErr || `No results for "${query}"`}
+            </div>
+          ) : null}
         </div>
       )}
     </div>
@@ -422,28 +506,19 @@ function ChartSymbolSearch() {
 const TIMEFRAMES = ['1W', '1M', '3M', '6M', '1Y', '3Y', 'ALL']
 const INDICATORS = ['MA', 'EMA', 'BB', 'RSI', 'MACD', 'ATR']
 
-// ── Indicator + Drawing Tools dropdown (desktop & mobile) ──────────────────────
+// ── Indicator + Drawing Tools dropdown ────────────────────────────────────────
 function ChartIndicatorDropdown({ activeTool, setActiveTool, onClearDrawings, drawCount }) {
   const { activeIndicators: _ai, toggleIndicator } = useScreen() || {}
   const activeIndicators = Array.isArray(_ai) ? _ai : []
-  const [open, setOpen] = useState(false)
-  const wrapRef = useRef(null)
-
-  // Close on outside click
-  useEffect(() => {
-    if (!open) return
-    const fn = (e) => { if (wrapRef.current && !wrapRef.current.contains(e.target)) setOpen(false) }
-    document.addEventListener('mousedown', fn)
-    return () => document.removeEventListener('mousedown', fn)
-  }, [open])
+  const { triggerRef, open, setOpen, portal } = useFixedDropdown('right')
 
   const totalActive = activeIndicators.length + (activeTool ? 1 : 0)
 
   return (
-    <div ref={wrapRef} className="relative shrink-0">
-
+    <div className="shrink-0">
       {/* Trigger */}
       <button
+        ref={triggerRef}
         onClick={() => setOpen(p => !p)}
         className={`flex items-center gap-1 px-2 py-1 rounded-lg text-[10px] font-semibold border transition-all ${
           open || totalActive > 0
@@ -451,7 +526,6 @@ function ChartIndicatorDropdown({ activeTool, setActiveTool, onClearDrawings, dr
             : 'bg-gray-50 dark:bg-gray-800 border-gray-200 dark:border-gray-700 text-gray-500 dark:text-gray-400 hover:border-blue-300 dark:hover:border-blue-600 hover:text-blue-500'
         }`}
       >
-        {/* Sliders icon */}
         <svg className="w-3 h-3" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth={1.8} strokeLinecap="round">
           <line x1="2" y1="4" x2="14" y2="4" />
           <line x1="2" y1="8" x2="14" y2="8" />
@@ -467,11 +541,9 @@ function ChartIndicatorDropdown({ activeTool, setActiveTool, onClearDrawings, dr
         )}
       </button>
 
-      {/* Dropdown panel */}
-      {open && (
-        <div className="absolute top-full right-0 mt-1.5 z-50 w-[270px]
-                        bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-700
-                        rounded-2xl shadow-2xl overflow-hidden">
+      {/* Dropdown — portalled to body, fixed position, never clipped */}
+      {portal(
+        <div className="w-[270px] bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-700 rounded-2xl shadow-2xl overflow-hidden">
 
           {/* Indicators section */}
           <div className="px-3 pt-3 pb-2.5">
@@ -946,6 +1018,34 @@ export default function StockChart() {
   const [activeTool,     setActiveTool]     = useState(null)
   const [drawVersion,    setDrawVersion]    = useState(0)  // bump to repaint canvas
   const [chartBuiltVer,  setChartBuiltVer]  = useState(0)  // bumps when chart instance is created
+
+  // ── Portal controls into ScreenPage tab bar ───────────────────────────────
+  const toolbarPortal = useScreenToolbarSlot(
+    <div className="flex items-center gap-1.5 min-w-0">
+      {/* Symbol search — must NOT sit inside overflow-x-auto (clips dropdown).
+          The slot container in ScreenPage uses overflow-x-auto for the rest of
+          the controls; search is shrink-0 so it anchors at the left. */}
+      <ChartSymbolSearch />
+      <div className="w-px h-4 bg-gray-200 dark:bg-gray-700 shrink-0" />
+      {/* Chart type + timeframes — scrollable section */}
+      <div className="flex-1 overflow-x-auto min-w-0 no-scrollbar">
+        <ChartHUDControls />
+      </div>
+      {/* Indicators + drawing tools — always at far right, outside overflow */}
+      <ChartIndicatorDropdown
+        activeTool={activeTool}
+        setActiveTool={setActiveTool}
+        drawCount={drawingsRef.current.length}
+        onClearDrawings={() => {
+          drawingsRef.current = []
+          drawPreviewRef.current = null
+          saveDrawingsRef.current([])
+          setActiveTool(null)
+          setDrawVersion(v => v + 1)
+        }}
+      />
+    </div>
+  )
 
   const C = {
     bg:     isDark ? '#030712' : '#ffffff',
@@ -1638,34 +1738,10 @@ export default function StockChart() {
   const subPanePct = indCount === 0 ? 0 : Math.round((100 - mainPct) / indCount)
 
   return (
+    <>
+    {/* Portal the toolbar controls up into ScreenPage's tab bar slot */}
+    {toolbarPortal}
     <div className="flex flex-col w-full h-full bg-white dark:bg-gray-950 overflow-hidden">
-
-      {/* ── HUD top bar ── */}
-      {/* ChartSymbolSearch MUST be outside the overflow-x-auto wrapper —
-          overflow-x:auto forces overflow-y:auto (CSS spec), which clips the
-          absolutely-positioned dropdown even at z-50. */}
-      <div className="shrink-0 z-30 flex items-center gap-1.5 px-2 py-1
-                      bg-white dark:bg-gray-900 border-b border-gray-100 dark:border-gray-800">
-        <ChartSymbolSearch />
-        <div className="w-px h-4 bg-gray-200 dark:bg-gray-700 shrink-0" />
-        {/* Candle type + timeframes — horizontally scrollable if needed */}
-        <div className="flex-1 overflow-x-auto min-w-0 scrollbar-none">
-          <ChartHUDControls />
-        </div>
-        {/* Indicator + drawing dropdown — always at far right, never inside overflow */}
-        <ChartIndicatorDropdown
-          activeTool={activeTool}
-          setActiveTool={setActiveTool}
-          drawCount={drawingsRef.current.length}
-          onClearDrawings={() => {
-            drawingsRef.current = []
-            drawPreviewRef.current = null
-            saveDrawingsRef.current([]) // remove from localStorage
-            setActiveTool(null)
-            setDrawVersion(v => v + 1)
-          }}
-        />
-      </div>
 
       {/* ── Overlays (absolute inside the chart area below) ── */}
 
@@ -1752,5 +1828,6 @@ export default function StockChart() {
         </div>
       )}
     </div>
+    </>
   )
 }

@@ -1,4 +1,5 @@
-import { useState, useEffect, lazy, Suspense } from 'react'
+import { useState, useEffect, useRef, lazy, Suspense, createContext, useContext } from 'react'
+import { createPortal } from 'react-dom'
 import { ScreenProvider }       from '../context/ScreenContext'
 import { ComplexTabProvider }   from '../hooks/useComplexTab.jsx'
 import StockChart               from '../components/screen/StockChart'
@@ -7,6 +8,18 @@ import LeftPanel                from '../components/screen/LeftPanel'
 import RightPanel               from '../components/screen/RightPanel'
 import ErrorBoundary            from '../components/ErrorBoundary'
 import ComingSoon               from '../components/ComingSoon'
+
+// ── Screen toolbar slot — same portal pattern as DataLabPage ─────────────────
+// Parent holds a ref to a DOM node in the tab bar. Child calls
+// useScreenToolbarSlot(jsx) to portal its controls into that node.
+// Child owns its own state — no sync, no loops.
+const ScreenToolbarSlotCtx = createContext(null)
+
+export function useScreenToolbarSlot(node) {
+  const slotRef = useContext(ScreenToolbarSlotCtx)
+  if (!slotRef?.current) return null
+  return createPortal(node, slotRef.current)
+}
 
 const BacktestPage = lazy(() => import('../components/backtest/BacktestPage'))
 const ReplayPage   = lazy(() => import('../components/screen/ReplayPage'))
@@ -240,6 +253,7 @@ function ScreenInner() {
   const [simpleTab,   setSimpleTab]   = useState(() => sessionStorage.getItem('screen_simpleTab')   || 'General')
   const [complexTab,  setComplexTab]  = useState(() => sessionStorage.getItem('screen_complexTab')  || 'Backtesting')
   const [mobilePanel, setMobilePanel] = useState(null)
+  const toolbarSlotRef = useRef(null)
 
   const handleMode       = (m) => { setMode(m);       sessionStorage.setItem('screen_mode', m) }
   const handleSimpleTab  = (t) => { setSimpleTab(t);  sessionStorage.setItem('screen_simpleTab', t) }
@@ -255,25 +269,46 @@ function ScreenInner() {
   const isSimple = mode === 'simple'
 
   return (
+    <ScreenToolbarSlotCtx.Provider value={toolbarSlotRef}>
     <div className="flex flex-col h-[calc(100dvh-56px)] overflow-hidden bg-white dark:bg-gray-950">
 
       {/* ── Top strip ── */}
-      <div className="flex items-center justify-between px-3 py-0.5 border-b border-gray-100 dark:border-gray-800 shrink-0 overflow-x-auto no-scrollbar">
-        <div className="flex items-center gap-2 min-w-0">
+      {/* NOTE: ChartSymbolSearch dropdown uses absolute positioning — it must NOT
+          be inside an overflow-x-auto container or the dropdown clips. The slot
+          ref sits outside the scrollable portion, after the shrink-0 tab groups. */}
+      <div className="flex items-center gap-2 px-3 py-0.5 border-b border-gray-100 dark:border-gray-800 shrink-0">
 
-          {/* Simple / Complex toggle */}
-          <TabStrip
-            tabs={[{ id: 'simple', label: 'Simple', short: 'Sim' }, { id: 'complex', label: 'Complex', short: 'Cpx' }]}
-            active={mode}
-            onChange={handleMode}
-          />
+        {/* Simple / Complex toggle — always visible, shrink-0 */}
+        <TabStrip
+          tabs={[{ id: 'simple', label: 'Simple', short: 'Sim' }, { id: 'complex', label: 'Complex', short: 'Cpx' }]}
+          active={mode}
+          onChange={handleMode}
+        />
 
-          {/* Sub-tabs */}
+        {/* Divider */}
+        <div className="w-px h-4 bg-gray-200 dark:bg-gray-700 shrink-0" />
+
+        {/* Sub-tabs — shrink-0 so they never compress */}
+        <div className="shrink-0">
           {isSimple
             ? <TabStrip tabs={SIMPLE_TABS}  active={simpleTab}  onChange={handleSimpleTab}  />
             : <TabStrip tabs={COMPLEX_TABS} active={complexTab} onChange={handleComplexTab} />
           }
         </div>
+
+        {/* Divider — only shown when General tab is active (slot will be populated) */}
+        {isSimple && simpleTab === 'General' && (
+          <div className="w-px h-4 bg-gray-200 dark:bg-gray-700 shrink-0" />
+        )}
+
+        {/* Toolbar slot — StockChart portals its controls here.
+            flex-1 so it fills available space; overflow-x-auto for narrow screens.
+            Must NOT be overflow-x-auto when ChartSymbolSearch is in it — see note above.
+            We use overflow-visible here; the tab bar itself handles horizontal scroll
+            only when needed via the outer wrapper below. */}
+        <div ref={toolbarSlotRef} className="flex-1 flex items-center gap-1.5 min-w-0 overflow-x-auto no-scrollbar" />
+
+        {/* Market status — always at far right, shrink-0 */}
         <MarketStatusBadge />
       </div>
 
@@ -290,6 +325,7 @@ function ScreenInner() {
         </ComplexTabProvider>
       )}
     </div>
+    </ScreenToolbarSlotCtx.Provider>
   )
 }
 

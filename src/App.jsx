@@ -23,7 +23,6 @@ const ResearchEditorPage = lazy(() => import('./pages/ResearchEditorPage'))
 const ResearchViewPage   = lazy(() => import('./pages/ResearchViewPage'))
 const ProfilePage        = lazy(() => import('./pages/ProfilePage'))
 const ChatPage           = lazy(() => import('./pages/ChatPage'))
-const IPOPage            = lazy(() => import('./pages/IPOPage'))
 const DataLabPage        = lazy(() => import('./pages/DataLabPage'))
 const ExplorePage        = lazy(() => import('./pages/ExplorePage'))
 
@@ -152,8 +151,7 @@ function AppContent() {
           <Route path="/research/:id" element={<ResearchViewPage />} />
           <Route path="/profile" element={<ProfilePage />} />
           <Route path="/chat" element={<ChatPage />} />
-          <Route path="/ipo" element={<IPOPage />} />
-          <Route path="/explore/ipo" element={<IPOPage />} />
+          <Route path="/ipo" element={<ExplorePage />} />
           <Route path="/datalab" element={<DataLabPage />} />
           <Route path="/explore" element={<ExplorePage />} />
           <Route path="/explore/:tab" element={<ExplorePage />} />

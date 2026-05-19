@@ -1,5 +1,6 @@
 import { useState, useEffect, useCallback, useRef } from 'react'
 import { useAuth } from '../context/AuthContext'
+import { useExploreToolbarSlot } from './ExplorePage'
 import {
   getMeroshareDpList, getMeroshareAccounts, addMeroshareAccount, deleteMeroshareAccount,
   getMeroshareIPOs, getMeroshareResults, applyMeroshareIPO, applyMeroshareIPOBulk,
@@ -747,8 +748,11 @@ function BulkApplyModal({ ipo, accounts, inFlightRef, onClose, onApplied }) {
     setApplying(true); setError(null)
     try {
       const res = await applyMeroshareIPOBulk({ company_share_id: ipo.companyShareId, applied_kitta: kitta, transaction_pins: pins })
-      setResults(res.data.results || [])
-      onApplied?.(ipo.companyShareId)
+      const bulkResults = res.data.results || []
+      setResults(bulkResults)
+      // Pass only account IDs that actually succeeded — not all accounts
+      const succeededIds = bulkResults.filter(r => r.status === 'success').map(r => r.account_id)
+      onApplied?.(ipo.companyShareId, succeededIds)
     } catch (err) {
       setError(err.response?.data?.error || 'Bulk apply failed')
     } finally {
@@ -868,8 +872,72 @@ function SortArrow({ dir }) {
   return <span>{dir === 'asc' ? '↑' : '↓'}</span>
 }
 
+// ── IPOToolbar ────────────────────────────────────────────────────────────────
+// Isolated component — useExploreToolbarSlot is always hook #1 in this tree.
+// Portals sub-tabs + account chips + refresh into the ExplorePage tab bar.
+function IPOToolbar({ activeTab, setActiveTab, onRefresh, isActive, accounts, selectedAcc, onSelectAcc, onAddAcc }) {
+  const portal = useExploreToolbarSlot(
+    isActive ? (
+      <div className="flex items-center gap-1.5 min-w-0">
+        {/* Sub-tabs */}
+        <div className="flex items-center gap-0.5 bg-gray-100 dark:bg-gray-800 rounded-lg p-0.5 shrink-0">
+          {[
+            { key: 'ipos',      label: 'Open IPOs'  },
+            { key: 'results',   label: 'My Results' },
+            { key: 'portfolio', label: 'Holdings'   },
+          ].map(tab => (
+            <button key={tab.key} onClick={() => setActiveTab(tab.key)}
+              className={`px-2 py-0.5 rounded-md text-[10px] font-semibold transition-all whitespace-nowrap ${
+                activeTab === tab.key
+                  ? 'bg-white dark:bg-gray-700 text-gray-900 dark:text-white shadow-sm'
+                  : 'text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-300'
+              }`}>
+              {tab.label}
+            </button>
+          ))}
+        </div>
+
+        {/* Divider */}
+        <div className="w-px h-4 bg-gray-200 dark:bg-gray-700 shrink-0" />
+
+        {/* Account chips */}
+        <div className="flex items-center gap-0.5 shrink-0">
+          {accounts.map(a => (
+            <button key={a.id} onClick={() => onSelectAcc(a.id)}
+              title={a.label}
+              className={`flex items-center gap-1 px-2 py-0.5 rounded-md text-[10px] font-semibold transition-all whitespace-nowrap ${
+                selectedAcc === a.id
+                  ? 'bg-white dark:bg-gray-700 text-gray-900 dark:text-white shadow-sm ring-1 ring-gray-200 dark:ring-gray-600'
+                  : 'text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-800'
+              }`}>
+              <span className={`w-3.5 h-3.5 rounded-full flex items-center justify-center text-[8px] font-bold flex-shrink-0 ${
+                selectedAcc === a.id ? 'bg-blue-500 text-white' : 'bg-gray-200 dark:bg-gray-700 text-gray-500 dark:text-gray-400'
+              }`}>{a.label.charAt(0).toUpperCase()}</span>
+              {a.label}
+              {a.auto_apply && <span className="text-[8px] font-bold text-emerald-500">AUTO</span>}
+            </button>
+          ))}
+          <button onClick={onAddAcc} title="Add account"
+            className="flex items-center gap-0.5 px-1.5 py-0.5 rounded-md text-[10px] text-gray-400 hover:text-gray-600 dark:hover:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-800 transition-all shrink-0">
+            <svg className="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M12 4v16m8-8H4" /></svg>
+          </button>
+        </div>
+
+        {/* Refresh */}
+        <button onClick={onRefresh} title="Refresh"
+          className="p-1 rounded-md text-gray-400 hover:text-gray-600 dark:hover:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-800 transition-all shrink-0">
+          <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
+          </svg>
+        </button>
+      </div>
+    ) : null
+  )
+  return portal
+}
+
 // ── Main Page ─────────────────────────────────────────────────────────────────
-function IPOPage() {
+function IPOPage({ isActive = true }) {
   const { user } = useAuth()
   const [activeTab,     setActiveTab]     = useState('ipos')
   const [accounts,      setAccounts]      = useState([])
@@ -892,15 +960,10 @@ function IPOPage() {
   // appliedMap persisted to sessionStorage so it survives account switches within a session.
   // Shape: { [companyShareId]: Set<accountId> } — but Sets aren't JSON-serialisable,
   // so we store as { [companyShareId]: accountId[] } and restore on init.
-  const [appliedMap, setAppliedMap] = useState(() => {
-    try {
-      const raw = sessionStorage.getItem('tradeo_ipo_applied')
-      if (!raw) return {}
-      const parsed = JSON.parse(raw)
-      // Restore arrays → Sets
-      return Object.fromEntries(Object.entries(parsed).map(([k, v]) => [k, new Set(v)]))
-    } catch { return {} }
-  })
+  // appliedMap is session-only — never restored from sessionStorage.
+  // Real applied state always comes from Meroshare via loadData (ipos fetch).
+  // Persisting across page loads caused stale "applied" badges for failed/filtered issues.
+  const [appliedMap, setAppliedMap] = useState({})
 
   const [actionError,   setActionError]   = useState(null)
   const [showAllTypes,  setShowAllTypes]  = useState(false)  // false = only Ordinary Shares + FPO; true = show all
@@ -922,6 +985,9 @@ function IPOPage() {
   const [initError, setInitError] = useState(null)
   const [initLoading, setInitLoading] = useState(true)
 
+  // Tab cache TTL — 5 minutes. Stale data after that triggers a fresh Meroshare fetch.
+  const TAB_CACHE_TTL = 5 * 60 * 1000
+
   useEffect(() => {
     Promise.all([
       getMeroshareDpList().then(r => setDpList(r.data || [])).catch(() => {}),
@@ -937,12 +1003,13 @@ function IPOPage() {
 
   const loadData = useCallback(async (accId, tab, force = false) => {
     if (!accId) return
-    const key = `${accId}:${tab}`
-    if (!force && tabCache.current[key]) {
-      const c = tabCache.current[key]
-      if (tab === 'ipos')      setIpos(c)
-      if (tab === 'results')   setResults(c.results)
-      if (tab === 'portfolio') { setPortfolio(c.holdings); setTotalValue(c.totalValue) }
+    const key    = `${accId}:${tab}`
+    const cached = tabCache.current[key]
+    // Serve from cache if fresh (within TTL) and not forced
+    if (!force && cached && Date.now() - cached.ts < TAB_CACHE_TTL) {
+      if (tab === 'ipos')      setIpos(cached.data)
+      if (tab === 'results')   setResults(cached.data.results)
+      if (tab === 'portfolio') { setPortfolio(cached.data.holdings); setTotalValue(cached.data.totalValue) }
       return
     }
     setLoading(true); setError(null)
@@ -950,7 +1017,8 @@ function IPOPage() {
       if (tab === 'ipos') {
         const res  = await getMeroshareIPOs(accId)
         const data = Array.isArray(res.data.ipos) ? res.data.ipos : []
-        tabCache.current[key] = data; setIpos(data)
+        tabCache.current[key] = { data, ts: Date.now() }
+        setIpos(data)
         setAppliedMap(m => {
           const next = { ...m }
           data.forEach(ipo => {
@@ -965,47 +1033,25 @@ function IPOPage() {
       } else if (tab === 'results') {
         const res  = await getMeroshareResults(accId)
         const data = Array.isArray(res.data.results) ? res.data.results : []
-        tabCache.current[key] = { results: data }; setResults(data)
+        tabCache.current[key] = { data: { results: data }, ts: Date.now() }
+        setResults(data)
       } else if (tab === 'portfolio') {
         const res      = await getMerosharePortfolio(accId)
         const holdings = Array.isArray(res.data.holdings) ? res.data.holdings : []
         const tv       = res.data.totalValue || null
-        tabCache.current[key] = { holdings, totalValue: tv }
+        tabCache.current[key] = { data: { holdings, totalValue: tv }, ts: Date.now() }
         setPortfolio(holdings); setTotalValue(tv)
       }
     } catch (err) {
       setError(err.response?.data?.error || 'Failed to load data')
     } finally { setLoading(false) }
-  }, [])
+  }, [TAB_CACHE_TTL])
 
   useEffect(() => {
     if (selectedAcc) loadData(selectedAcc, activeTab)
   }, [selectedAcc, activeTab, loadData])
 
-  useEffect(() => {
-    if (!ipos.length || !selectedAcc) return
-    setAppliedMap(m => {
-      const next = { ...m }
-      let changed = false
-      ipos.forEach(ipo => {
-        if (isApplied(ipo)) {
-          const s = new Set(next[ipo.companyShareId] || [])
-          if (!s.has(selectedAcc)) { s.add(selectedAcc); next[ipo.companyShareId] = s; changed = true }
-        }
-      })
-      return changed ? next : m
-    })
-  }, [ipos, selectedAcc])
 
-  // Persist appliedMap to sessionStorage whenever it changes
-  useEffect(() => {
-    try {
-      const serialisable = Object.fromEntries(
-        Object.entries(appliedMap).map(([k, v]) => [k, [...v]])
-      )
-      sessionStorage.setItem('tradeo_ipo_applied', JSON.stringify(serialisable))
-    } catch {}
-  }, [appliedMap])
 
   const handleSelectAccount = (id) => {
     setSelectedAcc(id); setIpos([]); setResults([]); setPortfolio([])
@@ -1096,12 +1142,14 @@ function IPOPage() {
     return () => { cancelled = true }
   }, [activeTab, results, selectedAcc]) // eslint-disable-line react-hooks/exhaustive-deps
 
-  const handleApplied = useCallback((companyShareId, accountId) => {
-    // Update appliedMap — tracks applied state across all accounts
+  const handleApplied = useCallback((companyShareId, accountIdOrIds) => {
+    // accountIdOrIds: a single accountId (number), an array of accountIds, or null
+    // null = unknown which accounts succeeded — don't mark any (let fresh fetch determine)
     setAppliedMap(m => {
       const s = new Set(m[companyShareId] || [])
-      if (accountId) s.add(accountId)
-      else accounts.forEach(a => s.add(a.id))
+      if (Array.isArray(accountIdOrIds)) accountIdOrIds.forEach(id => s.add(id))
+      else if (accountIdOrIds != null) s.add(accountIdOrIds)
+      // null → don't add anything — state will be set by next loadData from Meroshare
       return { ...m, [companyShareId]: s }
     })
     // Patch the ipos list in-place so cache and live state agree
@@ -1112,13 +1160,17 @@ function IPOPage() {
     ))
     // Also patch tabCache so a re-select doesn't revert to stale state
     accounts.forEach(a => {
-      const key = `${a.id}:ipos`
-      if (tabCache.current[key]) {
-        tabCache.current[key] = tabCache.current[key].map(ipo =>
-          String(ipo.companyShareId) === String(companyShareId)
-            ? { ...ipo, action: 'edit', statusName: 'EDIT_APPROVE' }
-            : ipo
-        )
+      const key    = `${a.id}:ipos`
+      const cached = tabCache.current[key]
+      if (cached?.data) {
+        tabCache.current[key] = {
+          ...cached,
+          data: cached.data.map(ipo =>
+            String(ipo.companyShareId) === String(companyShareId)
+              ? { ...ipo, action: 'edit', statusName: 'EDIT_APPROVE' }
+              : ipo
+          ),
+        }
       }
     })
   }, [accounts])
@@ -1208,12 +1260,16 @@ function IPOPage() {
   // mutual funds. Check shareTypeName + subGroup for explicit labels, and check company
   // name for "Fund" (e.g. "Sanima Equity Fund - II") since Meroshare has no cleaner flag.
   const TYPE_EXCLUDE  = ['mutual fund', 'debenture', 'right share', 'right issue', 'promoter', 'bond', 'preference share']
-  const NAME_EXCLUDE  = [' fund', ' debenture', ' bond']   // leading space avoids false positives
+  const NAME_EXCLUDE  = [' fund', ' debenture', ' bond']
+  // Meroshare scrip codes: MF = Mutual Fund, D = Debenture, B = Bond, PO = Promoter Ordinary
+  const SCRIP_EXCLUDE_RE = /MF\d*$|[A-Z]D\d*$|[A-Z]B\d*$/
   const isOrdinaryShare = (ipo) => {
-    const typStr = ((ipo.shareTypeName || '') + ' ' + (ipo.subGroup || '')).toLowerCase()
+    const typStr  = ((ipo.shareTypeName || '') + ' ' + (ipo.subGroup || '')).toLowerCase()
     const nameStr = (ipo.companyName || '').toLowerCase()
+    const scrip   = (ipo.scrip || '').toUpperCase()
     if (TYPE_EXCLUDE.some(kw => typStr.includes(kw))) return false
-    if (NAME_EXCLUDE.some(kw => nameStr.includes(kw)))  return false
+    if (NAME_EXCLUDE.some(kw => nameStr.includes(kw))) return false
+    if (SCRIP_EXCLUDE_RE.test(scrip)) return false
     return true
   }
   const filteredIpos   = showAllTypes ? ipos : ipos.filter(isOrdinaryShare)
@@ -1244,39 +1300,24 @@ function IPOPage() {
   const sortThCls = thCls + " cursor-pointer hover:text-gray-600 dark:hover:text-gray-200 transition-colors"
 
   return (
-    <div className="px-3 sm:px-6 pt-4 sm:pt-6 pb-10 max-w-6xl mx-auto">
+    <>
+    {/* IPOToolbar always mounts when page is alive — portals controls into Explore tab bar */}
+    <IPOToolbar
+      activeTab={activeTab}
+      setActiveTab={setActiveTab}
+      onRefresh={() => selectedAcc && loadData(selectedAcc, activeTab, true)}
+      isActive={isActive}
+      accounts={accounts}
+      selectedAcc={selectedAcc}
+      onSelectAcc={handleSelectAccount}
+      onAddAcc={() => setShowAddModal(true)}
+    />
 
-      {/* Page header */}
-      <div className="flex flex-wrap items-center justify-between gap-3 mb-5">
-        <div className="flex items-center gap-3">
-          {/* Mobile: toggle sidebar drawer */}
-          {hasAccounts && (
-            <button onClick={() => setSidebarOpen(s => !s)} title="Accounts"
-              className="sm:hidden flex items-center gap-1.5 px-2.5 py-2 rounded-xl border border-gray-200 dark:border-gray-700 text-gray-600 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-800 transition-colors text-[11px] font-semibold">
-              <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 6h16M4 12h16M4 18h16" /></svg>
-              {activeAccount?.label || 'Accounts'}
-            </button>
-          )}
-          <div>
-            <h1 className="text-[18px] font-bold text-gray-900 dark:text-white tracking-tight">Meroshare IPO</h1>
-            <p className="text-[11px] text-gray-400 mt-0.5">Manage applications across all your family accounts</p>
-          </div>
-        </div>
-        <button onClick={() => setShowAddModal(true)} title="Add Meroshare account"
-          className="flex items-center gap-1.5 px-3.5 py-2 rounded-xl bg-blue-600 text-white text-[11px] font-semibold hover:bg-blue-700 transition-colors focus-visible:ring-2 focus-visible:ring-blue-500/40">
-          <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" /></svg>
-          Add Account
-        </button>
-      </div>
+    <div className="px-3 sm:px-5 pt-3 pb-10 max-w-5xl mx-auto">
 
-      {/* Mobile sidebar drawer backdrop */}
-      {sidebarOpen && (
-        <div className="fixed inset-0 z-40 bg-black/40 sm:hidden" onClick={() => setSidebarOpen(false)} />
-      )}
-
-      {/* Empty state */}
+      {/* ── Empty state — no accounts ── */}
       {!hasAccounts && (
-        <div className="bg-white dark:bg-gray-900 rounded-2xl border border-gray-100 dark:border-gray-800 p-12 text-center">
+        <div className="mt-6 bg-white dark:bg-gray-900 rounded-2xl border border-gray-100 dark:border-gray-800 p-12 text-center">
           <div className="w-14 h-14 rounded-2xl bg-blue-50 dark:bg-blue-900/20 flex items-center justify-center mx-auto mb-4">
             <svg className="w-7 h-7 text-blue-500" fill="none" viewBox="0 0 24 24" stroke="currentColor">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" />
@@ -1286,8 +1327,8 @@ function IPOPage() {
           <p className="text-[11px] text-gray-400 mb-6">Connect your Meroshare account to view open IPOs, results, and holdings</p>
           <div className="flex items-start justify-center mb-6 max-w-sm mx-auto">
             {[
-              { n: '1', label: 'Add Account', desc: 'Enter Meroshare credentials' },
-              { n: '2', label: 'ASBA Setup',  desc: 'Link your bank once' },
+              { n: '1', label: 'Add Account',   desc: 'Enter Meroshare credentials' },
+              { n: '2', label: 'ASBA Setup',    desc: 'Link your bank once' },
               { n: '3', label: 'Apply & Track', desc: 'One-click applications' },
             ].map((s, i) => (
               <div key={i} className="flex items-start flex-1">
@@ -1300,219 +1341,115 @@ function IPOPage() {
               </div>
             ))}
           </div>
-          <button onClick={() => setShowAddModal(true)} className="px-5 py-2.5 rounded-xl bg-blue-600 text-white text-[12px] font-semibold hover:bg-blue-700 transition-colors">
+          <button onClick={() => setShowAddModal(true)}
+            className="px-5 py-2.5 rounded-xl bg-blue-600 text-white text-[12px] font-semibold hover:bg-blue-700 transition-colors">
             Connect Your First Account
           </button>
         </div>
       )}
 
       {hasAccounts && (
-        <div className="flex gap-5 items-start">
+        <div className="space-y-3">
 
-          {/* ── Sidebar ── */}
-          {/* On mobile: fixed drawer from left. On sm+: static column. */}
-          <div className={`
-            fixed sm:static inset-y-0 left-0 z-50 sm:z-auto
-            w-64 sm:w-52 flex-shrink-0
-            bg-white dark:bg-gray-950 sm:bg-transparent dark:sm:bg-transparent
-            border-r sm:border-0 border-gray-100 dark:border-gray-800
-            pt-16 sm:pt-0 px-4 sm:px-0
-            overflow-y-auto sm:overflow-visible
-            transition-transform duration-200 ease-out
-            ${sidebarOpen ? 'translate-x-0' : '-translate-x-full sm:translate-x-0'}
-            space-y-1.5
-          `}>
-            <div className="flex items-center justify-between px-1 mb-2">
-              <p className="text-[10px] font-semibold uppercase tracking-widest text-gray-400">Accounts</p>
-              <button onClick={() => setSidebarOpen(false)} className="sm:hidden text-gray-400 hover:text-gray-600 text-lg leading-none p-1">×</button>
-            </div>
-            {accounts.map(a => {
-              const noBankSetup = !a.bank_id || !a.account_number
-              const isSelected  = selectedAcc === a.id
-              return (
-                <div key={a.id} onClick={() => handleSelectAccount(a.id)}
-                  className={`group relative flex items-center gap-2.5 px-3 py-2.5 rounded-xl cursor-pointer transition-all duration-150 ${
-                    isSelected
-                      ? 'bg-gray-900 dark:bg-white text-white dark:text-gray-900 border-l-2 border-blue-500'
-                      : 'bg-white dark:bg-gray-900 border border-gray-100 dark:border-gray-800 text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-800 hover:-translate-y-px'
-                  }`}>
-                  <div className={`w-7 h-7 rounded-lg flex items-center justify-center text-[11px] font-bold flex-shrink-0 ${
-                    isSelected ? 'bg-white/20 text-white dark:bg-black/20 dark:text-gray-900' : 'bg-gray-100 dark:bg-gray-800 text-gray-500'
-                  }`}>{a.label.charAt(0).toUpperCase()}</div>
-                  <div className="flex-1 min-w-0">
-                    <div className="flex items-center gap-1.5">
-                      <p className="text-[11px] font-semibold truncate">{a.label}</p>
-                      {a.auto_apply && (
-                        <span className={`text-[9px] font-bold px-1 py-0.5 rounded flex-shrink-0 ${
-                          isSelected ? 'bg-white/20 text-white dark:bg-black/20 dark:text-emerald-600' : 'bg-emerald-100 dark:bg-emerald-900/30 text-emerald-600'
-                        }`}>AUTO</span>
-                      )}
-                    </div>
-                    <p className={`text-[10px] truncate font-mono ${isSelected ? 'opacity-60' : 'text-gray-400'}`}>
-                      {noBankSetup ? '⚠ Bank not set up' : (a.account_number ? `****${a.account_number.slice(-4)}` : a.bank_name || a.dp_name)}
-                    </p>
-                  </div>
-                  <div className="absolute right-2 top-1/2 -translate-y-1/2 flex items-center gap-0.5 opacity-0 group-hover:opacity-100 transition-opacity">
-                    <button onClick={e => { e.stopPropagation(); setEditAccount(a) }} title="Settings"
-                      className={`p-1 rounded hover:bg-black/10 dark:hover:bg-white/10 ${isSelected ? 'text-white/60 hover:text-white' : 'text-gray-400 hover:text-gray-600'}`}>
-                      <svg className="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z" />
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
-                      </svg>
-                    </button>
-                    <InlineConfirm label="×" danger onConfirm={() => handleDeleteAccount(a.id)} disabled={deleting === a.id} />
-                  </div>
+          {/* ── Account status bar ── */}
+          {activeAccount && (
+            <div className="flex flex-wrap items-center gap-2 px-3 py-2 bg-white dark:bg-gray-900 rounded-xl border border-gray-100 dark:border-gray-800">
+              {/* Avatar + name + bank */}
+              <div className="flex items-center gap-2 min-w-0 flex-1">
+                <div className="w-6 h-6 rounded-lg bg-gray-900 dark:bg-white flex items-center justify-center text-white dark:text-gray-900 text-[10px] font-bold flex-shrink-0">
+                  {activeAccount.label.charAt(0).toUpperCase()}
                 </div>
-              )
-            })}
-            <button onClick={() => setShowAddModal(true)} title="Add another account"
-              className="w-full flex items-center gap-2 px-3 py-2 rounded-xl border border-dashed border-gray-200 dark:border-gray-700 text-gray-400 hover:text-gray-600 hover:border-gray-300 dark:hover:border-gray-600 transition-all text-[10px] font-semibold">
-              <svg className="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M12 4v16m8-8H4" /></svg>
-              Add Account
-            </button>
-          </div>
-
-          {/* ── Main content ── */}
-          <div className="flex-1 min-w-0">
-
-            {/* Account header bar */}
-            {activeAccount && (
-              <div className="bg-white dark:bg-gray-900 rounded-2xl border border-gray-100 dark:border-gray-800 px-4 py-3 mb-4">
-                <div className="flex items-center justify-between">
-                  <div className="flex items-center gap-3">
-                    <div className="w-8 h-8 rounded-xl bg-gray-900 dark:bg-white flex items-center justify-center text-white dark:text-gray-900 text-[12px] font-bold flex-shrink-0">
-                      {activeAccount.label.charAt(0).toUpperCase()}
-                    </div>
-                    <div>
-                      <div className="flex items-center gap-2 flex-wrap">
-                        <p className="text-[13px] font-bold text-gray-900 dark:text-white">{activeAccount.label}</p>
-                        {(!activeAccount.bank_id || !activeAccount.account_number) && (
-                          <button onClick={() => setEditAccount(activeAccount)}
-                            className="text-[10px] font-semibold text-amber-600 bg-amber-50 dark:bg-amber-900/20 border border-amber-200 dark:border-amber-800/50 px-2 py-0.5 rounded hover:bg-amber-100 transition-colors">
-                            ⚠ Setup ASBA →
-                          </button>
-                        )}
-                      </div>
-                      <p className="text-[10px] text-gray-400 font-mono">{activeAccount.username} · {activeAccount.dp_name}</p>
-                    </div>
-                  </div>
-                  <div className="flex items-center gap-2">
-                    <button onClick={() => setEditAccount(activeAccount)} title="Account settings"
-                      className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg text-gray-500 hover:text-gray-700 hover:bg-gray-100 dark:hover:bg-gray-800 transition-all text-[10px] font-semibold">
-                      <svg className="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z" />
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
-                      </svg>
-                      Settings
-                    </button>
-                    <span className="flex items-center gap-1 text-[10px] text-emerald-500 font-semibold">
-                      <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse" />Connected
-                    </span>
-                  </div>
+                <div className="flex items-center gap-1.5 min-w-0 flex-wrap">
+                  <span className="text-[11px] font-bold text-gray-900 dark:text-white">{activeAccount.label}</span>
+                  {activeAccount.account_number
+                    ? <span className="text-[10px] text-gray-400 font-mono">· ****{activeAccount.account_number.slice(-4)}</span>
+                    : <button onClick={() => setEditAccount(activeAccount)}
+                        className="text-[10px] font-semibold text-amber-600 bg-amber-50 dark:bg-amber-900/20 border border-amber-200 dark:border-amber-800/50 px-1.5 py-0.5 rounded hover:bg-amber-100 transition-colors flex-shrink-0">
+                        ⚠ Setup ASBA →
+                      </button>
+                  }
+                  <span className="flex items-center gap-1 text-[10px] text-emerald-500 font-semibold flex-shrink-0">
+                    <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse" />Connected
+                  </span>
                 </div>
+              </div>
 
-                {/* Auto-apply toggle row */}
-                <div className="mt-3 pt-3 border-t border-gray-100 dark:border-gray-800 flex flex-wrap items-center justify-between gap-2">
-                  <div className="flex items-center gap-3">
-                    <label className="flex items-center gap-2.5 cursor-pointer select-none" title={activeAccount.auto_apply ? 'Click to disable auto-apply' : 'Click to enable auto-apply at 11 AM daily'}>
-                      <div onClick={() => !togglingAutoApply && handleToggleAutoApply(activeAccount, !activeAccount.auto_apply)}
-                        className={`relative w-9 h-5 rounded-full transition-colors duration-200 flex-shrink-0 ${togglingAutoApply ? 'opacity-50 cursor-wait' : 'cursor-pointer'} ${activeAccount.auto_apply ? 'bg-emerald-500' : 'bg-gray-300 dark:bg-gray-600'}`}>
-                        <span className={`absolute top-0.5 left-0.5 w-4 h-4 rounded-full bg-white shadow transition-transform duration-200 ${activeAccount.auto_apply ? 'translate-x-4' : 'translate-x-0'}`} />
-                      </div>
-                      <div>
-                        <p className={`text-[11px] font-semibold ${activeAccount.auto_apply ? 'text-emerald-600 dark:text-emerald-400' : 'text-gray-500 dark:text-gray-400'}`}>
-                          Auto-apply {activeAccount.auto_apply ? 'ON' : 'OFF'}
-                        </p>
-                        <p className="text-[10px] text-gray-400">Applies at 11:05 AM on weekdays</p>
-                      </div>
-                    </label>
-                  </div>
-                  {activeAccount.auto_apply && (
-                    <button onClick={handleRunAutoApply} disabled={runningAutoApply || togglingAutoApply}
-                      title="Run auto-apply now for all enabled accounts"
-                      className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-[10px] font-semibold bg-emerald-50 dark:bg-emerald-900/20 text-emerald-700 dark:text-emerald-400 border border-emerald-200 dark:border-emerald-800/50 hover:bg-emerald-100 dark:hover:bg-emerald-900/40 disabled:opacity-50 disabled:cursor-wait transition-colors">
-                      {runningAutoApply
-                        ? <><span className="w-2.5 h-2.5 border-2 border-emerald-400/40 border-t-emerald-500 rounded-full animate-spin" />Running…</>
-                        : <>▶ Run Now</>}
-                    </button>
-                  )}
+              {/* Auto-apply toggle */}
+              <div className="flex items-center gap-2 flex-shrink-0">
+                <div onClick={() => !togglingAutoApply && handleToggleAutoApply(activeAccount, !activeAccount.auto_apply)}
+                  className={`relative w-8 h-4 rounded-full transition-colors duration-200 flex-shrink-0 ${togglingAutoApply ? 'opacity-50 cursor-wait' : 'cursor-pointer'} ${activeAccount.auto_apply ? 'bg-emerald-500' : 'bg-gray-300 dark:bg-gray-600'}`}
+                  title={activeAccount.auto_apply ? 'Auto-apply ON — click to disable' : 'Auto-apply OFF — click to enable'}>
+                  <span className={`absolute top-0.5 left-0.5 w-3 h-3 rounded-full bg-white shadow transition-transform duration-200 ${activeAccount.auto_apply ? 'translate-x-4' : 'translate-x-0'}`} />
                 </div>
-
-                {/* Auto-apply run results */}
-                {autoApplyResults && (
-                  <div className="mt-3 pt-3 border-t border-gray-100 dark:border-gray-800">
-                    <div className="flex items-center justify-between mb-2">
-                      <p className="text-[10px] font-semibold text-gray-400 uppercase tracking-widest">Run Results</p>
-                      <button onClick={() => setAutoApplyResults(null)} className="text-gray-300 dark:text-gray-600 hover:text-gray-500 text-sm leading-none">×</button>
-                    </div>
-                    {autoApplyResults.length === 0 ? (
-                      <p className="text-[10px] text-gray-400">No auto-apply accounts found.</p>
-                    ) : (
-                      <div className="space-y-1">
-                        {autoApplyResults.map((r, i) => (
-                          <div key={i} className="flex items-center gap-2">
-                            <span className={`text-[10px] font-bold flex-shrink-0 ${r.status === 'success' ? 'text-emerald-500' : r.status === 'error' ? 'text-red-500' : 'text-gray-400'}`}>
-                              {r.status === 'success' ? '✓' : r.status === 'error' ? '✗' : '—'}
-                            </span>
-                            <span className="text-[10px] font-semibold text-gray-700 dark:text-gray-300 flex-shrink-0">{r.label}</span>
-                            <span className="text-[10px] text-gray-400 truncate">{r.message}</span>
-                          </div>
-                        ))}
-                      </div>
-                    )}
-                  </div>
+                <span className={`text-[10px] font-semibold ${activeAccount.auto_apply ? 'text-emerald-600 dark:text-emerald-400' : 'text-gray-400'}`}>
+                  Auto {activeAccount.auto_apply ? 'ON' : 'OFF'}
+                </span>
+                {activeAccount.auto_apply && (
+                  <button onClick={handleRunAutoApply} disabled={runningAutoApply || togglingAutoApply}
+                    className="flex items-center gap-1 px-2 py-0.5 rounded-lg text-[10px] font-semibold bg-emerald-50 dark:bg-emerald-900/20 text-emerald-700 dark:text-emerald-400 border border-emerald-200 dark:border-emerald-800/50 hover:bg-emerald-100 dark:hover:bg-emerald-900/40 disabled:opacity-50 disabled:cursor-wait transition-colors">
+                    {runningAutoApply
+                      ? <><span className="w-2 h-2 border-2 border-emerald-400/40 border-t-emerald-500 rounded-full animate-spin" />Running…</>
+                      : <>▶ Run</>}
+                  </button>
                 )}
               </div>
-            )}
 
-            {/* Stats strip */}
-            {activeAccount && (
-              <div className="flex gap-3 mb-4">
-                <StatTile label="Open IPOs"   value={filteredIpos.length}    accent="blue" />
-                <StatTile label="Applied"     value={appliedCount}   accent="emerald" />
-                <StatTile label="Holdings"    value={holdingsCount}  accent="purple" />
+              {/* Settings + delete */}
+              <div className="flex items-center gap-1 flex-shrink-0">
+                <button onClick={() => setEditAccount(activeAccount)} title="Account settings"
+                  className="flex items-center gap-1 px-2 py-0.5 rounded-lg text-[10px] font-semibold text-gray-500 hover:text-gray-700 hover:bg-gray-100 dark:hover:bg-gray-800 transition-all">
+                  <svg className="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z" />
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
+                  </svg>
+                  Settings
+                </button>
+                <InlineConfirm label="Remove" danger onConfirm={() => handleDeleteAccount(activeAccount.id)} disabled={deleting === activeAccount.id} />
               </div>
-            )}
-
-            {/* Tabs + refresh */}
-            <div className="flex items-center gap-1.5 mb-4">
-              {[
-                { key: 'ipos',      label: 'Open IPOs' },
-                { key: 'results',   label: 'My Results' },
-                { key: 'portfolio', label: 'Holdings' },
-              ].map(tab => (
-                <button key={tab.key} onClick={() => setActiveTab(tab.key)}
-                  className={`px-3.5 py-1.5 rounded-lg text-[11px] font-semibold transition-all ${
-                    activeTab === tab.key
-                      ? 'bg-gray-900 dark:bg-white text-white dark:text-gray-900'
-                      : 'bg-white dark:bg-gray-900 text-gray-500 border border-gray-200 dark:border-gray-800 hover:bg-gray-50 dark:hover:bg-gray-800'
-                  }`}>{tab.label}</button>
-              ))}
-              <button onClick={() => loadData(selectedAcc, activeTab, true)} title="Refresh"
-                className="ml-auto p-1.5 rounded-lg text-gray-400 hover:text-gray-600 hover:bg-gray-100 dark:hover:bg-gray-800 transition-all">
-                <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
-                </svg>
-              </button>
             </div>
+          )}
 
-            {actionError && (
-              <div className="mb-4 flex items-center gap-2 border-l-2 border-red-500 bg-red-50 dark:bg-red-900/20 rounded-r-xl px-4 py-3">
-                <span className="text-[11px] text-red-500 flex-1">{actionError}</span>
-                <button onClick={() => setActionError(null)} className="text-red-400 hover:text-red-600 text-lg leading-none">×</button>
+          {/* Auto-apply run results */}
+          {autoApplyResults && (
+            <div className="bg-white dark:bg-gray-900 rounded-xl border border-gray-100 dark:border-gray-800 px-4 py-3">
+              <div className="flex items-center justify-between mb-2">
+                <p className="text-[10px] font-semibold text-gray-400 uppercase tracking-widest">Auto-Apply Results</p>
+                <button onClick={() => setAutoApplyResults(null)} className="text-gray-300 dark:text-gray-600 hover:text-gray-500 text-sm leading-none">×</button>
               </div>
-            )}
+              {autoApplyResults.length === 0
+                ? <p className="text-[10px] text-gray-400">No auto-apply accounts found.</p>
+                : <div className="space-y-1">
+                    {autoApplyResults.map((r, i) => (
+                      <div key={i} className="flex items-center gap-2">
+                        <span className={`text-[10px] font-bold flex-shrink-0 ${r.status === 'success' ? 'text-emerald-500' : r.status === 'error' ? 'text-red-500' : 'text-gray-400'}`}>
+                          {r.status === 'success' ? '✓' : r.status === 'error' ? '✗' : '—'}
+                        </span>
+                        <span className="text-[10px] font-semibold text-gray-700 dark:text-gray-300 flex-shrink-0">{r.label}</span>
+                        <span className="text-[10px] text-gray-400 truncate">{r.message}</span>
+                      </div>
+                    ))}
+                  </div>
+              }
+            </div>
+          )}
 
-            {error && !loading && (
-              <div className="mb-4 flex items-center gap-2 border-l-2 border-red-500 bg-red-50 dark:bg-red-900/20 rounded-r-xl px-4 py-3">
-                <span className="text-[11px] text-red-500 flex-1">{error}</span>
-                <button onClick={() => loadData(selectedAcc, activeTab, true)} className="text-red-400 hover:text-red-600 font-semibold text-[10px]">Retry</button>
-              </div>
-            )}
+          {/* Errors */}
+          {actionError && (
+            <div className="flex items-center gap-2 border-l-2 border-red-500 bg-red-50 dark:bg-red-900/20 rounded-r-xl px-4 py-3">
+              <span className="text-[11px] text-red-500 flex-1">{actionError}</span>
+              <button onClick={() => setActionError(null)} className="text-red-400 hover:text-red-600 text-lg leading-none">×</button>
+            </div>
+          )}
+          {error && !loading && (
+            <div className="flex items-center gap-2 border-l-2 border-red-500 bg-red-50 dark:bg-red-900/20 rounded-r-xl px-4 py-3">
+              <span className="text-[11px] text-red-500 flex-1">{error}</span>
+              <button onClick={() => loadData(selectedAcc, activeTab, true)} className="text-red-400 hover:text-red-600 font-semibold text-[10px]">Retry</button>
+            </div>
+          )}
 
-            {loading && (
-              <div className="space-y-2">{[1,2,3].map(i => <div key={i} className="h-20 bg-gray-100 dark:bg-gray-800 rounded-2xl animate-pulse" />)}</div>
-            )}
+          {loading && (
+            <div className="space-y-2">{[1,2,3].map(i => <div key={i} className="h-20 bg-gray-100 dark:bg-gray-800 rounded-2xl animate-pulse" />)}</div>
+          )}
 
             {/* ── Open IPOs ── */}
             {!loading && activeTab === 'ipos' && (
@@ -1522,23 +1459,9 @@ function IPOPage() {
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
                   </svg>
                   <p className="text-[13px] font-semibold text-gray-400">No open IPOs at the moment</p>
-                  {hiddenCount > 0 && (
-                    <button onClick={() => setShowAllTypes(true)} className="mt-2 text-[10px] text-blue-500 hover:underline">
-                      {hiddenCount} other issue{hiddenCount > 1 ? 's' : ''} hidden (mutual funds, debentures…) — show all
-                    </button>
-                  )}
                 </div>
               ) : (
                 <div className="space-y-3">
-                  {/* Type filter toggle */}
-                  {hiddenCount > 0 && (
-                    <div className="flex items-center justify-end">
-                      <button onClick={() => setShowAllTypes(s => !s)}
-                        className="text-[10px] font-semibold text-gray-400 hover:text-gray-600 dark:hover:text-gray-300 transition-colors">
-                        {showAllTypes ? 'Hide mutual funds & debentures' : `+${hiddenCount} hidden (mutual funds, debentures…)`}
-                      </button>
-                    </div>
-                  )}
                   {filteredIpos.map((ipo, i) => {
                     const noBankSetup   = !activeAccount?.bank_id || !activeAccount?.account_number
                     const hasSavedPin   = !!activeAccount?.auto_apply
@@ -1834,7 +1757,6 @@ function IPOPage() {
               )
             )}
 
-          </div>
         </div>
       )}
 
@@ -1851,15 +1773,26 @@ function IPOPage() {
       {applyIPO && (
         <ApplyModal ipo={applyIPO} accounts={accounts} activeAccountId={selectedAcc}
           onClose={() => setApplyIPO(null)}
-          onApplied={(csid, accId) => { handleApplied(csid, accId); setApplyIPO(null) }} />
+          onApplied={(csid, accId) => {
+            handleApplied(csid, accId)
+            // Force fresh IPO fetch so Meroshare confirms the applied state
+            if (selectedAcc) loadData(selectedAcc, 'ipos', true)
+            setApplyIPO(null)
+          }} />
       )}
       {bulkApplyIPO && (
         <BulkApplyModal ipo={bulkApplyIPO} accounts={accounts}
           inFlightRef={bulkApplyInFlight}
           onClose={() => setBulkApplyIPO(null)}
-          onApplied={(csid) => { handleApplied(csid, null); setBulkApplyIPO(null) }} />
+          onApplied={(csid, succeededIds) => {
+            handleApplied(csid, succeededIds)
+            // Force fresh IPO fetch so applied state reflects Meroshare truth
+            if (selectedAcc) loadData(selectedAcc, 'ipos', true)
+            setBulkApplyIPO(null)
+          }} />
       )}
     </div>
+    </>
   )
 }
 
