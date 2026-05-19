@@ -34,7 +34,7 @@ function getInitials(name) {
     .slice(0, 2)
 }
 
-function Navbar() {
+function Navbar({ autoHide = false, hidden = false, onMouseEnter, onMouseLeave }) {
   const { user, logout } = useAuth()
   const { isDark, toggleTheme } = useTheme()
   const { t, isNepali, toggleLang } = useLanguage()
@@ -106,7 +106,19 @@ function Navbar() {
   const firstName = displayName.split(/\s+/)[0]
 
   return (
-    <nav className="glass-bar px-4 lg:px-6 py-0 flex justify-between items-center sticky top-0 z-50">
+    <nav
+      className={[
+        'glass-bar px-4 lg:px-6 py-0 flex justify-between items-center z-50',
+        // When auto-hide is active: fixed + slide transition.
+        // When normal: sticky (all other pages unchanged).
+        autoHide
+          ? 'fixed top-0 left-0 right-0 transition-transform duration-300 ease-in-out'
+          : 'sticky top-0',
+        autoHide && hidden ? '-translate-y-full' : 'translate-y-0',
+      ].join(' ')}
+      onMouseEnter={autoHide ? onMouseEnter : undefined}
+      onMouseLeave={autoHide ? onMouseLeave : undefined}
+    >
 
       {/* ── Left: Logo + Desktop nav links ─────────────────────────────────── */}
       <div className="flex items-center gap-6">

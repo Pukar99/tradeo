@@ -4,13 +4,13 @@ import { getPositions } from '../utils/globalCache'
 
 const ScreenContext = createContext(null)
 
-export function ScreenProvider({ children }) {
-  const [selectedSymbol,      setSelectedSymbol]      = useState('NEPSE')
+export function ScreenProvider({ children, initialSymbol, initialIndexId, initialIsIndex, initialTimeframe, onSymbolChange, disableMovers, disablePositions, disableNavState }) {
+  const [selectedSymbol,      setSelectedSymbol]      = useState(initialSymbol  || 'NEPSE')
   const [selectedCompanyName, setSelectedCompanyName] = useState(null)
-  const [selectedIndexId,     setSelectedIndexId]     = useState(12)
-  const [selectedIsIndex,     setSelectedIsIndex]     = useState(true)
+  const [selectedIndexId,     setSelectedIndexId]     = useState(initialIndexId ?? 12)
+  const [selectedIsIndex,     setSelectedIsIndex]     = useState(initialIsIndex ?? true)
   const [chartType,       setChartType]       = useState('candlestick')
-  const [timeframe,       setTimeframe]       = useState('1Y')
+  const [timeframe,       setTimeframe]       = useState(initialTimeframe || '1Y')
   const [activeIndicators,setActiveIndicators]= useState([])
 
   // Hover / click-lock state — drives the candle movers overlay
@@ -33,8 +33,8 @@ export function ScreenProvider({ children }) {
       .finally(() => setPositionsLoading(false))
   }, [])
 
-  // Fetch once on mount — all three consumers share this result
-  useEffect(() => { refreshPositions() }, [refreshPositions])
+  // Fetch once on mount — skipped when disablePositions=true (e.g. MultiChart panels)
+  useEffect(() => { if (!disablePositions) refreshPositions() }, [refreshPositions, disablePositions])
 
   // Active positions array — supports multiple entries for same symbol
   // Each: { id, entry_price, sl, tp, position, quantity }
@@ -52,6 +52,7 @@ export function ScreenProvider({ children }) {
     if (indexId != null) setSelectedIndexId(indexId)
     setPinnedDate(null)
     setPinnedMovers(null)
+    onSymbolChange?.(sym, indexId, companyName)
     // positions can be null, a single object (legacy), or an array
     if (positions === null) {
       setActivePositions(null)
@@ -63,7 +64,10 @@ export function ScreenProvider({ children }) {
   }, [])
 
   // On mount: read navigate state from LogsPage "Go to Chart"
+  // disableNavState=true skips this for MultiChart panels — otherwise all panels
+  // consume location.state and jump to the same symbol simultaneously (BUG-MC10).
   useEffect(() => {
+    if (disableNavState) return
     const state = location.state
     if (state?.symbol) {
       setSelectedSymbol(state.symbol)
@@ -123,6 +127,7 @@ export function ScreenProvider({ children }) {
       hoveredMovers, pinnedMovers, activeMovers,
       clickedMovers,
       onHover, onPin, clearPin,
+      disableMovers,
       activePositions,
       // backwards-compat: components that read activePosition get the first entry
       activePosition: activePositions?.[0] ?? null,

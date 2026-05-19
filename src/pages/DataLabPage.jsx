@@ -1,4 +1,5 @@
 import { useState, Suspense, lazy, createContext, useContext, useRef, useEffect } from 'react'
+import { useNavbarAutoHide, useNavbarState } from '../App'
 import { createPortal } from 'react-dom'
 import { ComplexTabProvider } from '../hooks/useComplexTab.jsx'
 import ErrorBoundary from '../components/ErrorBoundary'
@@ -250,6 +251,10 @@ export default function DataLabPage() {
   const [activeTab, setActiveTab] = useState(() => safeSessionGet('datalab_tab', 'performance'))
   const slotRef = useRef(null)    // ref to the slot DOM node
 
+  // Opt into navbar auto-hide — activates on mount, restores on unmount
+  useNavbarAutoHide()
+  const { hidden: navHidden } = useNavbarState()
+
   function handleTab(id) {
     setActiveTab(id)
     safeSessionSet('datalab_tab', id)
@@ -257,7 +262,11 @@ export default function DataLabPage() {
 
   return (
     <ToolbarSlotCtx.Provider value={slotRef}>
-      <div className="flex flex-col h-[calc(100dvh-56px)] overflow-hidden bg-gray-50 dark:bg-gray-950">
+      {/* pt reserves space for fixed navbar; transitions smoothly with slide */}
+      <div
+        className="flex flex-col overflow-hidden bg-gray-50 dark:bg-gray-950 transition-all duration-300"
+        style={{ height: '100dvh', paddingTop: navHidden ? 0 : 56 }}
+      >
 
         {/* ── Tab bar + inline toolbar ──
             Strategy: ONLY the slot scrolls horizontally. The outer row is a

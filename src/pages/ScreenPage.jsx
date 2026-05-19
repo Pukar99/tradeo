@@ -1,5 +1,6 @@
 import { useState, useEffect, useRef, lazy, Suspense, createContext, useContext } from 'react'
 import { createPortal } from 'react-dom'
+import { useNavbarAutoHide, useNavbarState } from '../App'
 import { ScreenProvider }       from '../context/ScreenContext'
 import { ComplexTabProvider }   from '../hooks/useComplexTab.jsx'
 import StockChart               from '../components/screen/StockChart'
@@ -17,12 +18,16 @@ const ScreenToolbarSlotCtx = createContext(null)
 
 export function useScreenToolbarSlot(node) {
   const slotRef = useContext(ScreenToolbarSlotCtx)
+  const [, setTick] = useState(0)
+  useEffect(() => { setTick(1) }, [])
+
   if (!slotRef?.current) return null
   return createPortal(node, slotRef.current)
 }
 
-const BacktestPage = lazy(() => import('../components/backtest/BacktestPage'))
-const ReplayPage   = lazy(() => import('../components/screen/ReplayPage'))
+const MultiChartPage = lazy(() => import('../components/screen/MultiChartPage'))
+const BacktestPage   = lazy(() => import('../components/backtest/BacktestPage'))
+const ReplayPage     = lazy(() => import('../components/screen/ReplayPage'))
 
 function TabSpinner() {
   return (
@@ -51,7 +56,11 @@ const COMPLEX_TABS = [
 // ── Simple mode content ──────────────────────────────────────────────────────
 
 function SimpleContent({ activeTab, mobilePanel, setMobilePanel }) {
-  if (activeTab === 'MultiChart') return <ComingSoon compact label="MultiChart — coming soon" />
+  if (activeTab === 'MultiChart') return (
+    <Suspense fallback={<TabSpinner />}>
+      <MultiChartPage />
+    </Suspense>
+  )
   if (activeTab === 'SMC')        return <ComingSoon compact label="SMC — coming soon" />
   if (activeTab === 'PriceAction') return <ComingSoon compact label="Price Action — coming soon" />
 
@@ -255,6 +264,10 @@ function ScreenInner() {
   const [mobilePanel, setMobilePanel] = useState(null)
   const toolbarSlotRef = useRef(null)
 
+  // Opt into navbar auto-hide — activates on mount, restores on unmount
+  useNavbarAutoHide()
+  const { hidden: navHidden } = useNavbarState()
+
   const handleMode       = (m) => { setMode(m);       sessionStorage.setItem('screen_mode', m) }
   const handleSimpleTab  = (t) => { setSimpleTab(t);  sessionStorage.setItem('screen_simpleTab', t) }
   const handleComplexTab = (t) => { setComplexTab(t); sessionStorage.setItem('screen_complexTab', t) }
@@ -270,7 +283,11 @@ function ScreenInner() {
 
   return (
     <ScreenToolbarSlotCtx.Provider value={toolbarSlotRef}>
-    <div className="flex flex-col h-[calc(100dvh-56px)] overflow-hidden bg-white dark:bg-gray-950">
+    {/* pt-[56px] reserves space for the fixed navbar. Transitions with navbar slide. */}
+    <div
+      className="flex flex-col overflow-hidden bg-white dark:bg-gray-950 transition-all duration-300"
+      style={{ height: '100dvh', paddingTop: navHidden ? 0 : 56 }}
+    >
 
       {/* ── Top strip ── */}
       {/* NOTE: ChartSymbolSearch dropdown uses absolute positioning — it must NOT
@@ -296,8 +313,8 @@ function ScreenInner() {
           }
         </div>
 
-        {/* Divider — only shown when General tab is active (slot will be populated) */}
-        {isSimple && simpleTab === 'General' && (
+        {/* Divider — shown for any simple tab that populates the toolbar slot */}
+        {isSimple && (simpleTab === 'General' || simpleTab === 'MultiChart') && (
           <div className="w-px h-4 bg-gray-200 dark:bg-gray-700 shrink-0" />
         )}
 
