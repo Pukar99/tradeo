@@ -57,6 +57,13 @@ export const TTL = {
   MOVERS_PAST:  60 * 60_000,  // 1 hour — past date movers never change
   DASHBOARD:    60 * 1_000,   // 1 min  — dashboard data
   ELIGIBILITY:  60 * 60_000,  // 1 hour — trade stats change rarely
+  NEPSE_CHART:  10 * 60_000,  // 10 min — EOD data, stable within session
+  SUGGESTIONS:  10 * 60_000,  // 10 min — chat suggestions are static per session
+  POSITIONS:    30 * 1_000,   // 30s    — trade data, invalidated on any write
+  WATCHLIST:     2 * 60_000,  // 2 min  — matches backend _watchlistCache TTL
+  MARKET_DATES: 60 * 60_000,  // 1 hour — trading dates never change once set
+  DAY_FULL:     10 * 60_000,  // 10 min — EOD day data is stable
+  FEED:         30 * 60_000,  // 30 min — IPOs and news change infrequently
 }
 
 // ── Cached wrappers for the most-fetched endpoints ────────────────────────────
@@ -66,6 +73,15 @@ import { getMarketSymbols as _getMarketSymbols } from '../api'
 import { getProfile       as _getProfile       } from '../api'
 import { getResearchEligibility as _getResearchEligibility } from '../api'
 import { getBatchPrices   as _getBatchPrices   } from '../api'
+import { getNepseChart    as _getNepseChart    } from '../api'
+import { getChatSuggestions as _getChatSuggestions } from '../api'
+import { getPositions     as _getPositions     } from '../api'
+import { getTradeActions  as _getTradeActions  } from '../api'
+import { getWatchlist     as _getWatchlist     } from '../api'
+import { getMarketDates   as _getMarketDates   } from '../api'
+import { getDayFull       as _getDayFull       } from '../api'
+import { getIPOs          as _getIPOs          } from '../api'
+import { getMarketNews    as _getMarketNews    } from '../api'
 
 export async function getMarketSymbols() {
   const cached = gCache.get('symbols')
@@ -105,6 +121,105 @@ export async function getBatchPrices(symbols) {
   return result
 }
 
+// NEPSE chart — keyed by range so each range gets its own 10-min cache entry.
+// EOD data doesn't change intraday; re-fetch is wasteful on every mount.
+export async function getNepseChart(range = '1y') {
+  const key = `nepse-chart:${range}`
+  const cached = gCache.get(key)
+  if (cached !== undefined) return cached
+  const result = await _getNepseChart(range)
+  gCache.set(key, result, TTL.NEPSE_CHART)
+  return result
+}
+
+// Chat suggestions — static per session, no need to re-fetch on every mount.
+export async function getChatSuggestions() {
+  const cached = gCache.get('suggestions')
+  if (cached !== undefined) return cached
+  const result = await _getChatSuggestions()
+  gCache.set('suggestions', result, TTL.SUGGESTIONS)
+  return result
+}
+
+// Positions — 30s TTL. Invalidated on any trade write via clearPositionsCache().
+// LogsPage and PortfolioPage both call this; the cache ensures only one network
+// request fires even if both mount simultaneously.
+export async function getPositions(status) {
+  const key = status ? `positions:${status}` : 'positions'
+  const cached = gCache.get(key)
+  if (cached !== undefined) return cached
+  const result = await _getPositions(status)
+  gCache.set(key, result, TTL.POSITIONS)
+  return result
+}
+
+// Call after any trade write (new/close/partial-exit) so next read is fresh.
+export function clearPositionsCache() {
+  gCache.delPrefix('positions')
+  gCache.del('trade-actions')
+}
+
+// Trade actions — all action rows, 30s TTL, same invalidation as positions.
+export async function getTradeActions() {
+  const cached = gCache.get('trade-actions')
+  if (cached !== undefined) return cached
+  const result = await _getTradeActions()
+  gCache.set('trade-actions', result, TTL.POSITIONS)
+  return result
+}
+
+// Watchlist — 2 min TTL matches backend cache. Invalidated after any watchlist write.
+export async function getWatchlist() {
+  const cached = gCache.get('watchlist')
+  if (cached !== undefined) return cached
+  const result = await _getWatchlist()
+  gCache.set('watchlist', result, TTL.WATCHLIST)
+  return result
+}
+export function clearWatchlistCache() { gCache.del('watchlist') }
+
+// Market dates — stable once set, cache 1 hour.
+export async function getMarketDates() {
+  const cached = gCache.get('market-dates')
+  if (cached !== undefined) return cached
+  const result = await _getMarketDates()
+  gCache.set('market-dates', result, TTL.MARKET_DATES)
+  return result
+}
+
+// Day-full — EOD data keyed by date (or 'latest' when no date given).
+export async function getDayFull(date) {
+  const key = `day-full:${date ?? 'latest'}`
+  const cached = gCache.get(key)
+  if (cached !== undefined) return cached
+  const result = await _getDayFull(date)
+  // Use past-date TTL (1hr) if date given, else 10min for 'latest'
+  gCache.set(key, result, date ? TTL.CHART : TTL.DAY_FULL)
+  return result
+}
+
+// IPO + news feed — changes infrequently, cache 30 min.
+let _feedPromise = null
+export async function getMarketFeed() {
+  const cachedIpos = gCache.get('feed-ipos')
+  const cachedNews = gCache.get('feed-news')
+  if (cachedIpos !== undefined && cachedNews !== undefined) {
+    return [cachedIpos, cachedNews]
+  }
+  // Single in-flight promise — prevents parallel mounts from doubling the request
+  if (!_feedPromise) {
+    _feedPromise = Promise.all([_getIPOs(), _getMarketNews()])
+      .then(([ir, nr]) => {
+        gCache.set('feed-ipos', ir, TTL.FEED)
+        gCache.set('feed-news', nr, TTL.FEED)
+        _feedPromise = null
+        return [ir, nr]
+      })
+      .catch(e => { _feedPromise = null; throw e })
+  }
+  return _feedPromise
+}
+
 // Dashboard init — cached 1 min client-side so navigating back to / is instant.
 // Backend also has 60s initCache, so double-caching is intentional (saves the RTT).
 // Pass force=true to bypass cache (e.g. after a trade write).
@@ -134,8 +249,11 @@ export function clearUserCache() {
   gCache.del('profile')
   gCache.del('dashboard')
   gCache.del('eligibility')
+  gCache.del('suggestions')
+  gCache.del('watchlist')
   gCache.delPrefix('tradelog')
   gCache.delPrefix('prices:')
+  gCache.delPrefix('positions')
   // Drain any registered module-local caches
   for (const fn of _cleaners) { try { fn() } catch {} }
 }

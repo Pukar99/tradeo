@@ -564,9 +564,13 @@ function CenterDashboard({ navigate, initData, onRefresh, onDataReady }) {
     const totalRealized   = closed.reduce((s, t) => s + (parseFloat(t.realized_pnl) || 0), 0)
     const profitable      = closed.filter(t => (parseFloat(t.realized_pnl) || 0) > 0).length
     const winRate         = closed.length > 0 ? Math.round((profitable / closed.length) * 100) : 0
+    const todayStr        = new Date().toISOString().slice(0, 10)
+    const todayPnl        = closed
+      .filter(t => t.last_action_at?.slice(0, 10) === todayStr)
+      .reduce((s, t) => s + (parseFloat(t.realized_pnl) || 0), 0)
     setPerfStats({
       totalPnl: totalRealized + totalUnrealized, unrealizedPnl: totalUnrealized,
-      realizedPnl: totalRealized, winRate, openCount: openWithPrices.length,
+      realizedPnl: totalRealized, todayPnl, winRate, openCount: openWithPrices.length,
       closedCount: closed.length,
       totalInvested:  openWithPrices.reduce((s, t) => s + (t.entry_price * t.quantity), 0),
       currentValue:   openWithPrices.reduce((s, t) => s + ((t.currentPrice || t.entry_price) * t.quantity), 0),
@@ -585,7 +589,7 @@ function CenterDashboard({ navigate, initData, onRefresh, onDataReady }) {
     setWatchlist([...watchWithPrices, ...portfolioItems])
     if (onDataReady) onDataReady({ openPositions: openWithPrices, perfStats: {
       totalPnl: totalRealized + totalUnrealized, unrealizedPnl: totalUnrealized,
-      realizedPnl: totalRealized, winRate, openCount: openWithPrices.length,
+      realizedPnl: totalRealized, todayPnl, winRate, openCount: openWithPrices.length,
       closedCount: closed.length,
       totalInvested:  openWithPrices.reduce((s, t) => s + (t.entry_price * t.quantity), 0),
       currentValue:   openWithPrices.reduce((s, t) => s + ((t.currentPrice || t.entry_price) * t.quantity), 0),
@@ -681,10 +685,10 @@ function CenterDashboard({ navigate, initData, onRefresh, onDataReady }) {
       {perfStats && (
         <div className="grid grid-cols-2 sm:grid-cols-4 gap-2.5">
           <StatCard
-            label={tr('stats.totalPL')}
-            value={`${perfStats.totalPnl >= 0 ? '+' : ''}Rs. ${Math.abs(Math.round(perfStats.totalPnl)).toLocaleString()}`}
-            color={perfStats.totalPnl >= 0 ? 'text-green-500' : 'text-red-500'}
-            sub={`Realized ${perfStats.realizedPnl >= 0 ? '+' : ''}Rs.${Math.round(perfStats.realizedPnl).toLocaleString()} · Open ${perfStats.unrealizedPnl >= 0 ? '+' : ''}Rs.${Math.round(perfStats.unrealizedPnl).toLocaleString()}`}
+            label="Total P/L Today"
+            value={`${perfStats.todayPnl >= 0 ? '+' : ''}Rs. ${Math.abs(Math.round(perfStats.todayPnl)).toLocaleString()}`}
+            color={perfStats.todayPnl > 0 ? 'text-green-500' : perfStats.todayPnl < 0 ? 'text-red-500' : 'text-gray-500 dark:text-gray-400'}
+            sub={perfStats.todayPnl === 0 ? 'No trades closed today' : `${perfStats.closedCount} total closed`}
           />
           <StatCard
             label="Realized P/L"
@@ -1115,8 +1119,10 @@ function LoggedInHome() {
 
         {/* LEFT — Daily Routine + Goals */}
         <div className="col-span-12 lg:col-span-3 flex flex-col gap-3 sm:gap-4">
-          <TaskBoard initData={initData?.tasks} mindsetContent={initData?.mindset?.content} />
-          <MonthlyGoals initData={initData?.goals} />
+          {initData
+            ? <><TaskBoard initData={initData.tasks} mindsetContent={initData.mindset?.content} /><MonthlyGoals initData={initData.goals} /></>
+            : <div className="flex flex-col gap-3"><div className="h-48 rounded-2xl bg-gray-100 dark:bg-gray-800 animate-pulse" /><div className="h-32 rounded-2xl bg-gray-100 dark:bg-gray-800 animate-pulse" /></div>
+          }
         </div>
 
         {/* CENTER — Stats + Watchlist */}
@@ -1126,7 +1132,10 @@ function LoggedInHome() {
 
         {/* RIGHT — Discipline Score + Open Positions + Alerts */}
         <div className="col-span-12 lg:col-span-3 flex flex-col gap-3 sm:gap-4">
-          <DisciplineScore initData={initData?.discipline} />
+          {initData
+            ? <DisciplineScore initData={initData.discipline} />
+            : <div className="h-48 rounded-2xl bg-gray-100 dark:bg-gray-800 animate-pulse" />
+          }
           <OpenPositionsPanel openPositions={dashData.openPositions} perfStats={dashData.perfStats} navigate={navigate} />
           <AlertsWidget initData={initData} />
         </div>

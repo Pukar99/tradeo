@@ -2,6 +2,7 @@ import { useState, useCallback } from 'react'
 import { useEscapeKey } from '../../hooks/useEscapeKey'
 import { partialExitPosition } from '../../api'
 import { fmt } from '../../utils/format'
+import { clearPositionsCache } from '../../utils/globalCache'
 
 const EMOTIONAL_STATES = ['Confident', 'Calm', 'Anxious', 'Fearful', 'Greedy', 'FOMO', 'Neutral']
 const EXIT_REASONS     = ['Target Hit', 'SL Hit', 'Manual Exit', 'Reversal Signal', 'Time Stop']
@@ -99,6 +100,7 @@ export default function PartialExitModal({ position, onClose, onSaved }) {
         lessons_notes:         form.lessons_notes || undefined,
         notes:                 form.notes || undefined,
       })
+      clearPositionsCache()
       onSaved(res.data)
     } catch (err) {
       setError(err.response?.data?.message || 'Failed to save partial exit')

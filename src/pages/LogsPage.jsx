@@ -1,10 +1,9 @@
 import { useState, useEffect, useCallback, useMemo, lazy, Suspense } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { useAuth } from '../context/AuthContext'
-import { getPositions, getMarketJournals, autoCreateMarketJournal } from '../api'
-import { getBatchPrices } from '../utils/globalCache'
+import { getMarketJournals, autoCreateMarketJournal } from '../api'
+import { getBatchPrices, getPositions, clearEligibilityCache } from '../utils/globalCache'
 import { useChatRefresh } from '../utils/chatEvents'
-import { clearEligibilityCache } from '../utils/globalCache'
 
 import TradeActionsTab  from '../components/logs/TradeActionsTab'
 const AuditTab         = lazy(() => import('../components/logs/AuditTab'))

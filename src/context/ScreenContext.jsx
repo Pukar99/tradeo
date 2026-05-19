@@ -1,6 +1,6 @@
 import { createContext, useContext, useState, useCallback, useEffect, useRef } from 'react'
 import { useLocation } from 'react-router-dom'
-import { getPositions } from '../api'
+import { getPositions } from '../utils/globalCache'
 
 const ScreenContext = createContext(null)
 

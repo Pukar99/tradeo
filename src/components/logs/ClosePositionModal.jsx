@@ -2,6 +2,7 @@ import { useState, useCallback } from 'react'
 import { useEscapeKey } from '../../hooks/useEscapeKey'
 import { closePosition } from '../../api'
 import { fmt } from '../../utils/format'
+import { clearEligibilityCache, clearPositionsCache } from '../../utils/globalCache'
 
 const EMOTIONAL_STATES = ['Confident', 'Calm', 'Anxious', 'Fearful', 'Greedy', 'FOMO', 'Neutral']
 const EXIT_REASONS     = ['Target Hit', 'SL Hit', 'Manual Exit', 'Reversal Signal', 'Time Stop']
@@ -88,6 +89,8 @@ export default function ClosePositionModal({ position, onClose, onSaved }) {
         lessons_notes:         form.lessons_notes || undefined,
         notes:                 form.notes || undefined,
       })
+      clearEligibilityCache()
+      clearPositionsCache()
       onSaved(res.data)
     } catch (err) {
       setError(err.response?.data?.message || 'Failed to close position')

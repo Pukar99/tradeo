@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from 'react'
 import { API } from '../api'
+import { getNepseChart as _getNepseChartCached } from '../utils/globalCache'
 import { useTheme } from '../context/ThemeContext'
 
 const ranges = [
@@ -180,20 +181,24 @@ function NEPSEChart({ fixed = false }) {
   const seriesRef         = useRef(null)
   const moversRef         = useRef({})
 
-  // ── Fixed (dual side-by-side) mode — single fetch, data passed as props ────
-  const [dailyData,  setDailyData]  = useState(null)
-  const [weeklyData, setWeeklyData] = useState(null)
+  // ── Fixed (dual side-by-side) mode — loads only on explicit button click ────
+  const [dailyData,   setDailyData]   = useState(null)
+  const [weeklyData,  setWeeklyData]  = useState(null)
+  const [fixedLoading, setFixedLoading] = useState(false)
+  const [fixedLoaded,  setFixedLoaded]  = useState(false)
 
-  useEffect(() => {
-    if (!fixed) return
+  const loadFixedChart = () => {
+    if (fixedLoading || fixedLoaded) return
+    setFixedLoading(true)
     Promise.all([
-      API.get('/api/market/nepse-chart?range=1y'),
+      _getNepseChartCached('1y'),
       API.get('/api/market/index-chart?index_id=12&timeframe=2Y&aggregate=week'),
     ]).then(([d, w]) => {
       setDailyData(d.data.data)
       setWeeklyData(w.data.data)
-    }).catch(() => {})
-  }, [fixed])
+      setFixedLoaded(true)
+    }).catch(() => {}).finally(() => setFixedLoading(false))
+  }
 
   if (fixed) {
     return (
@@ -202,6 +207,15 @@ function NEPSEChart({ fixed = false }) {
           <span className="w-1.5 h-1.5 rounded-full bg-green-400 animate-pulse" />
           <h3 className="text-[11px] font-semibold text-gray-600 dark:text-gray-400 uppercase tracking-widest">NEPSE Index</h3>
           <span className="ml-auto text-[10px] text-gray-300 dark:text-gray-600">Daily · Weekly</span>
+          {!fixedLoaded && (
+            <button
+              onClick={loadFixedChart}
+              disabled={fixedLoading}
+              className="ml-2 text-[10px] font-semibold px-2.5 py-1 rounded-lg bg-blue-50 dark:bg-blue-950 text-blue-500 hover:bg-blue-100 dark:hover:bg-blue-900 transition-colors disabled:opacity-50"
+            >
+              {fixedLoading ? 'Loading…' : 'Load Chart'}
+            </button>
+          )}
         </div>
         <div className="grid grid-cols-2 divide-x divide-gray-100 dark:divide-gray-800">
           <NEPSEMiniChart data={dailyData}  label="Daily"  height={210} />
@@ -273,7 +287,7 @@ function NEPSEChart({ fixed = false }) {
   useEffect(() => {
     if (!chartReady) return
     setLoading(true)
-    API.get(`/api/market/nepse-chart?range=${range}`)
+    _getNepseChartCached(range)
       .then(res => {
         const chartData = res.data.data
         moversRef.current = res.data.movers || {}

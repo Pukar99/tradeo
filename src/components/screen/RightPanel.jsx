@@ -1,5 +1,6 @@
 import { useState, useEffect, useCallback, useRef } from 'react'
-import { getMarketDates, getDayFull, getIPOs, getMarketNews, getTopMovers } from '../../api'
+import { getTopMovers } from '../../api'
+import { getMarketDates, getDayFull, getMarketFeed } from '../../utils/globalCache'
 import { useScreen } from '../../context/ScreenContext'
 import { useEscapeKey } from '../../hooks/useEscapeKey'
 import { safeUrl } from '../../utils/format'
@@ -421,7 +422,7 @@ export default function RightPanel() {
   // Load news/IPO feed once
   useEffect(() => {
     if (feedLoaded) return
-    Promise.all([getIPOs(), getMarketNews()])
+    getMarketFeed()
       .then(([ir, nr]) => {
         setFeedLoaded(true)
         const ipoItems = (ir.data.ipos || []).map(ipo => ({

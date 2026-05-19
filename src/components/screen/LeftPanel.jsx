@@ -1,6 +1,6 @@
 import { useState, useEffect, useCallback, useRef, useMemo } from 'react'
-import { newPosition, closePosition, getWatchlist, removeFromWatchlist, updateWatchlist } from '../../api'
-import { getBatchPrices } from '../../utils/globalCache'
+import { newPosition, closePosition, removeFromWatchlist, updateWatchlist } from '../../api'
+import { getBatchPrices, getWatchlist, clearWatchlistCache } from '../../utils/globalCache'
 import { useContextMenu } from '../ContextMenu'
 import { useChatRefresh, dispatchChatAction } from '../../utils/chatEvents'
 import { useScreen } from '../../context/ScreenContext'
@@ -180,6 +180,7 @@ function EditWatchItemForm({ item, onClose, onSaved }) {
         notes:       form.notes       || null,
         category:    form.category,
       })
+      clearWatchlistCache()
       onSaved()
     } catch (err) {
       setSaveErr(err.response?.data?.error || 'Failed to save')
@@ -401,6 +402,7 @@ export default function LeftPanel() {
                       onClick={async () => {
                         try {
                           await removeFromWatchlist(w.id)
+                          clearWatchlistCache()
                           setWatchlist(prev => prev.filter(x => x.id !== w.id))
                           setWatchErr(null)
                         } catch {

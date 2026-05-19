@@ -1242,22 +1242,7 @@ export default function StockChart() {
         const bar = param.seriesData?.get(priceSeries)
         if (!bar) return
         setTooltip({ ...bar, time: param.time, change: changeMap[param.time] })
-
-        if (!isIndex?.()) return
-        // Skip if already fetched/fetching this exact date — prevents duplicate network calls
-        // when the cursor lingers on the same candle across multiple crosshair move events
-        if (param.time === lastFetchedDate.current) return
-        // Debounce: only fire after cursor settles for 80ms on the candle
-        if (pendingHover.current) clearTimeout(pendingHover.current)
-        pendingHover.current = setTimeout(async () => {
-          if (cancelled || pinnedDateRef.current) return
-          if (param.time === lastFetchedDate.current) return
-          lastFetchedDate.current = param.time
-          const movers = await getMovers(param.time)
-          if (cancelled || pinnedDateRef.current) return
-          setOverlayData({ date: param.time, movers, pinned: false })
-          onHover(param.time, movers)
-        }, 80)
+        // Movers data loads on click only — see subscribeClick below
       })
 
       main.subscribeClick(async param => {

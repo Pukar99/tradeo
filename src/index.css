@@ -9,9 +9,9 @@ body { top: 0 !important; position: static !important; }
 #goog-gt-tt, .goog-te-balloon-frame, .goog-tooltip { display: none !important; }
 .goog-text-highlight { background: none !important; box-shadow: none !important; }
 
-/* ── Global font size: bump up 1 level for readability ──────────────────── */
+/* ── Global font size: 110% = 17.6px base — matches the "looks right at 110% zoom" point ── */
 html {
-  font-size: 106.25%; /* 1rem = ~17px instead of 16px — shifts all rem-based text ~1 size up */
+  font-size: 110%;
 }
 
 /* ── BlockNote dark theme ───────────────────────────────────────────────── */

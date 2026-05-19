@@ -1,7 +1,7 @@
 import { useState, useEffect, useCallback, useMemo, useRef } from 'react'
 import { useTheme } from '../../context/ThemeContext'
 import { useAuth } from '../../context/AuthContext'
-import { getTradeActions } from '../../api'
+import { getTradeActions } from '../../utils/globalCache'
 import TraderCard from './TraderCard'
 import { nepseCharges, nepseCGT } from '../../utils/format'
 
@@ -73,7 +73,7 @@ function ShareModal({ onClose, kpis, trades, dateLabel, user }) {
 
       const tradeRows = trades.map(t => {
         const entryDate = t.date || ''
-        const exitDate  = (t.updated_at || t.created_at || t.date || '').slice(0, 10)
+        const exitDate  = (t.date || '').slice(0, 10)
         const days      = entryDate && exitDate
           ? Math.max(0, Math.floor((new Date(exitDate) - new Date(entryDate)) / 86400000))
           : 0

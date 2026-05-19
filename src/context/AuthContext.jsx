@@ -1,5 +1,6 @@
 import { createContext, useContext, useState } from 'react'
 import { clearUserCache } from '../utils/globalCache'
+import { API } from '../api'
 
 const AuthContext = createContext()
 
@@ -52,6 +53,8 @@ export function AuthProvider({ children }) {
   }
 
   const logout = () => {
+    // Clear HttpOnly cookie on the server first (fire-and-forget — don't block UI)
+    API.post('/api/auth/logout').catch(() => {})
     localStorage.removeItem('token')
     localStorage.removeItem('user')
     // Clear once-per-session flags so they fire again on next login

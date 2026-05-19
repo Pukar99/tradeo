@@ -1,6 +1,7 @@
 import { useState, useEffect, useCallback, useMemo } from 'react'
 import { useEscapeKey } from '../../hooks/useEscapeKey'
 import { newPosition, addToPosition, getSetupTypes } from '../../api'
+import { clearPositionsCache } from '../../utils/globalCache'
 
 const MARKET_CONDITIONS = ['Bullish', 'Bearish', 'Sideways', 'Volatile', 'Low Vol']
 const EMOTIONAL_STATES  = ['Confident', 'Calm', 'Anxious', 'Fearful', 'Greedy', 'FOMO', 'Neutral']
@@ -279,6 +280,7 @@ export default function AddTradeModal({ onClose, onSaved, existingPosition }) {
           return
         }
       }
+      clearPositionsCache()
       onSaved(res.data)
     } catch (err) {
       const msg = err.response?.data?.message || err.response?.data?.error || err.message || 'Failed to save trade'

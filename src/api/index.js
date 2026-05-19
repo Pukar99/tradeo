@@ -5,6 +5,7 @@ export const BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:5000'
 export const API = axios.create({
   baseURL: BASE_URL,
   timeout: 60000, // 60s — Render free tier cold-starts can take 30–50s
+  withCredentials: true, // send HttpOnly auth cookie cross-origin (Vercel → Render)
 })
 
 // ── Request counter + 300ms dedup (dev-mode diagnostics) ─────────────────────
@@ -225,13 +226,6 @@ export const getWhatIf = (params) => API.get('/api/market/what-if', { params })
 
 // Tax Report
 export const getTaxReport        = (fy)       => API.get('/api/tax/report', { params: fy ? { fy } : {} })
-
-// Rules Library
-export const getRules            = ()         => API.get('/api/rules')
-export const addRule             = (data)     => API.post('/api/rules', data)
-export const updateRule          = (id, data) => API.put(`/api/rules/${id}`, data)
-export const deleteRule          = (id)       => API.delete(`/api/rules/${id}`)
-export const getRuleViolations   = ()         => API.get('/api/rules/violations')
 
 // Community Benchmarks
 export const getBenchmarkCompare = ()         => API.get('/api/benchmark/compare')

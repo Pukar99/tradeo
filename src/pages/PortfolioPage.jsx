@@ -2,8 +2,7 @@ import { useState, useEffect, useCallback, useMemo } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { useAuth } from '../context/AuthContext'
 import { useLanguage } from '../context/LanguageContext'
-import { getPositions, getTradeActions } from '../api'
-import { getBatchPrices } from '../utils/globalCache'
+import { getPositions, getTradeActions, getBatchPrices } from '../utils/globalCache'
 import { useChatRefresh } from '../utils/chatEvents'
 import {
   PieChart, Pie, Cell, Tooltip, ResponsiveContainer,
@@ -371,7 +370,7 @@ function MonthlyPnlChart({ closedTrades }) {
   }
   closedTrades.forEach(t => {
     if (t.realized_pnl == null) return
-    const closeDate = t.updated_at ? t.updated_at.slice(0, 7) : t.date?.slice(0, 7)
+    const closeDate = t.date?.slice(0, 7)
     if (!closeDate) return
     const m = months.find(m => m.key === closeDate)
     if (m) m.value += parseFloat(t.realized_pnl) || 0
@@ -440,7 +439,7 @@ function EquityCurve({ closedTrades }) {
   if (closedTrades.length === 0) return null
   const sorted = [...closedTrades]
     .filter(t => t.realized_pnl != null)
-    .map(t => ({ ...t, _closeDate: (t.updated_at || t.date || '').slice(0, 10) }))
+    .map(t => ({ ...t, _closeDate: (t.date || '').slice(0, 10) }))
     .filter(t => t._closeDate)
     .sort((a, b) => a._closeDate.localeCompare(b._closeDate))
   if (sorted.length < 2) return null
