@@ -122,11 +122,11 @@ function AppContent() {
     }
   }, [])
 
-  // scheduleHide: instant hide when mouse leaves navbar (delay=0).
-  // Only the initial mount uses HIDE_DELAY (3s grace before first auto-hide).
+  // scheduleHide: short delay before hiding — prevents glitter when mouse crosses
+  // the tab-bar/content boundary (paddingTop shift moves the boundary under the mouse).
   const scheduleHide = useCallback(() => {
     clearHideTimer()
-    setNavHidden(true)
+    hideTimerRef.current = setTimeout(() => setNavHidden(true), 400)
   }, [clearHideTimer])
 
   const showNavbar = useCallback(() => {

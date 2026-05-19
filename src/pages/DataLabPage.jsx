@@ -312,7 +312,7 @@ export default function DataLabPage() {
         </div>
 
         {/* ── Content — mouse entering chart area triggers navbar hide ── */}
-        <div className="flex-1 overflow-hidden min-h-0" onMouseEnter={scheduleHide}>
+        <div className="flex-1 overflow-hidden min-h-0" onMouseEnter={navHidden ? undefined : scheduleHide}>
           <TabContent activeTab={activeTab} />
         </div>
       </div>

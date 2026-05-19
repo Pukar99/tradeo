@@ -330,7 +330,7 @@ function ScreenInner() {
       </div>
 
       {/* ── Content — mouse entering chart area triggers navbar hide ── */}
-      <div className="flex-1 overflow-hidden min-h-0 flex flex-col" onMouseEnter={scheduleHide}>
+      <div className="flex-1 overflow-hidden min-h-0 flex flex-col" onMouseEnter={navHidden ? undefined : scheduleHide}>
       {isSimple ? (
         <SimpleContent
           activeTab={simpleTab}
