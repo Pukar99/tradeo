@@ -927,7 +927,7 @@ function SubPaneLabel({ title, sub, color, legend }) {
 
 // ── Main StockChart ────────────────────────────────────────────────────────────
 
-export default function StockChart({ hideToolbar = false, onChartReady, smcData = null, smcToggles = null, smcSignals = null, onChartDataReady = null }) {
+export default function StockChart({ hideToolbar = false, onChartReady, smcData = null, smcToggles = null, smcSignals = null, onChartDataReady = null, paData = null, paToggles = null }) {
   const { isDark } = useTheme()
   const {
     selectedSymbol, selectedIndexId, chartType, timeframe,
@@ -1094,6 +1094,148 @@ export default function StockChart({ hideToolbar = false, onChartReady, smcData 
       smcSeriesRef.current = []
     }
   }, [chartBuiltVer, smcData, smcToggles, smcSignals]) // eslint-disable-line react-hooks/exhaustive-deps
+
+  // ── PA series ref — declared after chartBuiltVer to avoid TDZ ───────────
+  const paSeriesRef = useRef([])
+
+  // ── Price Action overlay ──────────────────────────────────────────────────
+  useEffect(() => {
+    const chart = chartsRef.current.main
+    paSeriesRef.current.forEach(s => { try { chart?.removeSeries(s) } catch (_) {} })
+    paSeriesRef.current = []
+
+    if (!paData || !paToggles || !chart || !chartData.length) return
+    const lastDate = chartData[chartData.length - 1]?.time
+    if (!lastDate) return
+
+    // Add a horizontal line series extending from fromDate to lastDate
+    const addLine = (fromDate, level, color, lineWidth = 1, lineStyle = 0) => {
+      if (!fromDate || !level) return
+      try {
+        const s = chart.addLineSeries({ color, lineWidth, lineStyle, priceLineVisible: false, lastValueVisible: false, crosshairMarkerVisible: false })
+        s.setData([{ time: fromDate, value: level }, { time: lastDate, value: level }])
+        paSeriesRef.current.push(s)
+      } catch (_) {}
+    }
+
+    // Add a translucent zone band (two border lines only — no fill series in LW Charts v4)
+    const addZoneBand = (fromDate, top, bottom, color) => {
+      if (!fromDate || !top || !bottom) return
+      try {
+        const rgba = color + '66'
+        const sTop = chart.addLineSeries({ color: rgba, lineWidth: 1, lineStyle: 0, priceLineVisible: false, lastValueVisible: false, crosshairMarkerVisible: false })
+        sTop.setData([{ time: fromDate, value: top }, { time: lastDate, value: top }])
+        const sBot = chart.addLineSeries({ color: rgba, lineWidth: 1, lineStyle: 0, priceLineVisible: false, lastValueVisible: false, crosshairMarkerVisible: false })
+        sBot.setData([{ time: fromDate, value: bottom }, { time: lastDate, value: bottom }])
+        paSeriesRef.current.push(sTop, sBot)
+      } catch (_) {}
+    }
+
+    // Swing markers (HH/HL/LH/LL) — drawn as price markers on the price series
+    if (paToggles.showSwings && paData.swings?.length && priceSeriesRef.current) {
+      try {
+        const existing = priceSeriesRef.current.markers() || []
+        const swingMarkers = paData.swings.slice(-20).map(sw => ({
+          time:     sw.date,
+          position: (sw.type === 'HH' || sw.type === 'LH') ? 'aboveBar' : 'belowBar',
+          color:    sw.type === 'HH' ? '#3b82f6'
+                  : sw.type === 'HL' ? '#60a5fa'
+                  : sw.type === 'LH' ? '#9ca3af'
+                  : '#f87171',
+          shape: (sw.type === 'HH' || sw.type === 'LH') ? 'arrowDown' : 'arrowUp',
+          text:  sw.type,
+          size:  1,
+        }))
+        // Merge with existing markers (e.g. SMC entry markers) and sort by time
+        const merged = [...existing.filter(m => !['HH','HL','LH','LL'].includes(m.text)), ...swingMarkers]
+          .sort((a, b) => a.time < b.time ? -1 : a.time > b.time ? 1 : 0)
+        priceSeriesRef.current.setMarkers(merged)
+      } catch (_) {}
+    } else if (!paToggles.showSwings && priceSeriesRef.current) {
+      try {
+        const existing = priceSeriesRef.current.markers() || []
+        priceSeriesRef.current.setMarkers(existing.filter(m => !['HH','HL','LH','LL'].includes(m.text)))
+      } catch (_) {}
+    }
+
+    // S/R horizontal lines
+    if (paToggles.showSR && paData.support_resistance?.length) {
+      paData.support_resistance.forEach(z => {
+        const color    = z.type === 'resistance' ? '#ef4444' : '#22c55e'
+        const lw       = z.strength === 'strong' ? 2 : 1
+        const earliest = chartData[0]?.time ?? lastDate
+        addLine(earliest, z.price, color, lw)
+      })
+    }
+
+    // Demand/Supply zone bands
+    if (paToggles.showZones && paData.demand_supply?.length) {
+      paData.demand_supply.forEach(z => {
+        const color   = z.type === 'demand' ? '#22c55e' : '#ef4444'
+        const fromDate = z.origin_date ?? chartData[0]?.time
+        addZoneBand(fromDate, z.top, z.bottom, color)
+      })
+    }
+
+    // Volume spike markers
+    if (paToggles.showVolume && paData.volume_spikes?.length && priceSeriesRef.current) {
+      try {
+        const existing = priceSeriesRef.current.markers() || []
+        const volMarkers = paData.volume_spikes.slice(-15).map(sp => ({
+          time:     sp.date,
+          position: sp.type === 'bull' ? 'belowBar' : 'aboveBar',
+          color:    sp.type === 'bull' ? '#a855f7' : '#7c3aed',
+          shape:    sp.type === 'bull' ? 'arrowUp' : 'arrowDown',
+          text:     `${sp.ratio}×`,
+          size:     1,
+        }))
+        const merged = [...existing.filter(m => !m.text?.endsWith('×')), ...volMarkers]
+          .sort((a, b) => a.time < b.time ? -1 : a.time > b.time ? 1 : 0)
+        priceSeriesRef.current.setMarkers(merged)
+      } catch (_) {}
+    } else if (!paToggles.showVolume && priceSeriesRef.current) {
+      try {
+        const existing = priceSeriesRef.current.markers() || []
+        priceSeriesRef.current.setMarkers(existing.filter(m => !m.text?.endsWith('×')))
+      } catch (_) {}
+    }
+
+    // Candle pattern markers
+    if (paToggles.showPatterns && paData.patterns?.length && priceSeriesRef.current) {
+      const ABBREV = {
+        bullish_engulfing: 'ENG', bearish_engulfing: 'ENG',
+        hammer: 'HAM', shooting_star: 'SS',
+        bullish_pin: 'PIN', bearish_pin: 'PIN',
+        inside_bar: 'IB', doji: 'DOJ',
+      }
+      try {
+        const existing = priceSeriesRef.current.markers() || []
+        const ptMarkers = paData.patterns.slice(-20).map(pt => ({
+          time:     pt.date,
+          position: pt.direction === 'bull' ? 'belowBar' : 'aboveBar',
+          color:    pt.direction === 'bull' ? '#f59e0b' : '#d97706',
+          shape:    pt.direction === 'bull' ? 'arrowUp' : 'arrowDown',
+          text:     ABBREV[pt.type] ?? pt.type.slice(0, 3).toUpperCase(),
+          size:     1,
+        }))
+        const ptTypes = new Set(Object.values(ABBREV))
+        const merged = [...existing.filter(m => !ptTypes.has(m.text)), ...ptMarkers]
+          .sort((a, b) => a.time < b.time ? -1 : a.time > b.time ? 1 : 0)
+        priceSeriesRef.current.setMarkers(merged)
+      } catch (_) {}
+    } else if (!paToggles.showPatterns && priceSeriesRef.current) {
+      try {
+        const ABBREV_VALS = new Set(['ENG','HAM','SS','PIN','IB','DOJ'])
+        const existing = priceSeriesRef.current.markers() || []
+        priceSeriesRef.current.setMarkers(existing.filter(m => !ABBREV_VALS.has(m.text)))
+      } catch (_) {}
+    }
+
+    return () => {
+      paSeriesRef.current.forEach(s => { try { chart?.removeSeries(s) } catch (_) {} })
+      paSeriesRef.current = []
+    }
+  }, [chartBuiltVer, paData, paToggles]) // eslint-disable-line react-hooks/exhaustive-deps
 
   // ── Portal controls into ScreenPage tab bar ───────────────────────────────
   // hideToolbar=true when inside MultiChart panel — panel has its own header controls

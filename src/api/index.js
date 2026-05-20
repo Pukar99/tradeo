@@ -218,6 +218,9 @@ export const getStockPriceRange     = (params, cfg)   => API.get('/api/breakdown
 // SMC (Smart Money Concepts) Scanner
 export const getSMCScan = (params) => API.get('/api/smc/scan', { params })
 
+// Price Action Scanner
+export const getPriceActionScan = (params) => API.get('/api/market/price-action', { params })
+
 // AI Trade Coach — auto-debrief after trade close
 export const getTradeDebrief = (tradeData) => API.post('/api/chat/debrief', tradeData)
 

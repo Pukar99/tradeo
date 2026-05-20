@@ -25,8 +25,9 @@ export function useScreenToolbarSlot(node) {
   return createPortal(node, slotRef.current)
 }
 
-const MultiChartPage = lazy(() => import('../components/screen/MultiChartPage'))
-const SMCChartPage   = lazy(() => import('../components/screen/SMCChartPage'))
+const MultiChartPage    = lazy(() => import('../components/screen/MultiChartPage'))
+const SMCChartPage      = lazy(() => import('../components/screen/SMCChartPage'))
+const PriceActionPage   = lazy(() => import('../components/screen/PriceActionPage'))
 const BacktestPage   = lazy(() => import('../components/backtest/BacktestPage'))
 const ReplayPage     = lazy(() => import('../components/screen/ReplayPage'))
 
@@ -67,7 +68,11 @@ function SimpleContent({ activeTab, mobilePanel, setMobilePanel }) {
       <SMCChartPage />
     </Suspense>
   )
-  if (activeTab === 'PriceAction') return <ComingSoon compact label="Price Action — coming soon" />
+  if (activeTab === 'PriceAction') return (
+    <Suspense fallback={<TabSpinner />}>
+      <PriceActionPage />
+    </Suspense>
+  )
 
   // General — chart + panels layout
   return (
