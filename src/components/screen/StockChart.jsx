@@ -1339,7 +1339,11 @@ export default function StockChart({ hideToolbar = false, onChartReady, smcData 
           for (let i = 0; i < 7; i++) {
             const s = d.toISOString().slice(0, 10)
             const dow = d.getUTCDay()
-            const isWeekend = s >= '2026-04-01' ? (dow === 0 || dow === 6) : (dow === 5 || dow === 6)
+            // NEPSE switched to Sun–Thu (Sat+Sun off) starting Nepali year 2082 (≈ mid-April 2025).
+            // Use April 13 of each Gregorian year as the conservative cutoff for the new weekend rule.
+            const year = parseInt(s.slice(0, 4))
+            const nepaliNewYearApprox = `${year}-04-13`
+            const isWeekend = s >= nepaliNewYearApprox ? (dow === 0 || dow === 6) : (dow === 5 || dow === 6)
             if (!isWeekend) return s
             d.setUTCDate(d.getUTCDate() - 1)
           }

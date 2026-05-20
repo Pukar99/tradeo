@@ -288,7 +288,7 @@ function ProfilePage() {
             <div className="flex items-center gap-4 sm:gap-6">
               <div className="relative">
                 <div className="w-16 h-16 sm:w-24 sm:h-24 rounded-2xl overflow-hidden border-4 border-white border-opacity-20 shadow-xl">
-                  {profile.user.avatar_url && !avatarImgError ? (
+                  {profile.user.avatar_url && !avatarImgError && /^https?:\/\//.test(profile.user.avatar_url) ? (
                     <img
                       src={profile.user.avatar_url}
                       alt={profile.user.name}

@@ -511,7 +511,7 @@ export default function RightPanel() {
           <button
             key={key}
             onClick={() => setMoverTab(key)}
-            className={`flex-1 py-1 rounded-lg text-[10px] font-semibold transition-colors ${
+            className={`flex-1 min-h-[32px] py-1 rounded-lg text-[10px] font-semibold transition-colors ${
               moverTab === key
                 ? key === 'gainers' ? 'bg-white dark:bg-gray-700 text-emerald-600 shadow-sm'
                 : key === 'losers'  ? 'bg-white dark:bg-gray-700 text-red-500 shadow-sm'
@@ -544,10 +544,10 @@ export default function RightPanel() {
               <table className="w-full">
                 <thead>
                   <tr className="border-b border-gray-100 dark:border-gray-800">
-                    <th className="text-left text-[9px] text-gray-300 dark:text-gray-600 pb-1 w-4">#</th>
-                    <th className="text-left text-[9px] text-gray-400 pb-1">Symbol</th>
-                    <th className="text-right text-[9px] text-gray-400 pb-1">{moverTab === 'volume' ? 'Turnover' : 'Close'}</th>
-                    <th className="text-right text-[9px] text-gray-400 pb-1">Chg%</th>
+                    <th className="text-left text-[10px] text-gray-300 dark:text-gray-600 pb-1 w-4">#</th>
+                    <th className="text-left text-[10px] text-gray-400 pb-1">Symbol</th>
+                    <th className="text-right text-[10px] text-gray-400 pb-1">{moverTab === 'volume' ? 'Turnover' : 'Close'}</th>
+                    <th className="text-right text-[10px] text-gray-400 pb-1">Chg%</th>
                   </tr>
                 </thead>
                 <tbody translate="no">

@@ -142,7 +142,7 @@ function Navbar({ autoHide = false, hidden = false, onMouseEnter, onMouseLeave }
             >
               {link.label}
               {isActive(link.path) && (
-                <span className="absolute bottom-0 left-0 right-0 h-0.5 bg-green-500 rounded-t-full" />
+                <span className="absolute bottom-0 left-0 right-0 h-0.5 bg-green-500 rounded-t-full animate-scale-x-in origin-left" />
               )}
             </Link>
           ))}
@@ -299,22 +299,23 @@ function Navbar({ autoHide = false, hidden = false, onMouseEnter, onMouseLeave }
         </button>
       </div>
 
-      {/* ── Mobile menu drawer ──────────────────────────────────────────────── */}
+      {/* ── Mobile menu drawer — slide-down on open ─────────────────────────── */}
       {mobileMenuOpen && (
-        <div className="lg:hidden absolute top-full left-0 right-0 bg-white/95 dark:bg-gray-950/95 backdrop-blur-md border-b border-gray-200/60 dark:border-gray-800/60 shadow-xl z-50">
+        <div className="lg:hidden absolute top-full left-0 right-0 bg-white/95 dark:bg-gray-950/95 backdrop-blur-md border-b border-gray-200/60 dark:border-gray-800/60 shadow-xl z-50 animate-slide-down">
           {/* green accent bar at top */}
           <div className="h-0.5 bg-gradient-to-r from-green-500 via-green-400 to-transparent" />
           <div className="px-4 py-3 space-y-1">
-            {NAV_LINKS.map(link => (
+            {NAV_LINKS.map((link, i) => (
               <Link
                 key={link.path}
                 to={link.path}
                 onClick={() => setMobileMenuOpen(false)}
-                className={`flex items-center justify-between px-4 py-3 min-h-[48px] rounded-xl text-sm font-semibold transition-all ${
+                className={`flex items-center justify-between px-4 py-3 min-h-[48px] rounded-xl text-sm font-semibold transition-all animate-slide-down ${
                   isActive(link.path)
                     ? 'bg-green-500 text-white shadow-sm shadow-green-500/30'
                     : 'text-gray-600 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-800/80 hover:text-gray-900 dark:hover:text-white'
                 }`}
+                style={{ animationDelay: `${i * 40}ms` }}
               >
                 <span>{link.label}</span>
                 {isActive(link.path) && (

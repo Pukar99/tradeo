@@ -188,7 +188,8 @@ function FloatingChat() {
             </div>
             <button
               onClick={() => setIsOpen(false)}
-              className="w-5 h-5 flex items-center justify-center rounded
+              aria-label="Close chat"
+              className="w-7 h-7 flex items-center justify-center rounded
                 text-gray-400 hover:text-gray-600 dark:hover:text-gray-300
                 hover:bg-gray-200 dark:hover:bg-gray-700 text-sm leading-none transition-colors"
             >
@@ -213,7 +214,8 @@ function FloatingChat() {
       >
         <button
           className="w-full h-full rounded-xl flex items-center justify-center transition-all duration-200 cursor-grab active:cursor-grabbing select-none glass-fab hover:scale-105"
-          tabIndex={-1}
+          tabIndex={0}
+          aria-label="Open Tradeo AI chat"
         >
           {(
             <svg width="26" height="26" viewBox="0 0 40 40" fill="none">

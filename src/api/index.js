@@ -81,11 +81,18 @@ API.interceptors.response.use(
       if (entry) { entry.reject(error); _inFlight.delete(key) }
     }
     if (error.response?.status === 401) {
+      const hadToken = !!localStorage.getItem('token')
       localStorage.removeItem('token')
       localStorage.removeItem('user')
-      if (!window.location.pathname.startsWith('/login')) {
-        sessionStorage.setItem('authExpiredMsg', 'Your session has expired. Please log in again.')
-        window.location.href = '/login'
+      // Only force-redirect when the user HAD a token that expired mid-session.
+      // If there was no token, the user is simply unauthenticated — let the page
+      // handle it gracefully (show a login wall inline, not a hard redirect).
+      if (hadToken) {
+        const onAuthPage = ['/login', '/signup'].some(p => window.location.pathname.startsWith(p))
+        if (!onAuthPage) {
+          sessionStorage.setItem('authExpiredMsg', 'Your session has expired. Please log in again.')
+          window.location.href = '/login'
+        }
       }
     }
     return Promise.reject(error)

@@ -90,7 +90,8 @@ function ToggleChip({ label, active, onClick, activeColor }) {
   return (
     <button
       onClick={onClick}
-      className={`px-2 py-0.5 rounded text-[10px] font-semibold transition-all border whitespace-nowrap ${
+      aria-pressed={active}
+      className={`min-h-[28px] px-2 py-0.5 rounded text-[10px] font-semibold transition-all border whitespace-nowrap ${
         active
           ? `text-white border-transparent`
           : 'border-gray-200 dark:border-gray-700 text-gray-500 dark:text-gray-400 hover:border-gray-300'
@@ -249,7 +250,7 @@ function SMCToolbar({ toggles, setToggles, config, setConfig }) {
             <div className="flex gap-1 mb-3">
               {[1,2,3,4,5,6].map(n => (
                 <button key={n} onClick={() => updateConfig('minScore', n)}
-                  className={`w-6 h-6 rounded text-[10px] font-bold transition-colors ${
+                  className={`w-8 h-8 rounded text-[10px] font-bold transition-colors ${
                     config.minScore === n
                       ? 'bg-blue-600 text-white'
                       : 'bg-gray-100 dark:bg-gray-800 text-gray-500 dark:text-gray-400'
@@ -364,7 +365,7 @@ function SMCLeftPanel({ smcData, biasScore, chartData, currentPrice }) {
   const rangeHigh = chartData?.length ? Math.max(...chartData.map(d => d.high)) : 0
   const rangeLow  = chartData?.length ? Math.min(...chartData.map(d => d.low))  : 0
 
-  const LABEL = 'text-[9px] font-bold uppercase tracking-widest text-gray-400 dark:text-gray-500'
+  const LABEL = 'text-[10px] font-bold uppercase tracking-widest text-gray-400 dark:text-gray-500'
   const VAL   = 'text-[11px] font-semibold text-gray-800 dark:text-gray-100'
   const SUB   = 'text-[10px] text-gray-500 dark:text-gray-400'
 
@@ -473,7 +474,7 @@ function SMCLeftPanel({ smcData, biasScore, chartData, currentPrice }) {
 function SMCRightPanel({ smcData, signals, kpis, config }) {
   const [tab, setTab] = useState('signals')
 
-  const LABEL = 'text-[9px] font-bold uppercase tracking-widest text-gray-400 dark:text-gray-500'
+  const LABEL = 'text-[10px] font-bold uppercase tracking-widest text-gray-400 dark:text-gray-500'
   const VAL   = 'text-[12px] font-bold tabular-nums text-gray-800 dark:text-gray-100'
   const SUB   = 'text-[10px] text-gray-500 dark:text-gray-400'
 

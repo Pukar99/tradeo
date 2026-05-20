@@ -212,11 +212,11 @@ export function LanguageProvider({ children }) {
   const t = (path) => {
     const keys = path.split('.')
     let val = translations[lang]
-    for (const k of keys) {
-      val = val?.[k]
-      if (val === undefined) return path
-    }
-    return val
+    for (const k of keys) val = val?.[k]
+    if (val !== undefined) return val
+    let en = translations['en']
+    for (const k of keys) en = en?.[k]
+    return en ?? path
   }
 
   return (

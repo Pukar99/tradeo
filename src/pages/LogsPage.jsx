@@ -1,6 +1,4 @@
 import { useState, useEffect, useCallback, useMemo, lazy, Suspense } from 'react'
-import { useNavigate } from 'react-router-dom'
-import { useAuth } from '../context/AuthContext'
 import { getMarketJournals, autoCreateMarketJournal } from '../api'
 import { getBatchPrices, getPositions, clearEligibilityCache } from '../utils/globalCache'
 import { useChatRefresh } from '../utils/chatEvents'
@@ -26,9 +24,6 @@ const TABS = [
 ]
 
 export default function LogsPage() {
-  const { user }  = useAuth()
-  const navigate  = useNavigate()
-
   const [positions,  setPositions]  = useState([])
   const [ltpMap,     setLtpMap]     = useState({})
   const [loading,    setLoading]    = useState(true)
@@ -126,19 +121,6 @@ export default function LogsPage() {
     positions.forEach(p => seen.add(p.symbol))
     return [...seen]
   }, [positions])
-
-  if (!user) return (
-    <div className="min-h-screen bg-gray-50 dark:bg-gray-950 flex items-center justify-center p-6">
-      <div className="bg-white dark:bg-gray-900 rounded-2xl border border-gray-100 dark:border-gray-800 p-10 text-center max-w-sm">
-        <p className="text-sm font-semibold text-gray-800 dark:text-gray-200 mb-1">Login required</p>
-        <p className="text-xs text-gray-400 mb-5">Please log in to view your trade log.</p>
-        <div className="flex gap-2 justify-center">
-          <button onClick={() => navigate('/login')} className="bg-blue-600 text-white px-5 py-2 rounded-xl text-xs font-semibold hover:bg-blue-700 transition-colors">Login</button>
-          <button onClick={() => navigate('/signup')} className="bg-gray-100 dark:bg-gray-800 text-gray-600 dark:text-gray-300 px-5 py-2 rounded-xl text-xs font-semibold hover:bg-gray-200 transition-colors">Sign up</button>
-        </div>
-      </div>
-    </div>
-  )
 
   if (loading) return (
     <div className="flex flex-col h-[calc(100dvh-56px)] overflow-hidden bg-gray-50 dark:bg-gray-950 animate-pulse">

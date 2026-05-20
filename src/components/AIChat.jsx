@@ -626,7 +626,7 @@ function QuickForm({ type, onSubmit, onCancel }) {
       <div className="bg-white dark:bg-gray-900 border border-green-300 dark:border-green-800 rounded-2xl p-3 space-y-2">
         <p className="text-[11px] font-semibold text-green-600 dark:text-green-400 flex items-center gap-1">📒 Log BUY Trade</p>
         <div className="grid grid-cols-2 gap-1.5">
-          <input placeholder="Symbol (NABIL)" value={form.symbol||''} onChange={e=>set('symbol',e.target.value.toUpperCase())}
+          <input placeholder="Symbol (NABIL)" value={form.symbol||''} onChange={e=>set('symbol',e.target.value.toUpperCase().replace(/[^A-Z0-9]/g, '').slice(0, 15))}
             className="col-span-2 border border-gray-200 dark:border-gray-700 dark:bg-gray-800 dark:text-white rounded-xl px-2.5 py-1.5 text-xs focus:outline-none focus:border-green-400" />
           <input placeholder="Qty (kittas)" type="number" value={form.qty||''} onChange={e=>set('qty',e.target.value)}
             className="border border-gray-200 dark:border-gray-700 dark:bg-gray-800 dark:text-white rounded-xl px-2.5 py-1.5 text-xs focus:outline-none focus:border-green-400" />
@@ -656,7 +656,7 @@ function QuickForm({ type, onSubmit, onCancel }) {
       <div className="bg-white dark:bg-gray-900 border border-red-300 dark:border-red-800 rounded-2xl p-3 space-y-2">
         <p className="text-[11px] font-semibold text-red-500 flex items-center gap-1">🏁 Close / Sell Trade</p>
         <div className="grid grid-cols-2 gap-1.5">
-          <input placeholder="Symbol (NABIL)" value={form.symbol||''} onChange={e=>set('symbol',e.target.value.toUpperCase())}
+          <input placeholder="Symbol (NABIL)" value={form.symbol||''} onChange={e=>set('symbol',e.target.value.toUpperCase().replace(/[^A-Z0-9]/g, '').slice(0, 15))}
             className="col-span-2 border border-gray-200 dark:border-gray-700 dark:bg-gray-800 dark:text-white rounded-xl px-2.5 py-1.5 text-xs focus:outline-none focus:border-red-400" />
           <input placeholder="Exit price" type="number" value={form.exit||''} onChange={e=>set('exit',e.target.value)}
             className="col-span-2 border border-gray-200 dark:border-gray-700 dark:bg-gray-800 dark:text-white rounded-xl px-2.5 py-1.5 text-xs focus:outline-none focus:border-red-400" />
@@ -679,7 +679,7 @@ function QuickForm({ type, onSubmit, onCancel }) {
       <div className="bg-white dark:bg-gray-900 border border-purple-300 dark:border-purple-800 rounded-2xl p-3 space-y-2">
         <p className="text-[11px] font-semibold text-purple-600 dark:text-purple-400 flex items-center gap-1">👁️ Add to Watchlist</p>
         <div className="space-y-1.5">
-          <input placeholder="Symbol (e.g. NABIL)" value={form.symbol||''} onChange={e=>set('symbol',e.target.value.toUpperCase())}
+          <input placeholder="Symbol (e.g. NABIL)" value={form.symbol||''} onChange={e=>set('symbol',e.target.value.toUpperCase().replace(/[^A-Z0-9]/g, '').slice(0, 15))}
             className="w-full border border-gray-200 dark:border-gray-700 dark:bg-gray-800 dark:text-white rounded-xl px-2.5 py-1.5 text-xs focus:outline-none focus:border-purple-400" />
           <div className="flex gap-1">
             {['active','pre'].map(cat => (
@@ -712,7 +712,7 @@ function QuickForm({ type, onSubmit, onCancel }) {
       <div className="bg-white dark:bg-gray-900 border border-orange-300 dark:border-orange-800 rounded-2xl p-3 space-y-2">
         <p className="text-[11px] font-semibold text-orange-500 flex items-center gap-1">🎯 Update SL / TP</p>
         <div className="grid grid-cols-2 gap-1.5">
-          <input placeholder="Symbol" value={form.symbol||''} onChange={e=>set('symbol',e.target.value.toUpperCase())}
+          <input placeholder="Symbol" value={form.symbol||''} onChange={e=>set('symbol',e.target.value.toUpperCase().replace(/[^A-Z0-9]/g, '').slice(0, 15))}
             className="col-span-2 border border-gray-200 dark:border-gray-700 dark:bg-gray-800 dark:text-white rounded-xl px-2.5 py-1.5 text-xs focus:outline-none focus:border-orange-400" />
           <input placeholder="Stop Loss" type="number" value={form.sl||''} onChange={e=>set('sl',e.target.value)}
             className="border border-gray-200 dark:border-gray-700 dark:bg-gray-800 dark:text-white rounded-xl px-2.5 py-1.5 text-xs focus:outline-none focus:border-red-400" />
@@ -741,7 +741,7 @@ function QuickForm({ type, onSubmit, onCancel }) {
       <div className="bg-white dark:bg-gray-900 border border-sky-300 dark:border-sky-800 rounded-2xl p-3 space-y-2">
         <p className="text-[11px] font-semibold text-sky-600 dark:text-sky-400 flex items-center gap-1">🧮 NEPSE Broker Fee Calculator</p>
         <div className="grid grid-cols-2 gap-1.5">
-          <input placeholder="Symbol (NABIL)" value={form.symbol||''} onChange={e=>set('symbol',e.target.value.toUpperCase())}
+          <input placeholder="Symbol (NABIL)" value={form.symbol||''} onChange={e=>set('symbol',e.target.value.toUpperCase().replace(/[^A-Z0-9]/g, '').slice(0, 15))}
             className="col-span-2 border border-gray-200 dark:border-gray-700 dark:bg-gray-800 dark:text-white rounded-xl px-2.5 py-1.5 text-xs focus:outline-none focus:border-sky-400" />
           <input placeholder="Qty (kittas)" type="number" value={form.qty||''} onChange={e=>set('qty',e.target.value)}
             className="border border-gray-200 dark:border-gray-700 dark:bg-gray-800 dark:text-white rounded-xl px-2.5 py-1.5 text-xs focus:outline-none focus:border-sky-400" />
@@ -1074,6 +1074,7 @@ function AIChat({ isFullPage = false, onClose }) {
 
     try {
       abortCtrlRef.current?.abort()
+      abortCtrlRef.current = null
       const ctrl = new AbortController()
       abortCtrlRef.current = ctrl
 
@@ -1134,7 +1135,7 @@ function AIChat({ isFullPage = false, onClose }) {
           }
         } catch (streamErr) {
           console.error('SSE stream read error:', streamErr)
-          // Mark message as complete even if stream was cut
+          try { reader.cancel() } catch { /* ignore cancel errors */ }
           setMessages(prev => prev.map(m => m.id === msgId
             ? { ...m, streaming: false, content: fullText || 'Stream interrupted. Please try again.' }
             : m))
@@ -1216,7 +1217,7 @@ function AIChat({ isFullPage = false, onClose }) {
     }
   }
 
-  const formatTime = (date) => new Date(date).toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' })
+  const formatTime = (date) => date ? new Date(date).toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' }) : ''
 
   // ── Session management ───────────────────────────────────────────────────────
   const handleOpenHistory = async () => {

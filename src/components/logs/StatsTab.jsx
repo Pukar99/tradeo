@@ -5,7 +5,7 @@ import {
 
 // ── Design tokens (match DataLab) ─────────────────────────────────────────────
 const CARD  = 'bg-white dark:bg-gray-900 rounded-2xl border border-gray-100 dark:border-gray-800'
-const LABEL = 'text-[9px] font-bold uppercase tracking-widest text-gray-400'
+const LABEL = 'text-[10px] font-bold uppercase tracking-widest text-gray-400'
 const SVAL  = 'text-[15px] font-black tracking-tight tabular-nums leading-tight'
 
 // ── Range config ──────────────────────────────────────────────────────────────
@@ -27,14 +27,16 @@ function rangeStart(key) {
 }
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
-const fmtRs = n => {
+// Compact notation for chart/stat display — not the same as format.js fmtRs
+const fmtCompact = n => {
   const abs = Math.abs(n)
   if (abs >= 100000) return `Rs ${(n / 100000).toFixed(1)}L`
   if (abs >= 1000)   return `Rs ${(n / 1000).toFixed(1)}k`
   return `Rs ${Math.round(n).toLocaleString()}`
 }
 
-const fmtPct = n => `${(n * 100).toFixed(1)}%`
+// Converts a 0–1 ratio to percentage string — not the same as format.js fmtPct (which takes 0–100)
+const fmtRatio = n => `${(n * 100).toFixed(1)}%`
 
 // ── KPI card ──────────────────────────────────────────────────────────────────
 function KpiCard({ label, value, valueClass = 'text-gray-900 dark:text-white', sub }) {
@@ -99,8 +101,8 @@ function CurveTooltip({ active, payload }) {
   return (
     <div className="bg-white dark:bg-gray-900 border border-gray-100 dark:border-gray-800 rounded-lg px-3 py-2 shadow-lg text-[10px]">
       <p className="text-gray-400 mb-0.5">{pt.date}</p>
-      <p className={`font-bold tabular-nums ${color}`}>{fmtRs(pt.cum)}</p>
-      <p className="text-gray-400 tabular-nums">{pt.pnl >= 0 ? '+' : ''}{fmtRs(pt.pnl)} this trade</p>
+      <p className={`font-bold tabular-nums ${color}`}>{fmtCompact(pt.cum)}</p>
+      <p className="text-gray-400 tabular-nums">{pt.pnl >= 0 ? '+' : ''}{fmtCompact(pt.pnl)} this trade</p>
     </div>
   )
 }
@@ -108,7 +110,7 @@ function CurveTooltip({ active, payload }) {
 // ── Main component ────────────────────────────────────────────────────────────
 export default function StatsTab({ positions, loading, range }) {
   const closedTrades = useMemo(
-    () => (positions || []).filter(t => t.status === 'CLOSED'),
+    () => (positions || []).filter(t => t.status === 'CLOSED' || t.status === 'PARTIAL'),
     [positions]
   )
 
@@ -226,7 +228,7 @@ export default function StatsTab({ positions, loading, range }) {
       <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
         <KpiCard
           label="Win Rate"
-          value={fmtPct(stats.winRate)}
+          value={fmtRatio(stats.winRate)}
           valueClass={stats.winRate >= 0.5 ? 'text-green-600 dark:text-green-400' : 'text-red-600 dark:text-red-400'}
           sub={`${stats.winCount} / ${stats.totalTrades} trades`}
         />
@@ -238,13 +240,13 @@ export default function StatsTab({ positions, loading, range }) {
         />
         <KpiCard
           label="Avg Win"
-          value={stats.avgWin !== null ? fmtRs(stats.avgWin) : '—'}
+          value={stats.avgWin !== null ? fmtCompact(stats.avgWin) : '—'}
           valueClass="text-green-600 dark:text-green-400"
           sub={stats.avgWin !== null ? `${stats.winCount} wins` : 'No winning trades'}
         />
         <KpiCard
           label="Avg Loss"
-          value={stats.avgLoss !== null ? fmtRs(stats.avgLoss) : '—'}
+          value={stats.avgLoss !== null ? fmtCompact(stats.avgLoss) : '—'}
           valueClass="text-red-600 dark:text-red-400"
           sub={stats.avgLoss !== null ? `${stats.totalTrades - stats.winCount} losses` : 'No losing trades'}
         />
@@ -254,25 +256,25 @@ export default function StatsTab({ positions, loading, range }) {
       <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
         <KpiCard
           label="Total P&L"
-          value={fmtRs(stats.totalPnl)}
+          value={fmtCompact(stats.totalPnl)}
           valueClass={pnlColor}
           sub={`${stats.totalTrades} closed trades`}
         />
         <KpiCard
           label="Max Drawdown"
-          value={stats.maxDD > 0 ? fmtRs(stats.maxDD) : 'None'}
+          value={stats.maxDD > 0 ? fmtCompact(stats.maxDD) : 'None'}
           valueClass={stats.maxDD > 0 ? 'text-red-600 dark:text-red-400' : 'text-green-600 dark:text-green-400'}
           sub="Peak-to-trough"
         />
         <KpiCard
           label="Best Trade"
-          value={fmtRs(parseFloat(stats.best.total_realized_pnl) || 0)}
+          value={fmtCompact(parseFloat(stats.best.total_realized_pnl) || 0)}
           valueClass="text-green-600 dark:text-green-400"
           sub={stats.best.symbol}
         />
         <KpiCard
           label="Worst Trade"
-          value={fmtRs(parseFloat(stats.worst.total_realized_pnl) || 0)}
+          value={fmtCompact(parseFloat(stats.worst.total_realized_pnl) || 0)}
           valueClass="text-red-600 dark:text-red-400"
           sub={stats.worst.symbol}
         />
@@ -385,7 +387,7 @@ export default function StatsTab({ positions, loading, range }) {
             <div className="pt-1 border-t border-gray-100 dark:border-gray-800">
               <p className={`${LABEL} mb-1`}>Expectancy per trade</p>
               <p className={`text-[13px] font-bold tabular-nums ${stats.totalPnl >= 0 ? 'text-green-600 dark:text-green-400' : 'text-red-500 dark:text-red-400'}`}>
-                {fmtRs(stats.totalPnl / stats.totalTrades)}
+                {fmtCompact(stats.totalPnl / stats.totalTrades)}
               </p>
             </div>
           </div>

@@ -1,4 +1,4 @@
-import { useState, useCallback, useMemo, useRef } from 'react'
+import { useState, useCallback, useMemo } from 'react'
 import { deleteTradeAction, deleteEntireTrade } from '../../api'
 import PositionRow from './PositionRow'
 import AddTradeModal from './AddTradeModal'
@@ -14,8 +14,7 @@ export default function TradeActionsTab({ positions, ltpMap, view, filter, searc
   const [confirmDel,    setConfirmDel]   = useState(null)
   const [deleting,      setDeleting]     = useState(false)
   const [deleteErr,     setDeleteErr]    = useState(null)
-  const refreshTickRef = useRef(0)
-  const [refreshTick,  setRefreshTick]  = useState(0)
+  const [refreshTick, setRefreshTick] = useState(0)
 
   const displayed = useMemo(() => {
     let list = positions || []
@@ -32,8 +31,7 @@ export default function TradeActionsTab({ positions, ltpMap, view, filter, searc
     setAddTarget(null)
     setCloseTarget(null)
     setPartialTarget(null)
-    refreshTickRef.current += 1
-    setRefreshTick(refreshTickRef.current)
+    setRefreshTick(prev => prev + 1)
     onRefresh()
   }, [onRefresh, setAddModal])
 

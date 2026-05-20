@@ -85,7 +85,8 @@ function ToggleChip({ label, active, onClick, activeColor }) {
   return (
     <button
       onClick={onClick}
-      className={`px-2 py-0.5 rounded text-[10px] font-semibold transition-all border whitespace-nowrap ${
+      aria-pressed={active}
+      className={`min-h-[28px] px-2 py-0.5 rounded text-[10px] font-semibold transition-all border whitespace-nowrap ${
         active
           ? 'text-white border-transparent'
           : 'border-gray-200 dark:border-gray-700 text-gray-500 dark:text-gray-400 hover:border-gray-300'
@@ -307,7 +308,7 @@ function PAToolbar({ toggles, setToggles, config, setConfig }) {
 
 // ── Left Panel ────────────────────────────────────────────────────────────────
 function PALeftPanel({ paData, chartData, currentPrice }) {
-  const LABEL = 'text-[9px] font-bold uppercase tracking-widest text-gray-400 dark:text-gray-500'
+  const LABEL = 'text-[10px] font-bold uppercase tracking-widest text-gray-400 dark:text-gray-500'
   const SUB   = 'text-[10px] text-gray-500 dark:text-gray-400'
   const VAL   = 'text-[11px] font-semibold text-gray-800 dark:text-gray-100'
 
@@ -514,7 +515,7 @@ function PALeftPanel({ paData, chartData, currentPrice }) {
 function PARightPanel({ paData, kpis }) {
   const [tab, setTab] = useState('signals')
 
-  const LABEL = 'text-[9px] font-bold uppercase tracking-widest text-gray-400 dark:text-gray-500'
+  const LABEL = 'text-[10px] font-bold uppercase tracking-widest text-gray-400 dark:text-gray-500'
   const VAL   = 'text-[12px] font-bold tabular-nums text-gray-800 dark:text-gray-100'
   const SUB   = 'text-[10px] text-gray-500 dark:text-gray-400'
 

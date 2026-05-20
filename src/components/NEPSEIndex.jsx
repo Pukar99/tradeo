@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react'
-import { getNepseChart } from '../api'
+import { getNepseChart } from '../utils/globalCache'
 
 function NEPSEIndex() {
   const [data, setData] = useState(null)

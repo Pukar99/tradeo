@@ -282,7 +282,7 @@ function NEPSEChart({ fixed = false }) {
       cancelled = true
       if (chartRef.current) { chartRef.current.remove(); chartRef.current = null; seriesRef.current = null }
     }
-  }, [isDark])
+  }, []) // eslint-disable-line react-hooks/exhaustive-deps — isDark intentionally excluded: theme changes handled by applyOptions effect above
 
   useEffect(() => {
     if (!chartReady) return

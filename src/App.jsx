@@ -1,4 +1,4 @@
-import { BrowserRouter, Routes, Route, useLocation, useNavigate } from 'react-router-dom'
+import { BrowserRouter, Routes, Route, Navigate, useLocation, useNavigate } from 'react-router-dom'
 import { Component, useEffect, useMemo, lazy, Suspense, createContext, useContext, useRef, useState, useCallback } from 'react'
 import toast, { Toaster } from 'react-hot-toast'
 import { PriceAlertContainer, useAlertToasts } from './components/PriceAlertToast'
@@ -6,9 +6,11 @@ import { usePriceAlerts } from './hooks/usePriceAlerts'
 import { useAuth } from './context/AuthContext'
 import { useTheme } from './context/ThemeContext'
 import { useHotkeys } from './hooks/useHotkeys'
-import { getProfile, runMeroshareAutoApplyOnLogin } from './api'
+import { runMeroshareAutoApplyOnLogin } from './api'
+import { getProfile } from './utils/globalCache'
 import Navbar from './components/Navbar'
 import FloatingChat from './components/FloatingChat'
+import PrivateRoute from './components/PrivateRoute'
 
 // Lazy-loaded pages — each becomes its own JS chunk, reducing initial bundle size
 const HomePage           = lazy(() => import('./pages/HomePage'))
@@ -54,20 +56,10 @@ export function useNavbarState() {
   return { active, hidden, showNavbar, scheduleHide }
 }
 
-// Placeholder for pages being built in v2.0
-function ComingSoonPage({ title }) {
-  return (
-    <div className="flex flex-col items-center justify-center min-h-[60vh] gap-3">
-      <p className="text-2xl font-bold text-gray-900 dark:text-white">{title}</p>
-      <p className="text-sm text-gray-400">Coming soon — being built in v2.0</p>
-    </div>
-  )
-}
-
 // Shared page-level loading spinner
 function PageSpinner() {
   return (
-    <div className="flex items-center justify-center min-h-[60vh]">
+    <div className="flex items-center justify-center min-h-[60vh] animate-fade-in">
       <div className="w-8 h-8 border-2 border-blue-500 border-t-transparent rounded-full animate-spin" />
     </div>
   )
@@ -80,13 +72,13 @@ class ErrorBoundary extends Component {
   render() {
     if (this.state.hasError) {
       return (
-        <div className="min-h-screen flex flex-col items-center justify-center gap-4 bg-gray-50 dark:bg-gray-950 text-gray-700 dark:text-gray-300 p-8">
+        <div className="min-h-screen flex flex-col items-center justify-center gap-4 bg-gray-50 dark:bg-gray-950 text-gray-700 dark:text-gray-300 p-8 animate-fade-up">
           <div className="text-[32px]">⚠️</div>
           <div className="text-[14px] font-semibold">Something went wrong</div>
           <div className="text-[11px] text-gray-400 max-w-sm text-center">{this.state.error?.message}</div>
           <button
             onClick={() => window.location.reload()}
-            className="mt-2 px-4 py-2 rounded-lg bg-blue-600 text-white text-[11px] font-semibold hover:bg-blue-700"
+            className="mt-2 px-4 py-2 rounded-lg bg-blue-600 text-white text-[11px] font-semibold hover:bg-blue-700 active:scale-95 transition-all duration-150"
           >
             Reload page
           </button>
@@ -130,7 +122,9 @@ function AppContent() {
 
   const showNavbar = useCallback(() => {
     clearHideTimer()
-    setNavHidden(false)
+    // Only call setNavHidden when state actually needs to change — prevents
+    // unnecessary re-renders when onMouseMove fires continuously over toolbar
+    setNavHidden(prev => prev ? false : prev)
   }, [clearHideTimer])
 
   const activate = useCallback(() => {
@@ -148,6 +142,31 @@ function AppContent() {
 
   // Clean up timer on unmount
   useEffect(() => () => clearHideTimer(), [clearHideTimer])
+
+  // ── Global mouse-position freeze ─────────────────────────────────────────
+  // Portal content (SMC/PA/MultiChart toolbar controls) lives in a React portal
+  // so React synthetic events don't bubble to the toolbar strip div. Use a native
+  // window mousemove listener instead — freeze navbar when cursor is in the
+  // navbar+toolbar zone (top ~90px). Only active on auto-hide pages.
+  const autoHideActiveRef = useRef(autoHideActive)
+  useEffect(() => { autoHideActiveRef.current = autoHideActive }, [autoHideActive])
+
+  useEffect(() => {
+    const FREEZE_Y = 90 // px from top — covers navbar (56px) + toolbar strip (~34px)
+    const handler = (e) => {
+      if (!autoHideActiveRef.current) return
+      if (e.clientY <= FREEZE_Y) {
+        // Cursor in navbar+toolbar zone — cancel any pending hide
+        if (hideTimerRef.current) {
+          clearTimeout(hideTimerRef.current)
+          hideTimerRef.current = null
+        }
+        setNavHidden(false)
+      }
+    }
+    window.addEventListener('mousemove', handler, { passive: true })
+    return () => window.removeEventListener('mousemove', handler)
+  }, []) // eslint-disable-line react-hooks/exhaustive-deps — uses refs, no deps needed
 
   // Reset auto-hide whenever route changes (page unmount handles deactivate,
   // but guard against edge cases where navigate happens without full unmount)
@@ -191,15 +210,10 @@ function AppContent() {
 
   useEffect(() => {
     if (!userId) return
-    const PROFILE_TTL = 5 * 60_000
-    const cacheKey = `tradeo_profile_ts_${userId}`
-    const lastFetch = parseInt(localStorage.getItem(cacheKey) || '0', 10)
-    if (Date.now() - lastFetch < PROFILE_TTL) return
     getProfile()
       .then(res => {
         if (res.data?.user?.avatar_url) {
           updateUser({ avatar_url: res.data.user.avatar_url })
-          localStorage.setItem(cacheKey, String(Date.now()))
         }
       })
       .catch(() => {})
@@ -241,15 +255,15 @@ function AppContent() {
           <Routes>
             <Route path="/" element={<HomePage />} />
             <Route path="/screen" element={<ScreenPage />} />
-            <Route path="/portfolio" element={<PortfolioPage />} />
-            <Route path="/logs" element={<LogsPage />} />
+            <Route path="/portfolio" element={<PrivateRoute><PortfolioPage /></PrivateRoute>} />
+            <Route path="/logs" element={<PrivateRoute><LogsPage /></PrivateRoute>} />
             <Route path="/research" element={<ResearchPage />} />
-            <Route path="/research/new" element={<ResearchEditorPage />} />
-            <Route path="/research/edit/:id" element={<ResearchEditorPage />} />
+            <Route path="/research/new" element={<PrivateRoute><ResearchEditorPage /></PrivateRoute>} />
+            <Route path="/research/edit/:id" element={<PrivateRoute><ResearchEditorPage /></PrivateRoute>} />
             <Route path="/research/:id" element={<ResearchViewPage />} />
-            <Route path="/profile" element={<ProfilePage />} />
-            <Route path="/chat" element={<ChatPage />} />
-            <Route path="/ipo" element={<ExplorePage />} />
+            <Route path="/profile" element={<PrivateRoute><ProfilePage /></PrivateRoute>} />
+            <Route path="/chat" element={<PrivateRoute><ChatPage /></PrivateRoute>} />
+            <Route path="/ipo" element={<Navigate to="/explore/ipo" replace />} />
             <Route path="/datalab" element={<DataLabPage />} />
             <Route path="/explore" element={<ExplorePage />} />
             <Route path="/explore/:tab" element={<ExplorePage />} />

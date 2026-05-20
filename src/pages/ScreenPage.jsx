@@ -1,8 +1,10 @@
-import { useState, useEffect, useRef, lazy, Suspense, createContext, useContext } from 'react'
+import { useState, useEffect, useLayoutEffect, useRef, lazy, Suspense, createContext, useContext } from 'react'
 import { createPortal } from 'react-dom'
+import { Link } from 'react-router-dom'
 import { useNavbarAutoHide, useNavbarState } from '../App'
 import { ScreenProvider }       from '../context/ScreenContext'
 import { ComplexTabProvider }   from '../hooks/useComplexTab.jsx'
+import { useAuth }              from '../context/AuthContext'
 import StockChart               from '../components/screen/StockChart'
 import MarketStatusBadge        from '../components/screen/MarketStatusBadge'
 import LeftPanel                from '../components/screen/LeftPanel'
@@ -19,7 +21,10 @@ const ScreenToolbarSlotCtx = createContext(null)
 export function useScreenToolbarSlot(node) {
   const slotRef = useContext(ScreenToolbarSlotCtx)
   const [, setTick] = useState(0)
-  useEffect(() => { setTick(1) }, [])
+  // useLayoutEffect fires synchronously after DOM commit — slotRef.current is
+  // guaranteed to be populated before the portal renders, preventing the blank
+  // toolbar that occurs when useEffect fires after paint on re-renders.
+  useLayoutEffect(() => { setTick(t => t + 1) }, [])
 
   if (!slotRef?.current) return null
   return createPortal(node, slotRef.current)
@@ -35,6 +40,38 @@ function TabSpinner() {
   return (
     <div className="flex-1 flex items-center justify-center">
       <div className="w-6 h-6 border-2 border-blue-500 border-t-transparent rounded-full animate-spin" />
+    </div>
+  )
+}
+
+// ── Auth wall — shown inline when a locked tab is clicked while logged out ───
+function AuthWall({ feature }) {
+  return (
+    <div className="flex-1 flex flex-col items-center justify-center gap-4 text-center px-6 animate-fade-up">
+      <div className="w-12 h-12 rounded-full bg-gray-100 dark:bg-gray-800 flex items-center justify-center">
+        <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" className="text-gray-400">
+          <rect x="3" y="11" width="18" height="11" rx="2" ry="2"/>
+          <path d="M7 11V7a5 5 0 0 1 10 0v4"/>
+        </svg>
+      </div>
+      <div>
+        <p className="text-sm font-semibold text-gray-800 dark:text-gray-100">{feature} requires login</p>
+        <p className="text-xs text-gray-400 mt-1">Sign in to access this feature</p>
+      </div>
+      <div className="flex items-center gap-3">
+        <Link
+          to="/login"
+          className="px-4 py-2 bg-blue-600 text-white text-sm font-semibold rounded-lg hover:bg-blue-700 transition-colors"
+        >
+          Login
+        </Link>
+        <Link
+          to="/signup"
+          className="px-4 py-2 border border-gray-300 dark:border-gray-600 text-sm font-medium rounded-lg hover:bg-gray-50 dark:hover:bg-gray-800 transition-colors text-gray-700 dark:text-gray-300"
+        >
+          Sign up free
+        </Link>
+      </div>
     </div>
   )
 }
@@ -247,20 +284,31 @@ function MobileSheet({ panel, onClose }) {
 
 // ── Tab bar strip ────────────────────────────────────────────────────────────
 
-function TabStrip({ tabs, active, onChange }) {
+function TabStrip({ tabs, active, onChange, lockedIds = [] }) {
   return (
     <div className="flex items-center bg-gray-100 dark:bg-gray-800 rounded-lg p-0.5">
-      {tabs.map(t => (
-        <button key={t.id} onClick={() => onChange(t.id)}
-          className={`px-2 py-0.5 rounded-md text-[10px] font-semibold transition-colors whitespace-nowrap ${
-            active === t.id
-              ? 'bg-white dark:bg-gray-700 text-gray-900 dark:text-white shadow-sm'
-              : 'text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-300'
-          }`}>
-          <span className="hidden sm:inline">{t.label}</span>
-          <span className="sm:hidden">{t.short}</span>
-        </button>
-      ))}
+      {tabs.map(t => {
+        const locked = lockedIds.includes(t.id)
+        return (
+          <button key={t.id} onClick={() => onChange(t.id)}
+            className={`flex items-center gap-1 px-2 py-0.5 rounded-md text-[10px] font-semibold transition-colors whitespace-nowrap ${
+              active === t.id
+                ? 'bg-white dark:bg-gray-700 text-gray-900 dark:text-white shadow-sm'
+                : locked
+                  ? 'text-gray-400 dark:text-gray-600 cursor-pointer'
+                  : 'text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-300'
+            }`}>
+            <span className="hidden sm:inline">{t.label}</span>
+            <span className="sm:hidden">{t.short}</span>
+            {locked && (
+              <svg width="8" height="8" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" className="opacity-50">
+                <rect x="3" y="11" width="18" height="11" rx="2" ry="2"/>
+                <path d="M7 11V7a5 5 0 0 1 10 0v4"/>
+              </svg>
+            )}
+          </button>
+        )
+      })}
     </div>
   )
 }
@@ -268,19 +316,29 @@ function TabStrip({ tabs, active, onChange }) {
 // ── Screen inner ─────────────────────────────────────────────────────────────
 
 function ScreenInner() {
-  const [mode,        setMode]        = useState(() => sessionStorage.getItem('screen_mode')        || 'simple')
-  const [simpleTab,   setSimpleTab]   = useState(() => sessionStorage.getItem('screen_simpleTab')   || 'General')
-  const [complexTab,  setComplexTab]  = useState(() => sessionStorage.getItem('screen_complexTab')  || 'Backtesting')
+  const [mode,        setMode]        = useState(() => sessionStorage.getItem('tradeo_screen_mode')        || 'simple')
+  const [simpleTab,   setSimpleTab]   = useState(() => sessionStorage.getItem('tradeo_screen_simpleTab')   || 'General')
+  const [complexTab,  setComplexTab]  = useState(() => sessionStorage.getItem('tradeo_screen_complexTab')  || 'Backtesting')
   const [mobilePanel, setMobilePanel] = useState(null)
   const toolbarSlotRef = useRef(null)
+  const { user } = useAuth()
 
   // Opt into navbar auto-hide — activates on mount, restores on unmount
   useNavbarAutoHide()
-  const { hidden: navHidden, scheduleHide } = useNavbarState()
+  const { hidden: navHidden, scheduleHide, showNavbar } = useNavbarState()
 
-  const handleMode       = (m) => { setMode(m);       sessionStorage.setItem('screen_mode', m) }
-  const handleSimpleTab  = (t) => { setSimpleTab(t);  sessionStorage.setItem('screen_simpleTab', t) }
-  const handleComplexTab = (t) => { setComplexTab(t); sessionStorage.setItem('screen_complexTab', t) }
+  // If not logged in, keep simple mode and reset to General — never allow locked tabs to persist
+  const handleMode = (m) => {
+    if (!user && m === 'complex') return
+    setMode(m)
+    sessionStorage.setItem('tradeo_screen_mode', m)
+  }
+  const handleSimpleTab  = (t) => {
+    if (!user && t !== 'General') return
+    setSimpleTab(t)
+    sessionStorage.setItem('tradeo_screen_simpleTab', t)
+  }
+  const handleComplexTab = (t) => { setComplexTab(t); sessionStorage.setItem('tradeo_screen_complexTab', t) }
 
   // Close mobile sheet on Escape
   useEffect(() => {
@@ -294,7 +352,7 @@ function ScreenInner() {
   return (
     <ScreenToolbarSlotCtx.Provider value={toolbarSlotRef}>
     <div
-      className="flex flex-col overflow-hidden bg-white dark:bg-gray-950"
+      className="flex flex-col overflow-hidden bg-white dark:bg-gray-900"
       style={{ height: '100dvh', paddingTop: navHidden ? 0 : 56 }}
     >
 
@@ -302,13 +360,19 @@ function ScreenInner() {
       {/* NOTE: ChartSymbolSearch dropdown uses absolute positioning — it must NOT
           be inside an overflow-x-auto container or the dropdown clips. The slot
           ref sits outside the scrollable portion, after the shrink-0 tab groups. */}
-      <div className="flex items-center gap-2 px-3 py-0.5 border-b border-gray-100 dark:border-gray-800 shrink-0">
+      {/* Toolbar strip — onMouseEnter as fast path; global mousemove listener
+          in App.jsx handles portalled controls (portal breaks React bubbling) */}
+      <div
+        className="flex items-center gap-2 px-3 py-0.5 border-b border-gray-100 dark:border-gray-800 shrink-0"
+        onMouseEnter={showNavbar}
+      >
 
         {/* Simple / Complex toggle — always visible, shrink-0 */}
         <TabStrip
           tabs={[{ id: 'simple', label: 'Simple', short: 'Sim' }, { id: 'complex', label: 'Complex', short: 'Cpx' }]}
           active={mode}
           onChange={handleMode}
+          lockedIds={!user ? ['complex'] : []}
         />
 
         {/* Divider */}
@@ -317,13 +381,18 @@ function ScreenInner() {
         {/* Sub-tabs — shrink-0 so they never compress */}
         <div className="shrink-0">
           {isSimple
-            ? <TabStrip tabs={SIMPLE_TABS}  active={simpleTab}  onChange={handleSimpleTab}  />
+            ? <TabStrip
+                tabs={SIMPLE_TABS}
+                active={simpleTab}
+                onChange={handleSimpleTab}
+                lockedIds={!user ? ['MultiChart', 'SMC', 'PriceAction'] : []}
+              />
             : <TabStrip tabs={COMPLEX_TABS} active={complexTab} onChange={handleComplexTab} />
           }
         </div>
 
-        {/* Divider — shown for any simple tab that populates the toolbar slot */}
-        {isSimple && (simpleTab === 'General' || simpleTab === 'MultiChart') && (
+        {/* Divider — shown for all simple tabs (they all populate the toolbar slot) */}
+        {isSimple && (
           <div className="w-px h-4 bg-gray-200 dark:bg-gray-700 shrink-0" />
         )}
 
@@ -341,15 +410,19 @@ function ScreenInner() {
       {/* ── Content — mouse entering chart area triggers navbar hide ── */}
       <div className="flex-1 overflow-hidden min-h-0 flex flex-col" onMouseEnter={navHidden ? undefined : scheduleHide}>
       {isSimple ? (
-        <SimpleContent
-          activeTab={simpleTab}
-          mobilePanel={mobilePanel}
-          setMobilePanel={setMobilePanel}
-        />
+        !user && simpleTab !== 'General'
+          ? <AuthWall feature={SIMPLE_TABS.find(t => t.id === simpleTab)?.label || simpleTab} />
+          : <SimpleContent
+              activeTab={simpleTab}
+              mobilePanel={mobilePanel}
+              setMobilePanel={setMobilePanel}
+            />
       ) : (
-        <ComplexTabProvider>
-          <ComplexContent activeTab={complexTab} />
-        </ComplexTabProvider>
+        !user
+          ? <AuthWall feature="Complex mode" />
+          : <ComplexTabProvider>
+              <ComplexContent activeTab={complexTab} />
+            </ComplexTabProvider>
       )}
       </div>
     </div>

@@ -1,8 +1,10 @@
-import { useState, Suspense, lazy, createContext, useContext, useRef, useEffect } from 'react'
+import { useState, Suspense, lazy, createContext, useContext, useRef, useEffect, useLayoutEffect } from 'react'
+import { Link } from 'react-router-dom'
 import { useNavbarAutoHide, useNavbarState } from '../App'
 import { createPortal } from 'react-dom'
 import { ComplexTabProvider } from '../hooks/useComplexTab.jsx'
 import ErrorBoundary from '../components/ErrorBoundary'
+import { useAuth } from '../context/AuthContext'
 
 // ── Toolbar slot — portal approach ────────────────────────────────────────────
 // Parent passes a ref to the slot DOM node via context.
@@ -13,11 +15,10 @@ const ToolbarSlotCtx = createContext(null)
 
 export function useToolbarSlot(node) {
   const slotRef = useContext(ToolbarSlotCtx)
-  // Force one render cycle after mount so slotRef.current is populated.
-  // useState init runs once; useEffect bumps `tick` to re-render and capture
-  // the slot DOM node (which is committed by the parent on the same frame).
-  const [tick, setTick] = useState(0)
-  useEffect(() => { setTick(t => t + 1) }, [])
+  // useLayoutEffect fires synchronously after DOM commit — slotRef.current is
+  // guaranteed populated before paint, preventing blank toolbar on re-renders.
+  const [, setTick] = useState(0)
+  useLayoutEffect(() => { setTick(t => t + 1) }, [])
 
   if (!slotRef?.current) return null
   return createPortal(node, slotRef.current)
@@ -200,9 +201,35 @@ function TabLoader() {
   )
 }
 
+// ── Auth wall ─────────────────────────────────────────────────────────────────
+
+function AuthWall() {
+  return (
+    <div className="flex-1 h-full flex flex-col items-center justify-center gap-4 text-center px-6 animate-fade-up">
+      <div className="w-12 h-12 rounded-full bg-gray-100 dark:bg-gray-800 flex items-center justify-center">
+        <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" className="text-gray-400">
+          <rect x="3" y="11" width="18" height="11" rx="2" ry="2"/>
+          <path d="M7 11V7a5 5 0 0 1 10 0v4"/>
+        </svg>
+      </div>
+      <div>
+        <p className="text-sm font-semibold text-gray-800 dark:text-gray-100">Login required</p>
+        <p className="text-xs text-gray-400 mt-1">Sign in to access Data Lab analytics</p>
+      </div>
+      <div className="flex items-center gap-3">
+        <Link to="/login" className="px-4 py-2 bg-blue-600 text-white text-sm font-semibold rounded-lg hover:bg-blue-700 transition-colors">Login</Link>
+        <Link to="/signup" className="px-4 py-2 border border-gray-300 dark:border-gray-600 text-sm font-medium rounded-lg hover:bg-gray-50 dark:hover:bg-gray-800 transition-colors text-gray-700 dark:text-gray-300">Sign up free</Link>
+      </div>
+    </div>
+  )
+}
+
 // ── Tab content ───────────────────────────────────────────────────────────────
 
 function TabContent({ activeTab }) {
+  const { user } = useAuth()
+  if (!user) return <AuthWall />
+
   if (activeTab === 'performance') return (
     <ErrorBoundary label="Performance">
       <Suspense fallback={<TabLoader />}>
@@ -248,22 +275,23 @@ function safeSessionSet(key, value) {
 }
 
 export default function DataLabPage() {
-  const [activeTab, setActiveTab] = useState(() => safeSessionGet('datalab_tab', 'performance'))
-  const slotRef = useRef(null)    // ref to the slot DOM node
+  const [activeTab, setActiveTab] = useState(() => safeSessionGet('tradeo_datalab_tab', 'performance'))
+  const slotRef = useRef(null)
+  const { user } = useAuth()
 
   // Opt into navbar auto-hide — activates on mount, restores on unmount
   useNavbarAutoHide()
-  const { hidden: navHidden, scheduleHide } = useNavbarState()
+  const { hidden: navHidden, scheduleHide, showNavbar } = useNavbarState()
 
   function handleTab(id) {
     setActiveTab(id)
-    safeSessionSet('datalab_tab', id)
+    safeSessionSet('tradeo_datalab_tab', id)
   }
 
   return (
     <ToolbarSlotCtx.Provider value={slotRef}>
       <div
-        className="flex flex-col overflow-hidden bg-gray-50 dark:bg-gray-950"
+        className="flex flex-col overflow-hidden bg-white dark:bg-gray-900"
         style={{ height: '100dvh', paddingTop: navHidden ? 0 : 56 }}
       >
 
@@ -272,7 +300,12 @@ export default function DataLabPage() {
             simple flex with hard shrink-0 on the chips and info button so they
             never compress. Mobile (< 480px) gets a thin horizontal scrollbar
             inside the slot, which is exactly where the user expects it.       */}
-        <div className="shrink-0 flex items-center gap-1.5 px-3 py-1 border-b border-gray-200 dark:border-gray-800 bg-white dark:bg-gray-900">
+        {/* Toolbar strip — onMouseEnter as fast path; global mousemove listener
+            in App.jsx handles portalled controls (portal breaks React bubbling) */}
+        <div
+          className="shrink-0 flex items-center gap-1.5 px-3 py-1 border-b border-gray-200 dark:border-gray-800 bg-white dark:bg-gray-900"
+          onMouseEnter={showNavbar}
+        >
 
           {/* Compact tab chips — never compress */}
           <div className="flex items-center gap-0.5 bg-gray-100 dark:bg-gray-800 rounded-lg p-0.5 shrink-0">
@@ -290,6 +323,11 @@ export default function DataLabPage() {
                 >
                   {tab.icon}
                   <span>{tab.label}</span>
+                  {!user && (
+                    <svg width="8" height="8" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" className="opacity-40">
+                      <rect x="3" y="11" width="18" height="11" rx="2" ry="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/>
+                    </svg>
+                  )}
                 </button>
               )
             })}

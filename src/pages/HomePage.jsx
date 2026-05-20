@@ -7,6 +7,7 @@ import DisciplineScore from '../components/dashboard/DisciplineScore'
 import MonthlyGoals from '../components/dashboard/MonthlyGoals'
 import { Link, useNavigate } from 'react-router-dom'
 import { useState, useEffect, useCallback, useRef } from 'react'
+import { useEscapeKey } from '../hooks/useEscapeKey'
 import NEPSEChart from '../components/NEPSEChart'
 import {
   getDashboardInit as _getDashboardInit, getStockPrice,
@@ -204,9 +205,9 @@ function LoggedOutHome() {
         </div>
       </div>
 
-      {/* Centered intro overlay */}
+      {/* Centered intro overlay — scale-in on mount */}
       <div className="absolute inset-0 flex items-center justify-center z-20 pointer-events-none">
-        <div className="pointer-events-auto w-full max-w-lg mx-4">
+        <div className="pointer-events-auto w-full max-w-lg mx-4 animate-scale-in">
           <div className="bg-white/97 dark:bg-gray-900/97 backdrop-blur-md rounded-2xl shadow-2xl border border-gray-200 dark:border-gray-700 overflow-hidden">
             {/* Header strip */}
             <div className="bg-gradient-to-r from-gray-900 to-gray-800 dark:from-gray-950 dark:to-gray-900 px-5 sm:px-8 py-5 sm:py-6 border-b border-gray-700">
@@ -230,8 +231,8 @@ function LoggedOutHome() {
                 { icon: '🧠', title: t('hero.feat4Title'), desc: t('hero.feat4Desc') },
                 { icon: '🤖', title: t('hero.feat5Title'), desc: t('hero.feat5Desc') },
                 { icon: '⚗️', title: t('hero.feat6Title'), desc: t('hero.feat6Desc') },
-              ].map(f => (
-                <div key={f.title} className="flex items-start gap-2.5">
+              ].map((f, i) => (
+                <div key={f.title} className="flex items-start gap-2.5 animate-fade-up" style={{ animationDelay: `${100 + i * 50}ms` }}>
                   <span className="text-base mt-0.5">{f.icon}</span>
                   <div>
                     <p className="text-xs font-semibold text-gray-900 dark:text-white">{f.title}</p>
@@ -529,12 +530,7 @@ function CenterDashboard({ navigate, initData, onRefresh, onDataReady }) {
     notes: ''
   })
 
-  // Rule 14 — close add-watch panel on Escape
-  useEffect(() => {
-    const fn = (e) => { if (e.key === 'Escape') setShowAddWatch(false) }
-    document.addEventListener('keydown', fn)
-    return () => document.removeEventListener('keydown', fn)
-  }, [])
+  useEscapeKey(() => setShowAddWatch(false))
 
   const applyData = useCallback((d) => {
     const trades    = d.trades || []
@@ -568,13 +564,14 @@ function CenterDashboard({ navigate, initData, onRefresh, onDataReady }) {
     const todayPnl        = closed
       .filter(t => t.last_action_at?.slice(0, 10) === todayStr)
       .reduce((s, t) => s + (parseFloat(t.realized_pnl) || 0), 0)
-    setPerfStats({
+    const totalInvested  = openWithPrices.reduce((s, t) => s + (t.entry_price * t.quantity), 0)
+    const currentValue   = openWithPrices.reduce((s, t) => s + ((t.currentPrice || t.entry_price) * t.quantity), 0)
+    const stats = {
       totalPnl: totalRealized + totalUnrealized, unrealizedPnl: totalUnrealized,
       realizedPnl: totalRealized, todayPnl, winRate, openCount: openWithPrices.length,
-      closedCount: closed.length,
-      totalInvested:  openWithPrices.reduce((s, t) => s + (t.entry_price * t.quantity), 0),
-      currentValue:   openWithPrices.reduce((s, t) => s + ((t.currentPrice || t.entry_price) * t.quantity), 0),
-    })
+      closedCount: closed.length, totalInvested, currentValue,
+    }
+    setPerfStats(stats)
 
     const watchWithPrices = (d.watchlist || []).map(w => {
       const p = priceMap[w.symbol]
@@ -587,13 +584,7 @@ function CenterDashboard({ navigate, initData, onRefresh, onDataReady }) {
       pnlPct: t.pnlPct, sl: t.sl, tp: t.tp, status: t.status,
     }))
     setWatchlist([...watchWithPrices, ...portfolioItems])
-    if (onDataReady) onDataReady({ openPositions: openWithPrices, perfStats: {
-      totalPnl: totalRealized + totalUnrealized, unrealizedPnl: totalUnrealized,
-      realizedPnl: totalRealized, todayPnl, winRate, openCount: openWithPrices.length,
-      closedCount: closed.length,
-      totalInvested:  openWithPrices.reduce((s, t) => s + (t.entry_price * t.quantity), 0),
-      currentValue:   openWithPrices.reduce((s, t) => s + ((t.currentPrice || t.entry_price) * t.quantity), 0),
-    }})
+    if (onDataReady) onDataReady({ openPositions: openWithPrices, perfStats: stats })
   }, [onDataReady])
 
   // Hydrate from parent-supplied initData (avoids a second /init fetch)

@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback, useMemo, useRef } from 'react'
+import { useState, useEffect, useCallback, useMemo, useRef, useId } from 'react'
 import { useTheme } from '../../context/ThemeContext'
 import { useAuth } from '../../context/AuthContext'
 import { getTradeActions } from '../../utils/globalCache'
@@ -125,7 +125,7 @@ ${cardDataUrl ? `<img src="${cardDataUrl}" class="card-img" alt="Trader Card"/>`
   <thead><tr><th>Entry Date</th><th>Symbol</th><th>Dir</th><th>Qty</th><th>Entry</th><th>Exit</th><th>P&L</th><th>Hold</th></tr></thead>
   <tbody>${tradeRows}</tbody>
 </table>
-<p class="note">Nepal CGT: Short-term (&lt;365d) 7.5%, Long-term (≥365d) 5%. Broker fees: NEPSE commission tiers 0.40%–0.60%. This is an estimate — consult a tax advisor for official filing.</p>
+<p class="note">Nepal CGT: Short-term (&lt;365d) 7.5%, Long-term (≥365d) 5%. Broker fees: SEBON-regulated tiers (0.36%–0.24%). This is an estimate — consult a tax advisor for official filing.</p>
 </body></html>`
 
       const win = window.open('', '_blank')
@@ -215,7 +215,7 @@ function rangeToFromTo(range) {
   if (range === '1M') return { from: today.slice(0, 7) + '-01', to: today }
   if (range === '3M') { const d = new Date(); d.setMonth(d.getMonth() - 3); return { from: d.toISOString().slice(0, 10), to: today } }
   if (range === '6M') { const d = new Date(); d.setMonth(d.getMonth() - 6); return { from: d.toISOString().slice(0, 10), to: today } }
-  if (range === '1Y') { const d = new Date(); d.setFullYear(d.getFullYear() - 1); return { from: d.toISOString().slice(0, 10), to: today } }
+  if (range === '1Y') return { from: `${new Date().getFullYear()}-01-01`, to: today }
   return { from: null, to: today }
 }
 
@@ -223,7 +223,8 @@ function rangeToFromTo(range) {
 export default function AuditTab({ range = '1M', symbol = 'all', onSymbolsLoaded, shareOpen = false, onShareClose }) {
   const { isDark } = useTheme()
   const { user }   = useAuth()
-  const isForex    = false
+  const uid        = useId()
+  const gradId     = `audit-eq-grad-${uid}`
 
   const [trades,    setTrades]    = useState([])
   const [loading,   setLoading]   = useState(true)
@@ -399,13 +400,8 @@ export default function AuditTab({ range = '1M', symbol = 'all', onSymbolsLoaded
     }
   }, [rangedTrades, closed, entryDateMap])
 
-  const fmtPnl = (n) => isForex
-    ? `${n >= 0 ? '+' : '−'}$${Math.abs(n).toFixed(2)}`
-    : `${n >= 0 ? '+' : '−'}Rs.${Math.abs(Math.round(n)).toLocaleString()}`
-
-  const fmtAbs = (n) => isForex
-    ? `$${Math.abs(n).toFixed(2)}`
-    : `Rs.${Math.abs(Math.round(n)).toLocaleString()}`
+  const fmtPnl = (n) => `${n >= 0 ? '+' : '−'}Rs.${Math.abs(Math.round(n)).toLocaleString()}`
+  const fmtAbs = (n) => `Rs.${Math.abs(Math.round(n)).toLocaleString()}`
 
   const pnlColor = (n) => n > 0 ? 'text-emerald-500' : n < 0 ? 'text-red-400' : 'text-gray-400'
 
@@ -468,13 +464,13 @@ export default function AuditTab({ range = '1M', symbol = 'all', onSymbolsLoaded
             {scriptKpis && (
               <div className="flex items-center gap-4">
                 <div className="text-right">
-                  <p className="text-[9px] uppercase tracking-widest font-bold text-gray-400">Win Rate</p>
+                  <p className="text-[10px] uppercase tracking-widest font-bold text-gray-400">Win Rate</p>
                   <p className={`text-[13px] font-bold tabular-nums ${scriptKpis.winRate >= 50 ? 'text-emerald-500' : 'text-red-400'}`}>
                     {scriptKpis.winRate.toFixed(0)}% ({scriptKpis.winCount}/{scriptKpis.count})
                   </p>
                 </div>
                 <div className="text-right">
-                  <p className="text-[9px] uppercase tracking-widest font-bold text-gray-400">Net P&L</p>
+                  <p className="text-[10px] uppercase tracking-widest font-bold text-gray-400">Net P&L</p>
                   <p className={`text-[13px] font-bold tabular-nums ${scriptKpis.total >= 0 ? 'text-emerald-500' : 'text-red-400'}`}>
                     {scriptKpis.total >= 0 ? '+' : '−'}Rs.{Math.abs(Math.round(scriptKpis.total)).toLocaleString()}
                   </p>
@@ -492,7 +488,7 @@ export default function AuditTab({ range = '1M', symbol = 'all', onSymbolsLoaded
                 <thead>
                   <tr className="border-b border-gray-100 dark:border-gray-800">
                     {['Date', 'Action', 'Qty', 'Entry', 'Exit', 'Hold', 'P&L'].map(h => (
-                      <th key={h} className="text-left px-4 py-2 text-[9px] uppercase tracking-widest font-bold text-gray-400">{h}</th>
+                      <th key={h} className="text-left px-4 py-2 text-[10px] uppercase tracking-widest font-bold text-gray-400">{h}</th>
                     ))}
                   </tr>
                 </thead>
@@ -598,15 +594,14 @@ export default function AuditTab({ range = '1M', symbol = 'all', onSymbolsLoaded
           </div>
 
           {/* ── KPI Grid Row 3: Tax & Fees ── */}
-          {!isForex && (
-            <div>
-              <p className="text-[10px] uppercase tracking-widest font-bold text-gray-400 mb-2">Tax & Fees (Nepal)</p>
+          <div>
+            <p className="text-[10px] uppercase tracking-widest font-bold text-gray-400 mb-2">Tax & Fees (Nepal)</p>
               <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
                 <KpiCard
                   label="Est. Broker Fees"
                   value={`Rs.${Math.round(kpis.brokerFees).toLocaleString()}`}
                   valueClass="text-violet-500"
-                  sub="NEPSE tiers 0.40%–0.60%"
+                  sub="SEBON tiers (0.36%–0.24%)"
                 />
                 <KpiCard
                   label="Est. CGT Tax"
@@ -624,8 +619,7 @@ export default function AuditTab({ range = '1M', symbol = 'all', onSymbolsLoaded
               <p className="text-[10px] text-gray-400 mt-1.5 px-0.5">
                 Estimates only. Nepal CGT: short-term (&lt;365d) 7.5%, long-term (≥365d) 5%. Fiscal year Jul 16–Jul 15. Consult a tax advisor.
               </p>
-            </div>
-          )}
+          </div>
 
           {/* ── KPI Grid Row 4: Risk & Timing ── */}
           <div>
@@ -713,7 +707,7 @@ export default function AuditTab({ range = '1M', symbol = 'all', onSymbolsLoaded
                   return (
                     <svg viewBox={`0 0 ${w} ${h + 4}`} className="w-full" style={{ height: 88 }}>
                       <defs>
-                        <linearGradient id="audit-eq-grad" x1="0" y1="0" x2="0" y2="1">
+                        <linearGradient id={gradId} x1="0" y1="0" x2="0" y2="1">
                           <stop offset="0%" stopColor={endPnl >= 0 ? '#10b981' : '#f87171'} stopOpacity="0.3" />
                           <stop offset="100%" stopColor={endPnl >= 0 ? '#10b981' : '#f87171'} stopOpacity="0" />
                         </linearGradient>

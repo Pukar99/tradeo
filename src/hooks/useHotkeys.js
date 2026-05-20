@@ -1,18 +1,22 @@
-import { useEffect } from 'react'
+import { useEffect, useRef } from 'react'
 
-// Global keyboard shortcuts for power traders
-// Only fires when no input/textarea/contenteditable is focused
+// Global keyboard shortcuts for power traders.
+// Only fires when no input/textarea/contenteditable is focused.
+// keyMap MUST be memoized by the caller (useMemo/useCallback) — the handler
+// uses a ref internally so keyMap updates are picked up without re-subscribing.
 export function useHotkeys(keyMap) {
+  const keyMapRef = useRef(keyMap)
+  useEffect(() => { keyMapRef.current = keyMap })
+
   useEffect(() => {
     const handler = (e) => {
-      // Ignore when typing in inputs
       const tag = e.target.tagName
       if (tag === 'INPUT' || tag === 'TEXTAREA' || e.target.isContentEditable) return
 
-      const key = e.key.toLowerCase()
+      const key   = e.key.toLowerCase()
       const combo = `${e.ctrlKey ? 'ctrl+' : ''}${e.shiftKey ? 'shift+' : ''}${e.altKey ? 'alt+' : ''}${key}`
 
-      const action = keyMap[combo] || keyMap[key]
+      const action = keyMapRef.current[combo] || keyMapRef.current[key]
       if (action) {
         e.preventDefault()
         action(e)
@@ -20,5 +24,5 @@ export function useHotkeys(keyMap) {
     }
     window.addEventListener('keydown', handler)
     return () => window.removeEventListener('keydown', handler)
-  }, [keyMap])
+  }, []) // stable — keyMap changes are picked up via keyMapRef
 }

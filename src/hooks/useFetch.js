@@ -1,4 +1,5 @@
 import { useState, useEffect, useCallback, useRef } from 'react'
+import { isCanceled, apiError } from '../utils/format'
 
 /**
  * Reusable data-fetch hook with StrictMode-safe cancellation.
@@ -34,7 +35,7 @@ export function useFetch(getFn, deps = [], { skip = false } = {}) {
           if (!cancelledRef.current) setData(res.data ?? res)
         })
         .catch(err => {
-          if (!cancelledRef.current) setError(err)
+          if (!cancelledRef.current && !isCanceled(err)) setError(apiError(err))
         })
         .finally(() => {
           if (!cancelledRef.current) setLoading(false)

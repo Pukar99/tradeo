@@ -100,12 +100,6 @@ export const safeFloat = (v, fallback = 0) => {
 }
 
 /**
- * Sanitize a backend API error for display in the UI.
- * Strips internal details (SQL, stack traces, column names) and
- * returns a clean, user-friendly string.
- * Pass a fallback string for when extraction fails.
- */
-/**
  * Detects request cancellation across:
  *  - Fetch `AbortError`
  *  - Axios 1.x `CanceledError` (err.code === 'ERR_CANCELED')

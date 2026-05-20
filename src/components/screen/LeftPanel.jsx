@@ -6,6 +6,7 @@ import { useChatRefresh, dispatchChatAction } from '../../utils/chatEvents'
 import { useScreen } from '../../context/ScreenContext'
 import { useEscapeKey } from '../../hooks/useEscapeKey'
 import { ALERT_PCT_THRESHOLD } from '../../utils/constants'
+import { apiError } from '../../utils/format'
 
 // ── BUY / SELL Modal ──────────────────────────────────────────────────────────
 
@@ -37,7 +38,7 @@ function TradeModal({ side, symbol, onClose, onSaved }) {
       onSaved()
       onClose()
     } catch (e) {
-      setErr(e.response?.data?.error || 'Failed to save trade')
+      setErr(apiError(e, 'Failed to save trade'))
     } finally {
       setSaving(false)
     }
@@ -120,13 +121,13 @@ function CloseConfirm({ position, onClose, onDone }) {
     setSaving(true); setErr(null)
     try {
       const latestClose = position._latestPrice || position.entry_price
-      await closePosition(position.id, { exit_price: latestClose, date: new Date().toISOString().slice(0, 10) })
+      await closePosition(position.trade_id, { exit_price: latestClose, date: new Date().toISOString().slice(0, 10) })
       dispatchChatAction('CLOSE_TRADE')
       onDone()
       onClose()
       // setSaving not needed on success — modal closes via onClose()
     } catch (e) {
-      setErr(e.response?.data?.message || e.response?.data?.error || 'Failed to close position')
+      setErr(apiError(e, 'Failed to close position'))
       setSaving(false) // only reset on error so user can retry
     }
   }
@@ -137,7 +138,7 @@ function CloseConfirm({ position, onClose, onDone }) {
       <div className="relative bg-white dark:bg-gray-900 rounded-2xl shadow-2xl border border-gray-200 dark:border-gray-700 w-full max-w-xs z-10 p-5 text-center">
         <p className="text-[13px] font-bold text-gray-800 dark:text-gray-100 mb-1">Close Position?</p>
         <p className="text-[11px] text-gray-500 mb-4">
-          {position.symbol} · {position.position} · Qty {position.remaining_quantity ?? position.quantity}
+          {position.symbol} · {position.position} · Qty {position.remaining_quantity || 0}
         </p>
         {err && <p className="text-[11px] text-red-500 mb-3">{err}</p>}
         <div className="flex gap-2">
@@ -364,12 +365,12 @@ export default function LeftPanel() {
                 }`}>
                 <div className="flex items-center justify-between mb-1" translate="no">
                   <span className="text-[11px] font-bold text-gray-800 dark:text-gray-100">{p.symbol}</span>
-                  <span className={`text-[9px] font-bold px-1 py-0.5 rounded ${
+                  <span className={`text-[10px] font-bold px-1 py-0.5 rounded ${
                     p.position === 'LONG' ? 'bg-emerald-100 dark:bg-emerald-950 text-emerald-600' : 'bg-red-100 dark:bg-red-950 text-red-500'
                   }`}>{p.position}</span>
                 </div>
                 <div className="text-[10px] text-gray-500 space-y-0.5" translate="no">
-                  <div>Qty: <span className="text-gray-700 dark:text-gray-300 font-medium">{p.remaining_quantity ?? p.quantity}</span></div>
+                  <div>Qty: <span className="text-gray-700 dark:text-gray-300 font-medium">{p.remaining_quantity || 0}</span></div>
                   <div>Entry: <span className="text-blue-400 font-medium">{parseFloat(p.entry_price)?.toLocaleString()}</span></div>
                   {p.sl && <div>SL: <span className="text-red-400 font-medium">{parseFloat(p.sl).toLocaleString()}</span></div>}
                   {p.tp && <div>TP: <span className="text-emerald-500 font-medium">{parseFloat(p.tp).toLocaleString()}</span></div>}
@@ -439,7 +440,7 @@ export default function LeftPanel() {
                 }`}>
                 <div className="flex items-center justify-between" translate="no">
                   <span className="text-[11px] font-bold text-gray-800 dark:text-gray-100">{w.symbol}</span>
-                  <span className={`text-[9px] font-semibold px-1.5 py-0.5 rounded-md ${
+                  <span className={`text-[10px] font-semibold px-1.5 py-0.5 rounded-md ${
                     (w.category === 'pre' || w.category === 'pre-watch')
                       ? 'bg-amber-100 dark:bg-amber-950 text-amber-600 dark:text-amber-400'
                       : 'bg-emerald-100 dark:bg-emerald-950 text-emerald-600 dark:text-emerald-400'
@@ -468,7 +469,7 @@ export default function LeftPanel() {
             onClick={() => canTrade && setTradeModal('BUY')}
             disabled={!canTrade}
             title={!canTrade ? 'Not available for indexes' : ''}
-            className={`py-2 rounded-lg text-[10px] font-bold transition-colors shadow-sm ${
+            className={`min-h-[40px] py-2 rounded-lg text-[10px] font-bold transition-colors shadow-sm ${
               canTrade
                 ? 'bg-emerald-500 hover:bg-emerald-600 text-white'
                 : 'bg-gray-100 dark:bg-gray-800 text-gray-400 cursor-not-allowed'
@@ -479,7 +480,7 @@ export default function LeftPanel() {
             onClick={() => canTrade && setTradeModal('SELL')}
             disabled={!canTrade}
             title={!canTrade ? 'Not available for indexes' : ''}
-            className={`py-2 rounded-lg text-[10px] font-bold transition-colors shadow-sm ${
+            className={`min-h-[40px] py-2 rounded-lg text-[10px] font-bold transition-colors shadow-sm ${
               canTrade
                 ? 'bg-red-500 hover:bg-red-600 text-white'
                 : 'bg-gray-100 dark:bg-gray-800 text-gray-400 cursor-not-allowed'
@@ -507,7 +508,7 @@ export default function LeftPanel() {
                     {p.symbol}
                   </button>
                   <button onClick={e => { e.stopPropagation(); setCloseTarget(p) }}
-                    className="text-[9px] font-semibold px-1.5 py-0.5 rounded bg-red-100 dark:bg-red-950 text-red-500 hover:bg-red-200 dark:hover:bg-red-900 transition-colors">
+                    className="text-[10px] font-semibold px-1.5 py-0.5 rounded bg-red-100 dark:bg-red-950 text-red-500 hover:bg-red-200 dark:hover:bg-red-900 transition-colors">
                     Close
                   </button>
                 </div>
