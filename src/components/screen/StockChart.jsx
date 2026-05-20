@@ -927,12 +927,12 @@ function SubPaneLabel({ title, sub, color, legend }) {
 
 // ── Main StockChart ────────────────────────────────────────────────────────────
 
-export default function StockChart() {
+export default function StockChart({ hideToolbar = false, onChartReady, smcData = null, smcToggles = null, smcSignals = null, onChartDataReady = null }) {
   const { isDark } = useTheme()
   const {
     selectedSymbol, selectedIndexId, chartType, timeframe,
     activeIndicators: _activeIndicators, isIndex, onHover, onPin, pinnedDate, clearPin,
-    activePositions,
+    activePositions, disableMovers,
   } = useScreen() || {}
   const activeIndicators = Array.isArray(_activeIndicators) ? _activeIndicators : []
 
@@ -983,6 +983,11 @@ export default function StockChart() {
   const saveDrawingsRef     = useRef(saveDrawings)
   useEffect(() => { saveDrawingsRef.current = saveDrawings }, [saveDrawings])
 
+  // Always-fresh ref for onChartReady — the closure in loadLC().then() would otherwise
+  // capture the initial value and miss updates (onChartReady is an inline arrow in MultiChart)
+  const onChartReadyRef = useRef(onChartReady)
+  useEffect(() => { onChartReadyRef.current = onChartReady }, [onChartReady])
+
   // Action rows for active positions — keyed by trade_id. Fetched when activePositions changes.
   // Stored in a ref so the chart build effect can read them without adding them to its dep array.
   const positionActionsRef  = useRef({})
@@ -1019,8 +1024,80 @@ export default function StockChart() {
   const [drawVersion,    setDrawVersion]    = useState(0)  // bump to repaint canvas
   const [chartBuiltVer,  setChartBuiltVer]  = useState(0)  // bumps when chart instance is created
 
+  // SMC overlay series — declared after chartBuiltVer to avoid TDZ in the overlay useEffect
+  const smcSeriesRef = useRef([])
+
+  // ── SMC overlay drawing — must be after chartBuiltVer declaration ─────────
+  useEffect(() => {
+    const chart = chartsRef.current.main
+    smcSeriesRef.current.forEach(s => { try { chart?.removeSeries(s) } catch (_) {} })
+    smcSeriesRef.current = []
+
+    if (!smcData || !smcToggles || !chart || !chartData.length) return
+    const lastDate = chartData[chartData.length - 1]?.time
+    if (!lastDate) return
+
+    function addLine(fromDate, toDate, level, color, lineStyle = 1, lineWidth = 1.5) {
+      try {
+        const s = chart.addLineSeries({ color, lineWidth, lineStyle, priceLineVisible: false, lastValueVisible: false, crosshairMarkerVisible: false })
+        s.setData([{ time: fromDate, value: level }, { time: toDate, value: level }])
+        smcSeriesRef.current.push(s)
+      } catch (_) {}
+    }
+    function addZoneBand(fromDate, top, bottom, color) {
+      addLine(fromDate, lastDate, top, color, 1, 1)
+      addLine(fromDate, lastDate, bottom, color, 1, 1)
+    }
+
+    if (smcToggles.showBOS) {
+      smcData.bos.filter(b => b.type === 'bullish').slice(-10).forEach(b =>
+        addLine(b.swing_date ?? b.date, lastDate, b.level, '#22c55e', 1))
+    }
+    if (smcToggles.showCHoCH) {
+      smcData.choch.filter(c => c.type === 'bullish').slice(-5).forEach(c =>
+        addLine(c.swing_date ?? c.date, lastDate, c.level, '#f59e0b', 0, 1.5))
+    }
+    if (smcToggles.showOB) {
+      smcData.order_blocks.filter(o => o.type === 'bullish').slice(-5).forEach(o =>
+        addZoneBand(o.date, o.high, o.low, '#22c55e'))
+    }
+    if (smcToggles.showFVG) {
+      smcData.fvg.filter(f => f.type === 'bullish' && !f.mitigated).slice(-5).forEach(f =>
+        addZoneBand(f.date, f.top, f.bottom, '#3b82f6'))
+    }
+    if (smcToggles.showSweeps) {
+      smcData.sweeps.filter(s => s.type === 'buy_side').slice(-5).forEach(s =>
+        addLine(s.swing_date ?? s.date, lastDate, s.level, '#a78bfa', 1))
+    }
+    if (smcToggles.showEntry && smcSignals?.length && priceSeriesRef.current) {
+      try {
+        const existing = priceSeriesRef.current.markers() || []
+        const newMarkers = smcSignals.slice(-10).map(sig => ({
+          time: sig.date, position: 'belowBar',
+          color: sig.score >= 5 ? '#22c55e' : '#86efac',
+          shape: 'arrowUp', size: 1, text: `${sig.score}/6`,
+        }))
+        priceSeriesRef.current.setMarkers(
+          [...existing.filter(m => m.shape !== 'arrowUp'), ...newMarkers]
+            .sort((a, b) => a.time.localeCompare(b.time))
+        )
+      } catch (_) {}
+    } else if (!smcToggles.showEntry && priceSeriesRef.current) {
+      try {
+        const existing = priceSeriesRef.current.markers() || []
+        priceSeriesRef.current.setMarkers(existing.filter(m => m.shape !== 'arrowUp'))
+      } catch (_) {}
+    }
+
+    return () => {
+      smcSeriesRef.current.forEach(s => { try { chart?.removeSeries(s) } catch (_) {} })
+      smcSeriesRef.current = []
+    }
+  }, [chartBuiltVer, smcData, smcToggles, smcSignals]) // eslint-disable-line react-hooks/exhaustive-deps
+
   // ── Portal controls into ScreenPage tab bar ───────────────────────────────
-  const toolbarPortal = useScreenToolbarSlot(
+  // hideToolbar=true when inside MultiChart panel — panel has its own header controls
+  const toolbarPortal = useScreenToolbarSlot(hideToolbar ? null :
     <div className="flex items-center gap-1.5 min-w-0">
       {/* Symbol search — must NOT sit inside overflow-x-auto (clips dropdown).
           The slot container in ScreenPage uses overflow-x-auto for the rest of
@@ -1087,6 +1164,7 @@ export default function StockChart() {
       setChartData(cached.data)
       setLatestClose(cached.latest)
       setLoading(false)
+      onChartDataReady?.(cached.data)
       return
     }
 
@@ -1103,6 +1181,7 @@ export default function StockChart() {
       setChartData(data)
       setLatestClose(latest)
       setLoading(false)
+      onChartDataReady?.(data)
 
       // Gap detection: if latest candle is older than expected, trigger backfill
       if (data.length > 0) {
@@ -1203,6 +1282,9 @@ export default function StockChart() {
       }
       seriesRef.current.price = priceSeries
       priceSeriesRef.current  = priceSeries
+
+      // Notify parent with both chart + series — series required for setCrosshairPosition
+      onChartReadyRef.current?.(main, priceSeries)
 
       // MA overlay
       if (activeIndicators.includes('MA')) {
@@ -1352,7 +1434,7 @@ export default function StockChart() {
         if (!bar) return
         setTooltip({ ...bar, time: param.time, change: changeMap[param.time] })
 
-        if (!isIndex?.()) return
+        if (!isIndex?.() || disableMovers) return
         if (pendingHover.current) { clearTimeout(pendingHover.current); pendingHover.current = null }
         lastFetchedDate.current = param.time
         const movers = await getMovers(param.time)
@@ -1477,6 +1559,7 @@ export default function StockChart() {
       cancelled = true
       if (pendingHover.current) clearTimeout(pendingHover.current)
       if (roCleanup) roCleanup()
+      onChartReadyRef.current?.(null, null)  // clear stale refs in parent before removing
       Object.values(chartsRef.current).forEach(c => { try { c.remove() } catch (_) {} })
       chartsRef.current = {}
     }
