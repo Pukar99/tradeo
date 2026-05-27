@@ -123,9 +123,17 @@ function Navbar({ autoHide = false, hidden = false, onMouseEnter, onMouseLeave }
       <div className="flex items-center gap-6">
         <Link to="/" className="flex items-center gap-2.5 py-3 flex-shrink-0">
           <TradeoLogo />
-          <span className="text-gray-900 dark:text-white font-bold text-lg tracking-tight">
-            Tradeo
-          </span>
+          <div className="flex items-baseline gap-2">
+            <span className="text-gray-900 dark:text-white font-bold text-lg tracking-tight">
+              Tradeo
+            </span>
+            <span
+              className="text-[11px] text-gray-400 dark:text-gray-500 font-semibold"
+              title={`Tradeo v${import.meta.env.VITE_APP_VERSION}`}
+            >
+              v{import.meta.env.VITE_APP_VERSION}
+            </span>
+          </div>
         </Link>
 
         {/* Desktop nav — hidden on small screens */}
