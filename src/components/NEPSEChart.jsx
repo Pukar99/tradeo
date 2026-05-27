@@ -146,10 +146,14 @@ function NEPSEMiniChart({ data, label, height = 200, onCrosshairMove, syncTime, 
     }
   }, [syncTime])
 
-  // Sync visible time range from sibling chart
+  // Sync visible time range from sibling chart — guard null values and empty data
   useEffect(() => {
     if (!chartRef.current || !syncRange) return
-    chartRef.current.timeScale().setVisibleRange(syncRange)
+    if (!syncRange.from || !syncRange.to) return
+    if (!dataRef.current || dataRef.current.length === 0) return
+    try {
+      chartRef.current.timeScale().setVisibleRange(syncRange)
+    } catch (_) {}
   }, [syncRange])
 
   const last   = data?.[data.length - 1]
@@ -251,8 +255,15 @@ function NEPSEChart({ fixed = false }) {
       .catch(() => {})
   }, [fixed])
 
-  // Mobile view tab: 'daily' | 'weekly' | 'both' (both = desktop default)
+  // Mobile view tab: 'daily' | 'weekly'
   const [mobileTab, setMobileTab] = useState('daily')
+
+  const handleMobileTabSwitch = (tab) => {
+    // Clear stale range so the newly-mounted chart doesn't receive an invalid syncRange
+    setDailyRange(null)
+    setWeeklyRange(null)
+    setMobileTab(tab)
+  }
 
   if (fixed) {
     const handleDailyRange  = (r) => { if (rangeSyncLockRef.current) return; rangeSyncLockRef.current = true; setWeeklyRange(r); setTimeout(() => { rangeSyncLockRef.current = false }, 50) }
@@ -265,7 +276,7 @@ function NEPSEChart({ fixed = false }) {
           <span className="text-[10px] font-bold uppercase tracking-widest text-gray-400">NEPSE</span>
           <div className="flex items-center bg-gray-100 dark:bg-gray-800 rounded-lg p-0.5">
             {[{ id: 'daily', label: 'Daily' }, { id: 'weekly', label: 'Weekly' }].map(t => (
-              <button key={t.id} onClick={() => setMobileTab(t.id)}
+              <button key={t.id} onClick={() => handleMobileTabSwitch(t.id)}
                 className={`px-2.5 py-0.5 rounded-md text-[10px] font-semibold transition-all ${
                   mobileTab === t.id
                     ? 'bg-white dark:bg-gray-700 text-gray-900 dark:text-white shadow-sm'
