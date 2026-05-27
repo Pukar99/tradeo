@@ -326,7 +326,7 @@ function ScreenInner() {
 
   // Opt into navbar auto-hide — activates on mount, restores on unmount
   useNavbarAutoHide()
-  const { hidden: navHidden, scheduleHide, showNavbar } = useNavbarState()
+  const { active: navAutoHide, hidden: navHidden, scheduleHide, showNavbar } = useNavbarState()
 
   // If not logged in, keep simple mode and reset to General — never allow locked tabs to persist
   const handleMode = (m) => {
@@ -354,7 +354,7 @@ function ScreenInner() {
     <ScreenToolbarSlotCtx.Provider value={toolbarSlotRef}>
     <div
       className="flex flex-col overflow-hidden bg-white dark:bg-gray-900"
-      style={{ height: '100dvh', paddingTop: navHidden ? 0 : 56 }}
+      style={{ height: '100dvh', paddingTop: navAutoHide && !navHidden ? 56 : 0 }}
     >
 
       {/* ── Top strip ── */}

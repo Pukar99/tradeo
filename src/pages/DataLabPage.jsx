@@ -282,7 +282,7 @@ export default function DataLabPage() {
 
   // Opt into navbar auto-hide — activates on mount, restores on unmount
   useNavbarAutoHide()
-  const { hidden: navHidden, scheduleHide, showNavbar } = useNavbarState()
+  const { active: navAutoHide, hidden: navHidden, scheduleHide, showNavbar } = useNavbarState()
 
   function handleTab(id) {
     setActiveTab(id)
@@ -293,7 +293,7 @@ export default function DataLabPage() {
     <ToolbarSlotCtx.Provider value={slotRef}>
       <div
         className="flex flex-col overflow-hidden bg-white dark:bg-gray-900"
-        style={{ height: '100dvh', paddingTop: navHidden ? 0 : 56 }}
+        style={{ height: '100dvh', paddingTop: navAutoHide && !navHidden ? 56 : 0 }}
       >
 
         {/* ── Tab bar + inline toolbar ──
