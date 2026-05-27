@@ -1,30 +1,164 @@
-// =============================================================================
-// Watchlist.jsx — watchlist widget: active / pre-watch / portfolio tabs, price alerts
-// =============================================================================
-import { useState, useEffect, useCallback } from 'react'
+// === Watchlist.jsx ===
+import { useState, useEffect, useCallback, useRef, useMemo } from 'react'
 import {
   getWatchlist,
   addToWatchlist,
   updateWatchlist,
   removeFromWatchlist,
-  getStockPrice,
-  getPositions
+  getMarketSymbols,
 } from '../../api'
 import { getBatchPrices } from '../../utils/globalCache'
 import { useContextMenu } from '../ContextMenu'
 import { useChatRefresh } from '../../utils/chatEvents'
 
+// ── Classification ────────────────────────────────────────────────────────────
+// Returns { category: 'active'|'pre', status: null|'grace'|'expired' }
+// Rules:
+//   price signal  — ACTIVE if |ltp - alert| / ltp ≤ 15%, else PRE, else NEUTRAL
+//   date signal   — ACTIVE if 0–14 days left or in grace (overdue ≤10 days)
+//                   PRE if >14 days left
+//                   EXPIRED if overdue >10 days
+//   EXPIRED locks to PRE regardless of price signal
+//   Either ACTIVE signal → category = active
+//   Both NEUTRAL → category = pre (default)
+
+function classifyItem(item, today) {
+  const ltp = item.currentPrice
+
+  let priceSignal = 'neutral'
+  if (item.price_alert && ltp) {
+    const pct = Math.abs((ltp - parseFloat(item.price_alert)) / ltp) * 100
+    priceSignal = pct <= 15 ? 'active' : 'pre'
+  }
+
+  let dateSignal = 'neutral'
+  let status = null
+  if (item.alert_date) {
+    const alertDate = new Date(item.alert_date + 'T00:00:00')
+    const days = Math.ceil((alertDate - today) / (1000 * 60 * 60 * 24))
+    if (days >= 0 && days <= 14) {
+      dateSignal = 'active'
+    } else if (days > 14) {
+      dateSignal = 'pre'
+    } else if (days >= -10) {
+      dateSignal = 'active'
+      status = 'grace'
+    } else {
+      dateSignal = 'expired'
+      status = 'expired'
+    }
+  }
+
+  if (dateSignal === 'expired') return { category: 'pre', status: 'expired' }
+  if (priceSignal === 'active' || dateSignal === 'active') return { category: 'active', status }
+  return { category: 'pre', status }
+}
+
+// ── Alert messages ────────────────────────────────────────────────────────────
+function getAlertMessages(item, today) {
+  const msgs = []
+  const ltp = item.currentPrice
+  if (!ltp) return msgs
+
+  if (item.price_alert) {
+    const alert = parseFloat(item.price_alert)
+    const diff  = alert - ltp
+    const pct   = Math.abs((diff / ltp) * 100).toFixed(1)
+    if (Math.abs(diff) < ltp * 0.02) {
+      msgs.push({ text: 'Near alert level', color: 'text-orange-500 dark:text-orange-400', bg: 'bg-orange-50 dark:bg-orange-900/30' })
+    } else if (diff > 0) {
+      msgs.push({ text: `+Rs.${Math.abs(Math.round(diff)).toLocaleString()} (${pct}%) to alert`, color: 'text-green-600 dark:text-green-400', bg: 'bg-green-50 dark:bg-green-900/30' })
+    } else {
+      msgs.push({ text: `-Rs.${Math.abs(Math.round(diff)).toLocaleString()} (${pct}%) to alert`, color: 'text-red-500 dark:text-red-400', bg: 'bg-red-50 dark:bg-red-900/30' })
+    }
+  }
+
+  if (item.watch_low && ltp) {
+    const wl   = parseFloat(item.watch_low)
+    const diff = ltp - wl
+    const pct  = Math.abs((diff / ltp) * 100).toFixed(1)
+    if (diff > 0) {
+      msgs.push({ text: `-Rs.${Math.abs(Math.round(diff)).toLocaleString()} (${pct}%) to watch low`, color: 'text-red-400', bg: 'bg-red-50 dark:bg-red-900/30' })
+    } else {
+      msgs.push({ text: 'Below watch low', color: 'text-red-500 dark:text-red-400', bg: 'bg-red-50 dark:bg-red-900/30' })
+    }
+  }
+
+  if (item.watch_high && ltp) {
+    const wh   = parseFloat(item.watch_high)
+    const diff = wh - ltp
+    const pct  = Math.abs((diff / ltp) * 100).toFixed(1)
+    if (diff > 0) {
+      msgs.push({ text: `+Rs.${Math.abs(Math.round(diff)).toLocaleString()} (${pct}%) to watch high`, color: 'text-green-500 dark:text-green-400', bg: 'bg-green-50 dark:bg-green-900/30' })
+    } else {
+      msgs.push({ text: 'Above watch high', color: 'text-green-500 dark:text-green-400', bg: 'bg-green-50 dark:bg-green-900/30' })
+    }
+  }
+
+  if (item.alert_date) {
+    const alertDate = new Date(item.alert_date + 'T00:00:00')
+    const days = Math.ceil((alertDate - today) / (1000 * 60 * 60 * 24))
+    if (days < -10) {
+      msgs.push({ text: `Alert expired ${Math.abs(days)} days ago`, color: 'text-gray-400', bg: 'bg-gray-100 dark:bg-gray-800' })
+    } else if (days < 0) {
+      msgs.push({ text: `${Math.abs(days)}d overdue — grace period`, color: 'text-amber-500 dark:text-amber-400', bg: 'bg-amber-50 dark:bg-amber-900/30' })
+    } else if (days === 0) {
+      msgs.push({ text: 'Alert date is today', color: 'text-orange-500 dark:text-orange-400', bg: 'bg-orange-50 dark:bg-orange-900/30' })
+    } else if (days <= 3) {
+      msgs.push({ text: `${days}d left`, color: 'text-orange-500 dark:text-orange-400', bg: 'bg-orange-50 dark:bg-orange-900/30' })
+    } else if (days <= 14) {
+      msgs.push({ text: `${days}d left`, color: 'text-blue-500 dark:text-blue-400', bg: 'bg-blue-50 dark:bg-blue-900/30' })
+    }
+  }
+
+  return msgs
+}
+
+// ── Price proximity bar (0–100% fill based on distance to alert) ──────────────
+function PriceBar({ item }) {
+  if (!item.price_alert || !item.currentPrice) return null
+  const ltp   = item.currentPrice
+  const alert = parseFloat(item.price_alert)
+  const pct   = Math.abs((ltp - alert) / ltp) * 100
+  const fill  = Math.max(0, Math.min(100, 100 - pct / 15 * 100))
+  return (
+    <div className="mt-1.5 h-1 w-full bg-gray-100 dark:bg-gray-700 rounded-full overflow-hidden">
+      <div
+        className="h-full rounded-full bg-blue-400 dark:bg-blue-500 transition-all"
+        style={{ width: `${fill}%` }}
+      />
+    </div>
+  )
+}
+
+// ── Skeleton ──────────────────────────────────────────────────────────────────
+function Skeleton() {
+  return (
+    <div className="space-y-2 px-4 py-6 animate-pulse">
+      <div className="h-3 w-full bg-gray-100 dark:bg-gray-800 rounded" />
+      <div className="h-3 w-3/4 bg-gray-100 dark:bg-gray-800 rounded" />
+      <div className="h-3 w-1/2 bg-gray-100 dark:bg-gray-800 rounded" />
+    </div>
+  )
+}
+
+// ── Edit modal ────────────────────────────────────────────────────────────────
 function EditWatchlistModal({ item, onClose, onSaved }) {
   const [form, setForm] = useState({
-    watch_low:   item.watch_low   || '',
-    watch_high:  item.watch_high  || '',
-    price_alert: item.price_alert || '',
+    watch_low:   item.watch_low   != null ? String(item.watch_low)   : '',
+    watch_high:  item.watch_high  != null ? String(item.watch_high)  : '',
+    price_alert: item.price_alert != null ? String(item.price_alert) : '',
     alert_date:  item.alert_date  ? item.alert_date.slice(0, 10) : '',
     notes:       item.notes       || '',
-    category:    item.category    || 'active',
   })
   const [saving, setSaving] = useState(false)
-  const [err, setErr] = useState(null)
+  const [err,    setErr]    = useState(null)
+
+  useEffect(() => {
+    const onKey = (e) => { if (e.key === 'Escape') onClose() }
+    window.addEventListener('keydown', onKey)
+    return () => window.removeEventListener('keydown', onKey)
+  }, [onClose])
 
   const handleSave = async (e) => {
     e.preventDefault()
@@ -36,7 +170,6 @@ function EditWatchlistModal({ item, onClose, onSaved }) {
         price_alert: form.price_alert !== '' ? parseFloat(form.price_alert) : null,
         alert_date:  form.alert_date  || null,
         notes:       form.notes       || null,
-        category:    form.category,
       })
       onSaved()
       onClose()
@@ -47,25 +180,27 @@ function EditWatchlistModal({ item, onClose, onSaved }) {
     }
   }
 
+  const FIELDS = [
+    ['Watch Low (Rs)',  'watch_low',   'number'],
+    ['Watch High (Rs)', 'watch_high',  'number'],
+    ['Price Alert (Rs)','price_alert', 'number'],
+    ['Alert Date',      'alert_date',  'date'],
+  ]
+
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-4" role="dialog" aria-modal="true">
       <div className="absolute inset-0 bg-black/40 backdrop-blur-sm" onClick={onClose} />
       <div className="relative bg-white dark:bg-gray-900 rounded-2xl shadow-2xl border border-gray-200 dark:border-gray-700 w-full max-w-sm z-10 overflow-hidden">
         <div className="flex items-center justify-between px-4 py-3 border-b border-gray-100 dark:border-gray-800">
           <div>
-            <p className="text-[13px] font-bold text-gray-800 dark:text-gray-100">Edit Watchlist</p>
-            <p className="text-[10px] text-gray-400" translate="no">{item.symbol}</p>
+            <p className="text-[11px] font-bold uppercase tracking-widest text-gray-400">Edit</p>
+            <p className="text-[13px] font-bold text-gray-800 dark:text-gray-100 mt-0.5" translate="no">{item.symbol}</p>
           </div>
-          <button onClick={onClose} className="w-6 h-6 flex items-center justify-center rounded-full hover:bg-gray-100 dark:hover:bg-gray-800 text-gray-400 text-[16px]">×</button>
+          <button onClick={onClose} className="w-7 h-7 flex items-center justify-center rounded-full hover:bg-gray-100 dark:hover:bg-gray-800 text-gray-400 text-lg">×</button>
         </div>
         <form onSubmit={handleSave} className="px-4 py-4 space-y-3">
           <div className="grid grid-cols-2 gap-2">
-            {[
-              ['Watch Low (Rs)', 'watch_low', 'number'],
-              ['Watch High (Rs)', 'watch_high', 'number'],
-              ['Price Alert (Rs)', 'price_alert', 'number'],
-              ['Alert Date', 'alert_date', 'date'],
-            ].map(([label, key, type]) => (
+            {FIELDS.map(([label, key, type]) => (
               <div key={key}>
                 <label className="block text-[10px] font-bold uppercase tracking-widest text-gray-400 mb-1">{label}</label>
                 <input
@@ -82,22 +217,11 @@ function EditWatchlistModal({ item, onClose, onSaved }) {
             <input
               type="text"
               value={form.notes}
+              maxLength={300}
               onChange={e => setForm(f => ({ ...f, notes: e.target.value }))}
               placeholder="Why are you watching this?"
               className="w-full bg-gray-50 dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-xl px-3 py-2 text-[12px] text-gray-800 dark:text-gray-200 outline-none focus:ring-2 focus:ring-blue-300 dark:focus:ring-blue-800"
             />
-          </div>
-          <div>
-            <label className="block text-[10px] font-bold uppercase tracking-widest text-gray-400 mb-1">Category</label>
-            <select
-              value={form.category}
-              onChange={e => setForm(f => ({ ...f, category: e.target.value }))}
-              className="w-full bg-gray-50 dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-xl px-3 py-2 text-[12px] text-gray-800 dark:text-gray-200 outline-none focus:ring-2 focus:ring-blue-300"
-            >
-              {CATEGORIES.filter(c => c.value !== 'portfolio').map(c => (
-                <option key={c.value} value={c.value}>{c.label}</option>
-              ))}
-            </select>
           </div>
           {err && <p className="text-[10px] text-red-500 bg-red-50 dark:bg-red-950 px-3 py-1.5 rounded-lg">{err}</p>}
           <button
@@ -105,7 +229,7 @@ function EditWatchlistModal({ item, onClose, onSaved }) {
             disabled={saving}
             className="w-full bg-blue-600 hover:bg-blue-700 disabled:opacity-50 text-white py-2.5 rounded-xl text-[12px] font-bold transition-colors"
           >
-            {saving ? 'Saving...' : 'Save Changes'}
+            {saving ? 'Saving…' : 'Save Changes'}
           </button>
         </form>
       </div>
@@ -113,233 +237,320 @@ function EditWatchlistModal({ item, onClose, onSaved }) {
   )
 }
 
-const CATEGORIES = [
-  { value: 'active', label: '⭐ Active' },
-  { value: 'pre', label: '🟡 Pre-Watch' },
-  { value: 'portfolio', label: '📁 Portfolio' },
-]
+// ── Symbol search with auto-suggest ──────────────────────────────────────────
+function SymbolSearch({ symbolList, onSelected, onCancel }) {
+  const [query,    setQuery]    = useState('')
+  const [cursor,   setCursor]   = useState(-1)
+  const inputRef  = useRef(null)
+  const listRef   = useRef(null)
 
-function getAlertMessage(item) {
-  const messages = []
-  const ltp = item.currentPrice
+  useEffect(() => { inputRef.current?.focus() }, [])
 
-  if (!ltp) return []
+  const suggestions = useMemo(() => {
+    const q = query.trim().toUpperCase()
+    if (!q) return []
+    return symbolList
+      .filter(s => s.symbol.startsWith(q) || s.company_name?.toUpperCase().includes(q))
+      .slice(0, 8)
+  }, [query, symbolList])
 
-  // Price alert message
-  if (item.price_alert) {
-    const alertPrice = parseFloat(item.price_alert)
-    const diff = alertPrice - ltp
-    const pct = Math.abs((diff / ltp) * 100).toFixed(2)
-    if (Math.abs(diff) < ltp * 0.02) {
-      messages.push({ text: '🎯 Near your alert level!', color: 'text-orange-500', bg: 'bg-orange-50 dark:bg-orange-900' })
-    } else if (diff > 0) {
-      messages.push({ text: `+Rs.${Math.abs(Math.round(diff)).toLocaleString()} (${pct}%) rally needed to hit alert`, color: 'text-green-600 dark:text-green-400', bg: 'bg-green-50 dark:bg-green-900' })
-    } else {
-      messages.push({ text: `-Rs.${Math.abs(Math.round(diff)).toLocaleString()} (${pct}%) drop needed to hit alert`, color: 'text-red-500', bg: 'bg-red-50 dark:bg-red-900' })
+  const select = (sym) => {
+    onSelected(sym)
+  }
+
+  const handleKey = (e) => {
+    if (e.key === 'ArrowDown') {
+      e.preventDefault()
+      setCursor(c => Math.min(c + 1, suggestions.length - 1))
+    } else if (e.key === 'ArrowUp') {
+      e.preventDefault()
+      setCursor(c => Math.max(c - 1, 0))
+    } else if (e.key === 'Enter') {
+      e.preventDefault()
+      if (cursor >= 0 && suggestions[cursor]) select(suggestions[cursor])
+      else if (suggestions.length === 1) select(suggestions[0])
+    } else if (e.key === 'Escape') {
+      onCancel()
     }
   }
 
-  // Watch low/high messages
-  if (item.watch_low && ltp) {
-    const watchLow = parseFloat(item.watch_low)
-    const diff = ltp - watchLow
-    const pct = Math.abs((diff / ltp) * 100).toFixed(2)
-    if (diff > 0) {
-      messages.push({ text: `-Rs.${Math.abs(Math.round(diff)).toLocaleString()} (${pct}%) drop to watch low`, color: 'text-red-400', bg: 'bg-red-50 dark:bg-red-900' })
-    } else {
-      messages.push({ text: '⚠️ Below watch low level!', color: 'text-red-500', bg: 'bg-red-50 dark:bg-red-900' })
-    }
-  }
+  return (
+    <div className="px-3 pt-3 pb-2 border-b border-gray-100 dark:border-gray-800">
+      <div className="relative">
+        <div className="flex items-center gap-2 bg-gray-50 dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg px-2.5 h-7">
+          <svg className="w-3 h-3 text-gray-400 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-4.35-4.35M17 11A6 6 0 1 1 5 11a6 6 0 0 1 12 0z" />
+          </svg>
+          <input
+            ref={inputRef}
+            type="text"
+            value={query}
+            onChange={e => { setQuery(e.target.value.toUpperCase()); setCursor(-1) }}
+            onKeyDown={handleKey}
+            placeholder="Type symbol…"
+            className="flex-1 bg-transparent text-[11px] text-gray-800 dark:text-gray-100 placeholder-gray-400 outline-none"
+            translate="no"
+          />
+          {query && (
+            <button onClick={() => setQuery('')} className="text-gray-400 hover:text-gray-600 dark:hover:text-gray-300 text-xs leading-none">×</button>
+          )}
+        </div>
 
-  if (item.watch_high && ltp) {
-    const watchHigh = parseFloat(item.watch_high)
-    const diff = watchHigh - ltp
-    const pct = Math.abs((diff / ltp) * 100).toFixed(2)
-    if (diff > 0) {
-      messages.push({ text: `+Rs.${Math.abs(Math.round(diff)).toLocaleString()} (${pct}%) rally to watch high`, color: 'text-green-500', bg: 'bg-green-50 dark:bg-green-900' })
-    } else {
-      messages.push({ text: '🚀 Above watch high level!', color: 'text-green-500', bg: 'bg-green-50 dark:bg-green-900' })
-    }
-  }
+        {suggestions.length > 0 && (
+          <div
+            ref={listRef}
+            className="absolute top-full left-0 right-0 mt-1 bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-700 rounded-xl shadow-lg z-20 overflow-hidden"
+          >
+            {suggestions.map((s, i) => (
+              <button
+                key={s.symbol}
+                onClick={() => select(s)}
+                className={`w-full flex items-center justify-between px-3 py-2 text-left transition-colors ${
+                  i === cursor
+                    ? 'bg-blue-50 dark:bg-blue-900/30'
+                    : 'hover:bg-gray-50 dark:hover:bg-gray-800'
+                } ${i < suggestions.length - 1 ? 'border-b border-gray-100 dark:border-gray-800' : ''}`}
+              >
+                <div className="min-w-0">
+                  <p className="text-[11px] font-bold text-gray-900 dark:text-white" translate="no">{s.symbol}</p>
+                  {s.company_name && (
+                    <p className="text-[10px] text-gray-400 truncate">{s.company_name}</p>
+                  )}
+                </div>
+                {s.price != null && (
+                  <div className="text-right shrink-0 ml-2">
+                    <p className="text-[11px] font-semibold text-gray-800 dark:text-gray-200">Rs.{s.price.toLocaleString()}</p>
+                    {s.change != null && (
+                      <p className={`text-[10px] font-medium ${s.change >= 0 ? 'text-green-500' : 'text-red-500'}`}>
+                        {s.change >= 0 ? '+' : ''}{s.change}%
+                      </p>
+                    )}
+                  </div>
+                )}
+              </button>
+            ))}
+          </div>
+        )}
+      </div>
 
-  // Date alert message
-  if (item.alert_date) {
-    const today = new Date()
-    const alertDate = new Date(item.alert_date)
-    const diffDays = Math.ceil((alertDate - today) / (1000 * 60 * 60 * 24))
-    if (diffDays < 0) {
-      messages.push({ text: `⏰ Alert date passed ${Math.abs(diffDays)} days ago`, color: 'text-gray-400', bg: 'bg-gray-50 dark:bg-gray-700' })
-    } else if (diffDays === 0) {
-      messages.push({ text: '⏰ Alert date is today!', color: 'text-orange-500', bg: 'bg-orange-50 dark:bg-orange-900' })
-    } else if (diffDays <= 3) {
-      messages.push({ text: `⏰ ${diffDays} day${diffDays !== 1 ? 's' : ''} remaining for alert date`, color: 'text-orange-500', bg: 'bg-orange-50 dark:bg-orange-900' })
-    } else {
-      messages.push({ text: `📅 ${diffDays} days remaining for alert date`, color: 'text-blue-500', bg: 'bg-blue-50 dark:bg-blue-900' })
-    }
-  }
-
-  return messages
+      <button
+        onClick={onCancel}
+        className="mt-2 text-[10px] text-gray-400 hover:text-gray-600 dark:hover:text-gray-300"
+      >
+        Cancel
+      </button>
+    </div>
+  )
 }
 
-function Watchlist() {
-  const [watchlist, setWatchlist] = useState([])
-  const [loading, setLoading] = useState(true)
-  const [activeTab, setActiveTab] = useState('active')
-  const [showForm, setShowForm] = useState(false)
-  const { onContextMenu, ContextMenuPortal } = useContextMenu()
-  const [editItem, setEditItem] = useState(null)
-  const [form, setForm] = useState({
-    symbol: '',
-    watch_low: '',
-    watch_high: '',
-    price_alert: '',
-    alert_date: '',
-    notes: '',
-    category: 'active'
-  })
-  const [searching, setSearching] = useState(false)
-  const [stockInfo, setStockInfo] = useState(null)
-  const [stockError, setStockError] = useState('')
+// ── Add form (shown after symbol selected) ────────────────────────────────────
+const EMPTY_FORM = { watch_low: '', watch_high: '', price_alert: '', alert_date: '', notes: '' }
+
+function AddForm({ symbol, refPrice, onAdd, onCancel }) {
+  const [form,   setForm]   = useState(EMPTY_FORM)
   const [adding, setAdding] = useState(false)
+  const [err,    setErr]    = useState(null)
 
-  const fetchWatchlist = useCallback(async () => {
-    try {
-      const [watchRes, posRes] = await Promise.all([
-        getWatchlist(),
-        getPositions()
-      ])
-
-      const openTrades = (posRes.data || [])
-        .filter(p => p.status === 'OPEN' || p.status === 'PARTIAL')
-        .map(p => ({
-          id:                 p.trade_id,
-          symbol:             p.symbol,
-          position:           p.direction,
-          status:             p.status,
-          entry_price:        parseFloat(p.wacc) || 0,
-          remaining_quantity: parseFloat(p.total_qty) || 0,
-          quantity:           parseFloat(p.total_qty) || 0,
-          sl:                 p.sl,
-          tp:                 p.tp,
-        }))
-      const watchItems = watchRes.data.filter(w => w.category !== 'portfolio')
-
-      // Single batch request for all symbols — replaces N individual getStockPrice calls
-      const allSymbols = [...new Set([
-        ...openTrades.map(t => t.symbol),
-        ...watchItems.map(w => w.symbol),
-      ])].filter(Boolean)
-
-      let priceMap = {}
-      let latestDate = ''
-      if (allSymbols.length > 0) {
-        try {
-          const batchRes = await getBatchPrices(allSymbols)
-          priceMap = batchRes.data.prices || {}
-          latestDate = batchRes.data.latestDate || ''
-        } catch { /* prices unavailable — UI still works */ }
-      }
-
-      const portfolioWithPrices = openTrades.map(t => {
-        const qty = parseFloat(t.remaining_quantity || t.quantity) || 0
-        const p   = priceMap[t.symbol]
-        const ltp = p?.price ?? null
-        const pnl = ltp != null
-          ? (t.position === 'LONG' ? (ltp - t.entry_price) * qty : (t.entry_price - ltp) * qty)
-          : null
-        return {
-          id: `tradelog_${t.id}`,
-          symbol: t.symbol,
-          quantity: qty,
-          avg_price: t.entry_price,
-          currentPrice: ltp,
-          change: p?.change ?? null,
-          latestDate,
-          position: t.position,
-          status: t.status,
-          sl: t.sl,
-          tp: t.tp,
-          pnl: pnl != null ? Math.round(pnl) : null,
-          category: 'portfolio',
-          isPortfolio: true,
-        }
-      })
-
-      const watchWithPrices = watchItems.map(w => {
-        const p = priceMap[w.symbol]
-        return { ...w, currentPrice: p?.price ?? null, change: p?.change ?? null }
-      })
-
-      setWatchlist([...watchWithPrices, ...portfolioWithPrices])
-    } catch (err) {
-      console.error(err)
-    } finally {
-      setLoading(false)
-    }
-  }, []) // eslint-disable-line react-hooks/exhaustive-deps
-
-  useEffect(() => { fetchWatchlist() }, [fetchWatchlist])
-  useChatRefresh(['watchlist', 'trades'], fetchWatchlist)
-
-  const handleSymbolSearch = async () => {
-    if (!form.symbol.trim()) return
-    setSearching(true)
-    setStockError('')
-    setStockInfo(null)
-    try {
-      const res = await getStockPrice(form.symbol.trim())
-      setStockInfo(res.data)
-    } catch {
-      setStockError(`${form.symbol.toUpperCase()} not found in NEPSE data`)
-    } finally {
-      setSearching(false)
-    }
-  }
-
-  const handleAdd = async (e) => {
+  const handleSubmit = async (e) => {
     e.preventDefault()
-    if (!stockInfo) return
-    setAdding(true)
+    setAdding(true); setErr(null)
     try {
-      await addToWatchlist({
-        symbol: form.symbol.toUpperCase(),
-        watch_low: form.watch_low ? parseFloat(form.watch_low) : null,
-        watch_high: form.watch_high ? parseFloat(form.watch_high) : null,
+      await onAdd({
+        symbol,
+        watch_low:   form.watch_low   ? parseFloat(form.watch_low)   : null,
+        watch_high:  form.watch_high  ? parseFloat(form.watch_high)  : null,
         price_alert: form.price_alert ? parseFloat(form.price_alert) : null,
-        alert_date: form.alert_date || null,
-        notes: form.notes || null,
-        category: form.category
+        alert_date:  form.alert_date  || null,
+        notes:       form.notes       || null,
       })
-      setForm({ symbol: '', watch_low: '', watch_high: '', price_alert: '', alert_date: '', notes: '', category: 'active' })
-      setStockInfo(null)
-      setShowForm(false)
-      fetchWatchlist()
-    } catch (err) {
-      console.error(err)
-    } finally {
+    } catch (e) {
+      setErr(e.response?.data?.error || 'Failed to add')
       setAdding(false)
     }
   }
 
+  const priceAlertPct = form.price_alert && refPrice
+    ? ((parseFloat(form.price_alert) - refPrice) / refPrice * 100).toFixed(1)
+    : null
+  const alertDays = form.alert_date
+    ? Math.ceil((new Date(form.alert_date + 'T00:00:00') - new Date()) / (1000 * 60 * 60 * 24))
+    : null
+
+  return (
+    <div className="px-3 py-3 border-b border-gray-100 dark:border-gray-800 bg-gray-50 dark:bg-gray-900/60">
+      <div className="flex items-center justify-between mb-2.5">
+        <div className="flex items-center gap-2">
+          <p className="text-[12px] font-bold text-gray-800 dark:text-gray-100" translate="no">{symbol}</p>
+          {refPrice && (
+            <p className="text-[11px] text-gray-400">Rs.{refPrice.toLocaleString()}</p>
+          )}
+        </div>
+        <button onClick={onCancel} className="text-[10px] text-gray-400 hover:text-gray-600 dark:hover:text-gray-300">Cancel</button>
+      </div>
+
+      <form onSubmit={handleSubmit} className="space-y-2">
+        <div className="grid grid-cols-2 gap-2">
+          {[
+            ['Price Alert (Rs)', 'price_alert', 'number'],
+            ['Alert Date',       'alert_date',  'date'],
+            ['Watch Low (Rs)',   'watch_low',   'number'],
+            ['Watch High (Rs)',  'watch_high',  'number'],
+          ].map(([label, key, type]) => (
+            <div key={key}>
+              <label className="block text-[10px] font-bold uppercase tracking-widest text-gray-400 mb-1">{label}</label>
+              <input
+                type={type}
+                value={form[key]}
+                onChange={e => setForm(f => ({ ...f, [key]: e.target.value }))}
+                className="w-full bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg px-2.5 py-1.5 text-[11px] text-gray-800 dark:text-gray-200 outline-none focus:ring-2 focus:ring-blue-300 dark:focus:ring-blue-800"
+              />
+              {key === 'price_alert' && priceAlertPct && (
+                <p className={`text-[10px] mt-0.5 ${parseFloat(priceAlertPct) >= 0 ? 'text-green-500' : 'text-red-400'}`}>
+                  {parseFloat(priceAlertPct) >= 0 ? '+' : ''}{priceAlertPct}% from LTP
+                </p>
+              )}
+              {key === 'alert_date' && alertDays != null && (
+                <p className="text-[10px] mt-0.5 text-blue-500 dark:text-blue-400">{alertDays}d from today</p>
+              )}
+            </div>
+          ))}
+        </div>
+
+        <div>
+          <label className="block text-[10px] font-bold uppercase tracking-widest text-gray-400 mb-1">Notes</label>
+          <input
+            type="text"
+            value={form.notes}
+            maxLength={300}
+            onChange={e => setForm(f => ({ ...f, notes: e.target.value }))}
+            placeholder="Why watching?"
+            className="w-full bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg px-2.5 py-1.5 text-[11px] text-gray-800 dark:text-gray-200 outline-none focus:ring-2 focus:ring-blue-300 dark:focus:ring-blue-800"
+          />
+        </div>
+
+        {err && <p className="text-[10px] text-red-500 bg-red-50 dark:bg-red-950 px-2.5 py-1.5 rounded-lg">{err}</p>}
+
+        <button
+          type="submit"
+          disabled={adding}
+          className="w-full bg-blue-600 hover:bg-blue-700 disabled:opacity-50 text-white py-2 rounded-xl text-[11px] font-bold transition-colors"
+        >
+          {adding ? 'Adding…' : 'Add to Watchlist'}
+        </button>
+      </form>
+    </div>
+  )
+}
+
+// ── Main component ────────────────────────────────────────────────────────────
+function Watchlist() {
+  const [watchlist,   setWatchlist]   = useState([])
+  const [loading,     setLoading]     = useState(true)
+  const [fetchErr,    setFetchErr]    = useState(null)
+  const [activeTab,   setActiveTab]   = useState('active')
+  const [editItem,    setEditItem]    = useState(null)
+
+  // add flow: null | 'search' | { symbol, refPrice }
+  const [addState,    setAddState]    = useState(null)
+
+  // symbol list for autocomplete — loaded once, stored in ref to avoid re-renders
+  const symbolListRef = useRef([])
+  const [symbolsReady, setSymbolsReady] = useState(false)
+
+  const { onContextMenu, ContextMenuPortal } = useContextMenu()
+
+  // ── Fetch watchlist ─────────────────────────────────────────────────────────
+  const fetchWatchlist = useCallback(async () => {
+    setFetchErr(null)
+    try {
+      const watchRes = await getWatchlist()
+      const watchItems = (watchRes.data || []).filter(w => w.category !== 'portfolio')
+
+      const symbols = [...new Set(watchItems.map(w => w.symbol))].filter(Boolean)
+      let priceMap = {}
+      if (symbols.length > 0) {
+        try {
+          const batchRes = await getBatchPrices(symbols)
+          priceMap = batchRes.data.prices || {}
+        } catch { /* prices unavailable — UI still works */ }
+      }
+
+      setWatchlist(watchItems.map(w => {
+        const p = priceMap[w.symbol]
+        return { ...w, currentPrice: p?.price ?? null, change: p?.change ?? null }
+      }))
+    } catch {
+      setFetchErr('Failed to load watchlist')
+    } finally {
+      setLoading(false)
+    }
+  }, [])
+
+  useEffect(() => { fetchWatchlist() }, [fetchWatchlist])
+  useChatRefresh(['watchlist'], fetchWatchlist)
+
+  // ── Load symbol list for autocomplete ──────────────────────────────────────
+  useEffect(() => {
+    getMarketSymbols()
+      .then(res => {
+        symbolListRef.current = res.data || []
+        setSymbolsReady(true)
+      })
+      .catch(() => setSymbolsReady(true)) // proceed even if symbols fail
+  }, [])
+
+  // ── Classify items ─────────────────────────────────────────────────────────
+  const today = new Date()
+  today.setHours(0, 0, 0, 0)
+
+  const classified = useMemo(
+    () => watchlist.map(w => ({ ...w, ...classifyItem(w, today) })),
+    [watchlist, today.toDateString()] // eslint-disable-line react-hooks/exhaustive-deps
+  )
+
+  const activeItems = classified.filter(w => w.category === 'active')
+  const preItems    = classified.filter(w => w.category === 'pre')
+  const filtered    = activeTab === 'active' ? activeItems : preItems
+
+  // ── Handlers ───────────────────────────────────────────────────────────────
+  const handleSymbolSelected = (sym) => {
+    setAddState({ symbol: sym.symbol, refPrice: sym.price ?? null })
+  }
+
+  const handleAdd = async (data) => {
+    await addToWatchlist(data)
+    setAddState(null)
+    await fetchWatchlist()
+  }
+
   const handleRemove = async (id) => {
+    const snapshot = watchlist.find(w => w.id === id)
+    setWatchlist(prev => prev.filter(w => w.id !== id))
     try {
       await removeFromWatchlist(id)
-      setWatchlist(prev => prev.filter(w => w.id !== id))
-    } catch (err) {
-      console.error(err)
+    } catch {
+      if (snapshot) setWatchlist(prev => [...prev, snapshot])
     }
   }
 
-  const filtered = watchlist.filter(w => w.category === activeTab)
-
+  // ── Render ─────────────────────────────────────────────────────────────────
   if (loading) return (
-    <div className="bg-white dark:bg-gray-800 rounded-xl p-4 shadow-sm">
-      <p className="text-sm text-gray-400">Loading watchlist...</p>
+    <div className="bg-white dark:bg-gray-900 rounded-2xl border border-gray-100 dark:border-gray-800">
+      <Skeleton />
+    </div>
+  )
+
+  if (fetchErr) return (
+    <div className="bg-white dark:bg-gray-900 rounded-2xl border border-gray-100 dark:border-gray-800 p-4 flex flex-col items-center gap-3 min-h-[80px] justify-center">
+      <p className="text-[11px] text-red-400">{fetchErr}</p>
+      <button onClick={fetchWatchlist} className="text-[11px] px-3 py-1 rounded-lg bg-gray-100 dark:bg-gray-800 text-gray-600 dark:text-gray-300 hover:bg-gray-200 dark:hover:bg-gray-700">
+        Retry
+      </button>
     </div>
   )
 
   return (
-    <div className="bg-white dark:bg-gray-800 rounded-xl shadow-sm">
+    <div className="bg-white dark:bg-gray-900 rounded-2xl border border-gray-100 dark:border-gray-800 overflow-hidden">
       <ContextMenuPortal />
       {editItem && (
         <EditWatchlistModal
@@ -349,288 +560,161 @@ function Watchlist() {
         />
       )}
 
-      <div className="p-4 border-b border-gray-100 dark:border-gray-700">
-        <div className="flex justify-between items-center mb-3">
-          <h2 className="text-base font-semibold text-gray-900 dark:text-white">Watchlist</h2>
-          {activeTab !== 'portfolio' && (
+      {/* ── Header row: label + tabs + add button ── */}
+      <div className="flex items-center gap-2 px-3 py-2.5 border-b border-gray-100 dark:border-gray-800">
+        <p className="text-[10px] font-bold uppercase tracking-widest text-gray-400 shrink-0">Watchlist</p>
+
+        <div className="flex-1" />
+
+        {/* Tab pill group */}
+        <div className="flex items-center bg-gray-100 dark:bg-gray-800 rounded-lg p-0.5 shrink-0">
+          {[
+            { id: 'active', label: `Active${activeItems.length ? ` ${activeItems.length}` : ''}` },
+            { id: 'pre',    label: `Pre-Watch${preItems.length ? ` ${preItems.length}` : ''}` },
+          ].map(tab => (
             <button
-              onClick={() => setShowForm(!showForm)}
-              className="bg-blue-600 text-white px-3 py-1 rounded-lg text-xs font-medium hover:bg-blue-700"
-            >
-              {showForm ? 'Cancel' : '+ Add'}
-            </button>
-          )}
-        </div>
-        <div className="flex gap-1">
-          {CATEGORIES.map(cat => (
-            <button
-              key={cat.value}
-              onClick={() => { setActiveTab(cat.value); setShowForm(false) }}
-              className={`px-3 py-1 rounded-lg text-xs font-medium transition-colors ${
-                activeTab === cat.value
-                  ? 'bg-blue-600 text-white'
-                  : 'bg-gray-100 dark:bg-gray-700 text-gray-600 dark:text-gray-300 hover:bg-gray-200'
+              key={tab.id}
+              onClick={() => { setActiveTab(tab.id); setAddState(null) }}
+              className={`px-2 py-0.5 rounded-md text-[10px] font-semibold transition-all whitespace-nowrap ${
+                activeTab === tab.id
+                  ? 'bg-white dark:bg-gray-700 text-gray-900 dark:text-white shadow-sm'
+                  : 'text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-300'
               }`}
             >
-              {cat.label}
+              {tab.label}
             </button>
           ))}
         </div>
+
+        {/* Add button */}
+        {addState === null && (
+          <button
+            onClick={() => setAddState('search')}
+            className="flex items-center gap-0.5 px-2 py-0.5 rounded-md text-[10px] font-semibold bg-blue-600 hover:bg-blue-700 text-white transition-colors shrink-0"
+          >
+            <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M12 4v16m8-8H4" />
+            </svg>
+            Add
+          </button>
+        )}
       </div>
 
-      {showForm && activeTab !== 'portfolio' && (
-        <div className="p-4 border-b border-gray-100 dark:border-gray-700 bg-gray-50 dark:bg-gray-900">
-          <div className="flex gap-2 mb-3">
-            <input
-              type="text"
-              value={form.symbol}
-              onChange={e => setForm({ ...form, symbol: e.target.value.toUpperCase() })}
-              placeholder="Symbol e.g. NABIL"
-              className="flex-1 border border-gray-200 dark:border-gray-600 dark:bg-gray-700 dark:text-white rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-blue-500"
-              onKeyDown={e => e.key === 'Enter' && handleSymbolSearch()}
-            />
-            <button
-              onClick={handleSymbolSearch}
-              disabled={searching || !form.symbol.trim()}
-              className="bg-gray-800 dark:bg-gray-600 text-white px-3 py-2 rounded-lg text-sm hover:bg-gray-700 disabled:opacity-40"
-            >
-              {searching ? '...' : 'Search'}
-            </button>
-          </div>
-
-          {stockError && <p className="text-xs text-red-500 mb-3">{stockError}</p>}
-
-          {stockInfo && (
-            <div className="bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-600 rounded-xl p-3 mb-3">
-              <div className="flex justify-between items-center">
-                <div>
-                  <p className="text-sm font-bold text-gray-900 dark:text-white">{stockInfo.symbol}</p>
-                  <p className="text-xs text-gray-400">Data as of {stockInfo.latestDate}</p>
-                </div>
-                <div className="text-right">
-                  <p className="text-sm font-bold text-gray-900 dark:text-white">Rs. {stockInfo.price.toLocaleString()}</p>
-                  <p className={`text-xs font-medium ${stockInfo.change >= 0 ? 'text-green-500' : 'text-red-500'}`}>
-                    {stockInfo.change >= 0 ? '+' : ''}{stockInfo.change}%
-                  </p>
-                </div>
-              </div>
-            </div>
-          )}
-
-          {stockInfo && (
-            <form onSubmit={handleAdd}>
-              <div className="grid grid-cols-2 gap-2 mb-2">
-                <div>
-                  <label className="block text-xs text-gray-500 dark:text-gray-400 mb-1">
-                    Watch Low (Rs) <span className="text-gray-400">optional</span>
-                  </label>
-                  <input
-                    type="number"
-                    value={form.watch_low}
-                    onChange={e => setForm({ ...form, watch_low: e.target.value })}
-                    placeholder="e.g. 450"
-                    className="w-full border border-gray-200 dark:border-gray-600 dark:bg-gray-700 dark:text-white rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-blue-500"
-                  />
-                </div>
-                <div>
-                  <label className="block text-xs text-gray-500 dark:text-gray-400 mb-1">
-                    Watch High (Rs) <span className="text-gray-400">optional</span>
-                  </label>
-                  <input
-                    type="number"
-                    value={form.watch_high}
-                    onChange={e => setForm({ ...form, watch_high: e.target.value })}
-                    placeholder="e.g. 550"
-                    className="w-full border border-gray-200 dark:border-gray-600 dark:bg-gray-700 dark:text-white rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-blue-500"
-                  />
-                </div>
-                <div>
-                  <label className="block text-xs text-gray-500 dark:text-gray-400 mb-1">
-                    🎯 Price Alert (Rs) <span className="text-gray-400">optional</span>
-                  </label>
-                  <input
-                    type="number"
-                    value={form.price_alert}
-                    onChange={e => setForm({ ...form, price_alert: e.target.value })}
-                    placeholder={`e.g. ${stockInfo ? Math.round(stockInfo.price * 0.95) : '—'}`}
-                    className="w-full border border-gray-200 dark:border-gray-600 dark:bg-gray-700 dark:text-white rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-blue-500"
-                  />
-                  {form.price_alert && stockInfo && (
-                    <p className={`text-xs mt-1 ${parseFloat(form.price_alert) > stockInfo.price ? 'text-green-500' : 'text-red-400'}`}>
-                      {parseFloat(form.price_alert) > stockInfo.price
-                        ? `+${((parseFloat(form.price_alert) - stockInfo.price) / stockInfo.price * 100).toFixed(2)}% rally needed`
-                        : `${((parseFloat(form.price_alert) - stockInfo.price) / stockInfo.price * 100).toFixed(2)}% drop needed`
-                      }
-                    </p>
-                  )}
-                </div>
-                <div>
-                  <label className="block text-xs text-gray-500 dark:text-gray-400 mb-1">
-                    📅 Alert Date <span className="text-gray-400">optional</span>
-                  </label>
-                  <input
-                    type="date"
-                    value={form.alert_date}
-                    onChange={e => setForm({ ...form, alert_date: e.target.value })}
-                    min={new Date().toISOString().split('T')[0]}
-                    className="w-full border border-gray-200 dark:border-gray-600 dark:bg-gray-700 dark:text-white rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-blue-500"
-                  />
-                  {form.alert_date && (
-                    <p className="text-xs text-blue-500 mt-1">
-                      {Math.ceil((new Date(form.alert_date) - new Date()) / (1000 * 60 * 60 * 24))} days from today
-                    </p>
-                  )}
-                </div>
-              </div>
-
-              <div className="mb-3">
-                <label className="block text-xs text-gray-500 dark:text-gray-400 mb-1">
-                  Notes <span className="text-gray-400">optional</span>
-                </label>
-                <input
-                  type="text"
-                  value={form.notes}
-                  onChange={e => setForm({ ...form, notes: e.target.value })}
-                  placeholder="Why are you watching this stock?"
-                  className="w-full border border-gray-200 dark:border-gray-600 dark:bg-gray-700 dark:text-white rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-blue-500"
-                />
-              </div>
-
-              <div className="mb-3">
-                <label className="block text-xs text-gray-500 dark:text-gray-400 mb-1">Category</label>
-                <select
-                  value={form.category}
-                  onChange={e => setForm({ ...form, category: e.target.value })}
-                  className="w-full border border-gray-200 dark:border-gray-600 dark:bg-gray-700 dark:text-white rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-blue-500"
-                >
-                  {CATEGORIES.filter(c => c.value !== 'portfolio').map(cat => (
-                    <option key={cat.value} value={cat.value}>{cat.label}</option>
-                  ))}
-                </select>
-              </div>
-
-              <button
-                type="submit"
-                disabled={adding}
-                className="w-full bg-blue-600 text-white py-2 rounded-xl text-sm font-medium hover:bg-blue-700 disabled:opacity-50"
-              >
-                {adding ? 'Adding...' : 'Add to Watchlist'}
-              </button>
-            </form>
-          )}
+      {/* ── Symbol search ── */}
+      {addState === 'search' && symbolsReady && (
+        <SymbolSearch
+          symbolList={symbolListRef.current}
+          onSelected={handleSymbolSelected}
+          onCancel={() => setAddState(null)}
+        />
+      )}
+      {addState === 'search' && !symbolsReady && (
+        <div className="px-3 py-3 border-b border-gray-100 dark:border-gray-800 text-[11px] text-gray-400">
+          Loading symbols…
         </div>
       )}
 
-      <div className="divide-y divide-gray-50 dark:divide-gray-700">
+      {/* ── Add form ── */}
+      {addState && typeof addState === 'object' && (
+        <AddForm
+          symbol={addState.symbol}
+          refPrice={addState.refPrice}
+          onAdd={handleAdd}
+          onCancel={() => setAddState(null)}
+        />
+      )}
+
+      {/* ── List ── */}
+      <div className="divide-y divide-gray-50 dark:divide-gray-800">
         {filtered.length === 0 ? (
-          <div className="p-6 text-center">
-            <p className="text-sm text-gray-400">
-              {activeTab === 'portfolio' ? 'No open positions' : 'No stocks in this list'}
-            </p>
-            <p className="text-xs text-gray-400 mt-1">
-              {activeTab === 'portfolio'
-                ? 'Add trades in Trader screen to see open positions here'
-                : 'Click "+ Add" to add stocks'
-              }
+          <div className="py-8 text-center">
+            <p className="text-[11px] text-gray-400">No stocks in {activeTab === 'active' ? 'Active' : 'Pre-Watch'}</p>
+            <p className="text-[10px] text-gray-300 dark:text-gray-600 mt-1">
+              {activeTab === 'active'
+                ? 'Items auto-promote when alert is within 15% or 2 weeks'
+                : 'Click + to add a symbol'}
             </p>
           </div>
         ) : (
-          filtered.map(item => {
-            const pnlPct = item.isPortfolio && item.currentPrice
-              ? ((item.currentPrice - item.avg_price) / item.avg_price * 100).toFixed(2)
-              : null
-            const alertMessages = !item.isPortfolio ? getAlertMessage(item) : []
+          filtered.map((item, i) => {
+            const alertMsgs = getAlertMessages(item, today)
+            const isExpired = item.status === 'expired'
+            const inGrace   = item.status === 'grace'
 
             return (
               <div
                 key={item.id}
-                onContextMenu={!item.isPortfolio ? onContextMenu([
-                  { label: 'Edit', icon: '✏️', action: () => setEditItem(item) },
+                onContextMenu={onContextMenu([
+                  { label: 'Edit',   icon: '✏️', action: () => setEditItem(item) },
                   { separator: true },
                   { label: 'Delete', icon: '🗑️', danger: true, action: () => handleRemove(item.id) },
-                ]) : undefined}
-                className="px-4 py-3 hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors"
+                ])}
+                className={`px-3 py-2.5 cursor-default transition-colors ${
+                  i % 2 === 1
+                    ? 'bg-gray-50/80 dark:bg-gray-800/40 hover:bg-gray-100 dark:hover:bg-gray-800/60'
+                    : 'bg-white dark:bg-gray-900 hover:bg-gray-50 dark:hover:bg-gray-900/60'
+                } ${isExpired ? 'opacity-60' : ''}`}
               >
-                <div className="flex items-center justify-between" translate="no">
-                  <div>
-                    <div className="flex items-center gap-2">
-                      <p className="text-sm font-semibold text-gray-900 dark:text-white">
+                {/* Top row: symbol + badges + price */}
+                <div className="flex items-start justify-between gap-2" translate="no">
+                  <div className="min-w-0 flex-1">
+                    <div className="flex items-center gap-1.5 flex-wrap">
+                      <p className={`text-[12px] font-bold ${isExpired ? 'text-gray-400 dark:text-gray-500' : 'text-gray-900 dark:text-white'}`}>
                         {item.symbol}
                       </p>
-                      {item.isPortfolio && (
-                        <span className={`text-xs px-1.5 py-0.5 rounded font-medium ${
-                          item.position === 'LONG'
-                            ? 'bg-green-100 text-green-700 dark:bg-green-900 dark:text-green-300'
-                            : 'bg-red-100 text-red-700 dark:bg-red-900 dark:text-red-300'
-                        }`}>
-                          {item.position}
+                      {isExpired && (
+                        <span className="text-[9px] px-1.5 py-0.5 rounded bg-gray-100 dark:bg-gray-800 text-gray-400 font-semibold uppercase tracking-wide">
+                          Expired
                         </span>
                       )}
-                      {item.status === 'PARTIAL' && (
-                        <span className="text-xs px-1.5 py-0.5 rounded bg-orange-100 text-orange-700 dark:bg-orange-900 dark:text-orange-300 font-medium">
-                          PARTIAL
+                      {inGrace && (
+                        <span className="text-[9px] px-1.5 py-0.5 rounded bg-amber-100 dark:bg-amber-900/30 text-amber-600 dark:text-amber-400 font-semibold uppercase tracking-wide">
+                          Grace
                         </span>
                       )}
                     </div>
 
-                    {item.isPortfolio ? (
-                      <div className="text-xs text-gray-400 mt-0.5">
-                        {item.quantity} shares @ Rs.{item.avg_price}
-                        {item.sl && <span className="text-red-400 ml-2">SL:{item.sl}</span>}
-                        {item.tp && <span className="text-green-400 ml-2">TP:{item.tp}</span>}
-                      </div>
-                    ) : (
-                      <div className="text-xs text-gray-400 mt-0.5 space-y-0.5">
-                        {(item.watch_low || item.watch_high) && (
-                          <p>Range: Rs.{item.watch_low || '—'} – Rs.{item.watch_high || '—'}</p>
-                        )}
-                        {item.price_alert && (
-                          <p>Alert: Rs.{item.price_alert}</p>
-                        )}
-                        {item.alert_date && (
-                          <p>Watch by: {new Date(item.alert_date).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}</p>
-                        )}
-                        {item.notes && (
-                          <p className="text-gray-500 italic truncate max-w-36">"{item.notes}"</p>
-                        )}
-                      </div>
-                    )}
+                    {/* Sub-details */}
+                    <div className="text-[10px] text-gray-400 mt-0.5 space-y-0.5">
+                      {(item.watch_low || item.watch_high) && (
+                        <p>Range: Rs.{item.watch_low ?? '—'} – Rs.{item.watch_high ?? '—'}</p>
+                      )}
+                      {item.price_alert && (
+                        <p>Alert: Rs.{parseFloat(item.price_alert).toLocaleString()}</p>
+                      )}
+                      {item.alert_date && (
+                        <p className={isExpired ? 'line-through' : ''}>
+                          By: {new Date(item.alert_date + 'T00:00:00').toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}
+                        </p>
+                      )}
+                      {item.notes && (
+                        <p className="text-gray-400 dark:text-gray-500 italic truncate max-w-[160px]">"{item.notes}"</p>
+                      )}
+                    </div>
                   </div>
 
-                  <div className="flex items-center gap-3">
-                    {item.isPortfolio ? (
-                      <div className="text-right">
-                        <p className="text-sm font-medium text-gray-900 dark:text-white">
-                          Rs.{item.currentPrice?.toLocaleString() || '—'}
-                        </p>
-                        {item.pnl !== null && (
-                          <p className={`text-xs font-medium ${item.pnl >= 0 ? 'text-green-500' : 'text-red-500'}`}>
-                            {item.pnl >= 0 ? '+' : ''}Rs.{Math.abs(item.pnl).toLocaleString()}
-                            {pnlPct && ` (${pnlPct}%)`}
-                          </p>
-                        )}
-                      </div>
-                    ) : (
-                      <div className="text-right">
-                        <p className="text-sm font-medium text-gray-900 dark:text-white">
-                          Rs.{item.currentPrice?.toLocaleString() || '—'}
-                        </p>
-                        {item.change !== undefined && item.change !== null && (
-                          <p className={`text-xs font-medium ${item.change >= 0 ? 'text-green-500' : 'text-red-500'}`}>
-                            {item.change >= 0 ? '+' : ''}{item.change}%
-                          </p>
-                        )}
-                      </div>
+                  {/* Price + change */}
+                  <div className="text-right shrink-0">
+                    <p className="text-[12px] font-semibold tabular-nums text-gray-900 dark:text-white">
+                      {item.currentPrice != null ? `Rs.${item.currentPrice.toLocaleString()}` : '—'}
+                    </p>
+                    {item.change != null && (
+                      <p className={`text-[10px] font-medium tabular-nums ${item.change >= 0 ? 'text-green-600 dark:text-green-400' : 'text-red-600 dark:text-red-400'}`}>
+                        {item.change >= 0 ? '+' : ''}{item.change}%
+                      </p>
                     )}
                   </div>
                 </div>
 
-                {/* Alert Messages */}
-                {alertMessages.length > 0 && (
-                  <div className="mt-2 space-y-1">
-                    {alertMessages.map((msg, i) => (
-                      <div key={i} className={`${msg.bg} px-2.5 py-1 rounded-lg`}>
-                        <p className={`text-xs font-medium ${msg.color}`}>{msg.text}</p>
+                {/* Price proximity bar (active tab only, when price_alert set) */}
+                {activeTab === 'active' && <PriceBar item={item} />}
+
+                {/* Alert messages */}
+                {alertMsgs.length > 0 && (
+                  <div className="mt-1.5 space-y-1">
+                    {alertMsgs.map((msg, j) => (
+                      <div key={j} className={`${msg.bg} px-2 py-1 rounded-lg`}>
+                        <p className={`text-[10px] font-medium ${msg.color}`}>{msg.text}</p>
                       </div>
                     ))}
                   </div>
@@ -640,15 +724,6 @@ function Watchlist() {
           })
         )}
       </div>
-
-      {activeTab === 'portfolio' && filtered.length > 0 && (
-        <div className="px-4 py-2 border-t border-gray-100 dark:border-gray-700">
-          <p className="text-xs text-gray-400 text-center">
-            Synced from Trade Log · Open positions only ·{' '}
-            Prices as of {filtered.find(f => f.latestDate)?.latestDate || '—'}
-          </p>
-        </div>
-      )}
     </div>
   )
 }

@@ -1,31 +1,149 @@
-// =============================================================================
-// MonthlyGoals.jsx — goal list with add / edit / delete / toggle completion
-// =============================================================================
-import { useState, useEffect, useCallback } from 'react'
+// === MonthlyGoals.jsx ===
+import { useState, useEffect, useCallback, useMemo } from 'react'
 import { getGoals, addGoal, updateGoal, deleteGoal } from '../../api'
-import { useLanguage } from '../../context/LanguageContext'
 import { useContextMenu } from '../ContextMenu'
 import { useChatRefresh } from '../../utils/chatEvents'
+import { gCache } from '../../utils/globalCache'
+
+// ── Date helpers ──────────────────────────────────────────────────────────────
+
+function toLocalDateStr(date) {
+  const y = date.getFullYear()
+  const m = String(date.getMonth() + 1).padStart(2, '0')
+  const d = String(date.getDate()).padStart(2, '0')
+  return `${y}-${m}-${d}`
+}
+
+function lastDayOfMonth(year, month) {
+  // month is 0-indexed
+  return new Date(year, month + 1, 0)
+}
+
+function defaultDeadline() {
+  const d = new Date()
+  d.setDate(d.getDate() + 15)
+  return toLocalDateStr(d)
+}
+
+function autoDeadlineForMonth(year, month) {
+  return toLocalDateStr(lastDayOfMonth(year, month))
+}
+
+// ── Goal visibility filter ────────────────────────────────────────────────────
+// Rules:
+//   1. Current month: show goals whose deadline falls in the current calendar
+//      month OR within the 7-day grace window after month-end.
+//   2. Next month preview: if today is ≤10 days before next month, also show
+//      next month's goals.
+//   3. Goals with no target_date: treated as last day of current month.
+//
+// Returns { currentGoals, nextGoals, showNextMonth } so callers don't
+// recompute the same window logic independently.
+
+function buildVisibleGoals(goals, today) {
+  const y = today.getFullYear()
+  const m = today.getMonth()
+
+  const currentMonthEnd = lastDayOfMonth(y, m)
+
+  // MG01 fix: graceEnd is in the next calendar month — must check year too
+  const graceEnd = new Date(currentMonthEnd)
+  graceEnd.setDate(graceEnd.getDate() + 7)
+
+  const nextMonthStart  = new Date(y, m + 1, 1)
+  const daysToNextMonth = Math.ceil((nextMonthStart - today) / (1000 * 60 * 60 * 24))
+  const showNextMonth   = daysToNextMonth <= 10
+
+  // MG02 fix: (m + 1) % 12, and correct year for January wrap
+  const nextM = (m + 1) % 12
+  const nextY = m === 11 ? y + 1 : y
+
+  const currentGoals = []
+  const nextGoals    = []
+
+  for (const g of goals) {
+    const raw      = g.target_date || autoDeadlineForMonth(y, m)
+    const deadline = new Date(raw + 'T00:00:00')
+    const dy       = deadline.getFullYear()
+    const dm       = deadline.getMonth()
+
+    // MG01 fix: parentheses ensure year check wraps both month conditions
+    const inCurrentMonth = (dy === y && dm === m)
+    const inGrace        = (deadline > currentMonthEnd && deadline <= graceEnd)
+
+    if (inCurrentMonth || inGrace) {
+      currentGoals.push(g)
+    } else if (showNextMonth && dy === nextY && dm === nextM) {
+      nextGoals.push(g)
+    }
+  }
+
+  return { currentGoals, nextGoals, showNextMonth, nextY, nextM }
+}
+
+// ── Deadline urgency badge ─────────────────────────────────────────────────────
+
+function DeadlineBadge({ target_date, completed }) {
+  if (!target_date || completed) return null
+
+  // MG04 fix: fresh Date on every render — not frozen from mount
+  const today = new Date()
+  today.setHours(0, 0, 0, 0)
+  const deadline = new Date(target_date + 'T00:00:00')
+  const diffDays = Math.ceil((deadline - today) / (1000 * 60 * 60 * 24))
+
+  const label = deadline.toLocaleDateString('en-US', { month: 'short', day: 'numeric' })
+
+  let cls = 'text-gray-400 dark:text-gray-500'
+  if (diffDays < 0)       cls = 'text-red-500 dark:text-red-400'
+  else if (diffDays <= 3) cls = 'text-amber-500 dark:text-amber-400'
+
+  return (
+    <span className={`inline-flex items-center gap-0.5 text-[10px] mt-0.5 ${cls}`}>
+      <svg className="w-3 h-3 flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+        <rect x="3" y="4" width="18" height="18" rx="2" ry="2" />
+        <line x1="16" y1="2" x2="16" y2="6" />
+        <line x1="8" y1="2" x2="8" y2="6" />
+        <line x1="3" y1="10" x2="21" y2="10" />
+      </svg>
+      {label}
+      {diffDays < 0  && <span className="ml-0.5">· overdue</span>}
+      {diffDays >= 0 && diffDays <= 3 && (
+        <span className="ml-0.5">· {diffDays === 0 ? 'today' : `${diffDays}d left`}</span>
+      )}
+    </span>
+  )
+}
+
+// ── Month label helper ────────────────────────────────────────────────────────
+
+function monthLabel(year, month) {
+  return new Date(year, month, 1).toLocaleDateString('en-US', { month: 'long', year: 'numeric' })
+}
+
+// ── Main component ────────────────────────────────────────────────────────────
 
 function MonthlyGoals({ initData }) {
-  const { t } = useLanguage()
   const { onContextMenu, ContextMenuPortal } = useContextMenu()
-  const [goals, setGoals] = useState(initData || [])
-  const [loading, setLoading] = useState(!initData)
-  const [mutateError, setMutateError] = useState(null)
-  const [showForm, setShowForm] = useState(false)
-  const [form, setForm] = useState({ title: '', description: '', target_date: '' })
-  const [adding, setAdding] = useState(false)
-  const [editingId, setEditingId] = useState(null)
-  const [editForm, setEditForm] = useState({ title: '', description: '', target_date: '' })
-  const [saving, setSaving] = useState(false)
+  const [goals, setGoals]           = useState(initData || [])
+  const [loading, setLoading]       = useState(!initData)
+  const [fetchError, setFetchError] = useState(null)      // MG13
+  const [mutateErr, setMutateErr]   = useState(null)
+  const [showForm, setShowForm]     = useState(false)
+  const [form, setForm]             = useState({ title: '', description: '', target_date: defaultDeadline() })
+  const [adding, setAdding]         = useState(false)
+  const [editingId, setEditingId]   = useState(null)
+  const [editForm, setEditForm]     = useState({ title: '', description: '', target_date: '' })
+  const [saving, setSaving]         = useState(false)
 
   const fetchGoals = useCallback(async () => {
+    setFetchError(null)
     try {
       const res = await getGoals()
       setGoals(res.data)
     } catch (err) {
-      console.error(err)
+      console.error('[MonthlyGoals fetch]', err)
+      setFetchError('Failed to load goals')   // MG13 fix
     } finally {
       setLoading(false)
     }
@@ -35,53 +153,81 @@ function MonthlyGoals({ initData }) {
     if (initData) { setGoals(initData); setLoading(false); return }
     fetchGoals()
   }, [initData]) // eslint-disable-line react-hooks/exhaustive-deps
+
   useChatRefresh(['goals'], fetchGoals)
 
-  const completedCount = goals.filter(g => g.completed).length
-  const progress = goals.length > 0 ? Math.round((completedCount / goals.length) * 100) : 0
+  // ── Filtered view ─────────────────────────────────────────────────────────
+  // MG04 fix: plain variable — recalculates every render, stays fresh past midnight
+  const today = new Date()
+  today.setHours(0, 0, 0, 0)
+
+  const y = today.getFullYear()
+  const m = today.getMonth()
+
+  // MG03 + MG05 fix: single call, no duplicated window logic
+  const { currentGoals: currentMonthGoals, nextGoals: nextMonthGoals, showNextMonth, nextY, nextM } =
+    useMemo(() => buildVisibleGoals(goals, today), [goals, today.toDateString()])
+
+  const completedCount = currentMonthGoals.filter(g => g.completed).length
+  const totalCount     = currentMonthGoals.length
+  const progress       = totalCount > 0 ? Math.round((completedCount / totalCount) * 100) : 0
+
+  // ── Mutations ─────────────────────────────────────────────────────────────
 
   const handleAdd = async (e) => {
     e.preventDefault()
     setAdding(true)
-    setMutateError(null)
+    setMutateErr(null)
     try {
-      const res = await addGoal(form)
+      const deadline = form.target_date || autoDeadlineForMonth(y, m)
+      const res = await addGoal({ ...form, target_date: deadline })
       setGoals(prev => [res.data, ...prev])
-      setForm({ title: '', description: '', target_date: '' })
+      setForm({ title: '', description: '', target_date: defaultDeadline() })
       setShowForm(false)
-    } catch (err) {
-      setMutateError('Failed to add goal')
+      gCache.del('dashboard')
+    } catch {
+      setMutateErr('Failed to add goal')
     } finally {
       setAdding(false)
     }
   }
 
   const handleToggle = async (goal) => {
-    // Optimistic update — revert on failure
+    setMutateErr(null)
     setGoals(prev => prev.map(g => g.id === goal.id ? { ...g, completed: !g.completed } : g))
     try {
       await updateGoal(goal.id, !goal.completed)
+      gCache.del('dashboard')
     } catch {
       setGoals(prev => prev.map(g => g.id === goal.id ? { ...g, completed: goal.completed } : g))
-      setMutateError('Failed to update goal')
+      setMutateErr('Failed to update goal')
     }
   }
 
+  // MG08 fix: optimistic delete — remove immediately, restore on failure
   const handleDelete = async (id) => {
+    setMutateErr(null)
+    const snapshot = goals.find(g => g.id === id)
+    setGoals(prev => prev.filter(g => g.id !== id))
     try {
       await deleteGoal(id)
-      setGoals(prev => prev.filter(g => g.id !== id))
+      gCache.del('dashboard')
     } catch {
-      setMutateError('Failed to delete goal')
+      if (snapshot) setGoals(prev => [...prev, snapshot])
+      setMutateErr('Failed to delete goal')
     }
   }
 
+  // MG09 fix: clear error on any UI interaction that starts a new action
   const startEdit = (goal) => {
+    setMutateErr(null)
     setEditingId(goal.id)
     setEditForm({ title: goal.title, description: goal.description || '', target_date: goal.target_date || '' })
+    setShowForm(false)
   }
 
   const cancelEdit = () => {
+    setMutateErr(null)
     setEditingId(null)
     setEditForm({ title: '', description: '', target_date: '' })
   }
@@ -89,62 +235,101 @@ function MonthlyGoals({ initData }) {
   const handleSaveEdit = async (id) => {
     if (!editForm.title.trim()) return
     setSaving(true)
-    setMutateError(null)
+    setMutateErr(null)
     try {
-      const res = await updateGoal(id, editForm)
+      const deadline = editForm.target_date || autoDeadlineForMonth(y, m)
+      const res = await updateGoal(id, { ...editForm, target_date: deadline })
       setGoals(prev => prev.map(g => g.id === id ? res.data : g))
       setEditingId(null)
+      gCache.del('dashboard')
     } catch {
-      setMutateError('Failed to save edit')
+      setMutateErr('Failed to save edit')
     } finally {
       setSaving(false)
     }
   }
 
+  // ── Skeleton ──────────────────────────────────────────────────────────────
+
   if (loading) return (
     <div className="bg-white dark:bg-gray-900 rounded-2xl p-4 border border-gray-100 dark:border-gray-800">
       <div className="animate-pulse space-y-2">
-        <div className="h-4 bg-gray-100 dark:bg-gray-800 rounded w-1/2" />
-        <div className="h-2 bg-gray-100 dark:bg-gray-800 rounded w-full mt-3" />
+        <div className="h-4 bg-gray-100 dark:bg-gray-800 rounded w-1/3" />
+        <div className="h-1 bg-gray-100 dark:bg-gray-800 rounded-full w-full mt-3" />
         <div className="h-8 bg-gray-100 dark:bg-gray-800 rounded-xl mt-2" />
         <div className="h-8 bg-gray-100 dark:bg-gray-800 rounded-xl" />
       </div>
     </div>
   )
 
+  // MG13 fix: show error + retry instead of silent empty state
+  if (fetchError) return (
+    <div className="bg-white/70 dark:bg-gray-900/60 backdrop-blur-md rounded-2xl border border-white/60 dark:border-white/10 shadow-sm p-4 flex flex-col items-center justify-center gap-3 min-h-[100px]">
+      <p className="text-[11px] text-red-400">{fetchError}</p>
+      <button
+        onClick={fetchGoals}
+        className="text-[11px] px-3 py-1 rounded-lg bg-gray-100 dark:bg-gray-800 text-gray-600 dark:text-gray-300 hover:bg-gray-200 dark:hover:bg-gray-700 transition-colors"
+      >
+        Retry
+      </button>
+    </div>
+  )
+
+  // ── Render ────────────────────────────────────────────────────────────────
+
   return (
-    <div className="bg-white dark:bg-gray-900 rounded-2xl border border-gray-100 dark:border-gray-800 overflow-hidden">
+    <div className="hp-card bg-white/70 dark:bg-gray-900/60 backdrop-blur-md rounded-2xl border border-white/60 dark:border-white/10 shadow-sm overflow-hidden h-full flex flex-col">
       <ContextMenuPortal />
 
-      {/* Header */}
+      {/* ── Header ── */}
       <div className="px-4 pt-4 pb-3">
-        <div className="flex items-center justify-between mb-3">
+        <div className="flex items-center justify-between mb-2">
           <div>
-            <h2 className="text-[13px] font-semibold text-gray-900 dark:text-white tracking-tight">{t('goals.title')}</h2>
-            {goals.length > 0 && (
+            <h2 className="text-[11px] font-semibold uppercase tracking-widest text-gray-400 dark:text-gray-500">
+              Goals
+            </h2>
+            {totalCount > 0 && (
               <p className="text-[10px] text-gray-400 mt-0.5">
-                {completedCount}/{goals.length} {t('goals.completed')} · {progress}%
+                {completedCount}/{totalCount} done · {progress}%
               </p>
             )}
           </div>
           <button
-            onClick={() => { setShowForm(!showForm); setEditingId(null) }}
-            className={`text-[11px] font-medium px-2.5 py-1 rounded-lg transition-colors ${
+            onClick={() => { setMutateErr(null); setShowForm(s => !s); setEditingId(null) }}
+            className={`flex items-center gap-1 text-[11px] font-medium px-2.5 py-1 rounded-lg transition-colors ${
               showForm
-                ? 'text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-200'
-                : 'text-green-600 dark:text-green-400 hover:bg-green-50 dark:hover:bg-green-900/30'
+                ? 'text-gray-400 hover:text-gray-600 dark:hover:text-gray-300'
+                : 'text-indigo-500 dark:text-indigo-400 hover:bg-indigo-50 dark:hover:bg-indigo-900/30'
             }`}
           >
-            {showForm ? t('goals.cancel') : t('goals.add')}
+            {showForm ? (
+              <>
+                <svg className="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}>
+                  <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" />
+                </svg>
+                Cancel
+              </>
+            ) : (
+              <>
+                <svg className="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}>
+                  <path strokeLinecap="round" strokeLinejoin="round" d="M12 4v16m8-8H4" />
+                </svg>
+                Add
+              </>
+            )}
           </button>
         </div>
 
         {/* Progress bar */}
-        {goals.length > 0 && (
+        {totalCount > 0 && (
           <div className="w-full h-1 bg-gray-100 dark:bg-gray-800 rounded-full overflow-hidden">
             <div
               className={`h-full rounded-full transition-all duration-500 ${
-                progress === 100 ? 'bg-green-500' : progress >= 50 ? 'bg-blue-500' : 'bg-gray-400'
+                progress === 100
+                  ? 'bg-gradient-to-r from-indigo-500 to-violet-500'
+                  : progress >= 50
+                    ? 'bg-gradient-to-r from-indigo-500 to-blue-400'
+                    : 'bg-indigo-400'
               }`}
               style={{ width: `${progress}%` }}
             />
@@ -152,157 +337,213 @@ function MonthlyGoals({ initData }) {
         )}
       </div>
 
-      {/* Add form */}
+      {/* ── Add form ── */}
       {showForm && (
-        <div className="mx-3 mb-3 bg-gray-50 dark:bg-gray-800 rounded-xl p-3 border border-gray-100 dark:border-gray-700">
+        <div className="mx-3 mb-3 bg-gray-50 dark:bg-gray-800/60 rounded-xl p-3 border border-gray-100 dark:border-gray-700/60">
           <form onSubmit={handleAdd} className="space-y-2">
             <input
               type="text"
               value={form.title}
-              onChange={e => setForm({ ...form, title: e.target.value })}
-              placeholder={t('goals.titleLabel')}
+              onChange={e => setForm(f => ({ ...f, title: e.target.value }))}
+              placeholder="Goal title"
               autoFocus
-              className="w-full bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-700 rounded-lg px-2.5 py-1.5 text-xs text-gray-800 dark:text-white placeholder-gray-400 focus:outline-none focus:border-green-400 dark:focus:border-green-600 transition-colors"
               required
+              maxLength={200}
+              className="w-full bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-700 rounded-lg px-2.5 py-1.5 text-xs text-gray-800 dark:text-white placeholder-gray-400 focus:outline-none focus:ring-1 focus:ring-indigo-400 dark:focus:ring-indigo-600 transition-all"
             />
+            {/* MG07 fix: maxLength on description */}
             <input
               type="text"
               value={form.description}
-              onChange={e => setForm({ ...form, description: e.target.value })}
-              placeholder={t('goals.descLabel')}
-              className="w-full bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-700 rounded-lg px-2.5 py-1.5 text-xs text-gray-800 dark:text-white placeholder-gray-400 focus:outline-none focus:border-green-400 dark:focus:border-green-600 transition-colors"
+              onChange={e => setForm(f => ({ ...f, description: e.target.value }))}
+              placeholder="Note (optional)"
+              maxLength={500}
+              className="w-full bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-700 rounded-lg px-2.5 py-1.5 text-xs text-gray-800 dark:text-white placeholder-gray-400 focus:outline-none focus:ring-1 focus:ring-indigo-400 dark:focus:ring-indigo-600 transition-all"
             />
-            <div className="flex gap-2 items-center">
-              <input
-                type="date"
-                value={form.target_date}
-                onChange={e => setForm({ ...form, target_date: e.target.value })}
-                className="flex-1 bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-700 rounded-lg px-2.5 py-1.5 text-xs text-gray-800 dark:text-white focus:outline-none focus:border-green-400 dark:focus:border-green-600 transition-colors"
-              />
+            <div className="flex items-center gap-2">
+              <div className="flex-1">
+                <input
+                  type="date"
+                  value={form.target_date}
+                  onChange={e => setForm(f => ({ ...f, target_date: e.target.value }))}
+                  className="w-full bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-700 rounded-lg px-2.5 py-1.5 text-xs text-gray-600 dark:text-gray-300 focus:outline-none focus:ring-1 focus:ring-indigo-400 dark:focus:ring-indigo-600 transition-all"
+                />
+              </div>
               <button
                 type="submit"
                 disabled={adding || !form.title.trim()}
-                className="bg-green-500 hover:bg-green-400 disabled:opacity-40 text-white px-3 py-1.5 rounded-lg text-xs font-medium transition-colors whitespace-nowrap"
+                className="bg-indigo-500 hover:bg-indigo-400 disabled:opacity-40 text-white px-3 py-1.5 rounded-lg text-xs font-medium transition-colors whitespace-nowrap"
               >
-                {adding ? t('goals.saving') : t('goals.save')}
+                {adding ? 'Saving…' : 'Save'}
               </button>
             </div>
+            <p className="text-[10px] text-gray-400">
+              Deadline auto-set to end of month if left empty.
+            </p>
           </form>
         </div>
       )}
 
       {/* Mutate error */}
-      {mutateError && (
-        <p className="mx-3 mb-1 text-[10px] text-red-500 bg-red-50 dark:bg-red-950 px-2 py-1 rounded-lg">
-          {mutateError}
+      {mutateErr && (
+        <p className="mx-3 mb-2 text-[10px] text-red-500 bg-red-50 dark:bg-red-950 px-2 py-1 rounded-lg">
+          {mutateErr}
         </p>
       )}
 
-      {/* Goal list */}
-      <div className="px-3 pb-3 space-y-1.5">
-        {goals.length === 0 && !showForm ? (
+      {/* ── Goal list ── */}
+      <div className="px-3 pb-3 space-y-0.5 flex-1 overflow-y-auto">
+
+        {/* Current month */}
+        {currentMonthGoals.length === 0 && !showForm ? (
           <div className="py-6 text-center">
-            <p className="text-[11px] text-gray-400">{t('goals.noGoals')}</p>
+            <p className="text-[11px] text-gray-400">No goals for {monthLabel(y, m)}</p>
             <button
-              onClick={() => setShowForm(true)}
-              className="mt-2 text-[11px] text-green-500 hover:text-green-400 transition-colors"
+              onClick={() => { setMutateErr(null); setShowForm(true) }}
+              className="mt-1.5 text-[11px] text-indigo-500 hover:text-indigo-400 transition-colors"
             >
-              {t('goals.noGoalsHint')}
+              + Add your first goal
             </button>
           </div>
         ) : (
-          goals.map(goal => (
-            <div key={goal.id}>
-              {editingId === goal.id ? (
-                /* ── Inline edit ── */
-                <div className="bg-gray-50 dark:bg-gray-800 rounded-xl p-3 border border-gray-100 dark:border-gray-700 space-y-2">
-                  <input
-                    type="text"
-                    value={editForm.title}
-                    onChange={e => setEditForm({ ...editForm, title: e.target.value })}
-                    autoFocus
-                    className="w-full bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-700 rounded-lg px-2.5 py-1.5 text-xs text-gray-800 dark:text-white focus:outline-none focus:border-green-400 transition-colors"
-                  />
-                  <input
-                    type="text"
-                    value={editForm.description}
-                    onChange={e => setEditForm({ ...editForm, description: e.target.value })}
-                    placeholder="Description (optional)"
-                    className="w-full bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-700 rounded-lg px-2.5 py-1.5 text-xs text-gray-800 dark:text-white placeholder-gray-400 focus:outline-none focus:border-green-400 transition-colors"
-                  />
-                  <div className="flex gap-2 items-center">
-                    <input
-                      type="date"
-                      value={editForm.target_date}
-                      onChange={e => setEditForm({ ...editForm, target_date: e.target.value })}
-                      className="flex-1 bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-700 rounded-lg px-2.5 py-1.5 text-xs text-gray-800 dark:text-white focus:outline-none focus:border-green-400 transition-colors"
-                    />
-                    <button
-                      onClick={() => handleSaveEdit(goal.id)}
-                      disabled={saving || !editForm.title.trim()}
-                      className="bg-green-500 hover:bg-green-400 disabled:opacity-40 text-white px-3 py-1.5 rounded-lg text-xs font-medium transition-colors whitespace-nowrap"
-                    >
-                      {saving ? t('goals.saving') : t('goals.save')}
-                    </button>
-                    <button
-                      onClick={cancelEdit}
-                      className="text-gray-400 hover:text-gray-600 dark:hover:text-gray-200 px-2 py-1.5 rounded-lg text-xs transition-colors"
-                    >
-                      {t('goals.cancel')}
-                    </button>
-                  </div>
-                </div>
-              ) : (
-                /* ── Normal row ── */
-                <div
-                  onContextMenu={onContextMenu([
-                    { label: 'Edit', icon: '✏️', action: () => startEdit(goal) },
-                    { separator: true },
-                    { label: 'Delete', icon: '🗑️', danger: true, action: () => handleDelete(goal.id) },
-                  ])}
-                  className={`flex items-start gap-2.5 px-2.5 py-2 rounded-xl transition-colors hover:bg-gray-50 dark:hover:bg-gray-800 ${
-                  goal.completed ? 'opacity-60' : ''
-                }`}>
-                  {/* Checkbox */}
-                  <button
-                    onClick={() => handleToggle(goal)}
-                    className={`mt-0.5 w-4 h-4 rounded-full border-2 flex items-center justify-center flex-shrink-0 transition-all ${
-                      goal.completed
-                        ? 'bg-green-500 border-green-500'
-                        : 'border-gray-300 dark:border-gray-600 hover:border-green-400'
-                    }`}
-                  >
-                    {goal.completed && (
-                      <svg className="w-2 h-2 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3.5} d="M5 13l4 4L19 7" />
-                      </svg>
-                    )}
-                  </button>
-
-                  {/* Text */}
-                  <div className="flex-1 min-w-0">
-                    <p className={`text-[12px] font-medium leading-snug ${
-                      goal.completed
-                        ? 'line-through text-gray-400 dark:text-gray-500'
-                        : 'text-gray-800 dark:text-gray-100'
-                    }`}>
-                      {goal.title}
-                    </p>
-                    {goal.description && (
-                      <p className="text-[10px] text-gray-400 dark:text-gray-500 mt-0.5 leading-snug">{goal.description}</p>
-                    )}
-                    {goal.target_date && (
-                      <p className="text-[10px] text-gray-400 dark:text-gray-500 mt-0.5">
-                        🗓 {new Date(goal.target_date).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}
-                      </p>
-                    )}
-                  </div>
-
-                </div>
-              )}
-            </div>
+          currentMonthGoals.map(goal => (
+            <GoalRow
+              key={goal.id}
+              goal={goal}
+              editingId={editingId}
+              editForm={editForm}
+              setEditForm={setEditForm}
+              saving={saving}
+              onToggle={handleToggle}
+              onStartEdit={startEdit}
+              onDelete={handleDelete}
+              onSaveEdit={handleSaveEdit}
+              onCancelEdit={cancelEdit}
+              onContextMenu={onContextMenu}
+            />
           ))
         )}
+
+        {/* Next month preview */}
+        {showNextMonth && nextMonthGoals.length > 0 && (
+          <>
+            <div className="flex items-center gap-2 pt-3 pb-1 px-0.5">
+              <span className="text-[10px] font-semibold uppercase tracking-widest text-gray-300 dark:text-gray-600">
+                {monthLabel(nextY, nextM)}
+              </span>
+              <div className="flex-1 h-px bg-gray-100 dark:bg-gray-800" />
+            </div>
+            {nextMonthGoals.map(goal => (
+              <GoalRow
+                key={goal.id}
+                goal={goal}
+                editingId={editingId}
+                editForm={editForm}
+                setEditForm={setEditForm}
+                saving={saving}
+                onToggle={handleToggle}
+                onStartEdit={startEdit}
+                onDelete={handleDelete}
+                onSaveEdit={handleSaveEdit}
+                onCancelEdit={cancelEdit}
+                onContextMenu={onContextMenu}
+              />
+            ))}
+          </>
+        )}
+      </div>
+    </div>
+  )
+}
+
+// ── GoalRow ───────────────────────────────────────────────────────────────────
+
+function GoalRow({ goal, editingId, editForm, setEditForm, saving, onToggle, onStartEdit, onDelete, onSaveEdit, onCancelEdit, onContextMenu }) {
+  if (editingId === goal.id) {
+    return (
+      <div className="bg-gray-50 dark:bg-gray-800/60 rounded-xl p-3 border border-gray-100 dark:border-gray-700/60 space-y-2 my-1">
+        <input
+          type="text"
+          value={editForm.title}
+          onChange={e => setEditForm(f => ({ ...f, title: e.target.value }))}
+          autoFocus
+          maxLength={200}
+          className="w-full bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-700 rounded-lg px-2.5 py-1.5 text-xs text-gray-800 dark:text-white focus:outline-none focus:ring-1 focus:ring-indigo-400 transition-all"
+        />
+        {/* MG07 fix: maxLength on description */}
+        <input
+          type="text"
+          value={editForm.description}
+          onChange={e => setEditForm(f => ({ ...f, description: e.target.value }))}
+          placeholder="Note (optional)"
+          maxLength={500}
+          className="w-full bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-700 rounded-lg px-2.5 py-1.5 text-xs text-gray-800 dark:text-white placeholder-gray-400 focus:outline-none focus:ring-1 focus:ring-indigo-400 transition-all"
+        />
+        <div className="flex gap-2 items-center">
+          <input
+            type="date"
+            value={editForm.target_date}
+            onChange={e => setEditForm(f => ({ ...f, target_date: e.target.value }))}
+            className="flex-1 bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-700 rounded-lg px-2.5 py-1.5 text-xs text-gray-600 dark:text-gray-300 focus:outline-none focus:ring-1 focus:ring-indigo-400 transition-all"
+          />
+          <button
+            onClick={() => onSaveEdit(goal.id)}
+            disabled={saving || !editForm.title.trim()}
+            className="bg-indigo-500 hover:bg-indigo-400 disabled:opacity-40 text-white px-3 py-1.5 rounded-lg text-xs font-medium transition-colors whitespace-nowrap"
+          >
+            {saving ? 'Saving…' : 'Save'}
+          </button>
+          <button
+            onClick={onCancelEdit}
+            className="text-gray-400 hover:text-gray-600 dark:hover:text-gray-200 px-2 py-1.5 rounded-lg text-xs transition-colors"
+          >
+            Cancel
+          </button>
+        </div>
+      </div>
+    )
+  }
+
+  return (
+    <div
+      onContextMenu={onContextMenu([
+        { label: 'Edit',   icon: '✏️',  action: () => onStartEdit(goal) },
+        { separator: true },
+        { label: 'Delete', icon: '🗑️', danger: true, action: () => onDelete(goal.id) },
+      ])}
+      className={`flex items-start gap-2.5 px-2.5 py-2 rounded-xl transition-colors hover:bg-gray-50 dark:hover:bg-gray-800/60 ${
+        goal.completed ? 'opacity-55' : ''
+      }`}
+    >
+      {/* Checkbox */}
+      <button
+        onClick={() => onToggle(goal)}
+        className={`mt-0.5 w-4 h-4 rounded-full border-2 flex items-center justify-center flex-shrink-0 transition-all ${
+          goal.completed
+            ? 'bg-indigo-500 border-indigo-500'
+            : 'border-gray-300 dark:border-gray-600 hover:border-indigo-400'
+        }`}
+      >
+        {goal.completed && (
+          <svg className="w-2 h-2 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3.5} d="M5 13l4 4L19 7" />
+          </svg>
+        )}
+      </button>
+
+      {/* Text */}
+      <div className="flex-1 min-w-0">
+        <p className={`text-[12px] font-medium leading-snug ${
+          goal.completed
+            ? 'line-through text-gray-400 dark:text-gray-500'
+            : 'text-gray-800 dark:text-gray-100'
+        }`}>
+          {goal.title}
+        </p>
+        {goal.description && (
+          <p className="text-[10px] text-gray-400 dark:text-gray-500 mt-0.5 leading-snug">{goal.description}</p>
+        )}
+        <DeadlineBadge target_date={goal.target_date} completed={goal.completed} />
       </div>
     </div>
   )

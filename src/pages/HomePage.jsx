@@ -7,12 +7,13 @@ import TaskBoard from '../components/dashboard/TaskBoard'
 import DisciplineScore from '../components/dashboard/DisciplineScore'
 import MonthlyGoals from '../components/dashboard/MonthlyGoals'
 import { Link, useNavigate } from 'react-router-dom'
-import { useState, useEffect, useCallback, useRef } from 'react'
+import { useState, useEffect, useCallback, useRef, useMemo } from 'react'
 import { useEscapeKey } from '../hooks/useEscapeKey'
 import NEPSEChart from '../components/NEPSEChart'
 import {
-  getDashboardInit as _getDashboardInit, getStockPrice,
-  addToWatchlist, removeFromWatchlist,
+  getDashboardInit as _getDashboardInit,
+  addToWatchlist, updateWatchlist, removeFromWatchlist,
+  getMarketSymbols,
 } from '../api'
 import { getDashboardInit } from '../utils/globalCache'
 
@@ -207,9 +208,9 @@ function LoggedOutHome() {
       </div>
 
       {/* Centered intro overlay — scale-in on mount */}
-      <div className="absolute inset-0 flex items-center justify-center z-20 pointer-events-none">
-        <div className="pointer-events-auto w-full max-w-lg mx-4 animate-scale-in">
-          <div className="bg-white/97 dark:bg-gray-900/97 backdrop-blur-md rounded-2xl shadow-2xl border border-gray-200 dark:border-gray-700 overflow-hidden">
+      <div className="absolute inset-0 flex items-end sm:items-center justify-center z-20 pointer-events-none pb-safe">
+        <div className="pointer-events-auto w-full max-w-lg mx-0 sm:mx-4 animate-scale-in">
+          <div className="bg-white/97 dark:bg-gray-900/97 backdrop-blur-md rounded-t-2xl sm:rounded-2xl shadow-2xl border border-gray-200 dark:border-gray-700 overflow-hidden max-h-[92dvh] overflow-y-auto">
             {/* Header strip */}
             <div className="bg-gradient-to-r from-gray-900 to-gray-800 dark:from-gray-950 dark:to-gray-900 px-5 sm:px-8 py-5 sm:py-6 border-b border-gray-700">
               <div className="flex items-center gap-2 mb-3">
@@ -349,9 +350,9 @@ function AlertsWidget({ initData }) {
   }
 
   return (
-    <div className="bg-white dark:bg-gray-900 rounded-2xl border border-gray-100 dark:border-gray-800 overflow-hidden">
-      <div className="flex items-center justify-between px-4 py-3 border-b border-gray-100 dark:border-gray-800">
-        <h3 className="text-[12px] font-semibold text-gray-700 dark:text-gray-300 uppercase tracking-wide">Alerts</h3>
+    <div className="hp-card bg-white/70 dark:bg-gray-900/60 backdrop-blur-md rounded-2xl border border-white/60 dark:border-white/10 shadow-sm overflow-hidden h-full flex flex-col">
+      <div className="flex items-center justify-between px-4 py-3 border-b border-gray-100 dark:border-gray-800 flex-shrink-0">
+        <h3 className="text-[11px] font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-widest">Alerts</h3>
         {alerts.length > 0 && (
           <span className="w-4 h-4 rounded-full bg-red-500 text-white text-[10px] font-bold flex items-center justify-center">
             {alerts.length > 9 ? '9+' : alerts.length}
@@ -360,16 +361,16 @@ function AlertsWidget({ initData }) {
       </div>
 
       {alerts.length === 0 ? (
-        <div className="px-4 py-6 text-center">
-          <p className="text-xs text-gray-400">All clear — no active alerts</p>
+        <div className="flex-1 flex items-center justify-center px-4 py-6 text-center">
+          <p className="text-[11px] text-gray-400 dark:text-gray-600">All clear — no active alerts</p>
         </div>
       ) : (
-        <div className="divide-y divide-gray-50 dark:divide-gray-800 max-h-64 overflow-y-auto">
+        <div className="flex-1 divide-y divide-gray-50 dark:divide-gray-800 overflow-y-auto">
           {alerts.map((a, i) => (
             <button
               key={i}
               onClick={() => navigate(a.to)}
-              className={`w-full text-left flex items-center gap-2.5 px-3 py-2.5 border-l-2 hover:opacity-80 transition-opacity ${severityClass[a.severity]}`}
+              className={`hp-alert-row w-full text-left flex items-center gap-2.5 px-3 py-2.5 border-l-2 ${severityClass[a.severity]}`}
             >
               <span className="text-sm flex-shrink-0">{iconMap[a.type]}</span>
               <span className={`text-[11px] font-medium leading-snug ${textClass[a.severity]}`}>{a.label}</span>
@@ -381,129 +382,13 @@ function AlertsWidget({ initData }) {
   )
 }
 
-// ── Open Positions panel (right column) ──────────────────────────────────────
-function OpenPositionsPanel({ openPositions, perfStats, navigate }) {
-  const { t: tr } = useLanguage()
-  const [collapsed, setCollapsed] = useState(false)
-
-  return (
-    <div className="bg-white dark:bg-gray-900 rounded-2xl border border-gray-100 dark:border-gray-800 overflow-hidden">
-      <div className="flex items-center justify-between px-4 py-3 border-b border-gray-100 dark:border-gray-800">
-        <h3 className="text-[12px] font-semibold text-gray-700 dark:text-gray-300 uppercase tracking-wide">
-          {tr('positions.title')}
-          {perfStats && perfStats.openCount > 0 && (
-            <span className="ml-2 text-[10px] font-normal text-gray-400">({perfStats.openCount})</span>
-          )}
-        </h3>
-        <div className="flex items-center gap-2">
-          <button
-            onClick={() => setCollapsed(c => !c)}
-            className="text-xs text-gray-400 hover:text-gray-600 dark:hover:text-gray-200 flex items-center gap-1 transition-colors"
-            aria-expanded={!collapsed}
-          >
-            <svg className={`w-3 h-3 transition-transform ${collapsed ? '' : 'rotate-180'}`} fill="none" viewBox="0 0 24 24" stroke="currentColor">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
-            </svg>
-          </button>
-          <button onClick={() => navigate('/portfolio')} className="text-xs text-blue-500 hover:text-blue-700 transition-colors">›</button>
-        </div>
-      </div>
-
-      {!collapsed && (
-        openPositions.length === 0 ? (
-          <div className="p-6 text-center">
-            <p className="text-gray-400 text-xs">{tr('positions.noPositions')}</p>
-            <button onClick={() => navigate('/logs')} className="mt-2 text-blue-500 text-xs hover:underline">+ Add a trade</button>
-          </div>
-        ) : (
-          <div className="divide-y divide-gray-50 dark:divide-gray-800">
-            {openPositions.slice(0, 5).map(t => {
-              const slDistPct = t.sl != null && t.currentPrice
-                ? t.position === 'SHORT'
-                  ? (((t.sl - t.currentPrice) / t.currentPrice) * 100).toFixed(1)
-                  : (((t.currentPrice - t.sl) / t.currentPrice) * 100).toFixed(1)
-                : null
-              const tpDistPct = t.tp != null && t.currentPrice
-                ? t.position === 'SHORT'
-                  ? (((t.currentPrice - t.tp) / t.currentPrice) * 100).toFixed(1)
-                  : (((t.tp - t.currentPrice) / t.currentPrice) * 100).toFixed(1)
-                : null
-
-              return (
-                <div key={t.id} className="px-4 py-2.5 hover:bg-gray-50 dark:hover:bg-gray-800 transition-colors" translate="no">
-                  <div className="flex items-center justify-between">
-                    <div className="flex items-center gap-2">
-                      <StockAvatar symbol={t.symbol} size="w-7 h-7" textSize="text-[10px]" />
-                      <div>
-                        <div className="flex items-center gap-1.5">
-                          <p className="text-xs font-semibold text-gray-900 dark:text-white">{t.symbol}</p>
-                          <span className={`text-[10px] px-1 py-0.5 rounded font-medium ${
-                            t.position === 'LONG'
-                              ? 'bg-green-100 text-green-700 dark:bg-green-900 dark:text-green-300'
-                              : 'bg-red-100 text-red-700 dark:bg-red-900 dark:text-red-300'
-                          }`}>{t.position}</span>
-                          {t.status === 'PARTIAL' && (
-                            <span className="text-[10px] px-1 py-0.5 rounded bg-orange-100 text-orange-600 dark:bg-orange-900 dark:text-orange-300 font-medium">P</span>
-                          )}
-                        </div>
-                        <p className="text-[10px] text-gray-400">{t.quantity} @ Rs.{(t.entry_price || 0).toLocaleString()}</p>
-                      </div>
-                    </div>
-                    <div className="text-right">
-                      {t.unrealizedPnl != null ? (
-                        <p className={`text-xs font-semibold ${t.unrealizedPnl >= 0 ? 'text-green-500' : 'text-red-500'}`}>
-                          {t.unrealizedPnl >= 0 ? '+' : ''}Rs.{Math.abs(t.unrealizedPnl).toLocaleString()}
-                        </p>
-                      ) : (
-                        <p className="text-xs text-gray-400">—</p>
-                      )}
-                      {t.pnlPct != null && (
-                        <p className={`text-[10px] ${parseFloat(t.pnlPct) >= 0 ? 'text-green-400' : 'text-red-400'}`}>
-                          {parseFloat(t.pnlPct) >= 0 ? '+' : ''}{t.pnlPct}%
-                        </p>
-                      )}
-                    </div>
-                  </div>
-                  {/* SL / TP compact pills */}
-                  <div className="flex items-center gap-1.5 mt-1.5 ml-9 flex-wrap">
-                    {t.sl != null ? (
-                      <span className="text-[10px] bg-red-50 dark:bg-red-900/40 text-red-500 px-1.5 py-0.5 rounded">
-                        SL {slDistPct !== null ? `${parseFloat(slDistPct) > 0 ? '+' : ''}${slDistPct}%` : `Rs.${t.sl.toLocaleString()}`}
-                      </span>
-                    ) : (
-                      <span className="text-[10px] bg-orange-50 dark:bg-orange-900/40 text-orange-500 px-1.5 py-0.5 rounded">⚠ No SL</span>
-                    )}
-                    {t.tp != null && (
-                      <span className="text-[10px] bg-green-50 dark:bg-green-900/40 text-green-500 px-1.5 py-0.5 rounded">
-                        TP {tpDistPct !== null ? `${parseFloat(tpDistPct) > 0 ? '+' : ''}${tpDistPct}%` : `Rs.${t.tp.toLocaleString()}`}
-                      </span>
-                    )}
-                  </div>
-                </div>
-              )
-            })}
-            {openPositions.length > 5 && (
-              <button
-                onClick={() => navigate('/portfolio')}
-                className="w-full px-4 py-2 text-[11px] font-semibold text-blue-500 hover:text-blue-700 hover:bg-blue-50 dark:hover:bg-blue-900/20 transition-colors text-center"
-              >
-                +{openPositions.length - 5} more → Portfolio
-              </button>
-            )}
-          </div>
-        )
-      )}
-    </div>
-  )
-}
-
 // ── Stats bar ─────────────────────────────────────────────────────────────────
 function StatCard({ label, value, color, sub }) {
   return (
-    <div className="bg-white dark:bg-gray-900 rounded-2xl px-4 py-3 border border-gray-100 dark:border-gray-800">
-      <p className="text-[10px] font-medium text-gray-400 uppercase tracking-wide mb-1">{label}</p>
-      <p className={`text-lg font-bold tracking-tight ${color}`}>{value}</p>
-      {sub && <p className="text-[10px] text-gray-400 mt-0.5">{sub}</p>}
+    <div className="hp-stat bg-white/70 dark:bg-gray-900/60 backdrop-blur-md rounded-xl sm:rounded-2xl px-3 sm:px-4 py-2.5 sm:py-3 border border-white/60 dark:border-white/10 shadow-sm">
+      <p className="text-[9px] sm:text-[10px] font-medium text-gray-400 uppercase tracking-wide mb-0.5 sm:mb-1 truncate">{label}</p>
+      <p className={`text-sm sm:text-lg font-bold tracking-tight leading-none ${color}`}>{value}</p>
+      {sub && <p className="hidden sm:block text-[10px] text-gray-400 mt-0.5">{sub}</p>}
     </div>
   )
 }
@@ -513,35 +398,51 @@ function CenterDashboard({ navigate, initData, onRefresh, onDataReady }) {
   const { t: tr } = useLanguage()
   const [openPositions, setOpenPositions] = useState([])
   const [perfStats, setPerfStats] = useState(null)
-  const [watchlist, setWatchlist] = useState([])
+  const [watchlist,    setWatchlist]    = useState([])
   const [watchlistTab, setWatchlistTab] = useState('active')
   const { onContextMenu: watchCtx, ContextMenuPortal: WatchMenuPortal } = useContextMenu()
-  const [loading, setLoading] = useState(!initData)
-  const [error, setError] = useState(null)
-  const [showAddWatch, setShowAddWatch] = useState(false)
-  const [newSymbol, setNewSymbol] = useState('')
-  const [searchingSymbol, setSearchingSymbol] = useState(false)
-  const [symbolInfo, setSymbolInfo] = useState(null)
-  const [symbolError, setSymbolError] = useState('')
-  const [watchActionErr, setWatchActionErr] = useState(null)
-  const [watchForm, setWatchForm] = useState({
-    price_alert: '',
-    alert_date: '',
-    alert_type: '',
-    notes: ''
-  })
+  const [loading,      setLoading]      = useState(!initData)
+  const [error,        setError]        = useState(null)
 
-  useEscapeKey(() => setShowAddWatch(false))
+  // add-flow: null | 'search' | { symbol, refPrice }
+  const [watchAddState,   setWatchAddState]   = useState(null)
+  // edit-flow
+  const [watchEditItem,   setWatchEditItem]   = useState(null)
+  const [watchActionErr,  setWatchActionErr]  = useState(null)
+
+  // symbol list for autocomplete — load once
+  const symbolListRef   = useRef([])
+  const priceMapRef     = useRef({})
+  const [symbolsReady,  setSymbolsReady]  = useState(false)
+  // search UI
+  const [watchQuery,    setWatchQuery]    = useState('')
+  const [watchCursor,   setWatchCursor]   = useState(-1)
+  const watchInputRef   = useRef(null)
+  // add-form state
+  const [watchForm,     setWatchForm]     = useState({ price_alert: '', alert_date: '', watch_low: '', watch_high: '', notes: '' })
+  const [watchAdding,   setWatchAdding]   = useState(false)
+  // edit-form state
+  const [watchEditForm, setWatchEditForm] = useState(null)
+  const [watchSaving,   setWatchSaving]   = useState(false)
+
+  useEscapeKey(() => {
+    setWatchAddState(null)
+    setWatchEditItem(null)
+    setWatchForm({ price_alert: '', alert_date: '', watch_low: '', watch_high: '', notes: '' })
+    setWatchEditForm(null)
+    setWatchQuery('')
+  })
 
   const applyData = useCallback((d) => {
     const trades    = d.trades || []
     const priceMap  = d.prices || {}
+    priceMapRef.current = priceMap
     const open      = trades.filter(t => t.status === 'OPEN' || t.status === 'PARTIAL')
-    const closed    = trades.filter(t => t.status === 'CLOSED' || t.status === 'PARTIAL')
+    const closed    = trades.filter(t => t.status === 'CLOSED')
 
     const openWithPrices = open.map(t => {
       const entry = parseFloat(t.entry_price) || 0
-      const qty   = parseFloat(t.remaining_quantity || t.quantity) || 0
+      const qty   = parseFloat(t.total_qty || t.quantity) || 0
       const p     = priceMap[t.symbol]
       const ltp   = p ? parseFloat(p.price) || 0 : 0
       const pnl   = ltp ? (t.position === 'LONG' ? (ltp - entry) * qty : (entry - ltp) * qty) : 0
@@ -574,17 +475,13 @@ function CenterDashboard({ navigate, initData, onRefresh, onDataReady }) {
     }
     setPerfStats(stats)
 
-    const watchWithPrices = (d.watchlist || []).map(w => {
-      const p = priceMap[w.symbol]
-      return { ...w, currentPrice: p ? parseFloat(p.price) || null : null, change: p?.change ?? null }
-    })
-    const portfolioItems = openWithPrices.map(t => ({
-      id: `pos_${t.id}`, symbol: t.symbol, currentPrice: t.currentPrice, change: t.change,
-      category: '__portfolio__', isPosition: true, position: t.position,
-      quantity: t.quantity, entry_price: t.entry_price, unrealizedPnl: t.unrealizedPnl,
-      pnlPct: t.pnlPct, sl: t.sl, tp: t.tp, status: t.status,
-    }))
-    setWatchlist([...watchWithPrices, ...portfolioItems])
+    const watchWithPrices = (d.watchlist || [])
+      .filter(w => w.category !== 'portfolio')
+      .map(w => {
+        const p = priceMap[w.symbol]
+        return { ...w, currentPrice: p ? parseFloat(p.price) || null : null, change: p?.change ?? null }
+      })
+    setWatchlist(watchWithPrices)
     if (onDataReady) onDataReady({ openPositions: openWithPrices, perfStats: stats })
   }, [onDataReady])
 
@@ -596,68 +493,206 @@ function CenterDashboard({ navigate, initData, onRefresh, onDataReady }) {
 
   useChatRefresh(['trades', 'watchlist'], onRefresh)
 
-  const handleSymbolSearch = async () => {
-    if (!newSymbol.trim()) return
-    setSearchingSymbol(true)
-    setSymbolError('')
-    setSymbolInfo(null)
-    try {
-      const res = await getStockPrice(newSymbol.trim())
-      setSymbolInfo(res.data)
-    } catch {
-      setSymbolError(`${newSymbol.toUpperCase()} not found`)
-    } finally {
-      setSearchingSymbol(false)
-    }
+  // ── Load symbol list once for autocomplete ─────────────────────────────────
+  useEffect(() => {
+    getMarketSymbols()
+      .then(res => { symbolListRef.current = res.data?.stocks || []; setSymbolsReady(true) })
+      .catch(() => setSymbolsReady(true))
+  }, [])
+
+  // Focus search input when add panel opens
+  useEffect(() => {
+    if (watchAddState === 'search') setTimeout(() => watchInputRef.current?.focus(), 50)
+  }, [watchAddState])
+
+  // ── Classify: auto-derive active/pre from signals ───────────────────────────
+  // Stable date ref — computed once per mount, re-computed only if date string changes
+  const watchTodayStr = useMemo(() => {
+    const d = new Date(); d.setHours(0, 0, 0, 0); return d.toDateString()
+  }, [])
+  const watchToday = useMemo(() => {
+    const d = new Date(); d.setHours(0, 0, 0, 0); return d
+  }, [watchTodayStr]) // eslint-disable-line react-hooks/exhaustive-deps
+
+  const classifiedWatch = useMemo(() => {
+    return watchlist.map(w => {
+      const ltp = w.currentPrice
+      let priceSignal = 'neutral'
+      if (w.price_alert && ltp) {
+        const pct = Math.abs((ltp - parseFloat(w.price_alert)) / ltp) * 100
+        priceSignal = pct <= 15 ? 'active' : 'pre'
+      }
+      let dateSignal = 'neutral', wStatus = null
+      if (w.alert_date) {
+        const days = Math.ceil((new Date(w.alert_date + 'T00:00:00') - watchToday) / 86400000)
+        if      (days >= 0 && days <= 14) { dateSignal = 'active' }
+        else if (days > 14)               { dateSignal = 'pre' }
+        else if (days >= -10)             { dateSignal = 'active'; wStatus = 'grace' }
+        else                              { dateSignal = 'expired'; wStatus = 'expired' }
+      }
+      if (dateSignal === 'expired')                                   return { ...w, category: 'pre',    wStatus: 'expired' }
+      if (priceSignal === 'active' || dateSignal === 'active')        return { ...w, category: 'active', wStatus }
+      return { ...w, category: 'pre', wStatus }
+    })
+  }, [watchlist, watchToday])
+
+  const activeWatchItems = classifiedWatch.filter(w => w.category === 'active')
+  const preWatchItems    = classifiedWatch.filter(w => w.category === 'pre')
+  const filteredWatch    = watchlistTab === 'active' ? activeWatchItems : preWatchItems
+
+  // ── Autocomplete suggestions ────────────────────────────────────────────────
+  // WL-03 fix: depend on symbolsReady so memo re-runs after symbols load
+  const watchSuggestions = useMemo(() => {
+    const q = watchQuery.trim().toUpperCase()
+    if (!q || !symbolsReady) return []
+    return symbolListRef.current
+      .filter(s => s.symbol.startsWith(q) || s.company_name?.toUpperCase().includes(q))
+      .slice(0, 8)
+  }, [watchQuery, symbolsReady])
+
+  // Returns YYYY-MM-DD string offset by N days from today
+  const dateOffset = (days) => {
+    const d = new Date(watchToday)
+    d.setDate(d.getDate() + days)
+    return d.toISOString().slice(0, 10)
+  }
+  // Returns next weekday (Mon–Fri) from today
+  const nextWeekday = (day) => { // 1=Mon … 5=Fri
+    const d = new Date(watchToday)
+    const curr = d.getDay() // 0=Sun
+    let diff = day - curr
+    if (diff <= 0) diff += 7
+    d.setDate(d.getDate() + diff)
+    return d.toISOString().slice(0, 10)
   }
 
-  const handleAddWatch = async (category) => {
-    if (!symbolInfo) return
-    setWatchActionErr(null)
+  const handleWatchKey = (e) => {
+    if (e.key === 'ArrowDown') { e.preventDefault(); setWatchCursor(c => Math.min(c + 1, watchSuggestions.length - 1)) }
+    else if (e.key === 'ArrowUp') { e.preventDefault(); setWatchCursor(c => Math.max(c - 1, 0)) }
+    else if (e.key === 'Enter') {
+      e.preventDefault()
+      const pick = watchCursor >= 0 ? watchSuggestions[watchCursor] : watchSuggestions.length === 1 ? watchSuggestions[0] : null
+      if (pick) { const p = priceMapRef.current[pick.symbol]; setWatchAddState({ symbol: pick.symbol, refPrice: p ? parseFloat(p.price) || null : null }); setWatchQuery(''); setWatchCursor(-1) }
+    } else if (e.key === 'Escape') { setWatchAddState(null); setWatchQuery('') }
+  }
+
+  // ── Add handler ─────────────────────────────────────────────────────────────
+  const handleAddWatch = async (e) => {
+    e.preventDefault()
+    if (!watchAddState || typeof watchAddState !== 'object') return
+    if (watchlist.some(w => w.symbol === watchAddState.symbol)) {
+      setWatchActionErr(`${watchAddState.symbol} is already in your watchlist.`)
+      return
+    }
+    setWatchAdding(true); setWatchActionErr(null); setWatchQuery('')
     try {
       await addToWatchlist({
-        symbol: newSymbol.toUpperCase(),
-        category,
+        symbol: watchAddState.symbol,
         price_alert: watchForm.price_alert ? parseFloat(watchForm.price_alert) : null,
-        alert_date: watchForm.alert_date || null,
-        notes: watchForm.alert_type
-          ? `[${watchForm.alert_type}] ${watchForm.notes || ''}`.trim()
-          : watchForm.notes || null,
+        alert_date:  watchForm.alert_date  || null,
+        watch_low:   watchForm.watch_low   ? parseFloat(watchForm.watch_low)   : null,
+        watch_high:  watchForm.watch_high  ? parseFloat(watchForm.watch_high)  : null,
+        notes:       watchForm.notes       || null,
+        category:    'pre',
       })
-      setNewSymbol('')
-      setSymbolInfo(null)
-      setShowAddWatch(false)
-      setWatchForm({ price_alert: '', alert_date: '', alert_type: '', notes: '' })
+      setWatchAddState(null)
+      setWatchForm({ price_alert: '', alert_date: '', watch_low: '', watch_high: '', notes: '' })
       if (onRefresh) await onRefresh()
     } catch (err) {
-      setWatchActionErr(err.response?.data?.message || 'Failed to add to watchlist.')
+      setWatchActionErr(err.response?.data?.error || 'Failed to add.')
+    } finally {
+      setWatchAdding(false)
     }
   }
 
+  // ── Edit handlers ───────────────────────────────────────────────────────────
+  const openWatchEdit = (item) => {
+    setWatchActionErr(null)  // WL-06 fix: clear stale add-form error before opening edit
+    setWatchEditItem(item)
+    setWatchEditForm({
+      watch_low:   item.watch_low   != null ? String(item.watch_low)   : '',
+      watch_high:  item.watch_high  != null ? String(item.watch_high)  : '',
+      price_alert: item.price_alert != null ? String(item.price_alert) : '',
+      alert_date:  item.alert_date  ? item.alert_date.slice(0, 10) : '',
+      notes:       item.notes || '',
+    })
+  }
+
+  const handleSaveWatch = async (e) => {
+    e.preventDefault()
+    if (!watchEditItem || !watchEditForm) return
+    setWatchSaving(true); setWatchActionErr(null)
+    try {
+      await updateWatchlist(watchEditItem.id, {
+        watch_low:   watchEditForm.watch_low   !== '' ? parseFloat(watchEditForm.watch_low)   : null,
+        watch_high:  watchEditForm.watch_high  !== '' ? parseFloat(watchEditForm.watch_high)  : null,
+        price_alert: watchEditForm.price_alert !== '' ? parseFloat(watchEditForm.price_alert) : null,
+        alert_date:  watchEditForm.alert_date  || null,
+        notes:       watchEditForm.notes       || null,
+        category:    'pre',
+      })
+      setWatchEditItem(null); setWatchEditForm(null)
+      if (onRefresh) await onRefresh()
+    } catch (err) {
+      setWatchActionErr(err.response?.data?.error || 'Failed to save.')
+    } finally {
+      setWatchSaving(false)
+    }
+  }
+
+  // ── Remove handler ──────────────────────────────────────────────────────────
   const handleRemoveWatch = async (id) => {
-    setWatchActionErr(null)
+    const snapshot = watchlist.find(w => w.id === id)
+    setWatchlist(prev => prev.filter(w => w.id !== id))
     try {
       await removeFromWatchlist(id)
-      setWatchlist(prev => prev.filter(w => w.id !== id))
-    } catch (err) {
-      setWatchActionErr(err.response?.data?.message || 'Failed to remove from watchlist.')
+    } catch {
+      if (snapshot) setWatchlist(prev => [...prev, snapshot])
     }
   }
 
-  const filteredWatch = watchlist.filter(w => {
-    if (watchlistTab === 'portfolio') return w.category === '__portfolio__'
-    return w.category === watchlistTab
-  })
-
-  // Rule 8 — ISO date comparison for alert_date countdown
-  const today = new Date().toISOString().slice(0, 10)
+  // alert messages per item
+  function watchAlertMsgs(item) {
+    const msgs = []
+    const ltp = item.currentPrice
+    if (!ltp) return msgs
+    if (item.price_alert) {
+      const alert = parseFloat(item.price_alert)
+      const diff  = alert - ltp
+      const pct   = Math.abs((diff / ltp) * 100).toFixed(1)
+      if (Math.abs(diff) < ltp * 0.02) msgs.push({ text: 'Near alert level', color: 'text-orange-500', bg: 'bg-orange-50 dark:bg-orange-900/30' })
+      else if (diff > 0)               msgs.push({ text: `+Rs.${Math.abs(Math.round(diff)).toLocaleString()} (${pct}%) to alert`, color: 'text-green-600 dark:text-green-400', bg: 'bg-green-50 dark:bg-green-900/30' })
+      else                             msgs.push({ text: `-Rs.${Math.abs(Math.round(diff)).toLocaleString()} (${pct}%) to alert`, color: 'text-red-500', bg: 'bg-red-50 dark:bg-red-900/30' })
+    }
+    if (item.watch_low && ltp) {
+      const wl = parseFloat(item.watch_low)
+      const diff = ltp - wl; const pct = Math.abs((diff / ltp) * 100).toFixed(1)
+      if (diff > 0) msgs.push({ text: `-Rs.${Math.abs(Math.round(diff)).toLocaleString()} (${pct}%) to watch low`, color: 'text-red-400', bg: 'bg-red-50 dark:bg-red-900/30' })
+      else          msgs.push({ text: 'Below watch low', color: 'text-red-500', bg: 'bg-red-50 dark:bg-red-900/30' })
+    }
+    if (item.watch_high && ltp) {
+      const wh = parseFloat(item.watch_high)
+      const diff = wh - ltp; const pct = Math.abs((diff / ltp) * 100).toFixed(1)
+      if (diff > 0) msgs.push({ text: `+Rs.${Math.abs(Math.round(diff)).toLocaleString()} (${pct}%) to watch high`, color: 'text-green-500', bg: 'bg-green-50 dark:bg-green-900/30' })
+      else          msgs.push({ text: 'Above watch high', color: 'text-green-500', bg: 'bg-green-50 dark:bg-green-900/30' })
+    }
+    if (item.alert_date) {
+      const days = Math.ceil((new Date(item.alert_date + 'T00:00:00') - watchToday) / 86400000)
+      if      (days < -10) msgs.push({ text: `Alert expired ${Math.abs(days)}d ago`, color: 'text-gray-400', bg: 'bg-gray-100 dark:bg-gray-800' })
+      else if (days < 0)   msgs.push({ text: `${Math.abs(days)}d overdue — grace`, color: 'text-amber-500', bg: 'bg-amber-50 dark:bg-amber-900/30' })
+      else if (days === 0) msgs.push({ text: 'Alert date is today', color: 'text-orange-500', bg: 'bg-orange-50 dark:bg-orange-900/30' })
+      else if (days <= 3)  msgs.push({ text: `${days}d left`, color: 'text-orange-500', bg: 'bg-orange-50 dark:bg-orange-900/30' })
+      else if (days <= 14) msgs.push({ text: `${days}d left`, color: 'text-blue-500', bg: 'bg-blue-50 dark:bg-blue-900/30' })
+    }
+    return msgs
+  }
 
   if (loading) return (
     <div className="flex flex-col gap-4">
-      <div className="bg-white dark:bg-gray-800 rounded-2xl p-6 shadow-sm border border-gray-100 dark:border-gray-700 animate-pulse">
-        <div className="h-6 bg-gray-100 dark:bg-gray-700 rounded w-1/2 mb-4" />
+      <div className="bg-white/70 dark:bg-gray-900/60 backdrop-blur-md rounded-2xl p-6 shadow-sm border border-white/60 dark:border-white/10 animate-pulse">
+        <div className="h-6 bg-gray-100 dark:bg-gray-700/50 rounded w-1/2 mb-4" />
         <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
-          {[1,2,3,4].map(i => <div key={i} className="h-16 bg-gray-100 dark:bg-gray-700 rounded-xl" />)}
+          {[1,2,3,4].map(i => <div key={i} className="h-16 bg-gray-100 dark:bg-gray-700/50 rounded-xl" />)}
         </div>
       </div>
     </div>
@@ -671,11 +706,12 @@ function CenterDashboard({ navigate, initData, onRefresh, onDataReady }) {
   )
 
   return (
-    <div className="flex flex-col gap-4">
+    <div className="flex flex-col lg:grid gap-3 sm:gap-4" style={{ gridTemplateRows: '15fr 35fr 50fr' }}>
 
-      {/* ── Stats Bar ──────────────────────────────────────────────────────── */}
+      {/* ── Stats Bar (15% on desktop, auto on mobile) ───────────────────────── */}
+      <div className="flex flex-col gap-2 lg:min-h-0">
       {perfStats && (
-        <div className="grid grid-cols-2 sm:grid-cols-4 gap-2.5">
+        <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 sm:gap-2.5">
           <StatCard
             label="Total P/L Today"
             value={`${perfStats.todayPnl >= 0 ? '+' : ''}Rs. ${Math.abs(Math.round(perfStats.todayPnl)).toLocaleString()}`}
@@ -697,7 +733,7 @@ function CenterDashboard({ navigate, initData, onRefresh, onDataReady }) {
           <StatCard
             label={tr('stats.openPositions')}
             value={perfStats.openCount}
-            color="text-gray-900 dark:text-white"
+            color={perfStats.openCount > 0 ? 'text-blue-500' : 'text-gray-400 dark:text-gray-500'}
             sub={perfStats.totalInvested > 0 ? `Rs. ${Math.round(perfStats.totalInvested).toLocaleString()} invested` : undefined}
           />
         </div>
@@ -705,7 +741,7 @@ function CenterDashboard({ navigate, initData, onRefresh, onDataReady }) {
 
       {/* Drawdown warning */}
       {perfStats && perfStats.totalPnl < 0 && perfStats.totalInvested > 0 && (
-        <div className="flex items-center gap-2 bg-red-50 dark:bg-red-900/30 border border-red-100 dark:border-red-800 rounded-xl px-3 py-2">
+        <div className="hp-drawdown flex items-center gap-2 bg-red-50 dark:bg-red-900/30 border border-red-100 dark:border-red-800 rounded-xl px-3 py-2">
           <span className="w-1.5 h-1.5 bg-red-500 rounded-full flex-shrink-0" />
           <p className="text-[11px] text-red-600 dark:text-red-300 font-medium">
             {/* Rule 6 — guard denominator */}
@@ -717,339 +753,504 @@ function CenterDashboard({ navigate, initData, onRefresh, onDataReady }) {
         </div>
       )}
 
-      {/* ── NEPSE Chart ───────────────────────────────────────────────────────── */}
-      <NEPSEChart fixed={true} />
+      </div>{/* end stats section */}
 
-      {/* ── Watchlist ─────────────────────────────────────────────────────────── */}
-      <div className="bg-white dark:bg-gray-900 rounded-2xl border border-gray-100 dark:border-gray-800 overflow-hidden">
-        <div className="flex items-center justify-between px-4 py-3 border-b border-gray-100 dark:border-gray-800">
-          <h3 className="text-[12px] font-semibold text-gray-700 dark:text-gray-300 uppercase tracking-wide">{tr('watchlist.title')}</h3>
-          <div className="flex items-center gap-1">
-            {[
-              { key: 'active',      label: tr('watchlist.active') },
-              { key: 'pre',         label: tr('watchlist.preWatch') },
-              { key: 'portfolio',   label: tr('watchlist.portfolio') },
-            ].map(({ key, label }) => (
-              <button
-                key={key}
-                onClick={() => setWatchlistTab(key)}
-                className={`text-xs px-2 py-1 rounded-lg font-medium transition-colors ${
-                  watchlistTab === key
-                    ? 'bg-blue-600 text-white'
-                    : 'text-gray-500 hover:text-gray-700 dark:hover:text-gray-300'
-                }`}
-              >
-                {label}
-              </button>
-            ))}
-            {watchlistTab !== 'portfolio' && (
-              <button
-                onClick={() => setShowAddWatch(v => !v)}
-                aria-expanded={showAddWatch}
-                className="ml-1 w-6 h-6 rounded-lg bg-blue-100 dark:bg-blue-900 text-blue-600 dark:text-blue-300 flex items-center justify-center hover:bg-blue-200 dark:hover:bg-blue-800 transition-colors font-bold text-sm"
-              >
-                {showAddWatch ? '×' : '+'}
-              </button>
-            )}
+      {/* ── NEPSE Chart (35% on desktop, auto on mobile) ────────────────────── */}
+      <div className="lg:min-h-0">
+      <NEPSEChart fixed={true} />
+      </div>
+
+      {/* ── Watchlist (remaining ~50% on desktop, auto on mobile) ───────────── */}
+      <div className="lg:min-h-0 flex flex-col overflow-hidden">
+      {/* ── Watchlist edit modal — outside overflow-hidden container (WL-04 fix) ── */}
+      <WatchMenuPortal />
+      {watchEditItem && watchEditForm && (() => {
+        const ltp = watchEditItem.currentPrice != null ? parseFloat(watchEditItem.currentPrice) : null
+        const pctChips = ltp ? [
+          { label: '−10%', val: (ltp * 0.90).toFixed(2) },
+          { label: '−5%',  val: (ltp * 0.95).toFixed(2) },
+          { label: 'LTP',  val: ltp.toFixed(2) },
+          { label: '+5%',  val: (ltp * 1.05).toFixed(2) },
+          { label: '+10%', val: (ltp * 1.10).toFixed(2) },
+        ] : null
+        const dateChips = [
+          { label: 'Mon',  val: nextWeekday(1) },
+          { label: '+1w',  val: dateOffset(7) },
+          { label: '+2w',  val: dateOffset(14) },
+          { label: '+1m',  val: dateOffset(30) },
+        ]
+        return (
+        <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center p-0 sm:p-4" role="dialog" aria-modal="true">
+          <div className="absolute inset-0 bg-black/40 backdrop-blur-sm" onClick={() => setWatchEditItem(null)} />
+          <div className="relative bg-white dark:bg-gray-900 rounded-t-2xl sm:rounded-2xl shadow-2xl border border-gray-200 dark:border-gray-700 w-full sm:max-w-xs z-10 overflow-hidden max-h-[90dvh] overflow-y-auto">
+            {/* Header */}
+            <div className="flex items-center justify-between px-4 py-3 border-b border-gray-100 dark:border-gray-800">
+              <div className="min-w-0">
+                <div className="flex items-center gap-2 flex-wrap">
+                  <p className="text-[13px] font-bold text-gray-900 dark:text-white" translate="no">{watchEditItem.symbol}</p>
+                  {ltp != null && (
+                    <span className="text-[10px] font-semibold text-gray-500 dark:text-gray-400 tabular-nums bg-gray-100 dark:bg-gray-800 px-1.5 py-0.5 rounded">
+                      Rs.{ltp.toLocaleString()}
+                    </span>
+                  )}
+                  {watchEditItem.change != null && (
+                    <span className={`text-[9px] font-semibold tabular-nums ${watchEditItem.change >= 0 ? 'text-green-500' : 'text-red-500'}`}>
+                      {watchEditItem.change >= 0 ? '+' : ''}{watchEditItem.change}%
+                    </span>
+                  )}
+                </div>
+                <p className="text-[9px] font-bold uppercase tracking-widest text-gray-400 mt-0.5">Edit alert levels</p>
+              </div>
+              <button onClick={() => setWatchEditItem(null)}
+                className="w-6 h-6 flex items-center justify-center rounded-full hover:bg-gray-100 dark:hover:bg-gray-800 text-gray-400 hover:text-gray-600 dark:hover:text-gray-300 transition-colors text-base leading-none shrink-0 ml-2">×</button>
+            </div>
+            <form onSubmit={handleSaveWatch} className="px-4 py-3 space-y-2.5">
+
+              {/* ── Price Alert ── */}
+              <div>
+                <p className="text-[9px] font-bold uppercase tracking-widest text-gray-400 mb-1">Price Alert</p>
+                {pctChips && (
+                  <div className="flex gap-1 mb-1.5 flex-wrap">
+                    {pctChips.map(c => (
+                      <button key={c.label} type="button"
+                        onClick={() => setWatchEditForm(f => ({ ...f, price_alert: c.val }))}
+                        className={`px-1.5 py-0.5 rounded text-[9px] font-semibold transition-colors border ${
+                          watchEditForm.price_alert === c.val
+                            ? 'bg-blue-600 border-blue-600 text-white'
+                            : c.label.startsWith('−') ? 'border-red-200 dark:border-red-800 text-red-500 dark:text-red-400 hover:bg-red-50 dark:hover:bg-red-950/40'
+                            : c.label.startsWith('+') ? 'border-green-200 dark:border-green-800 text-green-600 dark:text-green-400 hover:bg-green-50 dark:hover:bg-green-950/40'
+                            : 'border-gray-200 dark:border-gray-700 text-gray-500 dark:text-gray-400 hover:bg-gray-50 dark:hover:bg-gray-800'
+                        }`}>{c.label}</button>
+                    ))}
+                  </div>
+                )}
+                <input type="number" min="0" step="0.01" value={watchEditForm.price_alert} autoComplete="off"
+                  onChange={e => setWatchEditForm(f => ({ ...f, price_alert: e.target.value }))}
+                  placeholder="0.00"
+                  className="w-full bg-gray-50 dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg px-2.5 py-1.5 text-[11px] text-gray-800 dark:text-gray-100 placeholder-gray-300 dark:placeholder-gray-600 outline-none focus:border-blue-400 dark:focus:border-blue-500 focus:ring-1 focus:ring-blue-300/40 transition-all" />
+                {watchEditForm.price_alert && ltp != null && (() => {
+                  const pct = ((parseFloat(watchEditForm.price_alert) - ltp) / ltp * 100)
+                  return <p className={`text-[9px] mt-0.5 tabular-nums ${pct >= 0 ? 'text-green-500' : 'text-red-400'}`}>{pct >= 0 ? '+' : ''}{pct.toFixed(1)}% from LTP</p>
+                })()}
+              </div>
+
+              {/* ── Target Date ── */}
+              <div>
+                <p className="text-[9px] font-bold uppercase tracking-widest text-gray-400 mb-1">Target Date</p>
+                <div className="flex gap-1 mb-1.5">
+                  {dateChips.map(c => (
+                    <button key={c.label} type="button"
+                      onClick={() => setWatchEditForm(f => ({ ...f, alert_date: c.val }))}
+                      className={`px-1.5 py-0.5 rounded text-[9px] font-semibold transition-colors border ${
+                        watchEditForm.alert_date === c.val
+                          ? 'bg-blue-600 border-blue-600 text-white'
+                          : 'border-gray-200 dark:border-gray-700 text-gray-500 dark:text-gray-400 hover:bg-gray-50 dark:hover:bg-gray-800'
+                      }`}>{c.label}</button>
+                  ))}
+                </div>
+                <input type="date" value={watchEditForm.alert_date}
+                  onChange={e => setWatchEditForm(f => ({ ...f, alert_date: e.target.value }))}
+                  className="w-full bg-gray-50 dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg px-2.5 py-1.5 text-[11px] text-gray-800 dark:text-gray-100 outline-none focus:border-blue-400 dark:focus:border-blue-500 focus:ring-1 focus:ring-blue-300/40 transition-all" />
+                {watchEditForm.alert_date && (
+                  <p className="text-[9px] mt-0.5 text-blue-500">{Math.ceil((new Date(watchEditForm.alert_date + 'T00:00:00') - watchToday) / 86400000)}d from today</p>
+                )}
+              </div>
+
+              {/* ── Watch Range ── */}
+              <div className="grid grid-cols-2 gap-2">
+                <div>
+                  <p className="text-[9px] font-bold uppercase tracking-widest text-gray-400 mb-1">Watch Low</p>
+                  <input type="number" min="0" step="0.01" value={watchEditForm.watch_low} autoComplete="off"
+                    onChange={e => setWatchEditForm(f => ({ ...f, watch_low: e.target.value }))}
+                    placeholder="0.00"
+                    className="w-full bg-gray-50 dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg px-2.5 py-1.5 text-[11px] text-gray-800 dark:text-gray-100 placeholder-gray-300 dark:placeholder-gray-600 outline-none focus:border-red-300 dark:focus:border-red-500/50 focus:ring-1 focus:ring-red-200/50 transition-all" />
+                </div>
+                <div>
+                  <p className="text-[9px] font-bold uppercase tracking-widest text-gray-400 mb-1">Watch High</p>
+                  <input type="number" min="0" step="0.01" value={watchEditForm.watch_high} autoComplete="off"
+                    onChange={e => setWatchEditForm(f => ({ ...f, watch_high: e.target.value }))}
+                    placeholder="0.00"
+                    className="w-full bg-gray-50 dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg px-2.5 py-1.5 text-[11px] text-gray-800 dark:text-gray-100 placeholder-gray-300 dark:placeholder-gray-600 outline-none focus:border-green-300 dark:focus:border-green-500/50 focus:ring-1 focus:ring-green-200/50 transition-all" />
+                </div>
+              </div>
+
+              {/* ── Notes ── */}
+              <div>
+                <p className="text-[9px] font-bold uppercase tracking-widest text-gray-400 mb-1">Notes</p>
+                <input type="text" value={watchEditForm.notes} maxLength={300} autoComplete="off"
+                  onChange={e => setWatchEditForm(f => ({ ...f, notes: e.target.value }))}
+                  placeholder="Setup reason, catalyst…"
+                  className="w-full bg-gray-50 dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg px-2.5 py-1.5 text-[11px] text-gray-800 dark:text-gray-100 placeholder-gray-300 dark:placeholder-gray-600 outline-none focus:border-blue-400 dark:focus:border-blue-500 focus:ring-1 focus:ring-blue-300/40 transition-all" />
+              </div>
+
+              {watchActionErr && <p className="text-[10px] text-red-500 bg-red-50 dark:bg-red-950/50 px-2.5 py-1.5 rounded-lg">{watchActionErr}</p>}
+              <div className="flex gap-2 pt-0.5">
+                <button type="button" onClick={() => setWatchEditItem(null)}
+                  className="flex-1 bg-gray-100 dark:bg-gray-800 hover:bg-gray-200 dark:hover:bg-gray-700 text-gray-600 dark:text-gray-300 py-2 rounded-lg text-[11px] font-semibold transition-colors">
+                  Cancel
+                </button>
+                <button type="submit" disabled={watchSaving}
+                  className="flex-1 bg-blue-600 hover:bg-blue-700 disabled:opacity-50 text-white py-2 rounded-lg text-[11px] font-bold transition-colors">
+                  {watchSaving ? 'Saving…' : 'Save'}
+                </button>
+              </div>
+            </form>
           </div>
         </div>
+        )
+      })()}
 
-        {/* Add-watch panel */}
-        {showAddWatch && watchlistTab !== 'portfolio' && (
-          <div className="px-4 py-3 border-b border-gray-100 dark:border-gray-700 bg-gray-50 dark:bg-gray-900/60">
+      {/* ── Watchlist ─────────────────────────────────────────────────────────── */}
+      <div className="hp-card bg-white/70 dark:bg-gray-900/60 backdrop-blur-md rounded-2xl border border-white/60 dark:border-white/10 shadow-sm overflow-hidden">
 
-            {/* Rule 5 — surface errors */}
-            {watchActionErr && (
-              <div className="mb-2 flex items-center justify-between bg-red-50 dark:bg-red-900/30 border border-red-200 dark:border-red-800 rounded-xl px-3 py-2">
-                <p className="text-xs text-red-600 dark:text-red-400">{watchActionErr}</p>
-                <button onClick={() => setWatchActionErr(null)} className="text-red-400 hover:text-red-600 ml-2">✕</button>
+        {/* Header row */}
+        <div className="flex items-center gap-2 px-3 py-2.5 border-b border-gray-100 dark:border-gray-800 overflow-x-auto no-scrollbar">
+          <p className="text-[10px] font-bold uppercase tracking-widest text-gray-400 shrink-0">Watchlist</p>
+          <div className="flex-1 shrink-0 min-w-[8px]" />
+          {/* Tab pill group */}
+          <div className="flex items-center bg-gray-100 dark:bg-gray-800 rounded-lg p-0.5 shrink-0">
+            {[
+              { id: 'active',    label: `Active${activeWatchItems.length ? ` ${activeWatchItems.length}` : ''}` },
+              { id: 'pre',       label: `Pre-Watch${preWatchItems.length ? ` ${preWatchItems.length}` : ''}` },
+              { id: 'positions', label: `Pos.${openPositions.length ? ` ${openPositions.length}` : ''}` },
+            ].map(tab => (
+              <button key={tab.id} onClick={() => { setWatchlistTab(tab.id); setWatchAddState(null) }}
+                className={`px-2 py-0.5 rounded-md text-[10px] font-semibold transition-all whitespace-nowrap ${
+                  watchlistTab === tab.id
+                    ? 'bg-white dark:bg-gray-700 text-gray-900 dark:text-white shadow-sm'
+                    : 'text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-300'
+                }`}>{tab.label}</button>
+            ))}
+          </div>
+          {/* Add button — only on watchlist tabs */}
+          {watchAddState === null && watchlistTab !== 'positions' && (
+            <button onClick={() => setWatchAddState('search')}
+              className="flex items-center gap-0.5 px-2 py-0.5 rounded-md text-[10px] font-semibold bg-blue-600 hover:bg-blue-700 active:bg-blue-800 text-white transition-colors shrink-0">
+              <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M12 4v16m8-8H4" /></svg>
+              Add
+            </button>
+          )}
+        </div>
+
+        {/* Symbol search panel */}
+        {watchAddState === 'search' && (
+          <div className="px-3 pt-3 pb-2 border-b border-gray-100 dark:border-gray-800">
+            <div className="relative">
+              <div className="flex items-center gap-2 bg-gray-50 dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg px-2.5 h-7">
+                <svg className="w-3 h-3 text-gray-400 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-4.35-4.35M17 11A6 6 0 1 1 5 11a6 6 0 0 1 12 0z" />
+                </svg>
+                <input ref={watchInputRef} type="text" value={watchQuery}
+                  onChange={e => { setWatchQuery(e.target.value.toUpperCase()); setWatchCursor(-1) }}
+                  onKeyDown={handleWatchKey} placeholder="Type symbol…"
+                  className="flex-1 bg-transparent text-[11px] text-gray-800 dark:text-gray-100 placeholder-gray-400 outline-none" translate="no" />
+                {watchQuery && <button onClick={() => setWatchQuery('')} className="text-gray-400 hover:text-gray-600 text-xs leading-none">×</button>}
               </div>
-            )}
-
-            {/* Symbol search */}
-            <div className="flex gap-2 mb-3">
-              <input
-                type="text"
-                value={newSymbol}
-                onChange={e => setNewSymbol(e.target.value.toUpperCase())}
-                placeholder="Symbol e.g. NABIL"
-                autoComplete="off"
-                className="flex-1 border border-gray-200 dark:border-gray-600 dark:bg-gray-700 dark:text-white rounded-xl px-3 py-1.5 text-sm focus:outline-none focus:border-blue-500"
-                onKeyDown={e => e.key === 'Enter' && handleSymbolSearch()}
-              />
-              <button
-                onClick={handleSymbolSearch}
-                disabled={searchingSymbol || !newSymbol.trim()}
-                className="bg-gray-800 dark:bg-gray-700 text-white px-3 py-1.5 rounded-xl text-xs hover:bg-gray-700 dark:hover:bg-gray-600 disabled:opacity-40 transition-colors"
-              >
-                {searchingSymbol ? '...' : 'Search'}
-              </button>
-            </div>
-
-            {symbolError && <p className="text-xs text-red-500 mb-2">{symbolError}</p>}
-
-            {symbolInfo && (
-              <>
-                {/* Stock info card */}
-                <div className="flex items-center justify-between bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-600 rounded-xl p-2.5 mb-3">
-                  <div className="flex items-center gap-2">
-                    <StockAvatar symbol={symbolInfo.symbol} size="w-7 h-7" />
-                    <div>
-                      <p className="text-xs font-bold text-gray-900 dark:text-white">{symbolInfo.symbol}</p>
-                      <p className="text-xs text-gray-400">Rs.{parseFloat(symbolInfo.price || 0).toLocaleString()}</p>
-                    </div>
-                  </div>
-                  <p className={`text-xs font-medium ${symbolInfo.change >= 0 ? 'text-green-500' : 'text-red-500'}`}>
-                    {symbolInfo.change >= 0 ? '+' : ''}{symbolInfo.change}%
-                  </p>
-                </div>
-
-                {/* Alert type toggle */}
-                <div className="flex gap-2 mb-3">
-                  {['BUY', 'SELL'].map(type => (
-                    <button
-                      key={type}
-                      type="button"
-                      onClick={() => setWatchForm(prev => ({ ...prev, alert_type: prev.alert_type === type ? '' : type }))}
-                      className={`flex-1 py-1.5 rounded-xl text-xs font-semibold border transition-colors ${
-                        watchForm.alert_type === type
-                          ? type === 'BUY' ? 'bg-green-500 text-white border-green-500' : 'bg-red-500 text-white border-red-500'
-                          : `border-gray-200 dark:border-gray-600 text-gray-500 dark:text-gray-400 ${
-                              type === 'BUY' ? 'hover:border-green-400 hover:text-green-500' : 'hover:border-red-400 hover:text-red-500'
-                            }`
-                      }`}
-                    >
-                      {type === 'BUY' ? '✓ Buy Alert' : '✓ Sell Alert'}
+              {watchSuggestions.length > 0 && (
+                <div className="absolute top-full left-0 right-0 mt-1 bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-700 rounded-xl shadow-lg z-20 overflow-hidden">
+                  {watchSuggestions.map((s, i) => (
+                    <button key={s.symbol} onClick={() => { const p = priceMapRef.current[s.symbol]; setWatchAddState({ symbol: s.symbol, refPrice: p ? parseFloat(p.price) || null : null }); setWatchQuery(''); setWatchCursor(-1) }}
+                      className={`w-full flex items-center gap-2.5 px-3 py-2 text-left transition-colors ${i === watchCursor ? 'bg-blue-50 dark:bg-blue-900/30' : 'hover:bg-gray-50 dark:hover:bg-gray-800/50'} ${i < watchSuggestions.length - 1 ? 'border-b border-gray-50 dark:border-gray-800' : ''}`}>
+                      <div className="min-w-0 flex-1">
+                        <span className="text-[11px] font-bold text-gray-900 dark:text-white" translate="no">{s.symbol}</span>
+                        {s.company_name && <span className="text-[10px] text-gray-400 ml-1.5 truncate">{s.company_name}</span>}
+                      </div>
                     </button>
                   ))}
                 </div>
-
-                {/* Price alert */}
-                <div className="mb-2">
-                  <p className="text-xs text-gray-400 mb-1">🎯 Price Alert (Rs.)</p>
-                  <input
-                    type="number"
-                    value={watchForm.price_alert}
-                    onChange={e => setWatchForm(prev => ({ ...prev, price_alert: e.target.value }))}
-                    placeholder={`Current: Rs.${symbolInfo.price}`}
-                    className="w-full border border-gray-200 dark:border-gray-600 dark:bg-gray-700 dark:text-white rounded-xl px-3 py-1.5 text-xs focus:outline-none focus:border-blue-500"
-                  />
-                  {watchForm.price_alert && symbolInfo.price && (
-                    <div className={`mt-1 px-2.5 py-1 rounded-lg text-xs font-medium flex items-center justify-between ${
-                      parseFloat(watchForm.price_alert) > parseFloat(symbolInfo.price)
-                        ? 'bg-green-50 dark:bg-green-900/30 text-green-600 dark:text-green-300'
-                        : 'bg-red-50 dark:bg-red-900/30 text-red-500'
-                    }`}>
-                      <span>
-                        {parseFloat(watchForm.price_alert) > parseFloat(symbolInfo.price) ? '↑' : '↓'} Rs.{Math.abs(Math.round(parseFloat(watchForm.price_alert) - parseFloat(symbolInfo.price))).toLocaleString()} away
-                      </span>
-                      {/* Rule 6 — guard division */}
-                      {parseFloat(symbolInfo.price) > 0 && (
-                        <span>
-                          {Math.abs(((parseFloat(watchForm.price_alert) - parseFloat(symbolInfo.price)) / parseFloat(symbolInfo.price)) * 100).toFixed(2)}% {parseFloat(watchForm.price_alert) > parseFloat(symbolInfo.price) ? 'rally' : 'drop'} needed
-                        </span>
-                      )}
-                    </div>
-                  )}
-                </div>
-
-                {/* Date alert */}
-                <div className="mb-2">
-                  <p className="text-xs text-gray-400 mb-1">📅 Date Alert</p>
-                  <input
-                    type="date"
-                    value={watchForm.alert_date}
-                    onChange={e => setWatchForm(prev => ({ ...prev, alert_date: e.target.value }))}
-                    min={today}
-                    className="w-full border border-gray-200 dark:border-gray-600 dark:bg-gray-700 dark:text-white rounded-xl px-3 py-1.5 text-xs focus:outline-none focus:border-blue-500"
-                  />
-                  {watchForm.alert_date && (
-                    <div className="mt-1 px-2.5 py-1 rounded-lg text-xs font-medium bg-blue-50 dark:bg-blue-900/30 text-blue-600 dark:text-blue-300 flex items-center justify-between">
-                      {/* Rule 8 — ISO string date comparison */}
-                      <span>📅 {new Date(watchForm.alert_date + 'T00:00:00').toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}</span>
-                      <span>{Math.ceil((new Date(watchForm.alert_date) - new Date(today)) / (1000 * 60 * 60 * 24))} days remaining</span>
-                    </div>
-                  )}
-                </div>
-
-                {/* Notes */}
-                <div className="mb-3">
-                  <input
-                    type="text"
-                    value={watchForm.notes}
-                    onChange={e => setWatchForm(prev => ({ ...prev, notes: e.target.value }))}
-                    placeholder="📝 Note (optional)"
-                    autoComplete="off"
-                    className="w-full border border-gray-200 dark:border-gray-600 dark:bg-gray-700 dark:text-white rounded-xl px-3 py-1.5 text-xs focus:outline-none focus:border-blue-500 mb-1.5"
-                  />
-                  <div className="flex flex-wrap gap-1">
-                    {[
-                      '💰 Salary coming', '📰 Bad news',
-                      '📈 NEPSE season starting', '📉 NEPSE season ending',
-                      '🏦 Dividend expected', '📊 Bonus share',
-                      '⚡ Breakout watch', '🔄 Accumulation zone',
-                    ].map(suggestion => (
-                      <button
-                        key={suggestion}
-                        type="button"
-                        onClick={() => setWatchForm(prev => ({ ...prev, notes: suggestion }))}
-                        className={`text-xs px-2 py-0.5 rounded-full border transition-colors ${
-                          watchForm.notes === suggestion
-                            ? 'bg-blue-600 text-white border-blue-600'
-                            : 'border-gray-200 dark:border-gray-600 text-gray-500 dark:text-gray-400 hover:border-blue-400 hover:text-blue-500 bg-white dark:bg-gray-800'
-                        }`}
-                      >
-                        {suggestion}
-                      </button>
-                    ))}
-                  </div>
-                </div>
-
-                <div className="flex gap-2">
-                  <button
-                    onClick={() => handleAddWatch('active')}
-                    className="flex-1 text-xs bg-blue-600 text-white py-2 rounded-xl hover:bg-blue-700 font-medium transition-colors"
-                  >
-                    {tr('watchlist.addToActive')}
-                  </button>
-                  <button
-                    onClick={() => handleAddWatch('pre')}
-                    className="flex-1 text-xs bg-gray-100 dark:bg-gray-700 text-gray-700 dark:text-gray-200 py-2 rounded-xl hover:bg-gray-200 dark:hover:bg-gray-600 font-medium transition-colors"
-                  >
-                    {tr('watchlist.addToPreWatch')}
-                  </button>
-                </div>
-              </>
-            )}
-          </div>
-        )}
-
-        {/* Rule 5 — surface remove errors */}
-        {watchActionErr && !showAddWatch && (
-          <div className="mx-3 mt-2 flex items-center justify-between bg-red-50 dark:bg-red-900/30 border border-red-200 dark:border-red-800 rounded-xl px-3 py-2">
-            <p className="text-xs text-red-600 dark:text-red-400">{watchActionErr}</p>
-            <button onClick={() => setWatchActionErr(null)} className="text-red-400 hover:text-red-600 ml-2">✕</button>
-          </div>
-        )}
-
-        <div className="p-3">
-          {filteredWatch.length === 0 ? (
-            <div className="text-center py-6">
-              <p className="text-xs text-gray-400">
-                {watchlistTab === 'portfolio' ? tr('watchlist.noPositions') : tr('watchlist.noStocks')}
-              </p>
-              {watchlistTab !== 'portfolio' && (
-                <button onClick={() => setShowAddWatch(true)} className="text-xs text-blue-500 mt-1 hover:underline">{tr('watchlist.addStock')}</button>
               )}
             </div>
-          ) : (
-            <div className="grid grid-cols-2 md:grid-cols-4 gap-2">
-              <WatchMenuPortal />
-              {filteredWatch.map(item => (
-                <div key={item.id}
-                  onContextMenu={!item.isPosition ? watchCtx([
-                    { label: 'Delete', icon: '🗑️', danger: true, action: () => handleRemoveWatch(item.id) },
-                  ]) : undefined}
-                  className="flex flex-col bg-gray-50 dark:bg-gray-800 rounded-lg px-2.5 py-2 group cursor-default"
-                >
-                  <div className="flex items-center justify-between">
-                    <div className="flex items-center gap-1.5">
-                      <StockAvatar symbol={item.symbol} size="w-7 h-7" />
-                      <div>
-                        <p className="text-xs font-semibold text-gray-900 dark:text-white">{item.symbol}</p>
-                        <p className="text-[10px] text-gray-400">
-                          {item.isPosition
-                            ? `${item.quantity} @ Rs.${item.entry_price?.toLocaleString()}`
-                            : `Rs.${item.currentPrice != null ? parseFloat(item.currentPrice).toLocaleString() : '—'}`
-                          }
-                        </p>
+            <button onClick={() => { setWatchAddState(null); setWatchQuery(''); setWatchForm({ price_alert: '', alert_date: '', watch_low: '', watch_high: '', notes: '' }) }} className="mt-2 text-[10px] text-gray-400 hover:text-gray-600 dark:hover:text-gray-300">Cancel</button>
+          </div>
+        )}
+
+        {/* Add form — after symbol selected */}
+        {watchAddState && typeof watchAddState === 'object' && (() => {
+          const ltp = watchAddState.refPrice
+          const pctChips = ltp ? [
+            { label: '−10%', val: (ltp * 0.90).toFixed(2) },
+            { label: '−5%',  val: (ltp * 0.95).toFixed(2) },
+            { label: 'LTP',  val: ltp.toFixed(2) },
+            { label: '+5%',  val: (ltp * 1.05).toFixed(2) },
+            { label: '+10%', val: (ltp * 1.10).toFixed(2) },
+          ] : null
+          const dateChips = [
+            { label: 'Mon',  val: nextWeekday(1) },
+            { label: '+1w',  val: dateOffset(7) },
+            { label: '+2w',  val: dateOffset(14) },
+            { label: '+1m',  val: dateOffset(30) },
+          ]
+          const noteTags = ['Breakout', 'Dip buy', 'Earnings', 'Long term', 'Sector play']
+          return (
+          <div className="border-b border-gray-100 dark:border-gray-800 bg-white dark:bg-gray-900">
+            {/* Symbol + LTP strip */}
+            <div className="flex items-center justify-between px-3 py-2 border-b border-gray-100 dark:border-gray-800 bg-gray-50 dark:bg-gray-800/50">
+              <div className="flex items-center gap-2 min-w-0">
+                <p className="text-[12px] font-bold text-gray-900 dark:text-white" translate="no">{watchAddState.symbol}</p>
+                {ltp != null
+                  ? <span className="text-[10px] font-semibold tabular-nums text-gray-500 dark:text-gray-400 bg-gray-200/60 dark:bg-gray-700 px-1.5 py-0.5 rounded">LTP Rs.{ltp.toLocaleString()}</span>
+                  : <span className="text-[10px] text-gray-400">No live price</span>
+                }
+              </div>
+              <button onClick={() => { setWatchAddState(null); setWatchForm({ price_alert: '', alert_date: '', watch_low: '', watch_high: '', notes: '' }) }}
+                className="text-[11px] text-gray-400 hover:text-gray-600 dark:hover:text-gray-300 leading-none px-1">✕</button>
+            </div>
+            <form onSubmit={handleAddWatch} className="px-3 py-2.5 space-y-2.5">
+
+              {/* ── Price Alert ── */}
+              <div>
+                <p className="text-[9px] font-bold uppercase tracking-widest text-gray-400 mb-1">Price Alert</p>
+                {pctChips && (
+                  <div className="flex gap-1 mb-1.5 flex-wrap">
+                    {pctChips.map(c => (
+                      <button key={c.label} type="button"
+                        onClick={() => setWatchForm(f => ({ ...f, price_alert: c.val }))}
+                        className={`px-1.5 py-0.5 rounded text-[9px] font-semibold transition-colors border ${
+                          watchForm.price_alert === c.val
+                            ? 'bg-blue-600 border-blue-600 text-white'
+                            : c.label.startsWith('−') ? 'border-red-200 dark:border-red-800 text-red-500 dark:text-red-400 hover:bg-red-50 dark:hover:bg-red-950/40'
+                            : c.label.startsWith('+') ? 'border-green-200 dark:border-green-800 text-green-600 dark:text-green-400 hover:bg-green-50 dark:hover:bg-green-950/40'
+                            : 'border-gray-200 dark:border-gray-700 text-gray-500 dark:text-gray-400 hover:bg-gray-50 dark:hover:bg-gray-800'
+                        }`}>{c.label}</button>
+                    ))}
+                  </div>
+                )}
+                <input type="number" min="0" step="0.01" value={watchForm.price_alert}
+                  onChange={e => setWatchForm(f => ({ ...f, price_alert: e.target.value }))}
+                  placeholder="0.00" autoComplete="off"
+                  className="w-full bg-gray-50 dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg px-2.5 py-1.5 text-[11px] text-gray-800 dark:text-gray-100 placeholder-gray-300 dark:placeholder-gray-600 outline-none focus:border-blue-400 dark:focus:border-blue-500 focus:ring-1 focus:ring-blue-300/40 transition-all" />
+                {watchForm.price_alert && ltp != null && (() => {
+                  const pct = ((parseFloat(watchForm.price_alert) - ltp) / ltp * 100)
+                  return <p className={`text-[9px] mt-0.5 tabular-nums ${pct >= 0 ? 'text-green-500' : 'text-red-400'}`}>{pct >= 0 ? '+' : ''}{pct.toFixed(1)}% from LTP</p>
+                })()}
+              </div>
+
+              {/* ── Target Date ── */}
+              <div>
+                <p className="text-[9px] font-bold uppercase tracking-widest text-gray-400 mb-1">Target Date</p>
+                <div className="flex gap-1 mb-1.5">
+                  {dateChips.map(c => (
+                    <button key={c.label} type="button"
+                      onClick={() => setWatchForm(f => ({ ...f, alert_date: c.val }))}
+                      className={`px-1.5 py-0.5 rounded text-[9px] font-semibold transition-colors border ${
+                        watchForm.alert_date === c.val
+                          ? 'bg-blue-600 border-blue-600 text-white'
+                          : 'border-gray-200 dark:border-gray-700 text-gray-500 dark:text-gray-400 hover:bg-gray-50 dark:hover:bg-gray-800'
+                      }`}>{c.label}</button>
+                  ))}
+                </div>
+                <input type="date" value={watchForm.alert_date}
+                  onChange={e => setWatchForm(f => ({ ...f, alert_date: e.target.value }))}
+                  className="w-full bg-gray-50 dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg px-2.5 py-1.5 text-[11px] text-gray-800 dark:text-gray-100 outline-none focus:border-blue-400 dark:focus:border-blue-500 focus:ring-1 focus:ring-blue-300/40 transition-all" />
+                {watchForm.alert_date && (
+                  <p className="text-[9px] mt-0.5 text-blue-500">{Math.ceil((new Date(watchForm.alert_date + 'T00:00:00') - watchToday) / 86400000)}d from today</p>
+                )}
+              </div>
+
+              {/* ── Watch Range ── */}
+              <div className="grid grid-cols-2 gap-2">
+                <div>
+                  <p className="text-[9px] font-bold uppercase tracking-widest text-gray-400 mb-1">Watch Low</p>
+                  <input type="number" min="0" step="0.01" value={watchForm.watch_low}
+                    onChange={e => setWatchForm(f => ({ ...f, watch_low: e.target.value }))}
+                    placeholder="0.00" autoComplete="off"
+                    className="w-full bg-gray-50 dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg px-2.5 py-1.5 text-[11px] text-gray-800 dark:text-gray-100 placeholder-gray-300 dark:placeholder-gray-600 outline-none focus:border-red-300 dark:focus:border-red-500/50 focus:ring-1 focus:ring-red-200/50 transition-all" />
+                </div>
+                <div>
+                  <p className="text-[9px] font-bold uppercase tracking-widest text-gray-400 mb-1">Watch High</p>
+                  <input type="number" min="0" step="0.01" value={watchForm.watch_high}
+                    onChange={e => setWatchForm(f => ({ ...f, watch_high: e.target.value }))}
+                    placeholder="0.00" autoComplete="off"
+                    className="w-full bg-gray-50 dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg px-2.5 py-1.5 text-[11px] text-gray-800 dark:text-gray-100 placeholder-gray-300 dark:placeholder-gray-600 outline-none focus:border-green-300 dark:focus:border-green-500/50 focus:ring-1 focus:ring-green-200/50 transition-all" />
+                </div>
+              </div>
+
+              {/* ── Notes + quick tags ── */}
+              <div>
+                <p className="text-[9px] font-bold uppercase tracking-widest text-gray-400 mb-1">Notes</p>
+                <div className="flex gap-1 flex-wrap mb-1.5">
+                  {noteTags.map(tag => (
+                    <button key={tag} type="button"
+                      onClick={() => setWatchForm(f => ({ ...f, notes: f.notes ? f.notes : tag }))}
+                      className="px-1.5 py-0.5 rounded text-[9px] font-medium border border-gray-200 dark:border-gray-700 text-gray-500 dark:text-gray-400 hover:bg-gray-50 dark:hover:bg-gray-800 transition-colors">
+                      {tag}
+                    </button>
+                  ))}
+                </div>
+                <input type="text" value={watchForm.notes} maxLength={300} autoComplete="off"
+                  onChange={e => setWatchForm(f => ({ ...f, notes: e.target.value }))}
+                  placeholder="Setup reason, catalyst…"
+                  className="w-full bg-gray-50 dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg px-2.5 py-1.5 text-[11px] text-gray-800 dark:text-gray-100 placeholder-gray-300 dark:placeholder-gray-600 outline-none focus:border-blue-400 dark:focus:border-blue-500 focus:ring-1 focus:ring-blue-300/40 transition-all" />
+              </div>
+
+              {watchActionErr && <p className="text-[10px] text-red-500 bg-red-50 dark:bg-red-950/50 px-2.5 py-1.5 rounded-lg">{watchActionErr}</p>}
+              <button type="submit" disabled={watchAdding}
+                className="w-full bg-blue-600 hover:bg-blue-700 disabled:opacity-50 text-white py-2 rounded-lg text-[11px] font-bold transition-colors">
+                {watchAdding ? 'Adding…' : 'Add to Watchlist'}
+              </button>
+            </form>
+          </div>
+          )
+        })()}
+
+        {/* List */}
+        {watchlistTab === 'positions' ? (
+          <div>
+            {openPositions.length === 0 ? (
+              <div className="p-6 text-center">
+                <p className="text-gray-400 text-xs">No open positions</p>
+                <button onClick={() => navigate('/logs')} className="mt-2 text-blue-500 text-xs hover:underline">+ Add a trade</button>
+              </div>
+            ) : (
+              <div className="divide-y divide-gray-50 dark:divide-gray-800">
+                {openPositions.map(t => {
+                  const slDistPct = t.sl != null && t.currentPrice
+                    ? t.position === 'SHORT'
+                      ? (((t.sl - t.currentPrice) / t.currentPrice) * 100).toFixed(1)
+                      : (((t.currentPrice - t.sl) / t.currentPrice) * 100).toFixed(1)
+                    : null
+                  const tpDistPct = t.tp != null && t.currentPrice
+                    ? t.position === 'SHORT'
+                      ? (((t.currentPrice - t.tp) / t.currentPrice) * 100).toFixed(1)
+                      : (((t.tp - t.currentPrice) / t.currentPrice) * 100).toFixed(1)
+                    : null
+                  return (
+                    <div key={t.id} className="px-3 py-2.5 hover:bg-gray-50 dark:hover:bg-gray-800 transition-colors" translate="no">
+                      <div className="flex items-center justify-between">
+                        <div className="flex items-center gap-2">
+                          <StockAvatar symbol={t.symbol} size="w-7 h-7" textSize="text-[10px]" />
+                          <div>
+                            <div className="flex items-center gap-1.5">
+                              <p className="text-xs font-semibold text-gray-900 dark:text-white">{t.symbol}</p>
+                              <span className={`text-[10px] px-1 py-0.5 rounded font-medium ${
+                                t.position === 'LONG'
+                                  ? 'bg-green-100 text-green-700 dark:bg-green-900 dark:text-green-300'
+                                  : 'bg-red-100 text-red-700 dark:bg-red-900 dark:text-red-300'
+                              }`}>{t.position}</span>
+                              {t.status === 'PARTIAL' && (
+                                <span className="text-[10px] px-1 py-0.5 rounded bg-orange-100 text-orange-600 dark:bg-orange-900 dark:text-orange-300 font-medium">P</span>
+                              )}
+                            </div>
+                            <p className="text-[10px] text-gray-400">{t.quantity} @ Rs.{(t.entry_price || 0).toLocaleString()}</p>
+                          </div>
+                        </div>
+                        <div className="text-right">
+                          {t.unrealizedPnl != null ? (
+                            <p className={`text-xs font-semibold ${t.unrealizedPnl >= 0 ? 'text-green-500' : 'text-red-500'}`}>
+                              {t.unrealizedPnl >= 0 ? '+' : ''}Rs.{Math.abs(t.unrealizedPnl).toLocaleString()}
+                            </p>
+                          ) : (
+                            <p className="text-xs text-gray-400">—</p>
+                          )}
+                          {t.pnlPct != null && (
+                            <p className={`text-[10px] ${parseFloat(t.pnlPct) >= 0 ? 'text-green-400' : 'text-red-400'}`}>
+                              {parseFloat(t.pnlPct) >= 0 ? '+' : ''}{t.pnlPct}%
+                            </p>
+                          )}
+                        </div>
+                      </div>
+                      <div className="flex items-center gap-1.5 mt-1.5 ml-9 flex-wrap">
+                        {t.sl != null ? (
+                          <span className="text-[10px] bg-red-50 dark:bg-red-900/40 text-red-500 px-1.5 py-0.5 rounded">
+                            SL {slDistPct !== null ? `${parseFloat(slDistPct) > 0 ? '+' : ''}${slDistPct}%` : `Rs.${t.sl.toLocaleString()}`}
+                          </span>
+                        ) : (
+                          <span className="text-[10px] bg-orange-50 dark:bg-orange-900/40 text-orange-500 px-1.5 py-0.5 rounded">⚠ No SL</span>
+                        )}
+                        {t.tp != null && (
+                          <span className="text-[10px] bg-green-50 dark:bg-green-900/40 text-green-500 px-1.5 py-0.5 rounded">
+                            TP {tpDistPct !== null ? `${parseFloat(tpDistPct) > 0 ? '+' : ''}${tpDistPct}%` : `Rs.${t.tp.toLocaleString()}`}
+                          </span>
+                        )}
                       </div>
                     </div>
-                    <div className="flex items-center gap-1">
-                      {item.isPosition && item.unrealizedPnl != null ? (
-                        <span className={`text-[10px] font-medium px-1.5 py-0.5 rounded-full ${
-                          item.unrealizedPnl >= 0
-                            ? 'bg-green-100 dark:bg-green-900 text-green-600 dark:text-green-300'
-                            : 'bg-red-100 dark:bg-red-900 text-red-600 dark:text-red-300'
-                        }`}>
-                          {item.unrealizedPnl >= 0 ? '+' : ''}Rs.{Math.abs(item.unrealizedPnl).toLocaleString()}
-                        </span>
-                      ) : item.change != null ? (
-                        <span className={`text-[10px] font-medium px-1.5 py-0.5 rounded-full ${
-                          item.change >= 0
-                            ? 'bg-green-100 dark:bg-green-900 text-green-600 dark:text-green-300'
-                            : 'bg-red-100 dark:bg-red-900 text-red-600 dark:text-red-300'
-                        }`}>
+                  )
+                })}
+                <button
+                  onClick={() => navigate('/portfolio')}
+                  className="w-full px-4 py-2 text-[11px] font-semibold text-blue-500 hover:text-blue-700 hover:bg-blue-50 dark:hover:bg-blue-900/20 transition-colors text-center"
+                >
+                  View all in Portfolio →
+                </button>
+              </div>
+            )}
+          </div>
+        ) : (
+        <div className="grid grid-cols-2 gap-px bg-gray-200/50 dark:bg-white/5">
+          {filteredWatch.length === 0 ? (
+            <div className="col-span-2 py-8 text-center bg-white dark:bg-gray-900">
+              <p className="text-[11px] text-gray-400">No stocks in {watchlistTab === 'active' ? 'Active' : 'Pre-Watch'}</p>
+              <p className="text-[10px] text-gray-300 dark:text-gray-600 mt-1">
+                {watchlistTab === 'active' ? 'Items auto-promote when alert is within 15% or 2 weeks' : 'Click + to add a symbol'}
+              </p>
+            </div>
+          ) : (
+            filteredWatch.map((item) => {
+              const isExpired  = item.wStatus === 'expired'
+              const inGrace    = item.wStatus === 'grace'
+              const priceFill  = item.price_alert && item.currentPrice
+                ? Math.max(0, Math.min(100, 100 - (Math.abs((item.currentPrice - parseFloat(item.price_alert)) / item.currentPrice) * 100) / 15))
+                : null
+              const meta = item.price_alert
+                ? `Alert Rs.${parseFloat(item.price_alert).toLocaleString()}`
+                : item.alert_date
+                  ? `By ${new Date(item.alert_date + 'T00:00:00').toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}`
+                  : item.notes || null
+
+              return (
+                <div key={item.id}
+                  onContextMenu={watchCtx([
+                    { label: 'Edit',   icon: '✏️', action: () => openWatchEdit(item) },
+                    { separator: true },
+                    { label: 'Delete', icon: '🗑️', danger: true, action: () => handleRemoveWatch(item.id) },
+                  ])}
+                  className={`hp-watch-item px-2.5 py-2 cursor-default bg-transparent ${isExpired ? 'opacity-60' : ''}`}
+                >
+                  <div className="flex items-start justify-between gap-1" translate="no">
+                    <div className="min-w-0 flex-1">
+                      <div className="flex items-center gap-1 flex-wrap">
+                        <p className={`text-[12px] font-bold leading-none ${isExpired ? 'text-gray-400 dark:text-gray-500' : 'text-gray-900 dark:text-white'}`}>{item.symbol}</p>
+                        {isExpired && <span className="text-[8px] px-1 py-0.5 rounded bg-gray-100 dark:bg-gray-800 text-gray-400 font-semibold uppercase tracking-wide">Exp</span>}
+                        {inGrace   && <span className="text-[8px] px-1 py-0.5 rounded bg-amber-100 dark:bg-amber-900/30 text-amber-600 dark:text-amber-400 font-semibold uppercase tracking-wide">Grace</span>}
+                      </div>
+                      {meta && <p className="text-[10px] text-gray-400 mt-0.5 truncate">{meta}</p>}
+                    </div>
+                    <div className="text-right shrink-0">
+                      <p className="text-[11px] font-semibold tabular-nums text-gray-900 dark:text-white leading-none">
+                        {item.currentPrice != null ? `Rs.${parseFloat(item.currentPrice).toLocaleString()}` : '—'}
+                      </p>
+                      {item.change != null && (
+                        <p className={`text-[10px] font-medium tabular-nums ${item.change >= 0 ? 'text-green-600 dark:text-green-400' : 'text-red-600 dark:text-red-400'}`}>
                           {item.change >= 0 ? '+' : ''}{item.change}%
-                        </span>
-                      ) : null}
+                        </p>
+                      )}
                     </div>
                   </div>
-
-                  {/* Alert badges (visible on hover) */}
-                  {!item.isPosition && (() => {
-                    const messages = []
-                    const ltp = item.currentPrice ? parseFloat(item.currentPrice) : null
-
-                    if (item.price_alert && ltp) {
-                      const alertPrice = parseFloat(item.price_alert)
-                      const diff = alertPrice - ltp
-                      // Rule 6 — guard division
-                      const pct = ltp > 0 ? Math.abs((diff / ltp) * 100).toFixed(2) : '0.00'
-                      const isBuy  = item.notes?.startsWith('[BUY]')
-                      const isSell = item.notes?.startsWith('[SELL]')
-                      const tag = isBuy ? '🟢 BUY' : isSell ? '🔴 SELL' : '🎯'
-
-                      if (Math.abs(diff) < ltp * 0.02) {
-                        messages.push({ text: `${tag} Near alert! Rs.${alertPrice}`, color: 'text-orange-500', bg: 'bg-orange-50 dark:bg-orange-900/30' })
-                      } else if (diff > 0) {
-                        messages.push({ text: `${tag} +${pct}% → Rs.${alertPrice}`, color: 'text-green-600 dark:text-green-400', bg: 'bg-green-50 dark:bg-green-900/30' })
-                      } else {
-                        messages.push({ text: `${tag} ${pct}% drop → Rs.${alertPrice}`, color: 'text-red-500', bg: 'bg-red-50 dark:bg-red-900/30' })
-                      }
-                    }
-
-                    if (item.alert_date) {
-                      // Rule 8 — ISO string comparison
-                      const days = Math.ceil((new Date(item.alert_date) - new Date(today)) / (1000 * 60 * 60 * 24))
-                      const isBuy  = item.notes?.startsWith('[BUY]')
-                      const isSell = item.notes?.startsWith('[SELL]')
-                      const dateTag = isBuy ? '🟢 BUY' : isSell ? '🔴 SELL' : '📅'
-                      const dateColor = isBuy ? 'text-green-600 dark:text-green-400' : isSell ? 'text-red-500' : 'text-blue-500'
-                      const dateBg   = isBuy ? 'bg-green-50 dark:bg-green-900/30' : isSell ? 'bg-red-50 dark:bg-red-900/30' : 'bg-blue-50 dark:bg-blue-900/30'
-
-                      if (days < 0) {
-                        messages.push({ text: `${dateTag} Expired ${Math.abs(days)}d ago`, color: 'text-gray-400', bg: 'bg-gray-50 dark:bg-gray-700' })
-                      } else if (days === 0) {
-                        messages.push({ text: `${dateTag} Alert date is TODAY!`, color: 'text-orange-500', bg: 'bg-orange-50 dark:bg-orange-900/30' })
-                      } else if (days <= 3) {
-                        messages.push({ text: `${dateTag} ${days}d to alert`, color: 'text-orange-500', bg: 'bg-orange-50 dark:bg-orange-900/30' })
-                      } else {
-                        messages.push({ text: `${dateTag} ${days} days to alert`, color: dateColor, bg: dateBg })
-                      }
-                    }
-
-                    const cleanNote = item.notes?.replace(/^\[(BUY|SELL)\]\s*/, '')
-                    if (cleanNote) {
-                      messages.push({ text: `📝 ${cleanNote}`, color: 'text-gray-500 dark:text-gray-400', bg: 'bg-gray-50 dark:bg-gray-700' })
-                    }
-
-                    return messages.length > 0 ? (
-                      <div className="mt-1.5 space-y-1 hidden group-hover:block">
-                        {messages.map((m, i) => (
-                          <div key={i} className={`${m.bg} px-1.5 py-0.5 rounded-lg`}>
-                            <p className={`text-[10px] font-medium leading-tight ${m.color}`}>{m.text}</p>
-                          </div>
+                  {watchlistTab === 'active' && priceFill != null && (
+                    <div className="mt-1.5 h-0.5 w-full bg-gray-100 dark:bg-gray-700 rounded-full overflow-hidden">
+                      <div className="h-full rounded-full bg-blue-400 dark:bg-blue-500 transition-all" style={{ width: `${priceFill}%` }} />
+                    </div>
+                  )}
+                  {/* Alert status badges */}
+                  {(() => {
+                    const msgs = watchAlertMsgs(item)
+                    if (!msgs.length) return null
+                    return (
+                      <div className="flex flex-wrap gap-1 mt-1">
+                        {msgs.map((m, i) => (
+                          <span key={i} className={`text-[9px] font-medium px-1 py-0.5 rounded ${m.bg} ${m.color}`}>{m.text}</span>
                         ))}
                       </div>
-                    ) : null
+                    )
                   })()}
                 </div>
-              ))}
-            </div>
+              )
+            })
           )}
         </div>
+        )}
       </div>
+      </div>{/* end watchlist section */}
     </div>
   )
 }
@@ -1059,11 +1260,8 @@ function LoggedInHome() {
   const { user } = useAuth()
   const navigate = useNavigate()
   const [initData, setInitData] = useState(null)
-  const [dashData, setDashData] = useState({ openPositions: [], perfStats: null })
-
-  const handleDashData = useCallback(({ openPositions, perfStats }) => {
-    setDashData({ openPositions, perfStats })
-  }, [])
+  const [mobileTopTab, setMobileTopTab]       = useState('tasks')   // 'tasks' | 'discipline'
+  const [mobileBottomTab, setMobileBottomTab] = useState('goals')   // 'goals' | 'alerts'
 
   // gCache-backed fetch — survives navigate-away-and-back within 60s TTL
   const fetchDashboard = useCallback(async (force = false) => {
@@ -1074,6 +1272,8 @@ function LoggedInHome() {
       console.error(err)
     }
   }, [])
+
+  const onRefresh = useCallback(() => fetchDashboard(true), [fetchDashboard])
 
   useEffect(() => { fetchDashboard() }, [fetchDashboard])
 
@@ -1090,47 +1290,116 @@ function LoggedInHome() {
 
   return (
     <>
-    <div className="w-full px-3 sm:px-4 py-3 sm:py-4 bg-gray-50 dark:bg-gray-900 min-h-screen">
+    <div className="w-full px-3 sm:px-4 py-3 sm:py-4 pb-safe min-h-[100dvh] bg-gradient-to-br from-slate-100 via-gray-50 to-blue-50/30 dark:from-gray-950 dark:via-gray-950 dark:to-slate-900">
 
       {/* Greeting bar */}
-      <div className="flex items-center justify-between mb-3 px-1">
+      <div className="flex items-center justify-between mb-3 sm:mb-4 px-1 animate-fade-up">
         <div>
           <p className="text-sm font-semibold text-gray-800 dark:text-gray-200">
             {getGreeting()}, {user?.name?.split(' ')[0] || 'Trader'} 👋
           </p>
-          <p className="text-[11px] text-gray-400">{today}</p>
+          <p className="text-[11px] text-gray-400 mt-0.5">{today}</p>
         </div>
-        <div className="hidden lg:flex items-center gap-2">
-          <div className="w-1.5 h-1.5 bg-green-500 rounded-full animate-pulse" />
-          <span className="text-xs text-gray-400">Live</span>
+        {/* Live pill — visible on all sizes on mobile, shown as dot+text on desktop */}
+        <div className="flex items-center gap-1.5 bg-green-50 dark:bg-green-900/20 border border-green-200 dark:border-green-800/40 rounded-full px-2.5 py-1">
+          <div className="w-1.5 h-1.5 bg-green-500 rounded-full animate-pulse flex-shrink-0" />
+          <span className="text-[10px] font-semibold text-green-600 dark:text-green-400">Live</span>
         </div>
       </div>
 
-      {/* 3-Column Layout — stacks on mobile, side-by-side on lg */}
+      {/* 3-Column Layout — mobile: center then 2×2 panels grid; desktop: 3-col */}
       <div className="grid grid-cols-12 gap-3 sm:gap-4">
 
-        {/* LEFT — Daily Routine + Goals */}
-        <div className="col-span-12 lg:col-span-3 flex flex-col gap-3 sm:gap-4">
+        {/* CENTER — always first on mobile */}
+        <div className="col-span-12 lg:col-span-6 order-1 lg:order-2">
+          <CenterDashboard navigate={navigate} initData={initData} onRefresh={onRefresh} />
+        </div>
+
+        {/* LEFT column — desktop only: stacked 35/65 rows */}
+        <div className="hidden lg:grid col-span-3 order-1 gap-3 hp-side-left" style={{ gridTemplateRows: '35fr 65fr' }}>
           {initData
-            ? <><TaskBoard initData={initData.tasks} mindsetContent={initData.mindset?.content} /><MonthlyGoals initData={initData.goals} /></>
-            : <div className="flex flex-col gap-3"><div className="h-48 rounded-2xl bg-gray-100 dark:bg-gray-800 animate-pulse" /><div className="h-32 rounded-2xl bg-gray-100 dark:bg-gray-800 animate-pulse" /></div>
+            ? <>
+                <TaskBoard initData={initData.tasks} mindsetContent={initData.mindset?.content} />
+                <MonthlyGoals initData={initData.goals} />
+              </>
+            : <>
+                <div className="rounded-2xl bg-gray-100 dark:bg-gray-800 animate-pulse min-h-[120px]" />
+                <div className="rounded-2xl bg-gray-100 dark:bg-gray-800 animate-pulse min-h-[200px]" />
+              </>
           }
         </div>
 
-        {/* CENTER — Stats + Watchlist */}
-        <div className="col-span-12 lg:col-span-6">
-          <CenterDashboard navigate={navigate} initData={initData} onRefresh={() => fetchDashboard(true)} onDataReady={handleDashData} />
-        </div>
-
-        {/* RIGHT — Discipline Score + Open Positions + Alerts */}
-        <div className="col-span-12 lg:col-span-3 flex flex-col gap-3 sm:gap-4">
+        {/* RIGHT column — desktop only: stacked 35/65 rows */}
+        <div className="hidden lg:grid col-span-3 order-3 gap-3 hp-side-right" style={{ gridTemplateRows: '35fr 65fr' }}>
           {initData
             ? <DisciplineScore initData={initData.discipline} />
-            : <div className="h-48 rounded-2xl bg-gray-100 dark:bg-gray-800 animate-pulse" />
+            : <div className="rounded-2xl bg-gray-100 dark:bg-gray-800 animate-pulse min-h-[120px]" />
           }
-          <OpenPositionsPanel openPositions={dashData.openPositions} perfStats={dashData.perfStats} navigate={navigate} />
           <AlertsWidget initData={initData} />
         </div>
+
+        {/* MOBILE only — two independent toggled cards */}
+        <div className="col-span-12 lg:hidden order-2 flex flex-col gap-3">
+
+          {/* Top toggle: Daily Routine ↔ Discipline Score */}
+          <div className="flex flex-col gap-2">
+            <div className="flex items-center justify-between px-1">
+              <p className="text-[10px] font-bold uppercase tracking-widest text-gray-400">
+                {mobileTopTab === 'tasks' ? 'Daily Routine' : 'Discipline Score'}
+              </p>
+              <div className="flex items-center bg-gray-100 dark:bg-gray-800 rounded-lg p-0.5">
+                <button onClick={() => setMobileTopTab('tasks')}
+                  className={`px-2.5 py-0.5 rounded-md text-[10px] font-semibold transition-all whitespace-nowrap ${
+                    mobileTopTab === 'tasks'
+                      ? 'bg-white dark:bg-gray-700 text-gray-900 dark:text-white shadow-sm'
+                      : 'text-gray-500 dark:text-gray-400'
+                  }`}>Routine</button>
+                <button onClick={() => setMobileTopTab('discipline')}
+                  className={`px-2.5 py-0.5 rounded-md text-[10px] font-semibold transition-all whitespace-nowrap ${
+                    mobileTopTab === 'discipline'
+                      ? 'bg-white dark:bg-gray-700 text-gray-900 dark:text-white shadow-sm'
+                      : 'text-gray-500 dark:text-gray-400'
+                  }`}>Score</button>
+              </div>
+            </div>
+            {initData
+              ? mobileTopTab === 'tasks'
+                ? <TaskBoard initData={initData.tasks} mindsetContent={initData.mindset?.content} />
+                : <DisciplineScore initData={initData.discipline} />
+              : <div className="rounded-2xl bg-gray-100 dark:bg-gray-800 animate-pulse min-h-[180px]" />
+            }
+          </div>
+
+          {/* Bottom toggle: Goals ↔ Alerts */}
+          <div className="flex flex-col gap-2">
+            <div className="flex items-center justify-between px-1">
+              <p className="text-[10px] font-bold uppercase tracking-widest text-gray-400">
+                {mobileBottomTab === 'goals' ? 'Monthly Goals' : 'Alerts'}
+              </p>
+              <div className="flex items-center bg-gray-100 dark:bg-gray-800 rounded-lg p-0.5">
+                <button onClick={() => setMobileBottomTab('goals')}
+                  className={`px-2.5 py-0.5 rounded-md text-[10px] font-semibold transition-all whitespace-nowrap ${
+                    mobileBottomTab === 'goals'
+                      ? 'bg-white dark:bg-gray-700 text-gray-900 dark:text-white shadow-sm'
+                      : 'text-gray-500 dark:text-gray-400'
+                  }`}>Goals</button>
+                <button onClick={() => setMobileBottomTab('alerts')}
+                  className={`px-2.5 py-0.5 rounded-md text-[10px] font-semibold transition-all whitespace-nowrap ${
+                    mobileBottomTab === 'alerts'
+                      ? 'bg-white dark:bg-gray-700 text-gray-900 dark:text-white shadow-sm'
+                      : 'text-gray-500 dark:text-gray-400'
+                  }`}>Alerts</button>
+              </div>
+            </div>
+            {initData
+              ? mobileBottomTab === 'goals'
+                ? <MonthlyGoals initData={initData.goals} />
+                : <AlertsWidget initData={initData} />
+              : <div className="rounded-2xl bg-gray-100 dark:bg-gray-800 animate-pulse min-h-[180px]" />
+            }
+          </div>
+
+        </div>{/* end mobile panels wrapper */}
 
       </div>
     </div>
@@ -1143,7 +1412,7 @@ function LoggedInHome() {
 function HomePage() {
   const { user } = useAuth()
   return (
-    <div className="min-h-screen bg-gray-50 dark:bg-gray-900 transition-colors">
+    <div className="min-h-[100dvh] bg-gradient-to-br from-slate-100 via-gray-50 to-blue-50/30 dark:from-gray-950 dark:via-gray-950 dark:to-slate-900 transition-colors">
       {user ? <LoggedInHome /> : <LoggedOutHome />}
     </div>
   )

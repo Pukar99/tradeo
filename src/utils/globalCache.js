@@ -86,6 +86,7 @@ import {
   getResearchEligibility as _getResearchEligibility,
   getBatchPrices        as _getBatchPrices,
   getNepseChart         as _getNepseChart,
+  getIndexChart         as _getIndexChart,
   getChatSuggestions    as _getChatSuggestions,
   getPositions          as _getPositions,
   getTradeActions       as _getTradeActions,
@@ -141,6 +142,16 @@ export async function getNepseChart(range = '1y') {
   const cached = gCache.get(key)
   if (cached !== undefined) return cached
   const result = await _getNepseChart(range)
+  gCache.set(key, result, TTL.NEPSE_CHART)
+  return result
+}
+
+// NEPSE weekly chart via index-chart endpoint — 2Y window aggregated to weekly candles.
+export async function getNepseWeeklyChart() {
+  const key = 'nepse-chart:weekly-2y'
+  const cached = gCache.get(key)
+  if (cached !== undefined) return cached
+  const result = await _getIndexChart({ index_id: 12, timeframe: '2Y', aggregate: 'week' })
   gCache.set(key, result, TTL.NEPSE_CHART)
   return result
 }

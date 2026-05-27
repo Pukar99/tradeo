@@ -1,5 +1,6 @@
 // === LogsPage.jsx — logs page: Trades / Market / Audit / Stats tabs, shared toolbar, position fetch, chat refresh ===
 import { useState, useEffect, useCallback, useMemo, lazy, Suspense } from 'react'
+import { useSearchParams } from 'react-router-dom'
 import { getMarketJournals, autoCreateMarketJournal } from '../api'
 import { getBatchPrices, getPositions, clearEligibilityCache } from '../utils/globalCache'
 import { useChatRefresh } from '../utils/chatEvents'
@@ -28,7 +29,11 @@ export default function LogsPage() {
   const [positions,  setPositions]  = useState([])
   const [ltpMap,     setLtpMap]     = useState({})
   const [loading,    setLoading]    = useState(true)
-  const [activeTab,  setActiveTab]  = useState('trades')
+  const [searchParams] = useSearchParams()
+  const [activeTab,  setActiveTab]  = useState(() => {
+    const t = searchParams.get('tab')
+    return TABS.some(tab => tab.key === t) ? t : 'trades'
+  })
   const [error,      setError]      = useState(null)
 
   // Shared log view — persists across Trades + Market tabs

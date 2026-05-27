@@ -14,6 +14,32 @@ html {
   font-size: 110%;
 }
 
+/* ── iOS Safari: prevent input zoom (triggered when font-size < 16px) ──── */
+/* Sets a 16px minimum on all inputs so iOS doesn't zoom the viewport on focus */
+@media screen and (-webkit-min-device-pixel-ratio: 1) {
+  input[type="text"],
+  input[type="number"],
+  input[type="email"],
+  input[type="password"],
+  input[type="search"],
+  input[type="date"],
+  input[type="tel"],
+  select,
+  textarea {
+    font-size: 16px !important;
+  }
+}
+
+/* ── Tailwind backdrop-blur: add -webkit- prefix for iOS Safari < 15.4 ─── */
+/* Tailwind v3 does NOT output -webkit-backdrop-filter — add it globally */
+.backdrop-blur-sm  { -webkit-backdrop-filter: blur(4px);  }
+.backdrop-blur     { -webkit-backdrop-filter: blur(8px);  }
+.backdrop-blur-md  { -webkit-backdrop-filter: blur(12px); }
+.backdrop-blur-lg  { -webkit-backdrop-filter: blur(16px); }
+.backdrop-blur-xl  { -webkit-backdrop-filter: blur(24px); }
+.backdrop-blur-2xl { -webkit-backdrop-filter: blur(40px); }
+.backdrop-blur-3xl { -webkit-backdrop-filter: blur(64px); }
+
 /* ── BlockNote dark theme ───────────────────────────────────────────────── */
 .dark .bn-editor {
   background-color: #111827 !important;
@@ -52,6 +78,19 @@ html {
 }
 *::-webkit-scrollbar {
   display: none;
+}
+
+/* ── iOS safe area inset (notch / home bar) ─────────────────────────────── */
+.pb-safe {
+  padding-bottom: env(safe-area-inset-bottom, 0px);
+}
+.pt-safe {
+  padding-top: env(safe-area-inset-top, 0px);
+}
+
+/* ── Touch tap highlight: remove default gray flash on iOS ──────────────── */
+* {
+  -webkit-tap-highlight-color: transparent;
 }
 
 /* ─────────────────────────────────────────────────────────────────────────
@@ -160,18 +199,20 @@ html {
     inset 0 -1px 0 rgba(0, 0, 0, 0.30);
 }
 
-/* Liquid shimmer highlight on hover */
-.glass-fab:hover, .glass:hover {
-  box-shadow:
-    0 12px 40px rgba(0, 0, 0, 0.14),
-    inset 0 1.5px 0 rgba(255, 255, 255, 1),
-    inset 0 -1px 0 rgba(0, 0, 0, 0.05);
-}
-.dark .glass-fab:hover, .dark .glass:hover {
-  box-shadow:
-    0 12px 40px rgba(0, 0, 0, 0.60),
-    inset 0 1.5px 0 rgba(255, 255, 255, 0.13),
-    inset 0 -1px 0 rgba(0, 0, 0, 0.35);
+/* Liquid shimmer highlight on hover — pointer devices only */
+@media (hover: hover) and (pointer: fine) {
+  .glass-fab:hover, .glass:hover {
+    box-shadow:
+      0 12px 40px rgba(0, 0, 0, 0.14),
+      inset 0 1.5px 0 rgba(255, 255, 255, 1),
+      inset 0 -1px 0 rgba(0, 0, 0, 0.05);
+  }
+  .dark .glass-fab:hover, .dark .glass:hover {
+    box-shadow:
+      0 12px 40px rgba(0, 0, 0, 0.60),
+      inset 0 1.5px 0 rgba(255, 255, 255, 0.13),
+      inset 0 -1px 0 rgba(0, 0, 0, 0.35);
+  }
 }
 
 /* keep .no-scrollbar for explicit use */
@@ -261,3 +302,139 @@ html {
 .animate-soft-bounce {
   animation: softBounce 1s ease-in-out infinite;
 }
+
+/* ═══════════════════════════════════════════════════════════════════════════
+   HOMEPAGE INTERACTIVE CARD EFFECTS — trader-grade hover polish
+   All transitions: 220ms ease-out (snappy but not jarring)
+   No JavaScript. Pure CSS. GPU-composited (transform + opacity only).
+   ═══════════════════════════════════════════════════════════════════════════ */
+
+/* ── Primary dashboard card — lift + shadow bloom + top shimmer ─────────── */
+.hp-card {
+  cursor: default;
+  position: relative;
+  overflow: hidden;
+}
+.hp-card::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(135deg, rgba(255,255,255,0.12) 0%, transparent 60%);
+  opacity: 0;
+  pointer-events: none;
+  z-index: 1;
+  border-radius: inherit;
+}
+
+/* ── Stat cards ─────────────────────────────────────────────────────────── */
+.hp-stat {
+  cursor: default;
+  position: relative;
+  overflow: hidden;
+}
+.hp-stat::after {
+  content: '';
+  position: absolute;
+  bottom: 0; left: 0; right: 0;
+  height: 2px;
+  background: linear-gradient(90deg, #3b82f6, #22c55e);
+  transform: scaleX(0);
+  transform-origin: left;
+  border-radius: 0 0 1px 1px;
+}
+
+/* ── Watchlist grid item ─────────────────────────────────────────────────── */
+.hp-watch-item {
+  position: relative;
+}
+.hp-watch-item::before {
+  content: '';
+  position: absolute;
+  left: 0; top: 20%; bottom: 20%;
+  width: 2px;
+  background: #3b82f6;
+  border-radius: 0 2px 2px 0;
+  transform: scaleY(0);
+  transform-origin: center;
+}
+
+/* ── Alert row ───────────────────────────────────────────────────────────── */
+.hp-alert-row {
+  transition: background 160ms ease-out;
+}
+
+/* ── Hover effects: pointer devices only (no sticky-hover on iOS touch) ─── */
+@media (hover: hover) and (pointer: fine) {
+  .hp-card {
+    transition: transform 220ms ease-out, box-shadow 220ms ease-out;
+  }
+  .hp-card::before {
+    transition: opacity 220ms ease-out;
+  }
+  .hp-card:hover {
+    transform: translateY(-3px);
+    box-shadow:
+      0 16px 40px rgba(0, 0, 0, 0.10),
+      0 4px 12px  rgba(0, 0, 0, 0.06),
+      inset 0 1px 0 rgba(255, 255, 255, 0.85);
+  }
+  .hp-card:hover::before { opacity: 1; }
+  .dark .hp-card:hover {
+    box-shadow:
+      0 16px 40px rgba(0, 0, 0, 0.50),
+      0 4px 12px  rgba(0, 0, 0, 0.30),
+      inset 0 1px 0 rgba(255, 255, 255, 0.10);
+  }
+
+  .hp-stat {
+    transition: transform 200ms ease-out, box-shadow 200ms ease-out, border-color 200ms ease-out;
+  }
+  .hp-stat::after {
+    transition: transform 260ms cubic-bezier(0.22, 1, 0.36, 1);
+  }
+  .hp-stat:hover {
+    transform: translateY(-2px);
+    box-shadow:
+      0 8px 24px rgba(59, 130, 246, 0.12),
+      0 2px 8px  rgba(0, 0, 0, 0.06),
+      inset 0 1px 0 rgba(255, 255, 255, 0.85);
+  }
+  .hp-stat:hover::after { transform: scaleX(1); }
+  .dark .hp-stat:hover {
+    box-shadow:
+      0 8px 24px rgba(59, 130, 246, 0.20),
+      0 2px 8px  rgba(0, 0, 0, 0.35),
+      inset 0 1px 0 rgba(255, 255, 255, 0.08);
+  }
+
+  .hp-watch-item {
+    transition: background 180ms ease-out, padding-left 180ms ease-out;
+  }
+  .hp-watch-item::before {
+    transition: transform 200ms cubic-bezier(0.22, 1, 0.36, 1);
+  }
+  .hp-watch-item:hover {
+    background: rgba(255,255,255,0.45) !important;
+    padding-left: 14px;
+  }
+  .hp-watch-item:hover::before { transform: scaleY(1); }
+  .dark .hp-watch-item:hover { background: rgba(255,255,255,0.06) !important; }
+
+  .hp-alert-row {
+    transition: background 160ms ease-out, transform 160ms ease-out;
+  }
+  .hp-alert-row:hover { transform: translateX(2px); }
+}
+
+/* ── Drawdown banner — subtle shake on mount ────────────────────────────── */
+@keyframes drawdownShake {
+  0%, 100% { transform: translateX(0); }
+  20%       { transform: translateX(-2px); }
+  40%       { transform: translateX(2px); }
+  60%       { transform: translateX(-1px); }
+  80%       { transform: translateX(1px); }
+}
+.hp-drawdown {
+  animation: drawdownShake 0.5s ease-out 0.6s both;
+}
+

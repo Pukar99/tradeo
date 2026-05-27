@@ -44,22 +44,23 @@ function Ring({ score, size = 88 }) {
   )
 }
 
-function DimBar({ label, score, extra }) {
+function DimBar({ label, score, extra, noData }) {
   return (
     <div className="space-y-1">
       <div className="flex items-center justify-between">
-        <div className="flex items-center gap-1.5">
-          <span className="text-[10px] text-gray-500 dark:text-gray-400">{label}</span>
-          {extra && <span className="text-[10px] text-gray-400 dark:text-gray-600">({extra})</span>}
+        <div className="flex items-center gap-1">
+          <span className="text-[10px] text-gray-500 dark:text-gray-400 leading-none">{label}</span>
+          {extra && <span className="text-[9px] text-gray-400 dark:text-gray-600">({extra})</span>}
         </div>
-        <div className="flex items-center gap-1.5">
-          <span className="text-[10px] font-semibold text-gray-700 dark:text-gray-200">{score}%</span>
-        </div>
+        {noData
+          ? <span className="text-[9px] text-gray-400 dark:text-gray-600 italic">No data</span>
+          : <span className="text-[10px] font-semibold text-gray-700 dark:text-gray-200 tabular-nums">{score}%</span>
+        }
       </div>
-      <div className="h-1.5 bg-gray-100 dark:bg-gray-800 rounded-full overflow-hidden">
+      <div className="h-1 bg-gray-100 dark:bg-gray-700 rounded-full overflow-hidden">
         <div
-          className={`h-full rounded-full transition-all duration-700 ${BAR_COLOR(score)}`}
-          style={{ width: `${score}%` }}
+          className={`h-full rounded-full transition-all duration-700 ${noData ? 'bg-gray-300 dark:bg-gray-600' : BAR_COLOR(score)}`}
+          style={{ width: noData ? '0%' : `${score}%` }}
         />
       </div>
     </div>
@@ -86,7 +87,7 @@ function DisciplineScore({ initData }) {
   }, [initData]) // re-sync when parent passes fresh data
 
   if (error) return (
-    <div className="bg-white dark:bg-gray-900 rounded-2xl border border-gray-100 dark:border-gray-800 p-4 flex flex-col items-center justify-center gap-3 min-h-[120px]">
+    <div className="bg-white/70 dark:bg-gray-900/60 backdrop-blur-md rounded-2xl border border-white/60 dark:border-white/10 shadow-sm p-4 flex flex-col items-center justify-center gap-3 h-full">
       <p className="text-[11px] text-red-400">{error}</p>
       <button
         onClick={load}
@@ -98,7 +99,7 @@ function DisciplineScore({ initData }) {
   )
 
   if (loading) return (
-    <div className="bg-white dark:bg-gray-900 rounded-2xl border border-gray-100 dark:border-gray-800 p-4 space-y-3 animate-pulse">
+    <div className="bg-white/70 dark:bg-gray-900/60 backdrop-blur-md rounded-2xl border border-white/60 dark:border-white/10 shadow-sm p-4 space-y-3 animate-pulse h-full">
       <div className="h-3 bg-gray-100 dark:bg-gray-800 rounded w-1/2" />
       <div className="flex gap-4">
         <div className="w-20 h-20 rounded-full bg-gray-100 dark:bg-gray-800 flex-shrink-0" />
@@ -112,15 +113,15 @@ function DisciplineScore({ initData }) {
   const score = data?.finalScore ?? data?.monthlyScore ?? 0
   const bd = data?.breakdown || {}
   const dims = [
-    { key: 'taskCompletion',    extra: null },
-    { key: 'journalConsistency',extra: null },
-    { key: 'winRate',           extra: bd.winRate?.raw != null ? `${bd.winRate.raw}% WR` : null },
-    { key: 'slUsage',           extra: null },
-    { key: 'rrConsistency',     extra: bd.rrConsistency?.raw != null ? `${bd.rrConsistency.raw}R avg` : null },
+    { key: 'taskCompletion',    extra: null,                                                                   noData: false },
+    { key: 'journalConsistency',extra: null,                                                                   noData: false },
+    { key: 'winRate',           extra: bd.winRate?.raw      != null ? `${bd.winRate.raw}% WR`       : null,   noData: bd.winRate?.raw      == null && bd.winRate?.score      === 0 },
+    { key: 'slUsage',           extra: null,                                                                   noData: false },
+    { key: 'rrConsistency',     extra: bd.rrConsistency?.raw != null ? `${bd.rrConsistency.raw}R avg` : null, noData: bd.rrConsistency?.raw == null && bd.rrConsistency?.score === 0 },
   ]
 
   return (
-    <div className="bg-white dark:bg-gray-900 rounded-2xl border border-gray-100 dark:border-gray-800 p-4 flex flex-col gap-3">
+    <div className="hp-card bg-white/70 dark:bg-gray-900/60 backdrop-blur-md rounded-2xl border border-white/60 dark:border-white/10 shadow-sm p-4 pb-3 flex flex-col gap-3 h-full overflow-y-auto">
 
       {/* Header */}
       <div className="flex items-center justify-between">
@@ -128,7 +129,7 @@ function DisciplineScore({ initData }) {
           Discipline Score
         </h3>
         {data?.streak > 0 && (
-          <span className="text-[10px] text-orange-400 font-medium">
+          <span className="text-[10px] text-orange-400 dark:text-orange-300 font-medium">
             🔥 {data.streak}d streak
           </span>
         )}
@@ -144,7 +145,7 @@ function DisciplineScore({ initData }) {
         </div>
 
         <div className="flex-1 space-y-2.5 pt-1">
-          {dims.map(({ key, extra }) => {
+          {dims.map(({ key, extra, noData }) => {
             const dim = bd[key]
             if (!dim) return null
             return (
@@ -152,8 +153,8 @@ function DisciplineScore({ initData }) {
                 key={key}
                 label={dim.label}
                 score={dim.score}
-                weight={dim.weight}
                 extra={extra}
+                noData={noData}
               />
             )
           })}
@@ -162,18 +163,12 @@ function DisciplineScore({ initData }) {
 
       {/* Streak bonus chip */}
       {data?.streakBonus > 0 && (
-        <div className="flex items-center justify-between px-2.5 py-1.5 bg-orange-50 dark:bg-orange-900/20 rounded-xl">
-          <span className="text-[10px] text-orange-500 font-medium">Streak bonus</span>
-          <span className="text-[10px] text-orange-500 font-semibold">+{data.streakBonus} pts</span>
+        <div className="flex items-center justify-between px-2.5 py-1.5 bg-orange-50 dark:bg-orange-900/20 rounded-xl mt-auto">
+          <span className="text-[10px] text-orange-500 dark:text-orange-400 font-medium">Streak bonus</span>
+          <span className="text-[10px] text-orange-500 dark:text-orange-400 font-semibold">+{data.streakBonus} pts</span>
         </div>
       )}
 
-      {/* Impact tag */}
-      {data?.impactTag && (
-        <p className="text-[10px] text-gray-400 dark:text-gray-500 leading-snug border-t border-gray-50 dark:border-gray-800 pt-2">
-          {data.impactTag}
-        </p>
-      )}
     </div>
   )
 }
