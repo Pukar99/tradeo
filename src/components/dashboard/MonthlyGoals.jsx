@@ -1,3 +1,6 @@
+// =============================================================================
+// MonthlyGoals.jsx — goal list with add / edit / delete / toggle completion
+// =============================================================================
 import { useState, useEffect, useCallback } from 'react'
 import { getGoals, addGoal, updateGoal, deleteGoal } from '../../api'
 import { useLanguage } from '../../context/LanguageContext'
@@ -9,6 +12,7 @@ function MonthlyGoals({ initData }) {
   const { onContextMenu, ContextMenuPortal } = useContextMenu()
   const [goals, setGoals] = useState(initData || [])
   const [loading, setLoading] = useState(!initData)
+  const [mutateError, setMutateError] = useState(null)
   const [showForm, setShowForm] = useState(false)
   const [form, setForm] = useState({ title: '', description: '', target_date: '' })
   const [adding, setAdding] = useState(false)
@@ -39,24 +43,27 @@ function MonthlyGoals({ initData }) {
   const handleAdd = async (e) => {
     e.preventDefault()
     setAdding(true)
+    setMutateError(null)
     try {
       const res = await addGoal(form)
       setGoals(prev => [res.data, ...prev])
       setForm({ title: '', description: '', target_date: '' })
       setShowForm(false)
     } catch (err) {
-      console.error(err)
+      setMutateError('Failed to add goal')
     } finally {
       setAdding(false)
     }
   }
 
   const handleToggle = async (goal) => {
+    // Optimistic update — revert on failure
+    setGoals(prev => prev.map(g => g.id === goal.id ? { ...g, completed: !g.completed } : g))
     try {
       await updateGoal(goal.id, !goal.completed)
-      setGoals(prev => prev.map(g => g.id === goal.id ? { ...g, completed: !g.completed } : g))
-    } catch (err) {
-      console.error(err)
+    } catch {
+      setGoals(prev => prev.map(g => g.id === goal.id ? { ...g, completed: goal.completed } : g))
+      setMutateError('Failed to update goal')
     }
   }
 
@@ -64,8 +71,8 @@ function MonthlyGoals({ initData }) {
     try {
       await deleteGoal(id)
       setGoals(prev => prev.filter(g => g.id !== id))
-    } catch (err) {
-      console.error(err)
+    } catch {
+      setMutateError('Failed to delete goal')
     }
   }
 
@@ -82,12 +89,13 @@ function MonthlyGoals({ initData }) {
   const handleSaveEdit = async (id) => {
     if (!editForm.title.trim()) return
     setSaving(true)
+    setMutateError(null)
     try {
       const res = await updateGoal(id, editForm)
       setGoals(prev => prev.map(g => g.id === id ? res.data : g))
       setEditingId(null)
-    } catch (err) {
-      console.error(err)
+    } catch {
+      setMutateError('Failed to save edit')
     } finally {
       setSaving(false)
     }
@@ -181,6 +189,13 @@ function MonthlyGoals({ initData }) {
             </div>
           </form>
         </div>
+      )}
+
+      {/* Mutate error */}
+      {mutateError && (
+        <p className="mx-3 mb-1 text-[10px] text-red-500 bg-red-50 dark:bg-red-950 px-2 py-1 rounded-lg">
+          {mutateError}
+        </p>
       )}
 
       {/* Goal list */}

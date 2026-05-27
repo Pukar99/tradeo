@@ -1,13 +1,20 @@
-// ── Global client-side cache ───────────────────────────────────────────────────
-// Singleton module — one import = one shared store across all components.
-// Prevents N components each fetching the same data independently.
-//
-// Usage:
-//   import { gCache } from '../utils/globalCache'
-//   const hit = gCache.get('symbols')
-//   if (hit) return hit
-//   const data = await getMarketSymbols()
-//   gCache.set('symbols', data, 60 * 60_000)
+// =============================================================================
+// globalCache.js — Singleton client-side cache
+// =============================================================================
+// Sections:
+//   1. Cache Core       — gCache object (get/set/has/del/delPrefix/clear)
+//   2. TTL Constants    — named TTLs for every cached endpoint
+//   3. Cached Wrappers  — drop-in replacements for raw API functions
+//   4. Invalidators     — clearPositionsCache, clearWatchlistCache, clearUserCache, clearEligibilityCache
+//   5. Cleaner Registry — registerCacheCleaner / unregisterCacheCleaner
+// =============================================================================
+// Singleton: one import = one shared store. Prevents N components each fetching
+// the same data independently on mount.
+// =============================================================================
+
+// =============================================================================
+// 1. CACHE CORE
+// =============================================================================
 
 const _store = new Map()
 
@@ -47,7 +54,9 @@ export const gCache = {
   clear() { _store.clear() },
 }
 
-// ── Pre-defined TTLs ───────────────────────────────────────────────────────────
+// =============================================================================
+// 2. TTL CONSTANTS
+// =============================================================================
 export const TTL = {
   SYMBOLS:      60 * 60_000,  // 1 hour — symbol list is stable
   PROFILE:      10 * 60_000,  // 10 min — profile rarely changes
@@ -66,22 +75,26 @@ export const TTL = {
   FEED:         30 * 60_000,  // 30 min — IPOs and news change infrequently
 }
 
-// ── Cached wrappers for the most-fetched endpoints ────────────────────────────
+// =============================================================================
+// 3. CACHED WRAPPERS
+// =============================================================================
 // Drop-in replacements — same return shape as the raw API functions.
 
-import { getMarketSymbols as _getMarketSymbols } from '../api'
-import { getProfile       as _getProfile       } from '../api'
-import { getResearchEligibility as _getResearchEligibility } from '../api'
-import { getBatchPrices   as _getBatchPrices   } from '../api'
-import { getNepseChart    as _getNepseChart    } from '../api'
-import { getChatSuggestions as _getChatSuggestions } from '../api'
-import { getPositions     as _getPositions     } from '../api'
-import { getTradeActions  as _getTradeActions  } from '../api'
-import { getWatchlist     as _getWatchlist     } from '../api'
-import { getMarketDates   as _getMarketDates   } from '../api'
-import { getDayFull       as _getDayFull       } from '../api'
-import { getIPOs          as _getIPOs          } from '../api'
-import { getMarketNews    as _getMarketNews    } from '../api'
+import {
+  getMarketSymbols      as _getMarketSymbols,
+  getProfile            as _getProfile,
+  getResearchEligibility as _getResearchEligibility,
+  getBatchPrices        as _getBatchPrices,
+  getNepseChart         as _getNepseChart,
+  getChatSuggestions    as _getChatSuggestions,
+  getPositions          as _getPositions,
+  getTradeActions       as _getTradeActions,
+  getWatchlist          as _getWatchlist,
+  getMarketDates        as _getMarketDates,
+  getDayFull            as _getDayFull,
+  getIPOs               as _getIPOs,
+  getMarketNews         as _getMarketNews,
+} from '../api'
 
 export async function getMarketSymbols() {
   const cached = gCache.get('symbols')
@@ -152,6 +165,10 @@ export async function getPositions(status) {
   gCache.set(key, result, TTL.POSITIONS)
   return result
 }
+
+// =============================================================================
+// 4. INVALIDATORS
+// =============================================================================
 
 // Call after any trade write (new/close/partial-exit) so next read is fresh.
 export function clearPositionsCache() {
@@ -232,6 +249,10 @@ export async function getDashboardInit(fetchFn, force = false) {
   gCache.set('dashboard', result, TTL.DASHBOARD)
   return result
 }
+
+// =============================================================================
+// 5. CLEANER REGISTRY
+// =============================================================================
 
 // Registry for module-local caches that want to be flushed on login/logout
 // without globalCache having to import those modules (avoids pulling lazy

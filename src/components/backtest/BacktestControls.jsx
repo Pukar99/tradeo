@@ -1,3 +1,5 @@
+// === BacktestControls.jsx — playback toolbar (play/pause/step/speed/progress) ===
+
 const SPEEDS = ['0.5', '1', '2', '5', '10']
 
 // SVG icons — no emoji, always visible on all OS/fonts

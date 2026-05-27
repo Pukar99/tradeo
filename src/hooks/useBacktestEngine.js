@@ -1,12 +1,20 @@
+// =============================================================================
+// useBacktestEngine.js — Backtest candle-by-candle playback engine
+// =============================================================================
+// Sections:
+//   1. Refs             — playing, processing, speed, timer, cursor, candles
+//   2. processCandle    — SL/TP checks, settlement, cursor advance
+//   3. Public API       — play, pause, stepForward, stepBack, setSpeed
+//   4. Cleanup          — unmount timer teardown
+// =============================================================================
+// All mutable state is in refs to avoid stale closures inside setInterval.
+// processingRef guards against concurrent processCandle calls from the interval.
+// SL takes priority over TP: if both hit on the same candle, SL closes first.
+// =============================================================================
+
 import { useRef, useCallback, useEffect } from 'react'
 import { btExitOrder, btLogBehavior } from '../api/backtest'
 
-/**
- * Backtest playback engine.
- * Handles candle-by-candle advancement, SL/TP checks, T+2 settlement.
- *
- * Uses refs for all mutable state to avoid stale closures inside setInterval.
- */
 export function useBacktestEngine({
   session,
   currentScript,
@@ -35,7 +43,16 @@ export function useBacktestEngine({
   sessionRef.current = session
   scriptRef.current  = currentScript
 
-  // ── Internal pause ────────────────────────────────────────────────────────────
+  // =============================================================================
+  // 1. REFS — all mutable playback state
+  // =============================================================================
+
+  // (declared above — keep refs section header here for readability)
+
+  // =============================================================================
+  // 2. PROCESS CANDLE
+  // =============================================================================
+
   const pauseInternal = useCallback(() => {
     playingRef.current = false
     if (timerRef.current) { clearInterval(timerRef.current); timerRef.current = null }
@@ -248,7 +265,10 @@ export function useBacktestEngine({
     processingRef.current = false
   }, [settlePositions, advanceCursor, closePositionLocal, onSLBreach, onTPHit, onDataEnd, pauseInternal])
 
-  // ── Public: Play ──────────────────────────────────────────────────────────────
+  // =============================================================================
+  // 3. PUBLIC API
+  // =============================================================================
+
   const play = useCallback(() => {
     if (playingRef.current) return
     if (cursorRef.current >= candlesRef.current.length) return
@@ -265,13 +285,11 @@ export function useBacktestEngine({
     }, ms)
   }, [processCandle, pauseInternal, onDataEnd])
 
-  // ── Public: Pause ─────────────────────────────────────────────────────────────
   const pause = useCallback(() => {
     playingRef.current = false
     if (timerRef.current) { clearInterval(timerRef.current); timerRef.current = null }
   }, [])
 
-  // ── Public: Step forward (manual mode) ───────────────────────────────────────
   const stepForward = useCallback(async () => {
     if (playingRef.current) return
     const idx    = cursorRef.current
@@ -280,7 +298,6 @@ export function useBacktestEngine({
     await processCandle(candle, idx)
   }, [processCandle, onDataEnd])
 
-  // ── Public: Step back (visual review — no DB change) ─────────────────────────
   const stepBack = useCallback(() => {
     if (playingRef.current) return
     const idx = cursorRef.current
@@ -291,7 +308,6 @@ export function useBacktestEngine({
     advanceCursor(newIndex, candle.date)
   }, [advanceCursor])
 
-  // ── Public: Set speed ─────────────────────────────────────────────────────────
   const setSpeed = useCallback((s) => {
     speedRef.current = parseFloat(s)
     if (playingRef.current) {
@@ -305,7 +321,10 @@ export function useBacktestEngine({
     }
   }, [pause, play])
 
-  // ── Cleanup on unmount ────────────────────────────────────────────────────────
+  // =============================================================================
+  // 4. CLEANUP
+  // =============================================================================
+
   useEffect(() => {
     return () => {
       if (timerRef.current)      { clearInterval(timerRef.current);  timerRef.current = null }

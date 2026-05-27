@@ -1,4 +1,17 @@
+// =============================================================================
+// PriceAlertToast.jsx — Price alert toast notifications
+// =============================================================================
+// Sections:
+//   1. Toast     — single dismissible toast (auto-dismisses after 8s)
+//   2. Container — stacks toasts in bottom-right corner
+//   3. Hook      — useAlertToasts: queue management (add / dismiss)
+// =============================================================================
+
 import { useState, useEffect, useCallback } from 'react'
+
+// =============================================================================
+// 1. TOAST
+// =============================================================================
 
 // Single toast — auto-dismisses after 8s
 function Toast({ alert, onDismiss }) {
@@ -22,10 +35,10 @@ function Toast({ alert, onDismiss }) {
           {alert.symbol} — Alert Triggered
         </p>
         <p className="text-[10px] text-gray-500 dark:text-gray-400 mt-0.5 leading-snug">
-          LTP <span className="font-semibold text-gray-800 dark:text-gray-200">Rs.{alert.ltp.toLocaleString()}</span>
+          LTP <span className="font-semibold text-gray-800 dark:text-gray-200">Rs.{parseFloat(alert.ltp).toLocaleString()}</span>
           {' '}{isAbove ? 'reached' : 'near'} your target{' '}
           <span className={`font-semibold ${isAbove ? 'text-emerald-500' : 'text-amber-500'}`}>
-            Rs.{alert.price_alert.toLocaleString()}
+            Rs.{parseFloat(alert.price_alert).toLocaleString()}
           </span>
         </p>
         {alert.pct_change != null && (
@@ -48,7 +61,10 @@ function Toast({ alert, onDismiss }) {
   )
 }
 
-// Container — stacks toasts in bottom-right corner
+// =============================================================================
+// 2. CONTAINER
+// =============================================================================
+
 export function PriceAlertContainer({ alerts, onDismiss }) {
   if (!alerts.length) return null
 
@@ -63,7 +79,10 @@ export function PriceAlertContainer({ alerts, onDismiss }) {
   )
 }
 
-// Hook for managing toast queue
+// =============================================================================
+// 3. HOOK
+// =============================================================================
+
 export function useAlertToasts() {
   const [toasts, setToasts] = useState([])
 

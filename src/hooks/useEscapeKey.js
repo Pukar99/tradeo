@@ -1,10 +1,9 @@
+// =============================================================================
+// useEscapeKey.js — Calls handler when Escape is pressed. Null-safe.
+// =============================================================================
+
 import { useEffect } from 'react'
 
-/**
- * Calls `handler` when the Escape key is pressed.
- * Safely handles null/undefined handler.
- * Usage: useEscapeKey(onClose)
- */
 export function useEscapeKey(handler) {
   useEffect(() => {
     if (!handler) return

@@ -1,11 +1,19 @@
+// =============================================================================
+// useBacktestSession.js — Active backtest session state manager
+// =============================================================================
+// Sections:
+//   1. State & Refs         — session, script, candles, cursor
+//   2. Local Mutations      — updatePositionLocal, addPositionLocal, closePositionLocal
+//   3. Script / Session Ops — switchToScript, loadSession, advanceCursor, settlePositions
+//   4. Lifecycle Callbacks  — onSessionStarted, onSessionEnded
+// =============================================================================
+
 import { useState, useCallback, useRef } from 'react'
+import { apiError } from '../utils/format'
 import { btGetSession, btGetOHLCV, btUpdateSession, btSettleOrder } from '../api/backtest'
 
-/**
- * Manages the active backtest session state.
- * Handles: session load/restore, OHLCV fetch per script, cursor persistence,
- * and local state mutations after orders.
- */
+// Manages the active backtest session: load/restore, OHLCV per script,
+// cursor persistence, and local state mutations after orders.
 export function useBacktestSession() {
   const [session, setSession]               = useState(null)
   const [currentScript, setCurrentScript]   = useState(null)
@@ -14,11 +22,14 @@ export function useBacktestSession() {
   const [loading, setLoading]               = useState(false)
   const [error, setError]                   = useState('')
 
-  // Refs to break circular/stale closure issues
+  // =============================================================================
+  // 1. STATE & REFS
+  // =============================================================================
+
+  // Refs shadow state — used inside callbacks to avoid stale closures
   const sessionRef       = useRef(null)
   const currentScriptRef = useRef(null)
 
-  // Keep refs in sync with state
   const setSessionSynced = useCallback((val) => {
     const resolved = typeof val === 'function' ? val(sessionRef.current) : val
     sessionRef.current = resolved
@@ -31,7 +42,10 @@ export function useBacktestSession() {
     setCurrentScript(resolved)
   }, [])
 
-  // ── Local position state mutations ────────────────────────────────────────────
+  // =============================================================================
+  // 2. LOCAL MUTATIONS
+  // =============================================================================
+
   const updatePositionLocal = useCallback((orderId, changes) => {
     setCurrentScriptSynced(prev => {
       if (!prev) return prev
@@ -73,8 +87,11 @@ export function useBacktestSession() {
     setSessionSynced(prev => ({ ...prev, available_capital: newCapital }))
   }, [setSessionSynced])
 
-  // ── Switch to a different script ──────────────────────────────────────────────
-  // Uses ref for session to avoid stale closure — safe to call from loadSession
+  // =============================================================================
+  // 3. SCRIPT / SESSION OPS
+  // =============================================================================
+
+  // Uses sessionRef to avoid stale closure — safe to call from loadSession
   const switchToScript = useCallback(async (sess, script) => {
     const sessToUse = sess || sessionRef.current
     if (!sessToUse || !script) return
@@ -118,14 +135,13 @@ export function useBacktestSession() {
       }
     } catch (err) {
       if (err.response?.status !== 404) {
-        setError(err.response?.data?.message || 'Failed to load session')
+        setError(apiError(err, 'Failed to load session'))
       }
     } finally {
       setLoading(false)
     }
   }, [setSessionSynced, switchToScript])
 
-  // ── Called by engine each tick to advance cursor ──────────────────────────────
   const advanceCursor = useCallback((newIndex, newDate) => {
     setCursorIndex(newIndex)
     setCurrentScriptSynced(prev => {
@@ -145,7 +161,6 @@ export function useBacktestSession() {
     }
   }, [setCurrentScriptSynced])
 
-  // ── Mark positions as settled ─────────────────────────────────────────────────
   const settlePositions = useCallback(async (currentDate) => {
     const script = currentScriptRef.current
     const sess   = sessionRef.current
@@ -164,7 +179,10 @@ export function useBacktestSession() {
     }
   }, [updatePositionLocal])
 
-  // ── Session started (from setup panel) ───────────────────────────────────────
+  // =============================================================================
+  // 4. LIFECYCLE CALLBACKS
+  // =============================================================================
+
   const onSessionStarted = useCallback(async (newSession) => {
     setSessionSynced(newSession)
     const firstScript = newSession.scripts?.[0]
@@ -173,7 +191,6 @@ export function useBacktestSession() {
     }
   }, [setSessionSynced, switchToScript])
 
-  // ── Session ended ─────────────────────────────────────────────────────────────
   const onSessionEnded = useCallback(() => {
     setSessionSynced(null)
     setCurrentScriptSynced(null)

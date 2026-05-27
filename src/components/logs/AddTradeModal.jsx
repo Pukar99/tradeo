@@ -1,3 +1,5 @@
+// === AddTradeModal.jsx — new/add trade modal: broker paste, SL/TP auto-suggest, conflict detection, journal fields ===
+
 import { useState, useEffect, useCallback, useMemo } from 'react'
 import { useEscapeKey } from '../../hooks/useEscapeKey'
 import { newPosition, addToPosition, getSetupTypes } from '../../api'
@@ -285,7 +287,6 @@ export default function AddTradeModal({ onClose, onSaved, existingPosition }) {
       onSaved(res.data)
     } catch (err) {
       const msg = err.response?.data?.message || err.response?.data?.error || err.message || 'Failed to save trade'
-      console.error('[AddTradeModal] save failed:', err.response?.status, msg, err.response?.data)
       setError(msg)
     } finally {
       setSaving(false)
@@ -563,7 +564,7 @@ export default function AddTradeModal({ onClose, onSaved, existingPosition }) {
             </div>
             <div className="text-center">
               <button type="button" disabled={saving}
-                onClick={e => handleSubmit(null, true)}
+                onClick={() => handleSubmit(null, true)}
                 className="w-full py-2 text-[11px] text-gray-400 dark:text-gray-600 hover:text-gray-500 dark:hover:text-gray-400 transition-colors disabled:opacity-50 min-h-[36px]">
                 Save without journal →
               </button>

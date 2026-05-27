@@ -1,3 +1,6 @@
+// =============================================================================
+// AIChat.jsx — AI chat panel (floating + full-page), SSE streaming, voice input
+// =============================================================================
 import { useState, useEffect, useRef } from 'react'
 import { useAuth } from '../context/AuthContext'
 import { useTheme } from '../context/ThemeContext'
@@ -1078,7 +1081,8 @@ function AIChat({ isFullPage = false, onClose }) {
       const ctrl = new AbortController()
       abortCtrlRef.current = ctrl
 
-      const token = localStorage.getItem('token')
+      let token = null
+      try { token = localStorage.getItem('token') } catch { /* private browsing */ }
       const response = await fetch(`${BASE_URL}/api/chat/agent`, {
         method: 'POST',
         signal: ctrl.signal,

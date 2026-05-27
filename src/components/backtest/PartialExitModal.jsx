@@ -1,3 +1,5 @@
+// === PartialExitModal.jsx — partial exit modal (exit qty, price, reason, P&L preview) ===
+
 import { useState, useEffect, useCallback } from 'react'
 import { btPartialExit } from '../../api/backtest'
 
@@ -17,7 +19,7 @@ const REASONS = ['MANUAL', 'TP_HIT', 'SL_HIT', 'OTHER']
 
 export default function PartialExitModal({ session, order, candle, onClose, onExited }) {
   const ep       = parseFloat(order.entry_price)
-  const remQty   = order.remaining_quantity ?? order.quantity
+  const remQty   = parseFloat(order.remaining_quantity ?? order.quantity)
   const [exitQty,   setExitQty]   = useState(String(Math.floor(remQty / 2)))
   const [exitPrice, setExitPrice] = useState(String(candle?.close || ''))
   const [reason,    setReason]    = useState('MANUAL')

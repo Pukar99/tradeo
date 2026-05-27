@@ -1,3 +1,5 @@
+// === ActionHistory.jsx — timeline of trade actions (buy/add/partial/close/reversal cards with context menu) ===
+
 import { useContextMenu } from '../ContextMenu'
 import { fmt } from '../../utils/format'
 

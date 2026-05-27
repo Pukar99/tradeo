@@ -1,3 +1,4 @@
+// === ProfilePage.jsx — profile page: hero banner, stat tabs (overview/trading/discipline/research), edit form, avatar upload, password change ===
 import { useState, useEffect, useRef, useCallback } from 'react'
 import { useAuth } from '../context/AuthContext'
 import { useNavigate } from 'react-router-dom'
@@ -64,7 +65,6 @@ function ProfilePage() {
         trading_since: res.data.user.trading_since || ''
       })
     } catch (err) {
-      console.error('fetchProfile error:', err)
       setFetchError(err.response?.data?.message || 'Failed to load profile. Please try again.')
     } finally {
       setLoading(false)
@@ -103,7 +103,6 @@ function ProfilePage() {
       }))
       updateUser({ avatar_url: res.data.avatar_url })
     } catch (err) {
-      console.error('Avatar upload error:', err)
       setAvatarError(err.response?.data?.message || 'Failed to upload avatar. Please try again.')
     } finally {
       setUploadingAvatar(false)
@@ -132,7 +131,6 @@ function ProfilePage() {
       setEditing(false)
       setFormErrors({})
     } catch (err) {
-      console.error('handleSave error:', err)
       setSaveError(err.response?.data?.message || 'Failed to save changes. Please try again.')
     } finally {
       setSaving(false)

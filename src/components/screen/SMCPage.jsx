@@ -1,3 +1,4 @@
+// === SMCPage.jsx — standalone SMC scanner tab: symbol search, order blocks, FVG, BOS, CHoCH, sweeps ===
 import { useState, useEffect, useRef, useCallback } from 'react'
 import { getSMCScan } from '../../api'
 import { getMarketSymbols } from '../../utils/globalCache'

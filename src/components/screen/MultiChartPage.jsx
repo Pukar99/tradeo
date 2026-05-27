@@ -1,3 +1,4 @@
+// === MultiChartPage.jsx — multi-panel chart view: 2/3/4 layout, per-panel symbol+timeframe, data sync, crosshair sync ===
 import { useState, useRef, useCallback, useEffect, useMemo, memo } from 'react'
 import { createPortal } from 'react-dom'
 import { ScreenProvider, useScreen } from '../../context/ScreenContext'

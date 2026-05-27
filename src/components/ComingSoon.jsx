@@ -1,3 +1,9 @@
+// =============================================================================
+// ComingSoon.jsx — Placeholder for unbuilt features
+// =============================================================================
+// Props: label (string), desc (string, optional), compact (bool — smaller variant)
+// =============================================================================
+
 export default function ComingSoon({ label, desc, compact = false }) {
   if (compact) {
     return (

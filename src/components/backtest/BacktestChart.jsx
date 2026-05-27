@@ -1,3 +1,5 @@
+// === BacktestChart.jsx — LightweightCharts candlestick chart with entry/SL/TP overlays and markers ===
+
 import { useEffect, useRef, useState } from 'react'
 import { useTheme } from '../../context/ThemeContext'
 

@@ -1,3 +1,4 @@
+// === RiskLabPage.jsx ===
 import { useState, useEffect } from 'react'
 import { useLanguage } from '../context/LanguageContext'
 import {

@@ -1,3 +1,5 @@
+// === MarketStatusBadge.jsx — live NEPSE market open/closed status badge (NPT timezone) ===
+
 // Shows live NPT market open/closed status
 // NEPSE open: 11:00 AM – 3:00 PM, Sun–Thu (NPT = UTC+5:45)
 

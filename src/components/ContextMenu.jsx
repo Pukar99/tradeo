@@ -1,15 +1,22 @@
+// =============================================================================
+// ContextMenu.jsx — Right-click context menu via portal
+// =============================================================================
+// Sections:
+//   1. Menu      — positioned, viewport-clamped menu with danger confirm
+//   2. Hook      — useContextMenu: returns onContextMenu handler + ContextMenuPortal
+// =============================================================================
+// Usage:
+//   const { onContextMenu, ContextMenuPortal } = useContextMenu()
+//   <div onContextMenu={onContextMenu([{ label: 'Edit', icon: '✏️', action: () => ... }])}>
+//   <ContextMenuPortal />
+// =============================================================================
+
 import { useState, useEffect, useRef, useCallback } from 'react'
 import { createPortal } from 'react-dom'
 
-// ── Global Context Menu ───────────────────────────────────────────────────────
-// Usage:
-//   const { onContextMenu, ContextMenuPortal } = useContextMenu()
-//
-//   <div onContextMenu={onContextMenu({ items: [
-//     { label: 'Edit', icon: '✏️', action: () => ... },
-//     { label: 'Delete', icon: '🗑️', danger: true, action: () => ... },
-//   ]})}>...</div>
-//   <ContextMenuPortal />
+// =============================================================================
+// 1. MENU
+// =============================================================================
 
 function Menu({ x, y, items, onClose }) {
   const [confirmIdx, setConfirmIdx] = useState(null)
@@ -94,26 +101,31 @@ function Menu({ x, y, items, onClose }) {
   )
 }
 
+// =============================================================================
+// 2. HOOK
+// =============================================================================
+
 export function useContextMenu() {
   const [menu, setMenu] = useState(null) // { x, y, items }
 
   const close = useCallback(() => setMenu(null), [])
 
-  // Returns an onContextMenu handler bound to a set of items
   const onContextMenu = useCallback((items) => (e) => {
     e.preventDefault()
     e.stopPropagation()
     setMenu({ x: e.clientX, y: e.clientY, items })
   }, [])
 
-  const ContextMenuPortal = useCallback(() => {
+  // Defined as a plain function, not useCallback — it returns JSX (a component render),
+  // not a stable callback. useCallback here would give a stale closure on menu changes.
+  function ContextMenuPortal() {
     if (!menu) return null
     const target = document.getElementById('portal-root') || document.body
     return createPortal(
       <Menu x={menu.x} y={menu.y} items={menu.items} onClose={close} />,
       target
     )
-  }, [menu, close])
+  }
 
   return { onContextMenu, ContextMenuPortal }
 }

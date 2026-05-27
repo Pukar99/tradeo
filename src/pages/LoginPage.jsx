@@ -1,3 +1,4 @@
+// === LoginPage.jsx — login page: brand panel (animated candles + features), email/password form, auth redirect, language support ===
 import { useState, useEffect } from 'react'
 import { useNavigate, Link } from 'react-router-dom'
 import { loginUser } from '../api'

@@ -1,3 +1,4 @@
+// === MarketJournalTab.jsx — market journal gallery/database/calendar views with NEPSE candlestick thumbnails ===
 import { useState, useMemo, useEffect, useRef } from 'react'
 import { useTheme } from '../../context/ThemeContext'
 import { getIndexChart } from '../../api'

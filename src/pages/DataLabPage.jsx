@@ -1,3 +1,4 @@
+// === DataLabPage.jsx — DataLab page: Performance / Insight / Breakdown tabs, toolbar slot portal, auth gating, navbar auto-hide ===
 import { useState, Suspense, lazy, createContext, useContext, useRef, useEffect, useLayoutEffect } from 'react'
 import { Link } from 'react-router-dom'
 import { useNavbarAutoHide, useNavbarState } from '../App'

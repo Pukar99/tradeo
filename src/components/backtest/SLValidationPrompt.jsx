@@ -1,11 +1,7 @@
+// === SLValidationPrompt.jsx — SL/TP breach prompt (PRE_SETTLEMENT_SL/TP, MANUAL_SL) ===
+
 import { useEffect } from 'react'
 
-/**
- * Shown in two scenarios:
- *  type = 'PRE_SETTLEMENT_SL' — SL hit before T+2 cleared
- *  type = 'MANUAL_SL'         — SL hit after settlement, Manual mode
- *  type = 'PRE_SETTLEMENT_TP' — TP hit before T+2 cleared
- */
 export default function SLValidationPrompt({ prompt, onClose }) {
   const { type, pos, candle, options } = prompt
 

@@ -1,8 +1,20 @@
+// =============================================================================
+// ScreenContext.jsx — Shared state for all ScreenPage tabs
+// =============================================================================
+// Sections:
+//   1. Provider   — symbol, chart, indicators, hover/pin, positions, nav state
+//   2. Hook       — useScreen
+// =============================================================================
+
 import { createContext, useContext, useState, useCallback, useEffect, useRef } from 'react'
 import { useLocation } from 'react-router-dom'
 import { getPositions } from '../utils/globalCache'
 
 const ScreenContext = createContext(null)
+
+// =============================================================================
+// 1. PROVIDER
+// =============================================================================
 
 export function ScreenProvider({ children, initialSymbol, initialIndexId, initialIsIndex, initialTimeframe, onSymbolChange, disableMovers, disablePositions, disableNavState }) {
   const [selectedSymbol,      setSelectedSymbol]      = useState(initialSymbol  || 'NEPSE')
@@ -19,7 +31,7 @@ export function ScreenProvider({ children, initialSymbol, initialIndexId, initia
   const [hoveredMovers, setHoveredMovers] = useState(null)  // { gainers, losers }
   const [pinnedMovers,  setPinnedMovers]  = useState(null)
 
-  // ── Shared positions — fetched once, consumed by LeftPanel + any future ScreenPage component ──
+  // Shared positions — fetched once, consumed by LeftPanel + any future ScreenPage component.
   // Raw position_view rows — each consumer does its own field mapping.
   const [sharedPositions,    setSharedPositions]    = useState([])
   const [positionsLoading,   setPositionsLoading]   = useState(true)
@@ -138,5 +150,9 @@ export function ScreenProvider({ children, initialSymbol, initialIndexId, initia
     </ScreenContext.Provider>
   )
 }
+
+// =============================================================================
+// 2. HOOK
+// =============================================================================
 
 export const useScreen = () => useContext(ScreenContext)

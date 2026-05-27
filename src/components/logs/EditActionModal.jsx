@@ -1,3 +1,5 @@
+// === EditActionModal.jsx — edit an existing trade action (buy/exit fields, emotion/market/reflection pills) ===
+
 import { useState, useCallback } from 'react'
 import { useEscapeKey } from '../../hooks/useEscapeKey'
 import { updateTradeAction } from '../../api'
@@ -90,7 +92,7 @@ export default function EditActionModal({ action, onClose, onSaved }) {
 
         <form onSubmit={handleSubmit} className="overflow-y-auto flex-1 px-4 sm:px-6 py-5 space-y-4">
 
-          <div className={`grid gap-3 ${isBuy ? 'grid-cols-2' : 'grid-cols-2'}`}>
+          <div className="grid grid-cols-2 gap-3">
             <div>
               <label className={LABEL}>Date</label>
               <input type="date" value={form.date} max={today()}

@@ -1,3 +1,4 @@
+// === StockChart.jsx — core chart component: candlestick/line, indicators (MA/EMA/BB/RSI/MACD/ATR), drawing tools, SMC + PA overlays, position lines ===
 import { useEffect, useRef, useState, useCallback } from 'react'
 import { createPortal } from 'react-dom'
 import { useTheme } from '../../context/ThemeContext'
@@ -976,6 +977,7 @@ export default function StockChart({ hideToolbar = false, onChartReady, smcData 
 
   const canvasRef           = useRef(null)
   const priceSeriesRef      = useRef(null)  // set after chart build — needed for coordinate conversion
+  const roRef               = useRef(null)  // ResizeObserver — stored independently so cleanup is always reachable
   const drawingsRef         = useRef([])
   const drawPreviewRef      = useRef(null)
   const rafRef              = useRef(null)
@@ -1384,7 +1386,6 @@ export default function StockChart({ hideToolbar = false, onChartReady, smcData 
     chartData.forEach(d => { changeMap[d.time] = d.diff_pct ?? d.per_change })
 
     let cancelled = false
-    let roCleanup = null
 
     loadLC().then(({ createChart, CrosshairMode, LineStyle }) => {
       if (cancelled || !mainRef.current) return
@@ -1671,7 +1672,7 @@ export default function StockChart({ hideToolbar = false, onChartReady, smcData 
       }
 
       // Resize both width AND height
-      const ro = new ResizeObserver(() => {
+      roRef.current = new ResizeObserver(() => {
         if (mainRef.current && chartsRef.current.main) {
           chartsRef.current.main.applyOptions({
             width:  mainRef.current.clientWidth,
@@ -1697,14 +1698,13 @@ export default function StockChart({ hideToolbar = false, onChartReady, smcData 
           })
         }
       })
-      if (mainRef.current) ro.observe(mainRef.current)
-      roCleanup = () => ro.disconnect()
+      if (mainRef.current) roRef.current.observe(mainRef.current)
     })
 
     return () => {
       cancelled = true
       if (pendingHover.current) clearTimeout(pendingHover.current)
-      if (roCleanup) roCleanup()
+      if (roRef.current) { roRef.current.disconnect(); roRef.current = null }
       onChartReadyRef.current?.(null, null)  // clear stale refs in parent before removing
       Object.values(chartsRef.current).forEach(c => { try { c.remove() } catch (_) {} })
       chartsRef.current = {}

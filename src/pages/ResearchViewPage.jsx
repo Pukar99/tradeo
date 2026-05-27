@@ -1,3 +1,4 @@
+// === ResearchViewPage.jsx ===
 import { useState, useEffect, useCallback } from 'react'
 import { useParams, useNavigate } from 'react-router-dom'
 import { useAuth } from '../context/AuthContext'
@@ -84,8 +85,8 @@ function ResearchViewPage() {
       try {
         editor.replaceBlocks(editor.document, post.content)
         setEditorReady(true)
-      } catch (err) {
-        console.error('Editor error:', err)
+      } catch {
+        // editor load failure is non-fatal — content simply won't render
       }
     }
   }, [post, editor, editorReady])

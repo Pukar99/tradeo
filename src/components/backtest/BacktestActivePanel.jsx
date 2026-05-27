@@ -1,3 +1,5 @@
+// === BacktestActivePanel.jsx — active session panel (positions, equity, script tabs, end session) ===
+
 import { useState, useCallback } from 'react'
 import { btAddScript, btEndSession } from '../../api/backtest'
 
@@ -7,7 +9,7 @@ function fmtPct(n) { return n == null ? '—' : (n >= 0 ? '+' : '') + Number(n).
 function PositionCard({ pos, currentCandle, onEditSLTP, onExit, onPartial }) {
   const ep          = parseFloat(pos.entry_price) || 0
   const ltp         = currentCandle?.close != null ? parseFloat(currentCandle.close) : ep
-  const remQty      = pos.remaining_quantity ?? pos.quantity
+  const remQty      = parseFloat(pos.remaining_quantity ?? pos.quantity)
   const unrealized  = (ltp - ep) * remQty
   const unrealizedPct = ep > 0 ? ((ltp - ep) / ep) * 100 : 0
   const settled     = pos.settled
@@ -96,7 +98,7 @@ export default function BacktestActivePanel({
   const unrealizedTotal = openPositions.reduce((s, p) => {
     const ep  = parseFloat(p.entry_price) || 0
     const ltp = currentCandle?.close != null ? parseFloat(currentCandle.close) : ep
-    return s + (ltp - ep) * (p.remaining_quantity ?? p.quantity)
+    return s + (ltp - ep) * parseFloat(p.remaining_quantity ?? p.quantity)
   }, 0)
 
   const totalEquity     = availCap + unrealizedTotal

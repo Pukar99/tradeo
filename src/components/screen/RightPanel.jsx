@@ -1,3 +1,4 @@
+// === RightPanel.jsx — screen right panel: date nav, gainers/losers/volume/summary tabs, market intel feed, all-movers modal ===
 import { useState, useEffect, useCallback, useRef } from 'react'
 import { getTopMovers } from '../../api'
 import { getMarketDates, getDayFull, getMarketFeed } from '../../utils/globalCache'

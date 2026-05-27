@@ -1,3 +1,4 @@
+// === LeftPanel.jsx — screen left panel: portfolio positions, watchlist, BUY/SELL modal, SL/TP alerts ===
 import { useState, useEffect, useCallback, useRef, useMemo } from 'react'
 import { newPosition, closePosition, removeFromWatchlist, updateWatchlist } from '../../api'
 import { getBatchPrices, getWatchlist, clearWatchlistCache } from '../../utils/globalCache'

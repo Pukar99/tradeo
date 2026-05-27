@@ -1,3 +1,5 @@
+// === MiniChart.jsx — multi-panel chart for MultiChartPage: symbol search, timeframe, candlestick/line, crosshair sync via forwardRef ===
+
 import { useState, useEffect, useRef, useCallback, forwardRef, useImperativeHandle } from 'react'
 import { useTheme } from '../../context/ThemeContext'
 import { getIndexChart, getStockChart, getMarketSymbols } from '../../api'
@@ -142,6 +144,7 @@ const MiniChart = forwardRef(function MiniChart({ defaultSymbol = 'NEPSE', defau
   const containerRef = useRef(null)
   const chartInstRef = useRef(null)   // lightweight-charts Chart instance
   const seriesRef    = useRef(null)   // price series
+  const roRef        = useRef(null)
   const isDarkRef    = useRef(isDark)
   isDarkRef.current  = isDark
 
@@ -252,27 +255,22 @@ const MiniChart = forwardRef(function MiniChart({ defaultSymbol = 'NEPSE', defau
 
       chart.timeScale().fitContent()
 
-      // ResizeObserver
-      const ro = new ResizeObserver(() => {
+      // ResizeObserver stored in roRef so cleanup can always reach it
+      roRef.current = new ResizeObserver(() => {
         if (!containerRef.current || !chart) return
         chart.applyOptions({
           width:  containerRef.current.clientWidth,
           height: containerRef.current.clientHeight,
         })
       })
-      if (containerRef.current) ro.observe(containerRef.current)
-
-      // Cleanup stored on chart instance for parent to access
-      chart._roDisconnect = () => ro.disconnect()
+      if (containerRef.current) roRef.current.observe(containerRef.current)
     })
 
     return () => {
       cancelled = true
+      if (roRef.current) { roRef.current.disconnect(); roRef.current = null }
       if (chartInstRef.current) {
-        try {
-          if (chartInstRef.current._roDisconnect) chartInstRef.current._roDisconnect()
-          chartInstRef.current.remove()
-        } catch (_) {}
+        try { chartInstRef.current.remove() } catch (_) {}
         chartInstRef.current = null
         seriesRef.current    = null
       }

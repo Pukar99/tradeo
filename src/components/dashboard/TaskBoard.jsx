@@ -1,3 +1,6 @@
+// =============================================================================
+// TaskBoard.jsx — daily routine tracker: fixed tasks + custom tasks, mindset modal
+// =============================================================================
 import { useState, useEffect, useRef } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { useLanguage } from '../../context/LanguageContext'
@@ -356,7 +359,7 @@ function TaskBoard({ initData, mindsetContent }) {
 
   const handleTaskDone = async (taskId) => {
     try {
-      const res = await toggleFixedTask(taskId)
+      await toggleFixedTask(taskId)
       setFixedTasks(prev => prev.map(t => t.id === taskId ? { ...t, completed: true } : t))
     } catch (err) { console.error('[toggle error]', err.response?.data || err.message) }
   }

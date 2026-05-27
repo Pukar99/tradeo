@@ -1,3 +1,4 @@
+// === ResearchEditorPage.jsx ===
 import { useState, useEffect, useRef, useCallback } from 'react'
 import { useNavigate, useParams } from 'react-router-dom'
 import { useAuth } from '../context/AuthContext'
@@ -40,9 +41,7 @@ function ResearchEditorPage() {
         formData.append('file', file)
         const res = await uploadResearchFile(formData)
         return res.data.url
-      } catch (err) {
-        console.error('Image upload failed:', err)
-        // Return undefined so BlockNote does not insert a broken image
+      } catch {
         return undefined
       }
     }
@@ -63,8 +62,7 @@ function ResearchEditorPage() {
           if (post.content && post.post_type !== 'pdf' && editor) {
             try {
               await editor.replaceBlocks(editor.document, post.content)
-            } catch (err) {
-              console.error('Editor load error:', err)
+            } catch {
               setError('Failed to load post content into editor')
             }
           }

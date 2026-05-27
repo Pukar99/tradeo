@@ -1,12 +1,27 @@
+// =============================================================================
+// FloatingChat.jsx — Draggable floating AI chat button + panel
+// =============================================================================
+// Sections:
+//   1. Helpers      — clamp utility
+//   2. FloatingChat — FAB with drag (mouse + touch), panel positioning
+// =============================================================================
+
 import { useState, useRef, useEffect, useCallback } from 'react'
 import AIChat from './AIChat'
 import { useAuth } from '../context/AuthContext'
 import { useNavigate, useLocation } from 'react-router-dom'
 
-// Clamp a position so the panel stays fully on-screen
+// =============================================================================
+// 1. HELPERS
+// =============================================================================
+
 function clamp(value, min, max) {
   return Math.min(Math.max(value, min), max)
 }
+
+// =============================================================================
+// 2. FLOATING CHAT
+// =============================================================================
 
 const PANEL_W = 340
 const PANEL_H = 500
@@ -103,7 +118,11 @@ function FloatingChat() {
       dragging.current = false
       window.removeEventListener('touchmove', onMove)
       window.removeEventListener('touchend',  onEnd)
-      try { sessionStorage.setItem('floatingChat_pos', JSON.stringify(pos)) } catch {}
+      // Use setPos callback to read current position — avoids stale closure on pos
+      setPos(p => {
+        try { sessionStorage.setItem('floatingChat_pos', JSON.stringify(p)) } catch {}
+        return p
+      })
     }
 
     window.addEventListener('touchmove', onMove, { passive: true })
@@ -217,20 +236,18 @@ function FloatingChat() {
           tabIndex={0}
           aria-label="Open Tradeo AI chat"
         >
-          {(
-            <svg width="26" height="26" viewBox="0 0 40 40" fill="none">
-              <rect width="40" height="40" rx="8" className="tradeo-logo-bg" strokeWidth="1"/>
-              <rect x="6" y="18" width="6" height="14" rx="1.5" fill="#22c55e"/>
-              <line x1="9" y1="12" x2="9" y2="18" stroke="#22c55e" strokeWidth="1.5"/>
-              <line x1="9" y1="32" x2="9" y2="36" stroke="#22c55e" strokeWidth="1.5"/>
-              <rect x="17" y="12" width="6" height="16" rx="1.5" fill="#ef4444"/>
-              <line x1="20" y1="6" x2="20" y2="12" stroke="#ef4444" strokeWidth="1.5"/>
-              <line x1="20" y1="28" x2="20" y2="32" stroke="#ef4444" strokeWidth="1.5"/>
-              <rect x="28" y="14" width="6" height="12" rx="1.5" fill="#22c55e"/>
-              <line x1="31" y1="8" x2="31" y2="14" stroke="#22c55e" strokeWidth="1.5"/>
-              <line x1="31" y1="26" x2="31" y2="30" stroke="#22c55e" strokeWidth="1.5"/>
-            </svg>
-          )}
+          <svg width="26" height="26" viewBox="0 0 40 40" fill="none">
+            <rect width="40" height="40" rx="8" className="tradeo-logo-bg" strokeWidth="1"/>
+            <rect x="6" y="18" width="6" height="14" rx="1.5" fill="#22c55e"/>
+            <line x1="9" y1="12" x2="9" y2="18" stroke="#22c55e" strokeWidth="1.5"/>
+            <line x1="9" y1="32" x2="9" y2="36" stroke="#22c55e" strokeWidth="1.5"/>
+            <rect x="17" y="12" width="6" height="16" rx="1.5" fill="#ef4444"/>
+            <line x1="20" y1="6" x2="20" y2="12" stroke="#ef4444" strokeWidth="1.5"/>
+            <line x1="20" y1="28" x2="20" y2="32" stroke="#ef4444" strokeWidth="1.5"/>
+            <rect x="28" y="14" width="6" height="12" rx="1.5" fill="#22c55e"/>
+            <line x1="31" y1="8" x2="31" y2="14" stroke="#22c55e" strokeWidth="1.5"/>
+            <line x1="31" y1="26" x2="31" y2="30" stroke="#22c55e" strokeWidth="1.5"/>
+          </svg>
         </button>
       </div>
     </>

@@ -1,3 +1,5 @@
+// === MarketJournalModal.jsx — market journal editor: NEPSE sparkline, breadth/volume, mood/pre/during/post fields ===
+
 import { useState, useEffect, useRef } from 'react'
 import { updateMarketJournal, getIndexChart } from '../../api'
 

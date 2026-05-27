@@ -1,3 +1,4 @@
+// === TraderCard.jsx — shareable performance card (dark, forwardRef for html2canvas PNG export) ===
 import { forwardRef } from 'react'
 
 // Equity sparkline as a pure SVG — no Recharts dep, renders correctly in html2canvas

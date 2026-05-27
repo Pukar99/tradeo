@@ -1,3 +1,4 @@
+// === IPOPage.jsx — IPO page: Meroshare account management, open IPOs, results, holdings, bulk/1-click apply, auto-apply ===
 import { useState, useEffect, useCallback, useRef } from 'react'
 import { useAuth } from '../context/AuthContext'
 import { useExploreToolbarSlot } from './ExplorePage'

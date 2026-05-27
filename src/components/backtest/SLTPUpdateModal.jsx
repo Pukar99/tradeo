@@ -1,3 +1,5 @@
+// === SLTPUpdateModal.jsx — stop-loss / take-profit update modal ===
+
 import { useState, useEffect, useCallback } from 'react'
 import { btUpdateSLTP } from '../../api/backtest'
 

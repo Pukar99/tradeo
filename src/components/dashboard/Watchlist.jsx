@@ -1,4 +1,7 @@
-import { useState, useEffect } from 'react'
+// =============================================================================
+// Watchlist.jsx — watchlist widget: active / pre-watch / portfolio tabs, price alerts
+// =============================================================================
+import { useState, useEffect, useCallback } from 'react'
 import {
   getWatchlist,
   addToWatchlist,
@@ -124,7 +127,8 @@ function getAlertMessage(item) {
 
   // Price alert message
   if (item.price_alert) {
-    const diff = item.price_alert - ltp
+    const alertPrice = parseFloat(item.price_alert)
+    const diff = alertPrice - ltp
     const pct = Math.abs((diff / ltp) * 100).toFixed(2)
     if (Math.abs(diff) < ltp * 0.02) {
       messages.push({ text: '🎯 Near your alert level!', color: 'text-orange-500', bg: 'bg-orange-50 dark:bg-orange-900' })
@@ -137,7 +141,8 @@ function getAlertMessage(item) {
 
   // Watch low/high messages
   if (item.watch_low && ltp) {
-    const diff = ltp - item.watch_low
+    const watchLow = parseFloat(item.watch_low)
+    const diff = ltp - watchLow
     const pct = Math.abs((diff / ltp) * 100).toFixed(2)
     if (diff > 0) {
       messages.push({ text: `-Rs.${Math.abs(Math.round(diff)).toLocaleString()} (${pct}%) drop to watch low`, color: 'text-red-400', bg: 'bg-red-50 dark:bg-red-900' })
@@ -147,7 +152,8 @@ function getAlertMessage(item) {
   }
 
   if (item.watch_high && ltp) {
-    const diff = item.watch_high - ltp
+    const watchHigh = parseFloat(item.watch_high)
+    const diff = watchHigh - ltp
     const pct = Math.abs((diff / ltp) * 100).toFixed(2)
     if (diff > 0) {
       messages.push({ text: `+Rs.${Math.abs(Math.round(diff)).toLocaleString()} (${pct}%) rally to watch high`, color: 'text-green-500', bg: 'bg-green-50 dark:bg-green-900' })
@@ -196,7 +202,7 @@ function Watchlist() {
   const [stockError, setStockError] = useState('')
   const [adding, setAdding] = useState(false)
 
-  const fetchWatchlist = async () => {
+  const fetchWatchlist = useCallback(async () => {
     try {
       const [watchRes, posRes] = await Promise.all([
         getWatchlist(),
@@ -270,9 +276,9 @@ function Watchlist() {
     } finally {
       setLoading(false)
     }
-  }
+  }, []) // eslint-disable-line react-hooks/exhaustive-deps
 
-  useEffect(() => { fetchWatchlist() }, [])
+  useEffect(() => { fetchWatchlist() }, [fetchWatchlist])
   useChatRefresh(['watchlist', 'trades'], fetchWatchlist)
 
   const handleSymbolSearch = async () => {

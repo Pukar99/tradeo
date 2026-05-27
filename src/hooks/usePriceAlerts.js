@@ -1,10 +1,22 @@
+// =============================================================================
+// usePriceAlerts.js — Price alert poller + browser notification dispatcher
+// =============================================================================
+// Sections:
+//   1. EOD Timing       — msUntilEOD helper
+//   2. Notification Dedup — session-scoped notified-IDs set
+//   3. Hook             — usePriceAlerts({ user, onAlert })
+// =============================================================================
+
 import { useEffect, useRef } from 'react'
 import { checkPriceAlerts } from '../api'
 
-// NEPSE market close: 15:00 NPT = 09:15 UTC
-// We fetch once on startup, then once at 15:10 NPT (09:25 UTC) — after EOD data lands
+// NEPSE market close: 15:00 NPT = 09:15 UTC. Poll at 15:10 NPT (09:25 UTC) after EOD data lands.
 const EOD_UTC_H = 9
 const EOD_UTC_M = 25
+
+// =============================================================================
+// 1. EOD TIMING
+// =============================================================================
 
 // How many ms until the next 15:10 NPT (09:25 UTC) today or tomorrow
 function msUntilEOD() {
@@ -15,7 +27,11 @@ function msUntilEOD() {
   return target - now
 }
 
-// Track which alerts we've already notified this session so we don't spam
+// =============================================================================
+// 2. NOTIFICATION DEDUP
+// =============================================================================
+
+// Session-scoped set of already-notified alert IDs — prevents repeat notifications
 const NOTIFIED_KEY = 'tradeo_alerted_ids'
 function getNotified() {
   try { return new Set(JSON.parse(sessionStorage.getItem(NOTIFIED_KEY) || '[]')) } catch { return new Set() }
@@ -25,6 +41,10 @@ function markNotified(id) {
   set.add(String(id))
   try { sessionStorage.setItem(NOTIFIED_KEY, JSON.stringify([...set])) } catch {}
 }
+
+// =============================================================================
+// 3. HOOK
+// =============================================================================
 
 export function usePriceAlerts({ user, onAlert }) {
   const timerRef   = useRef(null)
@@ -54,7 +74,7 @@ export function usePriceAlerts({ user, onAlert }) {
         markNotified(alert.id)
         if (Notification.permission === 'granted') {
           new Notification(`Tradeo Alert — ${alert.symbol}`, {
-            body: `LTP Rs.${alert.ltp.toLocaleString()} is ${alert.direction} your alert Rs.${alert.price_alert.toLocaleString()} (${alert.dist_pct}% away)`,
+            body: `LTP Rs.${parseFloat(alert.ltp).toLocaleString()} is ${alert.direction} your alert Rs.${parseFloat(alert.price_alert).toLocaleString()} (${alert.dist_pct}% away)`,
             icon: '/favicon.ico',
             tag:  `tradeo_alert_${alert.id}`,
           })

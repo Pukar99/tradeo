@@ -1,3 +1,4 @@
+// === TradeActionsTab.jsx — trade actions tab: database/gallery/calendar views, add/close/partial/delete modals ===
 import { useState, useCallback, useMemo } from 'react'
 import { deleteTradeAction, deleteEntireTrade } from '../../api'
 import PositionRow from './PositionRow'
@@ -47,8 +48,7 @@ export default function TradeActionsTab({ positions, ltpMap, view, filter, searc
         confirmDel.refreshHistory?.()
       }
       setConfirmDel(null)
-      refreshTickRef.current += 1
-      setRefreshTick(refreshTickRef.current)
+      setRefreshTick(prev => prev + 1)
       onRefresh()
     } catch (err) {
       setDeleteErr(err.response?.data?.message || err.response?.data?.error || err.message || 'Delete failed')

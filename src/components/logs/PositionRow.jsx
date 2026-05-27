@@ -1,3 +1,5 @@
+// === PositionRow.jsx — expandable position card: stats, SL/TP/RR, action history expand, context menu ===
+
 import { useState, useEffect, useCallback } from 'react'
 import { getTradeHistory } from '../../api'
 import { useContextMenu } from '../ContextMenu'

@@ -1,3 +1,4 @@
+// === ExplorePage.jsx — explore page: IPO / AI Signal / ShareMy / Risk Lab tabs, toolbar slot portal, CSS-preserve mount, auth gating ===
 import { useState, useEffect, useRef, Suspense, lazy, createContext, useContext } from 'react'
 import { createPortal } from 'react-dom'
 import { useParams, useNavigate, Link } from 'react-router-dom'

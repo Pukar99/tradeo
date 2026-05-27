@@ -1,3 +1,4 @@
+// === AuditTab.jsx — trade audit tab: KPI grid, equity curve, tax/fees estimates, share modal (PNG + PDF) ===
 import { useState, useEffect, useCallback, useMemo, useRef, useId } from 'react'
 import { useTheme } from '../../context/ThemeContext'
 import { useAuth } from '../../context/AuthContext'
@@ -714,7 +715,7 @@ export default function AuditTab({ range = '1M', symbol = 'all', onSymbolsLoaded
                       </defs>
                       <polygon
                         points={`0,${h + 4} ${fill} ${(pts.length - 1) * step},${h + 4}`}
-                        fill="url(#audit-eq-grad)"
+                        fill={`url(#${gradId})`}
                       />
                       <polyline
                         points={points}

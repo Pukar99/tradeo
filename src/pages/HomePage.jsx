@@ -1,3 +1,4 @@
+// === HomePage.jsx — home page: logged-out landing (blurred preview + hero), logged-in dashboard (stats, watchlist, positions, alerts, NEPSE chart) ===
 import { useAuth } from '../context/AuthContext'
 import { useLanguage } from '../context/LanguageContext'
 import { useContextMenu } from '../components/ContextMenu'

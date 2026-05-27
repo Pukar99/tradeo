@@ -1,3 +1,5 @@
+// === ChartControls.jsx — chart type / timeframe / indicator toggle strip (reads ScreenContext) ===
+
 import { useScreen } from '../../context/ScreenContext'
 
 const TIMEFRAMES  = ['1D', '1W', '1M', '6M', '1Y', '3Y', 'ALL']

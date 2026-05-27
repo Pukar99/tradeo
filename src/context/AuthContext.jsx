@@ -1,3 +1,7 @@
+// =============================================================================
+// AuthContext.jsx — Authentication state: user, login, logout, updateUser
+// =============================================================================
+
 import { createContext, useContext, useState } from 'react'
 import { clearUserCache } from '../utils/globalCache'
 import { API } from '../api'
@@ -31,7 +35,7 @@ function safeParseUser() {
 }
 
 export function AuthProvider({ children }) {
-    const [user, setUser] = useState(safeParseUser)
+  const [user, setUser] = useState(safeParseUser)
 
   const login = (userData, token) => {
     localStorage.setItem('token', token)

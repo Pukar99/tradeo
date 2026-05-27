@@ -1,3 +1,12 @@
+// =============================================================================
+// TraderProfile.jsx — AI-generated behavioral trader profile card
+// =============================================================================
+// Sections:
+//   1. BulletList  — renders newline-separated bullet text
+//   2. StatPill    — single stat chip
+//   3. TraderProfile — collapsible profile panel (fetches on mount)
+// =============================================================================
+
 import { useState, useEffect, useCallback } from 'react'
 import { getTraderProfile } from '../api'
 
@@ -32,7 +41,7 @@ export default function TraderProfile() {
   const [open, setOpen]       = useState(false)
   const [reason, setReason]   = useState(null)
 
-  const fetch = useCallback(async () => {
+  const loadProfile = useCallback(async () => {
     setLoading(true)
     setError(null)
     try {
@@ -46,13 +55,12 @@ export default function TraderProfile() {
     }
   }, [])
 
-  useEffect(() => { fetch() }, [fetch])
+  useEffect(() => { loadProfile() }, [loadProfile])
 
   const s = profile?.stats
 
   return (
     <div className="border border-gray-100 dark:border-gray-800 rounded-2xl overflow-hidden bg-white dark:bg-gray-900">
-      {/* Header — always visible */}
       <button
         onClick={() => setOpen(o => !o)}
         className="w-full flex items-center justify-between px-4 py-3 hover:bg-gray-50 dark:hover:bg-gray-800/50 transition-colors"
@@ -75,7 +83,6 @@ export default function TraderProfile() {
         </svg>
       </button>
 
-      {/* Body — collapsible */}
       {open && (
         <div className="border-t border-gray-100 dark:border-gray-800 px-4 py-4 space-y-4">
           {loading && (
@@ -88,7 +95,7 @@ export default function TraderProfile() {
           {error && (
             <div className="text-[11px] text-red-500 text-center py-2">
               {error} —{' '}
-              <button onClick={fetch} className="underline hover:text-red-600">retry</button>
+              <button onClick={loadProfile} className="underline hover:text-red-600">retry</button>
             </div>
           )}
 
@@ -98,15 +105,13 @@ export default function TraderProfile() {
 
           {profile && !loading && (
             <>
-              {/* Stats strip */}
               <div className="grid grid-cols-4 gap-2">
                 <StatPill label="Win Rate"  value={`${s.winRate}%`}  color={parseFloat(s.winRate) >= 50 ? 'text-emerald-500' : 'text-red-500'} />
-                <StatPill label="Avg Win"   value={`Rs.${Number(s.avgWinPnl).toLocaleString()}`}  color="text-emerald-500" />
-                <StatPill label="Avg Loss"  value={`Rs.${Math.abs(Number(s.avgLossPnl)).toLocaleString()}`} color="text-red-500" />
+                <StatPill label="Avg Win"   value={`Rs.${parseFloat(s.avgWinPnl).toLocaleString()}`}  color="text-emerald-500" />
+                <StatPill label="Avg Loss"  value={`Rs.${Math.abs(parseFloat(s.avgLossPnl)).toLocaleString()}`} color="text-red-500" />
                 <StatPill label="Avg Hold"  value={`${s.avgHold}d`}  color="text-blue-500" />
               </div>
 
-              {/* Violations strip */}
               {(s.noSLCount > 0 || s.noReasonCount > 0) && (
                 <div className="flex gap-2">
                   {s.noSLCount > 0 && (
@@ -124,9 +129,7 @@ export default function TraderProfile() {
                 </div>
               )}
 
-              {/* Profile sections */}
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                {/* Strengths */}
                 <div className="bg-emerald-50 dark:bg-emerald-900/20 border border-emerald-200 dark:border-emerald-800/50 rounded-xl px-3 py-3">
                   <p className="text-[10px] font-bold uppercase tracking-widest text-emerald-600 dark:text-emerald-400">Strengths</p>
                   <div className="text-emerald-700 dark:text-emerald-300">
@@ -134,7 +137,6 @@ export default function TraderProfile() {
                   </div>
                 </div>
 
-                {/* Weaknesses */}
                 <div className="bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800/50 rounded-xl px-3 py-3">
                   <p className="text-[10px] font-bold uppercase tracking-widest text-red-600 dark:text-red-400">Weaknesses</p>
                   <div className="text-red-700 dark:text-red-300">
@@ -143,7 +145,6 @@ export default function TraderProfile() {
                 </div>
               </div>
 
-              {/* Best conditions */}
               {profile.bestConditions && (
                 <div className="bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800/50 rounded-xl px-3 py-3">
                   <p className="text-[10px] font-bold uppercase tracking-widest text-blue-600 dark:text-blue-400 mb-1.5">Best Conditions</p>
@@ -151,7 +152,6 @@ export default function TraderProfile() {
                 </div>
               )}
 
-              {/* Key habit */}
               {profile.keyHabit && (
                 <div className="bg-violet-50 dark:bg-violet-900/20 border border-violet-200 dark:border-violet-800/50 rounded-xl px-3 py-3">
                   <p className="text-[10px] font-bold uppercase tracking-widest text-violet-600 dark:text-violet-400 mb-1.5">Key Habit to Build</p>
@@ -161,7 +161,6 @@ export default function TraderProfile() {
                 </div>
               )}
 
-              {/* Symbol performance */}
               {(profile.bestSymbols?.length > 0 || profile.worstSymbols?.length > 0) && (
                 <div className="grid grid-cols-2 gap-3">
                   <div>
@@ -170,7 +169,7 @@ export default function TraderProfile() {
                       {profile.bestSymbols.map(s => (
                         <div key={s.symbol} className="flex items-center justify-between text-[10px]">
                           <span className="font-semibold text-gray-700 dark:text-gray-200">{s.symbol}</span>
-                          <span className="text-emerald-500 font-semibold">+Rs.{s.pnl.toLocaleString()}</span>
+                          <span className="text-emerald-500 font-semibold">+Rs.{parseFloat(s.pnl).toLocaleString()}</span>
                         </div>
                       ))}
                     </div>
@@ -181,7 +180,7 @@ export default function TraderProfile() {
                       {profile.worstSymbols.map(s => (
                         <div key={s.symbol} className="flex items-center justify-between text-[10px]">
                           <span className="font-semibold text-gray-700 dark:text-gray-200">{s.symbol}</span>
-                          <span className="text-red-500 font-semibold">Rs.{s.pnl.toLocaleString()}</span>
+                          <span className="text-red-500 font-semibold">Rs.{parseFloat(s.pnl).toLocaleString()}</span>
                         </div>
                       ))}
                     </div>
@@ -189,7 +188,6 @@ export default function TraderProfile() {
                 </div>
               )}
 
-              {/* Tag breakdown */}
               {profile.tagStats && Object.keys(profile.tagStats).length > 0 && (
                 <div>
                   <p className="text-[10px] font-semibold uppercase tracking-widest text-gray-400 mb-2">Setup Performance</p>
@@ -212,7 +210,7 @@ export default function TraderProfile() {
                 <p className="text-[10px] text-gray-300 dark:text-gray-600">
                   Generated {profile.generatedAt ? new Date(profile.generatedAt).toLocaleTimeString() : ''} · cached 1hr
                 </p>
-                <button onClick={fetch} className="text-[10px] text-gray-400 hover:text-violet-500 transition-colors">
+                <button onClick={loadProfile} className="text-[10px] text-gray-400 hover:text-violet-500 transition-colors">
                   Refresh
                 </button>
               </div>

@@ -1,17 +1,11 @@
+// =============================================================================
+// ErrorBoundary.jsx — Generic React error boundary
+// =============================================================================
+// Props: label (string) — shown in fallback UI; onReset (fn) — called on "Try Again"
+// =============================================================================
+
 import { Component } from 'react'
 
-/**
- * Generic React error boundary.
- *
- * Usage:
- *   <ErrorBoundary label="Backtest">
- *     <BacktestPage />
- *   </ErrorBoundary>
- *
- * `label` is shown in the fallback UI so the user knows which section crashed.
- * `onReset`  is called when the user clicks "Try Again" — useful for resetting
- *             parent state (e.g. clearing a stale session ref).
- */
 export default class ErrorBoundary extends Component {
   constructor(props) {
     super(props)
@@ -58,7 +52,6 @@ export default class ErrorBoundary extends Component {
             Something went wrong rendering this section. Your data is safe.
           </p>
 
-          {/* Error message — collapsed by default, expandable */}
           <details className="text-left mb-4 rounded-xl border border-gray-100 dark:border-gray-800 overflow-hidden">
             <summary className="px-3 py-2 text-[10px] font-semibold text-gray-400 cursor-pointer hover:bg-gray-50 dark:hover:bg-gray-800/50 select-none">
               Error details

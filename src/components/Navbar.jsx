@@ -1,8 +1,21 @@
-import { useState, useRef, useEffect, useCallback } from 'react'
+// =============================================================================
+// Navbar.jsx — Top navigation bar
+// =============================================================================
+// Sections:
+//   1. TradeoLogo  — SVG logo mark
+//   2. Helpers     — getInitials
+//   3. Navbar      — main component (auto-hide, dropdown, mobile menu)
+// =============================================================================
+
+import { useState, useRef, useEffect, useCallback, useMemo } from 'react'
 import { Link, useLocation, useNavigate } from 'react-router-dom'
 import { useAuth } from '../context/AuthContext'
 import { useTheme } from '../context/ThemeContext'
 import { useLanguage } from '../context/LanguageContext'
+
+// =============================================================================
+// 1. LOGO
+// =============================================================================
 
 function TradeoLogo() {
   return (
@@ -21,7 +34,10 @@ function TradeoLogo() {
   )
 }
 
-// Safe initials — handles null, empty, extra whitespace
+// =============================================================================
+// 2. HELPERS
+// =============================================================================
+
 function getInitials(name) {
   if (!name || !name.trim()) return '?'
   return name
@@ -33,6 +49,10 @@ function getInitials(name) {
     .toUpperCase()
     .slice(0, 2)
 }
+
+// =============================================================================
+// 3. NAVBAR
+// =============================================================================
 
 function Navbar({ autoHide = false, hidden = false, onMouseEnter, onMouseLeave }) {
   const { user, logout } = useAuth()
@@ -46,15 +66,15 @@ function Navbar({ autoHide = false, hidden = false, onMouseEnter, onMouseLeave }
   const [avatarError, setAvatarError] = useState(false)
   const dropdownRef = useRef(null)
 
-  // ── Nav links ───────────────────────────────────────────────────────────────
-  const NAV_LINKS = [
+  // useMemo — t changes only on language toggle, not on every render
+  const NAV_LINKS = useMemo(() => [
     { path: '/',          label: t('nav.home')      },
     { path: '/screen',    label: 'Screen'           },
     { path: '/logs',      label: 'Logs'             },
     { path: '/portfolio', label: t('nav.portfolio') },
     { path: '/datalab',   label: 'Data Lab'         },
     { path: '/explore',   label: 'Explore'          },
-  ]
+  ], [t])
 
   // ── Close dropdown on outside click ────────────────────────────────────────
   useEffect(() => {
@@ -123,9 +143,17 @@ function Navbar({ autoHide = false, hidden = false, onMouseEnter, onMouseLeave }
       <div className="flex items-center gap-6">
         <Link to="/" className="flex items-center gap-2.5 py-3 flex-shrink-0">
           <TradeoLogo />
-          <span className="text-gray-900 dark:text-white font-bold text-lg tracking-tight">
-            Tradeo
-          </span>
+          <div className="flex items-baseline gap-2">
+            <span className="text-gray-900 dark:text-white font-bold text-lg tracking-tight">
+              Tradeo
+            </span>
+            <span
+              className="text-[11px] text-gray-400 dark:text-gray-500 font-semibold"
+              title={`Tradeo v${import.meta.env.VITE_APP_VERSION}`}
+            >
+              v{import.meta.env.VITE_APP_VERSION}
+            </span>
+          </div>
         </Link>
 
         {/* Desktop nav — hidden on small screens */}

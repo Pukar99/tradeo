@@ -1,3 +1,5 @@
+// === ReplayPage.jsx — chart replay mode: symbol + date setup, candle-by-candle playback, keyboard controls ===
+
 import { useState, useCallback, useRef, useEffect } from 'react'
 import { btGetOHLCV }    from '../../api/backtest'
 import { getMarketSymbols } from '../../utils/globalCache'

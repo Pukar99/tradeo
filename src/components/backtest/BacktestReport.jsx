@@ -1,3 +1,5 @@
+// === BacktestReport.jsx — session performance report (equity curve, trade log, behavior log, CSV export) ===
+
 import { useState, useEffect, useCallback } from 'react'
 import { btGetReport, btEndSession } from '../../api/backtest'
 import { AreaChart, Area, XAxis, YAxis, Tooltip, ResponsiveContainer } from 'recharts'

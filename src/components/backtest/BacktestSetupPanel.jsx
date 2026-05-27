@@ -1,3 +1,5 @@
+// === BacktestSetupPanel.jsx — session setup form (symbol, date, capital, mode, SL) ===
+
 import { useState, useEffect, useCallback, useRef } from 'react'
 import { btGetSymbols, btCreateSession } from '../../api/backtest'
 

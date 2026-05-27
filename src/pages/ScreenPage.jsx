@@ -1,3 +1,4 @@
+// === ScreenPage.jsx — screen page: simple/complex mode, tab routing, toolbar slot portal, auth gating, mobile sheet ===
 import { useState, useEffect, useLayoutEffect, useRef, lazy, Suspense, createContext, useContext } from 'react'
 import { createPortal } from 'react-dom'
 import { Link } from 'react-router-dom'

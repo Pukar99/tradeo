@@ -1,3 +1,5 @@
+// === TradeCalendarView.jsx — calendar view placeholder (Gann-style dot chart, coming soon) ===
+
 export default function TradeCalendarView() {
   return (
     <div className="flex flex-col items-center justify-center py-24 gap-3 text-center">

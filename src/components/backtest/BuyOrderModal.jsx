@@ -1,3 +1,5 @@
+// === BuyOrderModal.jsx — buy order entry modal (price, qty, SL/TP, fee preview) ===
+
 import { useState, useEffect, useCallback } from 'react'
 import { btPlaceOrder } from '../../api/backtest'
 

@@ -1,3 +1,4 @@
+// === SignupPage.jsx — signup page: brand panel (animated candles + feature list), name/email/password form, strength meter, language support ===
 import { useState, useEffect } from 'react'
 import { useNavigate, Link } from 'react-router-dom'
 import { signupUser } from '../api'

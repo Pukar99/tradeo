@@ -1,16 +1,26 @@
+// =============================================================================
+// PrivateRoute.jsx — Auth gate: redirects unauthenticated users to /login
+// =============================================================================
+// Saves intended destination in sessionStorage so login can redirect back.
+// Open-redirect prevention: rejects external URLs and protocol-relative paths.
+// sessionStorage calls are wrapped in try/catch — throws in private/restricted mode.
+// =============================================================================
+
 import { Navigate, useLocation } from 'react-router-dom'
 import { useAuth } from '../context/AuthContext'
 
-// Validates stored path is an internal route — rejects external URLs (open redirect prevention).
 function saveRedirectFrom(path) {
   if (!path || path === '/login' || path === '/signup') return
   if (/^https?:\/\/|^\/\//.test(path)) return
-  sessionStorage.setItem('authRedirectFrom', path)
+  try { sessionStorage.setItem('authRedirectFrom', path) } catch { /* private browsing */ }
 }
 
 export function getRedirectFrom() {
-  const from = sessionStorage.getItem('authRedirectFrom') || '/'
-  sessionStorage.removeItem('authRedirectFrom')
+  let from = '/'
+  try {
+    from = sessionStorage.getItem('authRedirectFrom') || '/'
+    sessionStorage.removeItem('authRedirectFrom')
+  } catch { /* private browsing */ }
   if (!from.startsWith('/') || /^\/\//.test(from)) return '/'
   return from
 }

@@ -1,3 +1,7 @@
+// =============================================================================
+// TopMovers.jsx — Top gainers / losers table with date selector
+// =============================================================================
+
 import { useState, useEffect, useRef } from 'react'
 import { getMarketDates, getTopMovers } from '../api'
 

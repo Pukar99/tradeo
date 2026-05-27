@@ -1,3 +1,5 @@
+// === TradeGalleryView.jsx — trade gallery: candlestick thumbnail cards, hover actions, lazy chart loading ===
+
 import { useState, useMemo, useEffect, useRef, useCallback } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { useTheme } from '../../context/ThemeContext'
@@ -98,6 +100,7 @@ function CandleThumbnail({ symbol, actions, wacc, ltp, isClosed, onCardHoverChan
   const { isDark } = useTheme()
   const containerRef  = useRef(null)
   const chartRef      = useRef(null)
+  const roRef         = useRef(null)
   const actionsRef    = useRef(actions)  // keep latest actions accessible in crosshair callback
   actionsRef.current  = actions
   const [loading,  setLoading]  = useState(true)
@@ -274,16 +277,15 @@ function CandleThumbnail({ symbol, actions, wacc, ltp, isClosed, onCardHoverChan
         setTooltip({ x: cx, y: cy, date, lines })
       })
 
-      // ResizeObserver
-      const ro = new ResizeObserver(() => {
+      // ResizeObserver stored in roRef so cleanup can always reach it
+      roRef.current = new ResizeObserver(() => {
         if (!containerRef.current || !chart) return
         chart.applyOptions({
           width:  containerRef.current.clientWidth,
           height: containerRef.current.clientHeight,
         })
       })
-      ro.observe(containerRef.current)
-      chart._ro = ro
+      roRef.current.observe(containerRef.current)
     }
 
     async function fetchAndBuild() {
@@ -309,11 +311,9 @@ function CandleThumbnail({ symbol, actions, wacc, ltp, isClosed, onCardHoverChan
 
     return () => {
       cancelled = true
+      if (roRef.current) { roRef.current.disconnect(); roRef.current = null }
       if (chartRef.current) {
-        try {
-          if (chartRef.current._ro) chartRef.current._ro.disconnect()
-          chartRef.current.remove()
-        } catch (_) {}
+        try { chartRef.current.remove() } catch (_) {}
         chartRef.current = null
       }
     }

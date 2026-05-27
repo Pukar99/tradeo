@@ -1,3 +1,4 @@
+// === LogsPage.jsx — logs page: Trades / Market / Audit / Stats tabs, shared toolbar, position fetch, chat refresh ===
 import { useState, useEffect, useCallback, useMemo, lazy, Suspense } from 'react'
 import { getMarketJournals, autoCreateMarketJournal } from '../api'
 import { getBatchPrices, getPositions, clearEligibilityCache } from '../utils/globalCache'

@@ -1,3 +1,4 @@
+// === App.jsx ===
 import { BrowserRouter, Routes, Route, Navigate, useLocation, useNavigate } from 'react-router-dom'
 import { Component, useEffect, useMemo, lazy, Suspense, createContext, useContext, useRef, useState, useCallback } from 'react'
 import toast, { Toaster } from 'react-hot-toast'

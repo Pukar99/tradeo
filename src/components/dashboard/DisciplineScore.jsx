@@ -1,3 +1,6 @@
+// =============================================================================
+// DisciplineScore.jsx — circular ring + dimension bars for trading discipline
+// =============================================================================
 import { useState, useEffect } from 'react'
 import { getDiscipline } from '../../api'
 

@@ -1,139 +1,148 @@
-// ── Shared number / string formatting utilities ────────────────────────────────
-// Used by: BacktestReport, BacktestActivePanel, BacktestControls, InsightPage, BreakdownPage, AuditTab, PortfolioPage, RiskLabPage
+// =============================================================================
+// format.js — Shared formatting & utility functions
+// =============================================================================
+// Sections:
+//   1. NEPSE Fee Utilities      — commission, SEBON fee, DP charge, CGT
+//   2. Number Formatters        — Rs, signed Rs, %, decimal, crore
+//   3. Safe Parsers             — safeFloat, isCanceled, apiError, safeUrl
+// =============================================================================
 
-// ── NEPSE Equity broker commission (SEBON-regulated, effective 2024) ──────────
-// Source: SEBON official fee schedule
-// Tiers apply per transaction side (buy or sell separately)
+
+// =============================================================================
+// 1. NEPSE FEE UTILITIES
+// =============================================================================
+
+// SEBON-regulated broker commission tiers (effective 2024, per transaction side)
+// Source: SEBON official fee schedule — do NOT change without verifying new schedule
+const COMMISSION_TIERS = [
+  { max: 0,         flat: 0,   rate: 0      },
+  { max: 2500,      flat: 10,  rate: 0      }, // flat Rs.10
+  { max: 50000,     flat: 0,   rate: 0.0036 }, // 0.36%
+  { max: 500000,    flat: 0,   rate: 0.0033 }, // 0.33%
+  { max: 2000000,   flat: 0,   rate: 0.0031 }, // 0.31%
+  { max: 10000000,  flat: 0,   rate: 0.0027 }, // 0.27%
+  { max: Infinity,  flat: 0,   rate: 0.0024 }, // 0.24%
+]
+
+// Broker commission for one side of a trade (buy or sell separately)
 export function nepseCommission(amount) {
-  if (amount <= 0)          return 0
-  if (amount <= 2500)       return 10                 // flat Rs.10
-  if (amount <= 50000)      return amount * 0.0036    // 0.36%
-  if (amount <= 500000)     return amount * 0.0033    // 0.33%
-  if (amount <= 2000000)    return amount * 0.0031    // 0.31%
-  if (amount <= 10000000)   return amount * 0.0027    // 0.27%
-  return                           amount * 0.0024    // 0.24%
+  if (!amount || amount <= 0) return 0
+  const tier = COMMISSION_TIERS.find(t => amount <= t.max)
+  return tier.flat || amount * tier.rate
 }
 
-// SEBON transaction fee (separate from broker commission)
-export const sebonFee = (amount) => amount * 0.00015  // 0.015%
+// SEBON transaction fee — 0.015% per side
+export const sebonFee = (amount) => (!amount || amount <= 0 ? 0 : amount * 0.00015)
 
-// DP charge per stock per transaction day (flat)
+// DP charge — flat Rs.25 per stock per transaction day
 export const dpCharge = () => 25
 
-// Total charges for one side of a trade (buy or sell)
+// All three charges combined for one side of a trade
 export function nepseCharges(amount) {
   return nepseCommission(amount) + sebonFee(amount) + dpCharge()
 }
 
-// CGT on net capital gain (individual investor rates)
-// Nepal: CGT is on net gain AFTER all transaction charges
+// Capital Gains Tax on net gain after all transaction charges
+// Rates: 7.5% if held < 365 days, 5% if held >= 365 days
 export function nepseCGT(netGain, entryDateStr, exitDateStr) {
-  if (netGain <= 0) return 0
-  const days = Math.max(0, Math.floor((new Date(exitDateStr) - new Date(entryDateStr)) / 86400000))
+  if (!netGain || netGain <= 0) return 0
+
+  const entry = new Date(entryDateStr)
+  const exit  = new Date(exitDateStr)
+
+  // Guard: invalid dates return NaN from subtraction — return 0 instead of NaN
+  if (isNaN(entry.getTime()) || isNaN(exit.getTime())) return 0
+
+  const days = Math.max(0, Math.floor((exit - entry) / 86400000))
   return netGain * (days >= 365 ? 0.05 : 0.075)
 }
 
-/**
- * Format a number as Nepali Rupees (rounded integer, no decimals).
- * fmtRs(12345.6) → 'Rs.12,346'  |  fmtRs(-500) → 'Rs.500' (absolute)
- * Use signCls() separately for color.
- */
-export const fmtRs = (n) => `Rs.${Math.abs(Math.round(parseFloat(n) || 0)).toLocaleString()}`
 
-/**
- * Format with explicit sign prefix.
- * fmtRsSigned(1200) → '+Rs.1,200'  |  fmtRsSigned(-800) → '-Rs.800'
- */
+// =============================================================================
+// 2. NUMBER FORMATTERS
+// =============================================================================
+
+// Absolute Rupees — no sign, rounded integer. e.g. fmtRs(-500) → 'Rs.500'
+export const fmtRs = (n) =>
+  `Rs.${Math.abs(Math.round(parseFloat(n) || 0)).toLocaleString()}`
+
+// Signed Rupees — explicit +/- prefix. e.g. fmtRsSigned(-800) → '-Rs.800'
 export const fmtRsSigned = (n) => {
   const v = parseFloat(n) || 0
   return `${v >= 0 ? '+' : '-'}Rs.${Math.abs(Math.round(v)).toLocaleString()}`
 }
 
-/**
- * Format a number as compact Nepali Rupees with 2 decimal places.
- * Returns '—' for null/undefined/NaN.
- */
+// Decimal number with 2dp — returns '—' for null/undefined/NaN
 export const fmt = (v) => {
   const n = parseFloat(v)
   if (isNaN(n)) return '—'
   return n.toLocaleString('en-NP', { minimumFractionDigits: 2, maximumFractionDigits: 2 })
 }
 
-/**
- * Format a number as a percentage string.
- * fmtPct(12.345) → '+12.35%'  |  fmtPct(-3.1) → '−3.10%'
- */
+// Percentage with explicit sign — e.g. fmtPct(12.3) → '+12.30%'
 export const fmtPct = (v, dec = 2) => {
   const n = parseFloat(v)
   if (isNaN(n)) return '—'
-  const sign = n >= 0 ? '+' : '−'
-  return `${sign}${Math.abs(n).toFixed(dec)}%`
+  return `${n >= 0 ? '+' : '−'}${Math.abs(n).toFixed(dec)}%`
 }
 
-/**
- * Format a number with a fixed number of decimal places.
- * fmtDec(1234.5, 1) → '1,234.5'
- */
+// Fixed decimal places with locale grouping — e.g. fmtDec(1234.5, 1) → '1,234.5'
 export const fmtDec = (v, dec = 2) => {
   const n = parseFloat(v)
   if (isNaN(n)) return '—'
   return n.toLocaleString('en-NP', { minimumFractionDigits: dec, maximumFractionDigits: dec })
 }
 
-/**
- * Format a large number in crores (1 Cr = 1e7).
- * fmtCr(1_500_000_000) → '150.00 Cr'
- */
+// Crore formatter — e.g. fmtCr(1_500_000_000) → '150.00 Cr'
 export const fmtCr = (v, dec = 2) => {
   const n = parseFloat(v)
   if (isNaN(n)) return '—'
   return `${(n / 1e7).toFixed(dec)} Cr`
 }
 
-/**
- * Safely parse a Supabase NUMERIC string to float. Returns 0 on failure.
- * Supabase returns NUMERIC columns as strings — always use this before arithmetic.
- */
+
+// =============================================================================
+// 3. SAFE PARSERS
+// =============================================================================
+
+// Parse Supabase NUMERIC string to float — Supabase returns NUMERIC as strings.
+// Always use this before arithmetic on DB values. Returns fallback (default 0) on failure.
 export const safeFloat = (v, fallback = 0) => {
   const n = parseFloat(v)
   return isNaN(n) ? fallback : n
 }
 
-/**
- * Detects request cancellation across:
- *  - Fetch `AbortError`
- *  - Axios 1.x `CanceledError` (err.code === 'ERR_CANCELED')
- *  - Axios legacy `Cancel` (err.__CANCEL__)
- *  - String messages like 'canceled' / 'aborted'
- * Use this before showing an error to the user — cancellations are intentional, not errors.
- */
+// Detect request cancellation across all axios + fetch cancel variants.
+// Use this in every .catch() before showing an error — cancellations are intentional.
 export const isCanceled = (err) => {
   if (!err) return false
   if (err.name === 'AbortError' || err.name === 'CanceledError') return true
   if (err.code === 'ERR_CANCELED' || err.__CANCEL__) return true
   const msg = (err.message || '').toLowerCase()
-  if (msg === 'canceled' || msg === 'cancelled' || msg === 'aborted') return true
-  return false
+  return msg === 'canceled' || msg === 'cancelled' || msg === 'aborted'
 }
 
+// Extract a safe, user-facing error message from an axios/fetch error.
+// Returns '' for cancellations. Returns fallback if message leaks internals.
 export const apiError = (err, fallback = 'Something went wrong. Please try again.') => {
   if (isCanceled(err)) return ''
+
   const msg = err?.response?.data?.message
            || err?.response?.data?.error
            || err?.message
            || ''
+
   if (!msg || typeof msg !== 'string') return fallback
-  // Block known internal leak patterns
-  const leak = /supabase|pgrst|sql|column|relation|syntax error|stack|at Object\.|\.js:\d/i
-  if (leak.test(msg)) return fallback
-  // Truncate very long messages
+
+  // Block Supabase/SQL internals from leaking to the UI
+  const INTERNAL_LEAK = /supabase|pgrst|sql|column|relation|syntax error|stack|at Object\.|\.js:\d/i
+  if (INTERNAL_LEAK.test(msg)) return fallback
+
   return msg.length > 200 ? msg.slice(0, 200) + '…' : msg
 }
 
-/**
- * Safe URL — returns the URL only if it uses http/https protocol.
- * Prevents javascript: and data: injection in anchor hrefs.
- */
+// Validate a URL — returns the URL only if it uses http/https.
+// Prevents javascript: and data: injection in anchor hrefs.
 export const safeUrl = (url) => {
   if (!url || typeof url !== 'string') return null
   try {

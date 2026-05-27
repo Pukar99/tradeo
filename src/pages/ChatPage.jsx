@@ -1,3 +1,4 @@
+// === ChatPage.jsx — chat page: AI trading assistant with TraderProfile sidebar (desktop), auth wall for guests ===
 import AIChat from '../components/AIChat'
 import TraderProfile from '../components/TraderProfile'
 import { useAuth } from '../context/AuthContext'

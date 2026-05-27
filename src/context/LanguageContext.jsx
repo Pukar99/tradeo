@@ -1,9 +1,20 @@
+// =============================================================================
+// LanguageContext.jsx — App language: English / Nepanglish toggle
+// =============================================================================
+// Sections:
+//   1. Translations     — full en/ne strings map
+//   2. Provider + Hook  — LanguageProvider, useLanguage
+// =============================================================================
+
 import { createContext, useContext, useState } from 'react'
 
 const LanguageContext = createContext()
 
-// Mixed Nepali-English (Nepanglish) translations
-// Style: key terms stay English, labels/UI in Nepali
+// Mixed Nepali-English (Nepanglish) — key terms stay English, labels/UI in Nepali
+// =============================================================================
+// 1. TRANSLATIONS
+// =============================================================================
+
 export const translations = {
   en: {
     // Nav
@@ -200,8 +211,15 @@ export const translations = {
   }
 }
 
+// =============================================================================
+// 2. PROVIDER + HOOK
+// =============================================================================
+
 export function LanguageProvider({ children }) {
-  const [lang, setLang] = useState(localStorage.getItem('lang') || 'en')
+  // try/catch: localStorage can throw in private browsing or quota-exceeded scenarios
+  const [lang, setLang] = useState(() => {
+    try { return localStorage.getItem('lang') || 'en' } catch { return 'en' }
+  })
 
   const toggleLang = () => {
     const next = lang === 'en' ? 'ne' : 'en'

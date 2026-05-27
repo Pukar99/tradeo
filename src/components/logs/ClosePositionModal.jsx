@@ -1,3 +1,5 @@
+// === ClosePositionModal.jsx — close position modal: broker paste, exit price/date, reflection, P&L preview ===
+
 import { useState, useCallback } from 'react'
 import { useEscapeKey } from '../../hooks/useEscapeKey'
 import { closePosition } from '../../api'

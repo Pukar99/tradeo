@@ -1,20 +1,17 @@
+// =============================================================================
+// useFetch.js — Reusable data-fetch hook with StrictMode-safe cancellation
+// =============================================================================
+// - setTimeout(0) lets StrictMode cleanup fire before the request fires,
+//   preventing double-invoke from triggering two real API calls.
+// - cancelledRef prevents stale state updates after unmount.
+// - Returns { data, loading, error, refetch } — identical shape every time.
+// - getFn must be stable (useCallback-wrapped by caller).
+// - skip: true → don't fire (use for conditional fetching).
+// =============================================================================
+
 import { useState, useEffect, useCallback, useRef } from 'react'
 import { isCanceled, apiError } from '../utils/format'
 
-/**
- * Reusable data-fetch hook with StrictMode-safe cancellation.
- *
- * Behaviour:
- * - Uses setTimeout(0) so React StrictMode's cleanup fires before the request,
- *   preventing the double-invoke from triggering two real API calls.
- * - `cancelled` ref prevents stale state updates on unmounted components.
- * - Returns { data, loading, error, refetch } — identical shape every time.
- *
- * @param {() => Promise} getFn  — a function that returns a promise (e.g. an API call)
- * @param {any[]}         deps   — useEffect dependency array; getFn must be stable (useCallback)
- * @param {{ skip?: boolean }} opts
- *   - skip: true → don't fire the request (use for conditional fetching)
- */
 export function useFetch(getFn, deps = [], { skip = false } = {}) {
   const [data,    setData]    = useState(null)
   const [loading, setLoading] = useState(!skip)

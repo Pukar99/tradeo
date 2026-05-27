@@ -1,3 +1,7 @@
+// =============================================================================
+// NEPSEIndex.jsx — Compact NEPSE index price + daily change widget
+// =============================================================================
+
 import { useState, useEffect } from 'react'
 import { getNepseChart } from '../utils/globalCache'
 
@@ -12,10 +16,12 @@ function NEPSEIndex() {
         if (chartData.length > 0) {
           const last = chartData[chartData.length - 1]
           const prev = chartData[chartData.length - 2]
-          const change = prev
-            ? ((last.close - prev.close) / prev.close * 100).toFixed(2)
+          const lastClose = parseFloat(last.close)
+          const prevClose = prev ? parseFloat(prev.close) : null
+          const change = prevClose != null
+            ? ((lastClose - prevClose) / prevClose * 100).toFixed(2)
             : '0.00'
-          setData({ close: last.close, change, date: last.time })
+          setData({ close: lastClose, change, date: last.time })
         }
       })
       .catch(() => {})

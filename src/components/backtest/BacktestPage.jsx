@@ -1,3 +1,5 @@
+// === BacktestPage.jsx — backtest page root: session orchestration, modals, chart, keyboard shortcuts ===
+
 import { useState, useCallback, useEffect, useRef } from 'react'
 import { useBacktestSession } from '../../hooks/useBacktestSession'
 import { useBacktestEngine }  from '../../hooks/useBacktestEngine'
@@ -175,27 +177,27 @@ export default function BacktestPage() {
     />
   )
 
-  const SidePanelContent = () => !session ? (
-    <BacktestSetupPanel onSessionStarted={(sess, opts) => {
+  const sidePanelSetupProps = {
+    onSessionStarted: (sess, opts) => {
       onSessionStarted(sess)
-      if (opts?.speed)   { setSpeedState(opts.speed); engine.setSpeed(opts.speed) }
+      if (opts?.speed)            { setSpeedState(opts.speed); engine.setSpeed(opts.speed) }
       if (opts?.runMode === 'PLAY') { handlePlay() }
       setMobilePanelOpen(false)
-    }} />
-  ) : (
-    <BacktestActivePanel
-      session={session}
-      currentScript={currentScript}
-      currentCandle={currentCandle}
-      totalCandles={candles.length}
-      onScriptSwitch={handleScriptSwitch}
-      onBuy={() => { setShowBuy(true); setMobilePanelOpen(false) }}
-      onEditSLTP={(order) => { setShowSLTP(order); setMobilePanelOpen(false) }}
-      onExit={handleFullExit}
-      onPartial={(order) => { setShowPartial(order); setMobilePanelOpen(false) }}
-      onEndSession={handleEndSession}
-    />
-  )
+    },
+  }
+
+  const sidePanelActiveProps = {
+    session,
+    currentScript,
+    currentCandle,
+    totalCandles: candles.length,
+    onScriptSwitch: handleScriptSwitch,
+    onBuy:          () => { setShowBuy(true); setMobilePanelOpen(false) },
+    onEditSLTP:     (order) => { setShowSLTP(order); setMobilePanelOpen(false) },
+    onExit:         handleFullExit,
+    onPartial:      (order) => { setShowPartial(order); setMobilePanelOpen(false) },
+    onEndSession:   handleEndSession,
+  }
 
   // ── Main layout ───────────────────────────────────────────────────────────────
   return (
@@ -203,7 +205,9 @@ export default function BacktestPage() {
 
       {/* LEFT PANEL — desktop only */}
       <div className="hidden md:flex w-[260px] min-w-[240px] border-r border-gray-100 dark:border-gray-800 bg-white dark:bg-gray-900 flex-col shrink-0 overflow-hidden">
-        <SidePanelContent />
+        {!session
+          ? <BacktestSetupPanel {...sidePanelSetupProps} />
+          : <BacktestActivePanel {...sidePanelActiveProps} />}
       </div>
 
       {/* CENTER: Chart + Controls */}
@@ -281,7 +285,9 @@ export default function BacktestPage() {
               </button>
             </div>
             <div className="flex-1 overflow-y-auto min-h-0">
-              <SidePanelContent />
+              {!session
+                ? <BacktestSetupPanel {...sidePanelSetupProps} />
+                : <BacktestActivePanel {...sidePanelActiveProps} />}
             </div>
           </div>
         </>

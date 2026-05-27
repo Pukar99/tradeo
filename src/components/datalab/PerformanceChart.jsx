@@ -1,3 +1,6 @@
+// =============================================================================
+// PerformanceChart.jsx — NEPSE bull/bear cycle analysis with stock comparison
+// =============================================================================
 import { useState, useEffect, useRef, useCallback, useMemo, forwardRef, useImperativeHandle } from 'react'
 import { useTheme } from '../../context/ThemeContext'
 import { getPerformance } from '../../api'

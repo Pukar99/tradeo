@@ -1,3 +1,4 @@
+// === PriceActionPage.jsx — Price Action chart tab: swings (HH/HL/LH/LL), S/R, demand/supply zones, volume spikes, patterns ===
 import { useState, useEffect, useCallback, useMemo, useRef } from 'react'
 import { createPortal } from 'react-dom'
 import { ScreenProvider, useScreen } from '../../context/ScreenContext'

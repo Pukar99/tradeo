@@ -1,3 +1,4 @@
+// === PortfolioPage.jsx — portfolio page: allocation donut, equity curve, monthly P&L, holdings table, trade history ===
 import { useState, useEffect, useCallback, useMemo } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { useAuth } from '../context/AuthContext'

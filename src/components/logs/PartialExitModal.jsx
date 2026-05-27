@@ -1,3 +1,4 @@
+// === PartialExitModal.jsx — partial exit modal: broker paste, exit qty/price, P&L preview, reflection fields ===
 import { useState, useCallback } from 'react'
 import { useEscapeKey } from '../../hooks/useEscapeKey'
 import { partialExitPosition } from '../../api'

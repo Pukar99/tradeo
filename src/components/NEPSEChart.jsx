@@ -1,3 +1,11 @@
+// =============================================================================
+// NEPSEChart.jsx — NEPSE index candlestick chart
+// =============================================================================
+// Sections:
+//   1. NEPSEMiniChart — single panel, pre-fetched data, no internal API call
+//   2. NEPSEChart     — full chart with range selector; fixed=true = dual daily/weekly panels
+// =============================================================================
+
 import { useEffect, useRef, useState } from 'react'
 import { API } from '../api'
 import { getNepseChart as _getNepseChartCached } from '../utils/globalCache'
@@ -12,7 +20,10 @@ const ranges = [
   { label: 'All', value: 'all' },
 ]
 
-// ── Single chart panel — receives pre-fetched data, no internal API call ─────
+// =============================================================================
+// 1. NEPSE MINI CHART
+// =============================================================================
+
 function NEPSEMiniChart({ data, label, height = 200 }) {
   const chartContainerRef = useRef(null)
   const chartRef          = useRef(null)
@@ -166,7 +177,10 @@ function NEPSEMiniChart({ data, label, height = 200 }) {
   )
 }
 
-// ── Main export ───────────────────────────────────────────────────────────────
+// =============================================================================
+// 2. NEPSE CHART
+// =============================================================================
+
 function NEPSEChart({ fixed = false }) {
   const { isDark } = useTheme()
   const [range, setRange] = useState('1y')
@@ -181,7 +195,7 @@ function NEPSEChart({ fixed = false }) {
   const seriesRef         = useRef(null)
   const moversRef         = useRef({})
 
-  // ── Fixed (dual side-by-side) mode — loads only on explicit button click ────
+  // Fixed (dual side-by-side) mode — loads only on explicit button click
   const [dailyData,   setDailyData]   = useState(null)
   const [weeklyData,  setWeeklyData]  = useState(null)
   const [fixedLoading, setFixedLoading] = useState(false)
@@ -225,7 +239,7 @@ function NEPSEChart({ fixed = false }) {
     )
   }
 
-  // ── Normal (single) mode — full chart with range selector ──────────────────
+  // Normal (single) mode — full chart with range selector
   useEffect(() => {
     let cancelled = false
 

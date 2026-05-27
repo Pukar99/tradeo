@@ -1,3 +1,4 @@
+// === StatsTab.jsx — trade stats tab: win rate, P&L curve, setup breakdown, streak panel (from position_view) ===
 import { useMemo, useState } from 'react'
 import {
   AreaChart, Area, XAxis, YAxis, Tooltip, ResponsiveContainer,

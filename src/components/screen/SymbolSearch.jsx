@@ -1,3 +1,5 @@
+// === SymbolSearch.jsx — symbol search dropdown with keyboard navigation (stocks + indexes) ===
+
 import { useState, useEffect, useRef } from 'react'
 import { getMarketSymbols } from '../../utils/globalCache'
 import { useScreen } from '../../context/ScreenContext'
