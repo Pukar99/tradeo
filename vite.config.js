@@ -1,11 +1,23 @@
 import { defineConfig } from 'vite'
 import react from '@vitejs/plugin-react'
+import path from 'path'
 
 const APP_VERSION = process.env.npm_package_version ?? '0.0.0'
 
 // https://vite.dev/config/
 export default defineConfig({
   plugins: [react()],
+  resolve: {
+    alias: {
+      '@':            path.resolve(__dirname, 'src'),
+      '@components':  path.resolve(__dirname, 'src/components'),
+      '@pages':       path.resolve(__dirname, 'src/pages'),
+      '@hooks':       path.resolve(__dirname, 'src/hooks'),
+      '@context':     path.resolve(__dirname, 'src/context'),
+      '@utils':       path.resolve(__dirname, 'src/utils'),
+      '@api':         path.resolve(__dirname, 'src/api'),
+    },
+  },
   define: {
     'import.meta.env.VITE_APP_VERSION': JSON.stringify(APP_VERSION),
   },
