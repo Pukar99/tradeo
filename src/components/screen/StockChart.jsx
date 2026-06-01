@@ -1465,6 +1465,7 @@ export default function StockChart({ hideToolbar = false, onChartReady, smcData 
     chartData.forEach(d => { changeMap[d.time] = d.diff_pct ?? d.per_change })
 
     let cancelled = false
+    const timeScaleUnsubs = []
 
     loadLC().then(({ createChart, CrosshairMode, LineStyle }) => {
       if (cancelled || !mainRef.current) return
@@ -1672,8 +1673,6 @@ export default function StockChart({ hideToolbar = false, onChartReady, smcData 
       // ── Sub-pane sync — one-way only (main → sub) prevents feedback loop.
       // Guard flag `syncing` stops the sub-pane subscriber from re-updating main.
       // All unsubscribe functions collected so cleanup removes them precisely.
-      const timeScaleUnsubs = []
-
       // RSI sub-pane
       if (activeIndicators.includes('RSI') && rsiRef.current) {
         const rsiData = calcRSI(chartData)
