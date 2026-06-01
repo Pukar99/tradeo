@@ -267,10 +267,12 @@ const PositionCard = memo(function PositionCard({ p, selected, onSelect, latestP
                        : 'bg-red-100 dark:bg-red-900/80 text-red-600 dark:text-red-300'
               }`}>{isLong ? 'LONG' : 'SHORT'}</span>
             </div>
-            {pnlPct !== null && (
+            {pnlPct !== null ? (
               <span className={`text-[11px] font-black tabular-nums ${isPos ? 'text-emerald-400' : 'text-red-400'}`}>
                 {isPos ? '+' : ''}{pnlPct.toFixed(2)}%
               </span>
+            ) : (
+              <span className="text-[11px] text-gray-300 dark:text-gray-600 tabular-nums">—</span>
             )}
           </div>
 
@@ -383,6 +385,7 @@ export default function LeftPanel() {
   const [pendingDelete, setPendingDelete] = useState(null)
   const [tab,           setTab]           = useState('portfolio')
   const [watchErr,      setWatchErr]      = useState(null)
+  const [watchLoading,  setWatchLoading]  = useState(true)
   const [latestPrices,  setLatestPrices]  = useState({})
 
   const [tradeModal,     setTradeModal]     = useState(null)
@@ -394,12 +397,14 @@ export default function LeftPanel() {
   useEffect(() => { mountedRef.current = true; return () => { mountedRef.current = false } }, [])
 
   const loadWatchlist = useCallback(() => {
+    setWatchLoading(true)
     getWatchlist()
       .then(r => {
         if (!mountedRef.current) return
         setWatchlist((r.data || []).filter(w => w.category === 'active' || w.category === 'pre' || w.category === 'pre-watch'))
       })
       .catch(() => {})
+      .finally(() => { if (mountedRef.current) setWatchLoading(false) })
   }, [])
 
   const loadData = useCallback(() => { refreshPositions(); loadWatchlist() }, [refreshPositions, loadWatchlist])
@@ -505,7 +510,16 @@ export default function LeftPanel() {
         {/* Portfolio tab */}
         {tab === 'portfolio' && (
           <div className="flex-1 overflow-y-auto min-h-0 px-2 space-y-1.5 pb-2 animate-fade-up">
-            {positions.length === 0 ? (
+            {positionsLoading ? (
+              <div className="space-y-1.5 pt-1">
+                {[1,2].map(i => (
+                  <div key={i} className="rounded-xl border border-gray-100 dark:border-white/8 bg-white/40 dark:bg-white/5 px-3 py-3 animate-pulse">
+                    <div className="h-2.5 bg-gray-200 dark:bg-gray-700 rounded-full w-1/2 mb-2" />
+                    <div className="h-2 bg-gray-100 dark:bg-gray-800 rounded-full w-3/4" />
+                  </div>
+                ))}
+              </div>
+            ) : positions.length === 0 ? (
               <div className="flex flex-col items-center justify-center py-8 text-center">
                 <div className="w-8 h-8 rounded-full bg-gray-100 dark:bg-gray-800 flex items-center justify-center mb-2">
                   <span className="text-[14px]">📊</span>
@@ -528,7 +542,16 @@ export default function LeftPanel() {
         {/* Watchlist tab */}
         {tab === 'watchlist' && (
           <div className="flex-1 overflow-y-auto min-h-0 px-2 space-y-1.5 pb-2 animate-fade-up">
-            {watchlist.length === 0 ? (
+            {watchLoading ? (
+              <div className="space-y-1.5 pt-1">
+                {[1,2,3].map(i => (
+                  <div key={i} className="rounded-xl border border-gray-100 dark:border-white/8 bg-white/40 dark:bg-white/5 px-3 py-2.5 animate-pulse">
+                    <div className="h-2.5 bg-gray-200 dark:bg-gray-700 rounded-full w-2/3 mb-1.5" />
+                    <div className="h-2 bg-gray-100 dark:bg-gray-800 rounded-full w-1/2" />
+                  </div>
+                ))}
+              </div>
+            ) : watchlist.length === 0 ? (
               <div className="flex flex-col items-center justify-center py-8 text-center">
                 <div className="w-8 h-8 rounded-full bg-gray-100 dark:bg-gray-800 flex items-center justify-center mb-2">
                   <span className="text-[14px]">👁</span>

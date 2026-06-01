@@ -223,8 +223,10 @@ function AllMoversModal({ date, onClose }) {
 
 function SummaryTab({ summary, selectSymbol }) {
   if (!summary) return (
-    <div className="flex items-center justify-center py-8">
-      <div className="w-4 h-4 border-2 border-violet-400 border-t-transparent rounded-full animate-spin" />
+    <div className="space-y-2 py-1 animate-pulse">
+      <div className="rounded-xl bg-gray-100 dark:bg-gray-800/60 h-[88px]" />
+      <div className="rounded-xl bg-gray-100 dark:bg-gray-800/60 h-[72px]" />
+      <div className="rounded-xl bg-gray-100 dark:bg-gray-800/60 h-[120px]" />
     </div>
   )
 
@@ -635,7 +637,8 @@ export default function RightPanel() {
             ))}
             <button
               onClick={() => setShowExplore(true)}
-              className="w-full mt-2 py-2 rounded-xl bg-gradient-to-r from-violet-50 to-blue-50 dark:from-violet-950/30 dark:to-blue-950/30 border border-violet-100 dark:border-violet-800/40 text-[10px] font-semibold text-violet-600 dark:text-violet-400 hover:from-violet-100 hover:to-blue-100 dark:hover:from-violet-950/50 dark:hover:to-blue-950/50 transition-all flex items-center justify-center gap-1.5"
+              disabled={showExplore}
+              className="w-full mt-2 py-2 rounded-xl bg-gradient-to-r from-violet-50 to-blue-50 dark:from-violet-950/30 dark:to-blue-950/30 border border-violet-100 dark:border-violet-800/40 text-[10px] font-semibold text-violet-600 dark:text-violet-400 hover:from-violet-100 hover:to-blue-100 dark:hover:from-violet-950/50 dark:hover:to-blue-950/50 transition-all flex items-center justify-center gap-1.5 disabled:opacity-50"
             >
               <span>🔗</span> View All {feedItems.length} Updates
             </button>

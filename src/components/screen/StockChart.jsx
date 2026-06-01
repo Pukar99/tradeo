@@ -1369,7 +1369,7 @@ export default function StockChart({ hideToolbar = false, onChartReady, smcData 
 
   // Fetch chart data — with client-side cache to avoid redundant server hits
   useEffect(() => {
-    setError(null); setTooltip(null); setOverlayData(null)
+    setError(null); setTooltip(null); setOverlayData(null); setChartData([])
     lastFetchedDate.current = null   // reset date guard on every symbol/timeframe change
 
     const cacheKey = isIndex()
@@ -2168,6 +2168,9 @@ export default function StockChart({ hideToolbar = false, onChartReady, smcData 
       {/* ── Overlays (absolute inside the chart area below) ── */}
 
       {/* ── Chart area ── */}
+      {/* Position badge rendered outside loading gate so it's visible during chart load */}
+      {!loading && <PositionBadge positions={activePositions} latestClose={latestClose} />}
+
       {loading ? (
         <ChartSkeleton />
       ) : (
@@ -2181,9 +2184,6 @@ export default function StockChart({ hideToolbar = false, onChartReady, smcData 
               </div>
             )}
           </div>
-
-          {/* Position badge */}
-          <PositionBadge positions={activePositions} latestClose={latestClose} />
 
           {/* OHLC tooltip */}
           <OHLCTooltip bar={tooltip} change={tooltip?.change} />
@@ -2226,26 +2226,32 @@ export default function StockChart({ hideToolbar = false, onChartReady, smcData 
           </div>
 
           {showRSI && (
-            <div className="w-full shrink-0 flex flex-col" style={{ borderTop: isDark ? '1px solid #1c2333' : '1px solid #f3f4f6' }} style={{ height: `${subPanePct}%` }}>
+            <div className="w-full shrink-0 flex flex-col" style={{ height: `${subPanePct}%`, borderTop: isDark ? '1px solid #1c2333' : '1px solid #f3f4f6' }}>
               <SubPaneLabel title="RSI" sub="14" color="#a78bfa"
                 legend={[{ color: '#ef444480', label: '70 OB' }, { color: '#10b98180', label: '30 OS' }]} />
-              <div ref={rsiRef} className="w-full flex-1 min-h-0" />
+              <div ref={rsiRef} className="w-full flex-1 min-h-0 relative">
+                {!chartsRef.current.rsi && <div className="absolute inset-0 animate-pulse" style={{ background: isDark ? '#0d1117' : '#fafafa' }} />}
+              </div>
             </div>
           )}
 
           {showMACD && (
-            <div className="w-full shrink-0 flex flex-col" style={{ borderTop: isDark ? '1px solid #1c2333' : '1px solid #f3f4f6' }} style={{ height: `${subPanePct}%` }}>
+            <div className="w-full shrink-0 flex flex-col" style={{ height: `${subPanePct}%`, borderTop: isDark ? '1px solid #1c2333' : '1px solid #f3f4f6' }}>
               <SubPaneLabel title="MACD" sub="12 / 26 / 9" color="#60a5fa"
                 legend={[{ color: '#60a5fa', label: 'MACD' }, { color: '#f59e0b', label: 'Signal' }]} />
-              <div ref={macdRef} className="w-full flex-1 min-h-0" />
+              <div ref={macdRef} className="w-full flex-1 min-h-0 relative">
+                {!chartsRef.current.macd && <div className="absolute inset-0 animate-pulse" style={{ background: isDark ? '#0d1117' : '#fafafa' }} />}
+              </div>
             </div>
           )}
 
           {showATR && (
-            <div className="w-full shrink-0 flex flex-col" style={{ borderTop: isDark ? '1px solid #1c2333' : '1px solid #f3f4f6' }} style={{ height: `${subPanePct}%` }}>
+            <div className="w-full shrink-0 flex flex-col" style={{ height: `${subPanePct}%`, borderTop: isDark ? '1px solid #1c2333' : '1px solid #f3f4f6' }}>
               <SubPaneLabel title="ATR" sub="14" color="#f59e0b"
                 legend={[{ color: '#f59e0b', label: 'ATR' }]} />
-              <div ref={atrRef} className="w-full flex-1 min-h-0" />
+              <div ref={atrRef} className="w-full flex-1 min-h-0 relative">
+                {!chartsRef.current.atr && <div className="absolute inset-0 animate-pulse" style={{ background: isDark ? '#0d1117' : '#fafafa' }} />}
+              </div>
             </div>
           )}
 
