@@ -123,6 +123,8 @@ function monthLabel(year, month) {
 
 // ── Main component ────────────────────────────────────────────────────────────
 
+const GOALS_DEFAULT_LIMIT = 4
+
 function MonthlyGoals({ initData }) {
   const { onContextMenu, ContextMenuPortal } = useContextMenu()
   const [goals, setGoals]           = useState(initData || [])
@@ -135,6 +137,7 @@ function MonthlyGoals({ initData }) {
   const [editingId, setEditingId]   = useState(null)
   const [editForm, setEditForm]     = useState({ title: '', description: '', target_date: '' })
   const [saving, setSaving]         = useState(false)
+  const [showAllGoals, setShowAllGoals] = useState(false)
 
   const fetchGoals = useCallback(async () => {
     setFetchError(null)
@@ -171,6 +174,24 @@ function MonthlyGoals({ initData }) {
   const completedCount = currentMonthGoals.filter(g => g.completed).length
   const totalCount     = currentMonthGoals.length
   const progress       = totalCount > 0 ? Math.round((completedCount / totalCount) * 100) : 0
+
+  // Sort by deadline urgency: overdue first, then nearest upcoming, completed last
+  const sortedCurrentGoals = useMemo(() => {
+    const todayMs = today.getTime()
+    return [...currentMonthGoals].sort((a, b) => {
+      if (a.completed !== b.completed) return a.completed ? 1 : -1
+      const aMs = a.target_date ? new Date(a.target_date + 'T00:00:00').getTime() : Infinity
+      const bMs = b.target_date ? new Date(b.target_date + 'T00:00:00').getTime() : Infinity
+      // overdue (past) before future; among same side, nearest first
+      const aOverdue = aMs < todayMs
+      const bOverdue = bMs < todayMs
+      if (aOverdue !== bOverdue) return aOverdue ? -1 : 1
+      return aMs - bMs
+    })
+  }, [currentMonthGoals, today.toDateString()])
+
+  const visibleCurrentGoals = showAllGoals ? sortedCurrentGoals : sortedCurrentGoals.slice(0, GOALS_DEFAULT_LIMIT)
+  const hasMoreGoals = sortedCurrentGoals.length > GOALS_DEFAULT_LIMIT
 
   // ── Mutations ─────────────────────────────────────────────────────────────
 
@@ -252,12 +273,14 @@ function MonthlyGoals({ initData }) {
   // ── Skeleton ──────────────────────────────────────────────────────────────
 
   if (loading) return (
-    <div className="bg-white dark:bg-gray-900 rounded-2xl p-4 border border-gray-100 dark:border-gray-800">
-      <div className="animate-pulse space-y-2">
-        <div className="h-4 bg-gray-100 dark:bg-gray-800 rounded w-1/3" />
-        <div className="h-1 bg-gray-100 dark:bg-gray-800 rounded-full w-full mt-3" />
-        <div className="h-8 bg-gray-100 dark:bg-gray-800 rounded-xl mt-2" />
-        <div className="h-8 bg-gray-100 dark:bg-gray-800 rounded-xl" />
+    <div className="bg-white/70 dark:bg-gray-900/60 backdrop-blur-md rounded-2xl border border-white/60 dark:border-white/10 shadow-sm p-4 h-full flex flex-col gap-3 animate-pulse">
+      <div className="flex items-center justify-between">
+        <div className="h-3 bg-gray-100 dark:bg-gray-800 rounded w-1/3" />
+        <div className="h-3 bg-gray-100 dark:bg-gray-800 rounded w-12" />
+      </div>
+      <div className="h-1.5 bg-gray-100 dark:bg-gray-800 rounded-full w-full" />
+      <div className="flex-1 space-y-2">
+        {[1,2,3,4].map(i => <div key={i} className="h-8 bg-gray-100 dark:bg-gray-800 rounded-xl" />)}
       </div>
     </div>
   )
@@ -278,7 +301,7 @@ function MonthlyGoals({ initData }) {
   // ── Render ────────────────────────────────────────────────────────────────
 
   return (
-    <div className="hp-card bg-white/70 dark:bg-gray-900/60 backdrop-blur-md rounded-2xl border border-white/60 dark:border-white/10 shadow-sm overflow-hidden h-full flex flex-col">
+    <div className="hp-card bg-white/70 dark:bg-gray-900/60 backdrop-blur-md rounded-2xl border border-white/60 dark:border-white/10 shadow-sm overflow-hidden h-full flex flex-col min-h-0">
       <ContextMenuPortal />
 
       {/* ── Header ── */}
@@ -391,65 +414,117 @@ function MonthlyGoals({ initData }) {
         </p>
       )}
 
-      {/* ── Goal list ── */}
-      <div className="px-3 pb-3 space-y-0.5 flex-1 overflow-y-auto">
-
-        {/* Current month */}
-        {currentMonthGoals.length === 0 && !showForm ? (
-          <div className="py-6 text-center">
-            <p className="text-[11px] text-gray-400">No goals for {monthLabel(y, m)}</p>
+      {/* ── Inline edit form — outside scroll area so it never scrolls off-screen ── */}
+      {editingId && (
+        <div className="mx-3 mb-2 bg-gray-50 dark:bg-gray-800/60 rounded-xl p-3 border border-gray-100 dark:border-gray-700/60 space-y-2 flex-shrink-0">
+          <input
+            type="text"
+            value={editForm.title}
+            onChange={e => setEditForm(f => ({ ...f, title: e.target.value }))}
+            autoFocus
+            maxLength={200}
+            className="w-full bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-700 rounded-lg px-2.5 py-1.5 text-xs text-gray-800 dark:text-white focus:outline-none focus:ring-1 focus:ring-indigo-400 transition-all"
+          />
+          <input
+            type="text"
+            value={editForm.description}
+            onChange={e => setEditForm(f => ({ ...f, description: e.target.value }))}
+            placeholder="Note (optional)"
+            maxLength={500}
+            className="w-full bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-700 rounded-lg px-2.5 py-1.5 text-xs text-gray-800 dark:text-white placeholder-gray-400 focus:outline-none focus:ring-1 focus:ring-indigo-400 transition-all"
+          />
+          <div className="flex gap-2 items-center">
+            <input
+              type="date"
+              value={editForm.target_date}
+              onChange={e => setEditForm(f => ({ ...f, target_date: e.target.value }))}
+              className="flex-1 bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-700 rounded-lg px-2.5 py-1.5 text-xs text-gray-600 dark:text-gray-300 focus:outline-none focus:ring-1 focus:ring-indigo-400 transition-all"
+            />
             <button
-              onClick={() => { setMutateErr(null); setShowForm(true) }}
-              className="mt-1.5 text-[11px] text-indigo-500 hover:text-indigo-400 transition-colors"
+              onClick={() => handleSaveEdit(editingId)}
+              disabled={saving || !editForm.title.trim()}
+              className="bg-indigo-500 hover:bg-indigo-400 disabled:opacity-40 text-white px-3 py-1.5 rounded-lg text-xs font-medium transition-colors whitespace-nowrap"
             >
-              + Add your first goal
+              {saving ? 'Saving…' : 'Save'}
+            </button>
+            <button
+              onClick={cancelEdit}
+              className="text-gray-400 hover:text-gray-600 dark:hover:text-gray-200 px-2 py-1.5 rounded-lg text-xs transition-colors"
+            >
+              Cancel
             </button>
           </div>
-        ) : (
-          currentMonthGoals.map(goal => (
-            <GoalRow
-              key={goal.id}
-              goal={goal}
-              editingId={editingId}
-              editForm={editForm}
-              setEditForm={setEditForm}
-              saving={saving}
-              onToggle={handleToggle}
-              onStartEdit={startEdit}
-              onDelete={handleDelete}
-              onSaveEdit={handleSaveEdit}
-              onCancelEdit={cancelEdit}
-              onContextMenu={onContextMenu}
-            />
-          ))
-        )}
+        </div>
+      )}
 
-        {/* Next month preview */}
-        {showNextMonth && nextMonthGoals.length > 0 && (
-          <>
-            <div className="flex items-center gap-2 pt-3 pb-1 px-0.5">
-              <span className="text-[10px] font-semibold uppercase tracking-widest text-gray-300 dark:text-gray-600">
-                {monthLabel(nextY, nextM)}
-              </span>
-              <div className="flex-1 h-px bg-gray-100 dark:bg-gray-800" />
+      {/* ── Goal list ── */}
+      <div className="flex-1 min-h-0 flex flex-col overflow-hidden">
+        <div className="flex-1 min-h-0 overflow-y-auto no-scrollbar px-3 space-y-0.5 pb-1">
+
+          {/* Current month */}
+          {currentMonthGoals.length === 0 && !showForm ? (
+            <div className="py-6 text-center">
+              <p className="text-[11px] text-gray-400">No goals for {monthLabel(y, m)}</p>
+              <button
+                onClick={() => { setMutateErr(null); setShowForm(true) }}
+                className="mt-1.5 text-[11px] text-indigo-500 hover:text-indigo-400 transition-colors"
+              >
+                + Add your first goal
+              </button>
             </div>
-            {nextMonthGoals.map(goal => (
+          ) : (
+            visibleCurrentGoals.map(goal => (
               <GoalRow
                 key={goal.id}
                 goal={goal}
                 editingId={editingId}
-                editForm={editForm}
-                setEditForm={setEditForm}
-                saving={saving}
                 onToggle={handleToggle}
                 onStartEdit={startEdit}
                 onDelete={handleDelete}
-                onSaveEdit={handleSaveEdit}
-                onCancelEdit={cancelEdit}
                 onContextMenu={onContextMenu}
               />
-            ))}
-          </>
+            ))
+          )}
+
+          {/* Next month preview */}
+          {showNextMonth && nextMonthGoals.length > 0 && (
+            <>
+              <div className="flex items-center gap-2 pt-3 pb-1 px-0.5">
+                <span className="text-[10px] font-semibold uppercase tracking-widest text-gray-300 dark:text-gray-600">
+                  {monthLabel(nextY, nextM)}
+                </span>
+                <div className="flex-1 h-px bg-gray-100 dark:bg-gray-800" />
+              </div>
+              {nextMonthGoals.map(goal => (
+                <GoalRow
+                  key={goal.id}
+                  goal={goal}
+                  editingId={editingId}
+                  editForm={editForm}
+                  setEditForm={setEditForm}
+                  saving={saving}
+                  onToggle={handleToggle}
+                  onStartEdit={startEdit}
+                  onDelete={handleDelete}
+                  onSaveEdit={handleSaveEdit}
+                  onCancelEdit={cancelEdit}
+                  onContextMenu={onContextMenu}
+                />
+              ))}
+            </>
+          )}
+        </div>
+
+        {/* Show all — sticky at bottom, outside scroll area */}
+        {hasMoreGoals && currentMonthGoals.length > 0 && (
+          <button
+            onClick={() => setShowAllGoals(s => !s)}
+            className="flex-shrink-0 py-2 text-[10px] font-medium text-indigo-500 dark:text-indigo-400 hover:text-indigo-400 dark:hover:text-indigo-300 transition-colors border-t border-gray-100 dark:border-gray-800 text-center w-full"
+          >
+            {showAllGoals
+              ? '↑ Show less'
+              : `Show all ${sortedCurrentGoals.length} goals`}
+          </button>
         )}
       </div>
     </div>
@@ -458,51 +533,8 @@ function MonthlyGoals({ initData }) {
 
 // ── GoalRow ───────────────────────────────────────────────────────────────────
 
-function GoalRow({ goal, editingId, editForm, setEditForm, saving, onToggle, onStartEdit, onDelete, onSaveEdit, onCancelEdit, onContextMenu }) {
-  if (editingId === goal.id) {
-    return (
-      <div className="bg-gray-50 dark:bg-gray-800/60 rounded-xl p-3 border border-gray-100 dark:border-gray-700/60 space-y-2 my-1">
-        <input
-          type="text"
-          value={editForm.title}
-          onChange={e => setEditForm(f => ({ ...f, title: e.target.value }))}
-          autoFocus
-          maxLength={200}
-          className="w-full bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-700 rounded-lg px-2.5 py-1.5 text-xs text-gray-800 dark:text-white focus:outline-none focus:ring-1 focus:ring-indigo-400 transition-all"
-        />
-        {/* MG07 fix: maxLength on description */}
-        <input
-          type="text"
-          value={editForm.description}
-          onChange={e => setEditForm(f => ({ ...f, description: e.target.value }))}
-          placeholder="Note (optional)"
-          maxLength={500}
-          className="w-full bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-700 rounded-lg px-2.5 py-1.5 text-xs text-gray-800 dark:text-white placeholder-gray-400 focus:outline-none focus:ring-1 focus:ring-indigo-400 transition-all"
-        />
-        <div className="flex gap-2 items-center">
-          <input
-            type="date"
-            value={editForm.target_date}
-            onChange={e => setEditForm(f => ({ ...f, target_date: e.target.value }))}
-            className="flex-1 bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-700 rounded-lg px-2.5 py-1.5 text-xs text-gray-600 dark:text-gray-300 focus:outline-none focus:ring-1 focus:ring-indigo-400 transition-all"
-          />
-          <button
-            onClick={() => onSaveEdit(goal.id)}
-            disabled={saving || !editForm.title.trim()}
-            className="bg-indigo-500 hover:bg-indigo-400 disabled:opacity-40 text-white px-3 py-1.5 rounded-lg text-xs font-medium transition-colors whitespace-nowrap"
-          >
-            {saving ? 'Saving…' : 'Save'}
-          </button>
-          <button
-            onClick={onCancelEdit}
-            className="text-gray-400 hover:text-gray-600 dark:hover:text-gray-200 px-2 py-1.5 rounded-lg text-xs transition-colors"
-          >
-            Cancel
-          </button>
-        </div>
-      </div>
-    )
-  }
+function GoalRow({ goal, editingId, onToggle, onStartEdit, onDelete, onContextMenu }) {
+  const isEditing = editingId === goal.id
 
   return (
     <div
@@ -511,9 +543,11 @@ function GoalRow({ goal, editingId, editForm, setEditForm, saving, onToggle, onS
         { separator: true },
         { label: 'Delete', icon: '🗑️', danger: true, action: () => onDelete(goal.id) },
       ])}
-      className={`flex items-start gap-2.5 px-2.5 py-2 rounded-xl transition-colors hover:bg-gray-50 dark:hover:bg-gray-800/60 ${
-        goal.completed ? 'opacity-55' : ''
-      }`}
+      className={`flex items-start gap-2.5 px-2.5 py-2 rounded-xl transition-colors ${
+        isEditing
+          ? 'bg-indigo-50 dark:bg-indigo-900/20 ring-1 ring-indigo-200 dark:ring-indigo-800'
+          : 'hover:bg-gray-50 dark:hover:bg-gray-800/60'
+      } ${goal.completed ? 'opacity-55' : ''}`}
     >
       {/* Checkbox */}
       <button

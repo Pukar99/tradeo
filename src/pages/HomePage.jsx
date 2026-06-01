@@ -31,10 +31,28 @@ const STOCK_COLORS = [
   'bg-orange-500','bg-pink-500','bg-teal-500',
   'bg-red-500','bg-indigo-500','bg-yellow-500','bg-cyan-500'
 ]
+const STOCK_BORDERS = [
+  'border-blue-400','border-green-400','border-purple-400',
+  'border-orange-400','border-pink-400','border-teal-400',
+  'border-red-400','border-indigo-400','border-yellow-400','border-cyan-400'
+]
+const STOCK_BAR_COLORS = [
+  'bg-blue-400','bg-green-400','bg-purple-400',
+  'bg-orange-400','bg-pink-400','bg-teal-400',
+  'bg-red-400','bg-indigo-400','bg-yellow-400','bg-cyan-400'
+]
 
 function getStockColor(symbol) {
   if (!symbol) return 'bg-blue-500'
   return STOCK_COLORS[symbol.charCodeAt(0) % STOCK_COLORS.length]
+}
+function getStockBorder(symbol) {
+  if (!symbol) return 'border-blue-400'
+  return STOCK_BORDERS[symbol.charCodeAt(0) % STOCK_BORDERS.length]
+}
+function getStockBar(symbol) {
+  if (!symbol) return 'bg-blue-400'
+  return STOCK_BAR_COLORS[symbol.charCodeAt(0) % STOCK_BAR_COLORS.length]
 }
 
 function StockAvatar({ symbol, size = 'w-8 h-8', textSize = 'text-xs' }) {
@@ -266,8 +284,13 @@ function LoggedOutHome() {
 }
 
 // ── Alerts widget (right column) ─────────────────────────────────────────────
+const ALERTS_DEFAULT_LIMIT = 7
+
+const SEVERITY_ORDER = { danger: 0, warn: 1, success: 2, info: 3 }
+
 function AlertsWidget({ initData }) {
   const navigate = useNavigate()
+  const [showAllAlerts, setShowAllAlerts] = useState(false)
   const trades   = initData?.trades   || []
   const watchlist = initData?.watchlist || []
   const goals    = initData?.goals    || []
@@ -333,6 +356,17 @@ function AlertsWidget({ initData }) {
       alerts.push({ type: 'circuit', label: `${t.symbol} near circuit — ${chg > 0 ? '+' : ''}${chg}%`, severity: chg > 0 ? 'success' : 'danger', to: '/screen' })
   }
 
+  // Sort by severity (danger first) then by deadline proximity for goal alerts
+  const sortedAlerts = [...alerts].sort((a, b) => {
+    const sd = (SEVERITY_ORDER[a.severity] ?? 9) - (SEVERITY_ORDER[b.severity] ?? 9)
+    if (sd !== 0) return sd
+    // secondary: goal alerts sorted by days-left embedded in label (lower = more urgent)
+    return 0
+  })
+
+  const visibleAlerts = showAllAlerts ? sortedAlerts : sortedAlerts.slice(0, ALERTS_DEFAULT_LIMIT)
+  const hasMoreAlerts = sortedAlerts.length > ALERTS_DEFAULT_LIMIT
+
   const iconMap = {
     nosl: '⚠', sl: '🔴', tp: '🟢', watch: '🔔', goal: '📅', circuit: '⚡',
   }
@@ -349,8 +383,15 @@ function AlertsWidget({ initData }) {
     info:   'text-blue-600 dark:text-blue-400',
   }
 
+  if (!initData) return (
+    <div className="bg-white/70 dark:bg-gray-900/60 backdrop-blur-md rounded-2xl border border-white/60 dark:border-white/10 shadow-sm h-full animate-pulse p-4 space-y-2">
+      <div className="h-3 bg-gray-100 dark:bg-gray-800 rounded w-1/4" />
+      {[1,2,3].map(i => <div key={i} className="h-8 bg-gray-100 dark:bg-gray-800 rounded-lg" />)}
+    </div>
+  )
+
   return (
-    <div className="hp-card bg-white/70 dark:bg-gray-900/60 backdrop-blur-md rounded-2xl border border-white/60 dark:border-white/10 shadow-sm overflow-hidden h-full flex flex-col">
+    <div className="hp-card bg-white/70 dark:bg-gray-900/60 backdrop-blur-md rounded-2xl border border-white/60 dark:border-white/10 shadow-sm overflow-hidden h-full flex flex-col min-h-0">
       <div className="flex items-center justify-between px-4 py-3 border-b border-gray-100 dark:border-gray-800 flex-shrink-0">
         <h3 className="text-[11px] font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-widest">Alerts</h3>
         {alerts.length > 0 && (
@@ -365,18 +406,30 @@ function AlertsWidget({ initData }) {
           <p className="text-[11px] text-gray-400 dark:text-gray-600">All clear — no active alerts</p>
         </div>
       ) : (
-        <div className="flex-1 divide-y divide-gray-50 dark:divide-gray-800 overflow-y-auto">
-          {alerts.map((a, i) => (
+        <>
+          {/* Scrollable alert list */}
+          <div className="flex-1 min-h-0 overflow-y-auto no-scrollbar divide-y divide-gray-50 dark:divide-gray-800">
+            {visibleAlerts.map((a, i) => (
+              <button
+                key={i}
+                onClick={() => navigate(a.to)}
+                className={`hp-alert-row w-full text-left flex items-center gap-2.5 px-3 py-2.5 border-l-2 ${severityClass[a.severity]}`}
+              >
+                <span className="text-sm flex-shrink-0">{iconMap[a.type]}</span>
+                <span className={`text-[11px] font-medium leading-snug ${textClass[a.severity]}`}>{a.label}</span>
+              </button>
+            ))}
+          </div>
+          {/* Show all — always pinned at bottom, outside scroll */}
+          {hasMoreAlerts && (
             <button
-              key={i}
-              onClick={() => navigate(a.to)}
-              className={`hp-alert-row w-full text-left flex items-center gap-2.5 px-3 py-2.5 border-l-2 ${severityClass[a.severity]}`}
+              onClick={() => setShowAllAlerts(s => !s)}
+              className="flex-shrink-0 py-2 text-[10px] font-medium text-indigo-500 dark:text-indigo-400 hover:text-indigo-400 dark:hover:text-indigo-300 transition-colors border-t border-gray-100 dark:border-gray-800 w-full"
             >
-              <span className="text-sm flex-shrink-0">{iconMap[a.type]}</span>
-              <span className={`text-[11px] font-medium leading-snug ${textClass[a.severity]}`}>{a.label}</span>
+              {showAllAlerts ? '↑ Show less' : `Show all ${sortedAlerts.length} alerts`}
             </button>
-          ))}
-        </div>
+          )}
+        </>
       )}
     </div>
   )
@@ -459,11 +512,14 @@ function CenterDashboard({ navigate, initData, onRefresh, onDataReady }) {
     setOpenPositions(openWithPrices)
 
     const totalUnrealized = openWithPrices.reduce((s, t) => s + (t.unrealizedPnl || 0), 0)
-    const totalRealized   = closed.reduce((s, t) => s + (parseFloat(t.realized_pnl) || 0), 0)
-    const profitable      = closed.filter(t => (parseFloat(t.realized_pnl) || 0) > 0).length
-    const winRate         = closed.length > 0 ? Math.round((profitable / closed.length) * 100) : 0
     const todayStr        = new Date().toISOString().slice(0, 10)
-    const todayPnl        = closed
+    // 2-month window for Realized P/L and Win Rate
+    const twoMonthsAgo   = new Date(); twoMonthsAgo.setMonth(twoMonthsAgo.getMonth() - 2); twoMonthsAgo.setHours(0,0,0,0)
+    const recent         = closed.filter(t => t.last_action_at && new Date(t.last_action_at) >= twoMonthsAgo)
+    const totalRealized  = recent.reduce((s, t) => s + (parseFloat(t.realized_pnl) || 0), 0)
+    const profitable     = recent.filter(t => (parseFloat(t.realized_pnl) || 0) > 0).length
+    const winRate        = recent.length > 0 ? Math.round((profitable / recent.length) * 100) : 0
+    const todayPnl       = closed
       .filter(t => t.last_action_at?.slice(0, 10) === todayStr)
       .reduce((s, t) => s + (parseFloat(t.realized_pnl) || 0), 0)
     const totalInvested  = openWithPrices.reduce((s, t) => s + (t.entry_price * t.quantity), 0)
@@ -471,7 +527,7 @@ function CenterDashboard({ navigate, initData, onRefresh, onDataReady }) {
     const stats = {
       totalPnl: totalRealized + totalUnrealized, unrealizedPnl: totalUnrealized,
       realizedPnl: totalRealized, todayPnl, winRate, openCount: openWithPrices.length,
-      closedCount: closed.length, totalInvested, currentValue,
+      closedCount: recent.length, totalInvested, currentValue,
     }
     setPerfStats(stats)
 
@@ -688,11 +744,36 @@ function CenterDashboard({ navigate, initData, onRefresh, onDataReady }) {
   }
 
   if (loading) return (
-    <div className="flex flex-col gap-4">
-      <div className="bg-white/70 dark:bg-gray-900/60 backdrop-blur-md rounded-2xl p-6 shadow-sm border border-white/60 dark:border-white/10 animate-pulse">
-        <div className="h-6 bg-gray-100 dark:bg-gray-700/50 rounded w-1/2 mb-4" />
-        <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
-          {[1,2,3,4].map(i => <div key={i} className="h-16 bg-gray-100 dark:bg-gray-700/50 rounded-xl" />)}
+    <div className="flex flex-col gap-3 sm:gap-4 animate-pulse">
+      {/* Stat cards */}
+      <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 sm:gap-2.5">
+        {[1,2,3,4].map(i => (
+          <div key={i} className="bg-white/70 dark:bg-gray-900/60 backdrop-blur-md rounded-xl sm:rounded-2xl border border-white/60 dark:border-white/10 shadow-sm px-3 py-2.5">
+            <div className="h-2 bg-gray-100 dark:bg-gray-800 rounded w-3/4 mb-2" />
+            <div className="h-5 bg-gray-100 dark:bg-gray-800 rounded w-1/2" />
+          </div>
+        ))}
+      </div>
+      {/* Chart placeholder */}
+      <div className="bg-white/70 dark:bg-gray-900/60 backdrop-blur-md rounded-2xl border border-white/60 dark:border-white/10 shadow-sm h-[200px] sm:h-[220px]" />
+      {/* Watchlist placeholder */}
+      <div className="bg-white/70 dark:bg-gray-900/60 backdrop-blur-md rounded-2xl border border-white/60 dark:border-white/10 shadow-sm">
+        <div className="h-10 border-b border-gray-100 dark:border-gray-800 px-3 flex items-center gap-2">
+          <div className="h-2 bg-gray-100 dark:bg-gray-800 rounded w-16" />
+          <div className="flex-1" />
+          <div className="h-6 bg-gray-100 dark:bg-gray-800 rounded-lg w-40" />
+        </div>
+        <div className="grid grid-cols-4 gap-1.5 p-1.5">
+          {[1,2,3,4].map(i => (
+            <div key={i} className="bg-gray-50 dark:bg-gray-800/50 rounded-xl px-1.5 py-1.5 space-y-1.5">
+              <div className="flex items-center gap-1">
+                <div className="w-5 h-5 bg-gray-200 dark:bg-gray-700 rounded-lg flex-shrink-0" />
+                <div className="h-2.5 bg-gray-200 dark:bg-gray-700 rounded w-2/3" />
+              </div>
+              <div className="h-3 bg-gray-200 dark:bg-gray-700 rounded w-full" />
+              <div className="h-1.5 bg-gray-200 dark:bg-gray-700 rounded-full w-full" />
+            </div>
+          ))}
         </div>
       </div>
     </div>
@@ -706,11 +787,20 @@ function CenterDashboard({ navigate, initData, onRefresh, onDataReady }) {
   )
 
   return (
-    <div className="flex flex-col lg:grid gap-3 sm:gap-4" style={{ gridTemplateRows: '15fr 35fr 50fr' }}>
+    <div className="flex flex-col gap-3 sm:gap-4">
 
-      {/* ── Stats Bar (15% on desktop, auto on mobile) ───────────────────────── */}
-      <div className="flex flex-col gap-2 lg:min-h-0">
-      {perfStats && (
+      {/* ── Stats Bar ────────────────────────────────────────────────────────── */}
+      <div className="flex flex-col gap-2">
+      {!perfStats ? (
+        <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 sm:gap-2.5 animate-pulse">
+          {[1,2,3,4].map(i => (
+            <div key={i} className="bg-white/70 dark:bg-gray-900/60 backdrop-blur-md rounded-xl sm:rounded-2xl border border-white/60 dark:border-white/10 shadow-sm px-3 py-2.5">
+              <div className="h-2 bg-gray-100 dark:bg-gray-800 rounded w-3/4 mb-2" />
+              <div className="h-5 bg-gray-100 dark:bg-gray-800 rounded w-1/2" />
+            </div>
+          ))}
+        </div>
+      ) : (
         <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 sm:gap-2.5">
           <StatCard
             label="Total P/L Today"
@@ -719,16 +809,16 @@ function CenterDashboard({ navigate, initData, onRefresh, onDataReady }) {
             sub={perfStats.todayPnl === 0 ? 'No trades closed today' : `${perfStats.closedCount} total closed`}
           />
           <StatCard
-            label="Realized P/L"
+            label="Realized P/L (2M)"
             value={`${perfStats.realizedPnl >= 0 ? '+' : ''}Rs. ${Math.abs(Math.round(perfStats.realizedPnl)).toLocaleString()}`}
             color={perfStats.realizedPnl > 0 ? 'text-green-500' : perfStats.realizedPnl < 0 ? 'text-red-500' : 'text-gray-500 dark:text-gray-400'}
-            sub={perfStats.closedCount > 0 ? `${perfStats.closedCount} closed trade${perfStats.closedCount !== 1 ? 's' : ''}` : 'No closed trades yet'}
+            sub={perfStats.closedCount > 0 ? `${perfStats.closedCount} trade${perfStats.closedCount !== 1 ? 's' : ''} last 2mo` : 'No trades last 2mo'}
           />
           <StatCard
-            label={tr('stats.winRate')}
+            label="Win Rate (2M)"
             value={`${perfStats.winRate}%`}
             color={perfStats.winRate >= 50 ? 'text-green-500' : perfStats.winRate > 0 ? 'text-yellow-500' : 'text-gray-500 dark:text-gray-400'}
-            sub={perfStats.closedCount > 0 ? `from ${perfStats.closedCount} closed trades` : 'No closed trades yet'}
+            sub={perfStats.closedCount > 0 ? `${perfStats.closedCount} trade${perfStats.closedCount !== 1 ? 's' : ''} last 2mo` : 'No trades last 2mo'}
           />
           <StatCard
             label={tr('stats.openPositions')}
@@ -755,13 +845,13 @@ function CenterDashboard({ navigate, initData, onRefresh, onDataReady }) {
 
       </div>{/* end stats section */}
 
-      {/* ── NEPSE Chart (35% on desktop, auto on mobile) ────────────────────── */}
-      <div className="lg:min-h-0">
+      {/* ── NEPSE Chart ──────────────────────────────────────────────────────── */}
+      <div>
       <NEPSEChart fixed={true} />
       </div>
 
-      {/* ── Watchlist (remaining ~50% on desktop, auto on mobile) ───────────── */}
-      <div className="lg:min-h-0 flex flex-col overflow-hidden">
+      {/* ── Watchlist ────────────────────────────────────────────────────────── */}
+      <div className="flex flex-col overflow-hidden">
       {/* ── Watchlist edit modal — outside overflow-hidden container (WL-04 fix) ── */}
       <WatchMenuPortal />
       {watchEditItem && watchEditForm && (() => {
@@ -1095,7 +1185,7 @@ function CenterDashboard({ navigate, initData, onRefresh, onDataReady }) {
 
         {/* List */}
         {watchlistTab === 'positions' ? (
-          <div>
+          <div className="overflow-y-auto no-scrollbar max-h-[280px]">
             {openPositions.length === 0 ? (
               <div className="p-6 text-center">
                 <p className="text-gray-400 text-xs">No open positions</p>
@@ -1176,9 +1266,9 @@ function CenterDashboard({ navigate, initData, onRefresh, onDataReady }) {
             )}
           </div>
         ) : (
-        <div className="grid grid-cols-2 gap-px bg-gray-200/50 dark:bg-white/5">
+        <div className="grid grid-cols-4 gap-1.5 p-1.5">
           {filteredWatch.length === 0 ? (
-            <div className="col-span-2 py-8 text-center bg-white dark:bg-gray-900">
+            <div className="col-span-4 py-8 text-center">
               <p className="text-[11px] text-gray-400">No stocks in {watchlistTab === 'active' ? 'Active' : 'Pre-Watch'}</p>
               <p className="text-[10px] text-gray-300 dark:text-gray-600 mt-1">
                 {watchlistTab === 'active' ? 'Items auto-promote when alert is within 15% or 2 weeks' : 'Click + to add a symbol'}
@@ -1192,10 +1282,11 @@ function CenterDashboard({ navigate, initData, onRefresh, onDataReady }) {
                 ? Math.max(0, Math.min(100, 100 - (Math.abs((item.currentPrice - parseFloat(item.price_alert)) / item.currentPrice) * 100) / 15))
                 : null
               const meta = item.price_alert
-                ? `Alert Rs.${parseFloat(item.price_alert).toLocaleString()}`
+                ? `@ Rs.${parseFloat(item.price_alert).toLocaleString()}`
                 : item.alert_date
                   ? `By ${new Date(item.alert_date + 'T00:00:00').toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}`
                   : item.notes || null
+              const isUp = item.change != null && item.change >= 0
 
               return (
                 <div key={item.id}
@@ -1204,41 +1295,60 @@ function CenterDashboard({ navigate, initData, onRefresh, onDataReady }) {
                     { separator: true },
                     { label: 'Delete', icon: '🗑️', danger: true, action: () => handleRemoveWatch(item.id) },
                   ])}
-                  className={`hp-watch-item px-2.5 py-2 cursor-default bg-transparent ${isExpired ? 'opacity-60' : ''}`}
+                  className={`hp-watch-item relative flex flex-col gap-1 px-1.5 py-1.5 rounded-xl cursor-default
+                    bg-white/70 dark:bg-gray-800/50 border border-white/80 dark:border-white/5
+                    backdrop-blur-sm shadow-sm border-l-[3px] ${getStockBorder(item.symbol)}
+                    ${isExpired ? 'opacity-50' : ''}`}
+                  translate="no"
                 >
-                  <div className="flex items-start justify-between gap-1" translate="no">
-                    <div className="min-w-0 flex-1">
-                      <div className="flex items-center gap-1 flex-wrap">
-                        <p className={`text-[12px] font-bold leading-none ${isExpired ? 'text-gray-400 dark:text-gray-500' : 'text-gray-900 dark:text-white'}`}>{item.symbol}</p>
-                        {isExpired && <span className="text-[8px] px-1 py-0.5 rounded bg-gray-100 dark:bg-gray-800 text-gray-400 font-semibold uppercase tracking-wide">Exp</span>}
-                        {inGrace   && <span className="text-[8px] px-1 py-0.5 rounded bg-amber-100 dark:bg-amber-900/30 text-amber-600 dark:text-amber-400 font-semibold uppercase tracking-wide">Grace</span>}
-                      </div>
-                      {meta && <p className="text-[10px] text-gray-400 mt-0.5 truncate">{meta}</p>}
-                    </div>
-                    <div className="text-right shrink-0">
-                      <p className="text-[11px] font-semibold tabular-nums text-gray-900 dark:text-white leading-none">
-                        {item.currentPrice != null ? `Rs.${parseFloat(item.currentPrice).toLocaleString()}` : '—'}
-                      </p>
-                      {item.change != null && (
-                        <p className={`text-[10px] font-medium tabular-nums ${item.change >= 0 ? 'text-green-600 dark:text-green-400' : 'text-red-600 dark:text-red-400'}`}>
-                          {item.change >= 0 ? '+' : ''}{item.change}%
-                        </p>
-                      )}
-                    </div>
+                  {/* Avatar + symbol */}
+                  <div className="flex items-center gap-1">
+                    <StockAvatar symbol={item.symbol} size="w-5 h-5" textSize="text-[8px]" />
+                    <span className={`text-[10px] font-bold leading-none truncate ${isExpired ? 'text-gray-400 dark:text-gray-500' : 'text-gray-900 dark:text-white'}`}>
+                      {item.symbol}
+                    </span>
                   </div>
-                  {watchlistTab === 'active' && priceFill != null && (
-                    <div className="mt-1.5 h-0.5 w-full bg-gray-100 dark:bg-gray-700 rounded-full overflow-hidden">
-                      <div className="h-full rounded-full bg-blue-400 dark:bg-blue-500 transition-all" style={{ width: `${priceFill}%` }} />
+
+                  {/* Price + change */}
+                  <div className="flex items-baseline justify-between gap-0.5">
+                    <p className="text-[11px] font-bold tabular-nums text-gray-900 dark:text-white leading-none truncate">
+                      {item.currentPrice != null ? `Rs.${parseFloat(item.currentPrice).toLocaleString()}` : '—'}
+                    </p>
+                    {item.change != null && (
+                      <span className={`text-[9px] font-semibold tabular-nums shrink-0 ${isUp ? 'text-green-500 dark:text-green-400' : 'text-red-500 dark:text-red-400'}`}>
+                        {isUp ? '+' : ''}{item.change}%
+                      </span>
+                    )}
+                  </div>
+
+                  {/* Meta */}
+                  {meta && (
+                    <p className="text-[8px] text-gray-400 dark:text-gray-500 truncate leading-none">{meta}</p>
+                  )}
+
+                  {/* Status badges */}
+                  {(isExpired || inGrace) && (
+                    <div className="flex gap-1">
+                      {isExpired && <span className="text-[7px] px-1 py-0.5 rounded bg-gray-100 dark:bg-gray-700 text-gray-400 font-semibold uppercase tracking-wide">Exp</span>}
+                      {inGrace   && <span className="text-[7px] px-1 py-0.5 rounded bg-amber-100 dark:bg-amber-900/30 text-amber-600 dark:text-amber-400 font-semibold uppercase tracking-wide">Grace</span>}
                     </div>
                   )}
-                  {/* Alert status badges */}
+
+                  {/* Progress bar */}
+                  {watchlistTab === 'active' && priceFill != null && (
+                    <div className="h-0.5 w-full bg-gray-100 dark:bg-gray-700/60 rounded-full overflow-hidden">
+                      <div className={`h-full rounded-full ${getStockBar(item.symbol)} transition-all`} style={{ width: `${priceFill}%` }} />
+                    </div>
+                  )}
+
+                  {/* Alert badges */}
                   {(() => {
                     const msgs = watchAlertMsgs(item)
                     if (!msgs.length) return null
                     return (
-                      <div className="flex flex-wrap gap-1 mt-1">
+                      <div className="flex flex-wrap gap-0.5">
                         {msgs.map((m, i) => (
-                          <span key={i} className={`text-[9px] font-medium px-1 py-0.5 rounded ${m.bg} ${m.color}`}>{m.text}</span>
+                          <span key={i} className={`text-[8px] font-medium px-1 py-0.5 rounded-full ${m.bg} ${m.color}`}>{m.text}</span>
                         ))}
                       </div>
                     )
@@ -1316,7 +1426,7 @@ function LoggedInHome() {
         </div>
 
         {/* LEFT column — desktop only: stacked 35/65 rows */}
-        <div className="hidden lg:grid col-span-3 order-1 gap-3 hp-side-left" style={{ gridTemplateRows: '35fr 65fr' }}>
+        <div className="hidden lg:grid col-span-3 order-1 gap-3 hp-side-left" style={{ gridTemplateRows: '35fr 65fr', height: 'calc(100dvh - 56px - 80px)' }}>
           {initData
             ? <>
                 <TaskBoard initData={initData.tasks} mindsetContent={initData.mindset?.content} />
@@ -1330,12 +1440,15 @@ function LoggedInHome() {
         </div>
 
         {/* RIGHT column — desktop only: stacked 35/65 rows */}
-        <div className="hidden lg:grid col-span-3 order-3 gap-3 hp-side-right" style={{ gridTemplateRows: '35fr 65fr' }}>
+        <div className="hidden lg:grid col-span-3 order-3 gap-3 hp-side-right" style={{ gridTemplateRows: '35fr 65fr', height: 'calc(100dvh - 56px - 80px)' }}>
           {initData
             ? <DisciplineScore initData={initData.discipline} />
             : <div className="rounded-2xl bg-gray-100 dark:bg-gray-800 animate-pulse min-h-[120px]" />
           }
-          <AlertsWidget initData={initData} />
+          {initData
+            ? <AlertsWidget initData={initData} />
+            : <div className="rounded-2xl bg-gray-100 dark:bg-gray-800 animate-pulse min-h-[200px]" />
+          }
         </div>
 
         {/* MOBILE only — two independent toggled cards */}

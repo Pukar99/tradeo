@@ -104,7 +104,7 @@ function DisciplineScore({ initData }) {
       <div className="flex gap-4">
         <div className="w-20 h-20 rounded-full bg-gray-100 dark:bg-gray-800 flex-shrink-0" />
         <div className="flex-1 space-y-2 pt-1">
-          {[1,2,3,4,5].map(i => <div key={i} className="h-2 bg-gray-100 dark:bg-gray-800 rounded" />)}
+          {[1,2,3].map(i => <div key={i} className="h-2 bg-gray-100 dark:bg-gray-800 rounded" />)}
         </div>
       </div>
     </div>
@@ -113,15 +113,13 @@ function DisciplineScore({ initData }) {
   const score = data?.finalScore ?? data?.monthlyScore ?? 0
   const bd = data?.breakdown || {}
   const dims = [
-    { key: 'taskCompletion',    extra: null,                                                                   noData: false },
-    { key: 'journalConsistency',extra: null,                                                                   noData: false },
-    { key: 'winRate',           extra: bd.winRate?.raw      != null ? `${bd.winRate.raw}% WR`       : null,   noData: bd.winRate?.raw      == null && bd.winRate?.score      === 0 },
-    { key: 'slUsage',           extra: null,                                                                   noData: false },
-    { key: 'rrConsistency',     extra: bd.rrConsistency?.raw != null ? `${bd.rrConsistency.raw}R avg` : null, noData: bd.rrConsistency?.raw == null && bd.rrConsistency?.score === 0 },
+    { key: 'taskCompletion',    extra: null,                                                                 noData: false },
+    { key: 'journalConsistency',extra: null,                                                                 noData: false },
+    { key: 'winRate',           extra: bd.winRate?.raw != null ? `${bd.winRate.raw}% WR` : null,           noData: bd.winRate?.raw == null && bd.winRate?.score === 0 },
   ]
 
   return (
-    <div className="hp-card bg-white/70 dark:bg-gray-900/60 backdrop-blur-md rounded-2xl border border-white/60 dark:border-white/10 shadow-sm p-4 pb-3 flex flex-col gap-3 h-full overflow-y-auto">
+    <div className="hp-card bg-white/70 dark:bg-gray-900/60 backdrop-blur-md rounded-2xl border border-white/60 dark:border-white/10 shadow-sm p-4 pb-3 flex flex-col gap-3 h-full min-h-0 overflow-y-auto">
 
       {/* Header */}
       <div className="flex items-center justify-between">

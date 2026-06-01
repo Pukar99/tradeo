@@ -426,25 +426,25 @@ const GRADE = (pct) => {
 
 // ── Ring — same as DisciplineScore, blue palette ──────────────────────────────
 function Ring({ pct, completed, total }) {
-  const size = 88
-  const r = 34
+  const size = 72
+  const r = 27
   const circ = 2 * Math.PI * r
   const offset = circ - (pct / 100) * circ
   const grade = GRADE(pct)
 
   return (
     <div className="relative flex-shrink-0" style={{ width: size, height: size }}>
-      <svg width={size} height={size} viewBox="0 0 88 88" className="-rotate-90">
-        <circle cx="44" cy="44" r={r} fill="none" stroke="currentColor"
-          className="text-gray-100 dark:text-gray-800" strokeWidth="7" />
-        <circle cx="44" cy="44" r={r} fill="none"
-          stroke={grade.ring} strokeWidth="7" strokeLinecap="round"
+      <svg width={size} height={size} viewBox="0 0 72 72" className="-rotate-90">
+        <circle cx="36" cy="36" r={r} fill="none" stroke="currentColor"
+          className="text-gray-100 dark:text-gray-800" strokeWidth="6" />
+        <circle cx="36" cy="36" r={r} fill="none"
+          stroke={grade.ring} strokeWidth="6" strokeLinecap="round"
           strokeDasharray={circ} strokeDashoffset={offset}
           style={{ transition: 'stroke-dashoffset 0.9s ease' }} />
       </svg>
       <div className="absolute inset-0 flex flex-col items-center justify-center">
-        <span className={`text-lg font-bold leading-none ${grade.color}`}>{completed}</span>
-        <span className={`text-[10px] font-semibold ${grade.color} opacity-70`}>/ {total}</span>
+        <span className={`text-base font-bold leading-none ${grade.color}`}>{completed}</span>
+        <span className={`text-[9px] font-semibold ${grade.color} opacity-70`}>/ {total}</span>
       </div>
     </div>
   )
@@ -479,10 +479,10 @@ function TaskBar({ label, iconType = 'custom', done, onClick, onDelete }) {
       onContextMenu={handleContextMenu}
       className={`space-y-1 ${!done ? 'cursor-pointer group' : ''}`}
     >
-      <div className="flex items-center justify-between">
-        <div className="flex items-center gap-1.5">
-          <span className={`transition-colors ${iconColor}`}>{iconEl}</span>
-          <span className={`text-[10px] transition-colors leading-none ${
+      <div className="flex items-center justify-between gap-1 min-w-0">
+        <div className="flex items-center gap-1.5 min-w-0 flex-1">
+          <span className={`transition-colors flex-shrink-0 ${iconColor}`}>{iconEl}</span>
+          <span className={`text-[11px] transition-colors leading-none truncate ${
             done
               ? 'line-through text-gray-400 dark:text-gray-600'
               : 'text-gray-500 dark:text-gray-400 group-hover:text-gray-700 dark:group-hover:text-gray-200'
@@ -608,12 +608,12 @@ function TaskBoard({ initData, mindsetContent }) {
   }
 
   if (loading) return (
-    <div className="bg-white/70 dark:bg-gray-900/60 backdrop-blur-md rounded-2xl border border-white/60 dark:border-white/10 shadow-sm p-4 space-y-3 animate-pulse">
+    <div className="bg-white/70 dark:bg-gray-900/60 backdrop-blur-md rounded-2xl border border-white/60 dark:border-white/10 shadow-sm p-4 flex flex-col gap-3 animate-pulse h-full">
       <div className="h-3 bg-gray-100 dark:bg-gray-800 rounded w-1/2" />
-      <div className="flex gap-4">
-        <div className="w-[88px] h-[88px] rounded-full bg-gray-100 dark:bg-gray-800 flex-shrink-0" />
+      <div className="flex gap-3">
+        <div className="w-[72px] h-[72px] rounded-full bg-gray-100 dark:bg-gray-800 flex-shrink-0" />
         <div className="flex-1 space-y-3 pt-2">
-          {[1,2,3].map(i => <div key={i} className="h-4 bg-gray-100 dark:bg-gray-800 rounded" />)}
+          {[1,2,3].map(i => <div key={i} className="h-5 bg-gray-100 dark:bg-gray-800 rounded" />)}
         </div>
       </div>
     </div>
@@ -643,28 +643,30 @@ function TaskBoard({ initData, mindsetContent }) {
         />
       )}
 
-      <div className="hp-card bg-white/70 dark:bg-gray-900/60 backdrop-blur-md rounded-2xl border border-white/60 dark:border-white/10 shadow-sm p-4 flex flex-col gap-3 h-full overflow-y-auto">
+      <div className="hp-card bg-white/70 dark:bg-gray-900/60 backdrop-blur-md rounded-2xl border border-white/60 dark:border-white/10 shadow-sm flex flex-col h-full overflow-hidden">
 
-        {/* Header — identical to DisciplineScore */}
-        <div className="flex items-center justify-between">
+        {/* Fixed header — never scrolls */}
+        <div className="flex items-center justify-between px-4 pt-4 pb-2 flex-shrink-0">
           <h3 className="text-[11px] font-semibold uppercase tracking-widest text-gray-400 dark:text-gray-500">
             Daily Routine
           </h3>
           {totalDone === totalTasks && totalTasks > 0 && (
-            <span className="text-[10px] text-indigo-400 font-medium tracking-wide">All done</span>
+            <span className="text-[10px] text-indigo-400 font-medium tracking-wide">All done ✓</span>
           )}
         </div>
 
-        {/* Ring + bars — identical layout to DisciplineScore */}
-        <div className="flex items-start gap-4">
-          <div className="flex flex-col items-center gap-1">
+        {/* Ring + scrollable task list */}
+        <div className="flex items-start gap-3 px-4 min-w-0 flex-1 min-h-0">
+          {/* Ring — fixed, never scrolls */}
+          <div className="flex flex-col items-center gap-1 flex-shrink-0 pt-1">
             <Ring pct={fixedProgress} completed={totalDone} total={totalTasks} />
-            <span className="text-[10px] text-gray-400 text-center leading-tight">
+            <span className="text-[9px] text-gray-400 text-center leading-tight">
               daily<br/>progress
             </span>
           </div>
 
-          <div className="flex-1 space-y-2.5 pt-1">
+          {/* Task list — scrolls when overflow */}
+          <div className="flex-1 min-w-0 overflow-y-auto no-scrollbar py-1 space-y-2.5">
             {fixedTasks.map(task => (
               <TaskBar
                 key={task.id}
@@ -687,8 +689,8 @@ function TaskBoard({ initData, mindsetContent }) {
           </div>
         </div>
 
-        {/* Add task — mirrors impact tag placement in DisciplineScore */}
-        <div className="border-t border-gray-50 dark:border-gray-800 pt-2 space-y-1.5">
+        {/* Fixed footer — add task, never scrolls */}
+        <div className="flex-shrink-0 border-t border-gray-50 dark:border-gray-800 px-4 py-2.5 space-y-1.5">
           {mutateErr && (
             <p className="text-[10px] text-red-500 bg-red-50 dark:bg-red-950 px-2 py-1 rounded-lg">{mutateErr}</p>
           )}
@@ -700,6 +702,7 @@ function TaskBoard({ initData, mindsetContent }) {
                 onChange={e => setNewTask(e.target.value)}
                 placeholder="Task name…"
                 autoFocus
+                maxLength={100}
                 className="flex-1 bg-gray-50 dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg px-2.5 py-1.5 text-[11px] text-gray-800 dark:text-white placeholder-gray-400 focus:outline-none focus:border-blue-400 transition-colors min-w-0"
               />
               <button
