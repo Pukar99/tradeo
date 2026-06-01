@@ -95,21 +95,27 @@ const COMPLEX_TABS = [
 
 // ── Simple mode content ──────────────────────────────────────────────────────
 
-function SimpleContent({ activeTab, mobilePanel, setMobilePanel }) {
+function SimpleContent({ activeTab, mobilePanel, setMobilePanel, leftOpen, toggleLeft }) {
   if (activeTab === 'MultiChart') return (
-    <Suspense fallback={<TabSpinner />}>
-      <MultiChartPage />
-    </Suspense>
+    <div key="MultiChart" className="flex-1 min-h-0 animate-tab-in">
+      <Suspense fallback={<TabSpinner />}>
+        <MultiChartPage />
+      </Suspense>
+    </div>
   )
   if (activeTab === 'SMC') return (
-    <Suspense fallback={<TabSpinner />}>
-      <SMCChartPage />
-    </Suspense>
+    <div key="SMC" className="flex-1 min-h-0 animate-tab-in">
+      <Suspense fallback={<TabSpinner />}>
+        <SMCChartPage />
+      </Suspense>
+    </div>
   )
   if (activeTab === 'PriceAction') return (
-    <Suspense fallback={<TabSpinner />}>
-      <PriceActionPage />
-    </Suspense>
+    <div key="PriceAction" className="flex-1 min-h-0 animate-tab-in">
+      <Suspense fallback={<TabSpinner />}>
+        <PriceActionPage />
+      </Suspense>
+    </div>
   )
 
   // General — chart + panels layout
@@ -117,22 +123,53 @@ function SimpleContent({ activeTab, mobilePanel, setMobilePanel }) {
     <>
       <div className="flex-1 flex overflow-hidden min-h-0">
 
-        {/* Left panel — desktop only (lg+) */}
-        <div className="w-[10%] min-w-[120px] max-w-[180px] border-r border-gray-100
-                        dark:border-gray-800 overflow-y-auto hidden lg:flex flex-col shrink-0">
-          <LeftPanel />
+        {/* Left panel — iOS 26 liquid glass, collapsible */}
+        <div className={`hidden lg:flex flex-col shrink-0 overflow-y-auto relative
+                        bg-white/50 dark:bg-gray-950/60 backdrop-blur-2xl
+                        shadow-[1px_0_0_rgba(255,255,255,0.18),2px_0_12px_rgba(0,0,0,0.06)]
+                        dark:shadow-[1px_0_0_rgba(255,255,255,0.07),2px_0_16px_rgba(0,0,0,0.4)]
+                        transition-all duration-200 ease-in-out
+                        ${leftOpen ? 'w-[13%] min-w-[150px] max-w-[200px]' : 'w-0 min-w-0 max-w-0 overflow-hidden'} ${!leftOpen ? 'screen-panel-collapsed' : ''}`}>
+          <div className="screen-panel-content flex flex-col h-full">
+            <LeftPanel />
+          </div>
         </div>
 
-        {/* Chart */}
-        <div className="flex-1 min-h-0 overflow-hidden">
+        {/* Chart — wraps toggle button on left edge */}
+        <div className="flex-1 min-h-0 overflow-hidden relative">
+          {/* Toggle button — sits on the left edge of the chart, always accessible */}
+          <button
+            onClick={toggleLeft}
+            title={leftOpen ? 'Hide left panel' : 'Show left panel'}
+            className="hidden lg:flex absolute left-0 top-1/2 -translate-y-1/2 z-30
+                       h-12 w-4 items-center justify-center
+                       bg-white/70 dark:bg-gray-800/70 backdrop-blur-sm
+                       border-y border-r border-gray-200/60 dark:border-gray-700/50
+                       rounded-r-lg shadow-sm
+                       text-gray-400 dark:text-gray-500
+                       hover:bg-white dark:hover:bg-gray-700
+                       hover:text-blue-500 dark:hover:text-blue-400
+                       transition-all duration-150"
+          >
+            <svg
+              className={`w-2.5 h-2.5 transition-transform duration-200 ${leftOpen ? '' : 'rotate-180'}`}
+              viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2.5}
+              strokeLinecap="round" strokeLinejoin="round"
+            >
+              <polyline points="15 18 9 12 15 6" />
+            </svg>
+          </button>
+
           <ErrorBoundary label="Chart">
             <StockChart />
           </ErrorBoundary>
         </div>
 
-        {/* Right panel — desktop only (lg+) */}
-        <div className="w-[15%] min-w-[160px] max-w-[240px] border-l border-gray-100
-                        dark:border-gray-800 overflow-y-auto hidden lg:flex flex-col shrink-0">
+        {/* Right panel — iOS 26 liquid glass */}
+        <div className="w-[16%] min-w-[170px] max-w-[240px] hidden lg:flex flex-col shrink-0 overflow-y-auto relative
+                        bg-white/50 dark:bg-gray-950/60 backdrop-blur-2xl
+                        shadow-[-1px_0_0_rgba(255,255,255,0.18),-2px_0_12px_rgba(0,0,0,0.06)]
+                        dark:shadow-[-1px_0_0_rgba(255,255,255,0.07),-2px_0_16px_rgba(0,0,0,0.4)]">
           <RightPanel />
         </div>
       </div>
@@ -287,22 +324,23 @@ function MobileSheet({ panel, onClose }) {
 
 function TabStrip({ tabs, active, onChange, lockedIds = [] }) {
   return (
-    <div className="flex items-center bg-gray-100 dark:bg-gray-800 rounded-lg p-0.5">
+    <div className="flex items-center bg-gray-100/80 dark:bg-gray-800/80 rounded-lg p-0.5 gap-0.5">
       {tabs.map(t => {
         const locked = lockedIds.includes(t.id)
+        const isActive = active === t.id
         return (
           <button key={t.id} onClick={() => onChange(t.id)}
-            className={`flex items-center gap-1 px-2 py-0.5 rounded-md text-[10px] font-semibold transition-colors whitespace-nowrap ${
-              active === t.id
-                ? 'bg-white dark:bg-gray-700 text-gray-900 dark:text-white shadow-sm'
+            className={`flex items-center gap-1 px-2.5 py-1 rounded-md text-[10px] font-bold transition-all whitespace-nowrap ${
+              isActive
+                ? 'bg-white dark:bg-gray-700 text-gray-900 dark:text-white shadow-sm animate-scale-in'
                 : locked
-                  ? 'text-gray-400 dark:text-gray-600 cursor-pointer'
-                  : 'text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-300'
+                  ? 'text-gray-300 dark:text-gray-600 cursor-pointer'
+                  : 'text-gray-400 dark:text-gray-500 hover:text-gray-700 dark:hover:text-gray-300 hover:bg-white/60 dark:hover:bg-gray-700/40'
             }`}>
             <span className="hidden sm:inline">{t.label}</span>
             <span className="sm:hidden">{t.short}</span>
             {locked && (
-              <svg width="8" height="8" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" className="opacity-50">
+              <svg width="7" height="7" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" className="opacity-40">
                 <rect x="3" y="11" width="18" height="11" rx="2" ry="2"/>
                 <path d="M7 11V7a5 5 0 0 1 10 0v4"/>
               </svg>
@@ -318,17 +356,28 @@ function TabStrip({ tabs, active, onChange, lockedIds = [] }) {
 
 function ScreenInner() {
   const [mode,        setMode]        = useState(() => sessionStorage.getItem('tradeo_screen_mode')        || 'simple')
-  const [simpleTab,   setSimpleTab]   = useState(() => sessionStorage.getItem('tradeo_screen_simpleTab')   || 'General')
-  const [complexTab,  setComplexTab]  = useState(() => sessionStorage.getItem('tradeo_screen_complexTab')  || 'Backtesting')
+  const [simpleTab,   setSimpleTab]   = useState(() => {
+    const stored = sessionStorage.getItem('tradeo_screen_simpleTab')
+    return SIMPLE_TABS.some(t => t.id === stored) ? stored : 'General'
+  })
+  const [complexTab,  setComplexTab]  = useState(() => {
+    const stored = sessionStorage.getItem('tradeo_screen_complexTab')
+    return COMPLEX_TABS.some(t => t.id === stored) ? stored : 'Backtesting'
+  })
   const [mobilePanel, setMobilePanel] = useState(null)
+  const [leftOpen,    setLeftOpen]    = useState(() => localStorage.getItem('tradeo_screen_leftOpen') !== 'false')
   const toolbarSlotRef = useRef(null)
   const { user } = useAuth()
+
+  const toggleLeft = () => setLeftOpen(v => {
+    localStorage.setItem('tradeo_screen_leftOpen', String(!v))
+    return !v
+  })
 
   // Opt into navbar auto-hide — activates on mount, restores on unmount
   useNavbarAutoHide()
   const { active: navAutoHide, hidden: navHidden, scheduleHide, showNavbar } = useNavbarState()
 
-  // If not logged in, keep simple mode and reset to General — never allow locked tabs to persist
   const handleMode = (m) => {
     if (!user && m === 'complex') return
     setMode(m)
@@ -341,7 +390,6 @@ function ScreenInner() {
   }
   const handleComplexTab = (t) => { setComplexTab(t); sessionStorage.setItem('tradeo_screen_complexTab', t) }
 
-  // Close mobile sheet on Escape
   useEffect(() => {
     const fn = (e) => { if (e.key === 'Escape') setMobilePanel(null) }
     window.addEventListener('keydown', fn)
@@ -354,21 +402,17 @@ function ScreenInner() {
     <ScreenToolbarSlotCtx.Provider value={toolbarSlotRef}>
     <div
       className="flex flex-col overflow-hidden bg-white dark:bg-gray-900"
-      style={{ height: '100dvh', paddingTop: navAutoHide && !navHidden ? 56 : 0 }}
+      style={{ height: '100dvh', paddingTop: navHidden ? 0 : 56 }}
     >
 
-      {/* ── Top strip ── */}
-      {/* NOTE: ChartSymbolSearch dropdown uses absolute positioning — it must NOT
-          be inside an overflow-x-auto container or the dropdown clips. The slot
-          ref sits outside the scrollable portion, after the shrink-0 tab groups. */}
-      {/* Toolbar strip — onMouseEnter as fast path; global mousemove listener
-          in App.jsx handles portalled controls (portal breaks React bubbling) */}
+      {/* ── Toolbar strip ──────────────────────────────────────────────────── */}
+      {/* NOTE: ChartSymbolSearch uses absolute positioning — toolbar slot must
+          never be inside overflow-x-auto or the dropdown clips. */}
       <div
-        className="flex items-center gap-2 px-3 py-0.5 border-b border-gray-100 dark:border-gray-800 shrink-0"
+        className="flex items-center gap-2 px-3 py-1 border-b border-gray-100 dark:border-gray-800/80 shrink-0 bg-white/80 dark:bg-gray-900/80 backdrop-blur-sm animate-fade-up"
         onMouseEnter={showNavbar}
       >
-
-        {/* Simple / Complex toggle — always visible, shrink-0 */}
+        {/* Simple / Complex toggle */}
         <TabStrip
           tabs={[{ id: 'simple', label: 'Simple', short: 'Sim' }, { id: 'complex', label: 'Complex', short: 'Cpx' }]}
           active={mode}
@@ -376,11 +420,10 @@ function ScreenInner() {
           lockedIds={!user ? ['complex'] : []}
         />
 
-        {/* Divider */}
-        <div className="w-px h-4 bg-gray-200 dark:bg-gray-700 shrink-0" />
+        <div className="w-px h-5 bg-gray-300/80 dark:bg-gray-600/70 shrink-0 mx-0.5" />
 
-        {/* Sub-tabs — shrink-0 so they never compress */}
-        <div className="shrink-0">
+        {/* Sub-tabs — key on mode so strip re-mounts (replays animate-fade-up) on Simple↔Complex switch */}
+        <div key={mode} className="shrink-0 animate-fade-up">
           {isSimple
             ? <TabStrip
                 tabs={SIMPLE_TABS}
@@ -392,19 +435,12 @@ function ScreenInner() {
           }
         </div>
 
-        {/* Divider — shown for all simple tabs (they all populate the toolbar slot) */}
-        {isSimple && (
-          <div className="w-px h-4 bg-gray-200 dark:bg-gray-700 shrink-0" />
-        )}
+        <div className="w-px h-5 bg-gray-300/80 dark:bg-gray-600/70 shrink-0 mx-0.5" />
 
-        {/* Toolbar slot — StockChart portals its controls here.
-            flex-1 so it fills available space; overflow-x-auto for narrow screens.
-            Must NOT be overflow-x-auto when ChartSymbolSearch is in it — see note above.
-            We use overflow-visible here; the tab bar itself handles horizontal scroll
-            only when needed via the outer wrapper below. */}
+        {/* Toolbar slot — StockChart portals its controls here */}
         <div ref={toolbarSlotRef} className="flex-1 flex items-center gap-1.5 min-w-0 overflow-x-auto no-scrollbar" />
 
-        {/* Market status — always at far right, shrink-0 */}
+        {/* Market status — always far right */}
         <MarketStatusBadge />
       </div>
 
@@ -417,6 +453,8 @@ function ScreenInner() {
               activeTab={simpleTab}
               mobilePanel={mobilePanel}
               setMobilePanel={setMobilePanel}
+              leftOpen={leftOpen}
+              toggleLeft={toggleLeft}
             />
       ) : (
         !user

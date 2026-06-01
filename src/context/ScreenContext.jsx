@@ -6,7 +6,7 @@
 //   2. Hook       — useScreen
 // =============================================================================
 
-import { createContext, useContext, useState, useCallback, useEffect, useRef } from 'react'
+import { createContext, useContext, useState, useCallback, useEffect, useRef, useMemo } from 'react'
 import { useLocation } from 'react-router-dom'
 import { getPositions } from '../utils/globalCache'
 
@@ -22,7 +22,7 @@ export function ScreenProvider({ children, initialSymbol, initialIndexId, initia
   const [selectedIndexId,     setSelectedIndexId]     = useState(initialIndexId ?? 12)
   const [selectedIsIndex,     setSelectedIsIndex]     = useState(initialIsIndex ?? true)
   const [chartType,       setChartType]       = useState('candlestick')
-  const [timeframe,       setTimeframe]       = useState(initialTimeframe || '1Y')
+  const [timeframe,       setTimeframe]       = useState(initialTimeframe || 'ALL')
   const [activeIndicators,setActiveIndicators]= useState([])
 
   // Hover / click-lock state — drives the candle movers overlay
@@ -128,24 +128,33 @@ export function ScreenProvider({ children, initialSymbol, initialIndexId, initia
   const activeDate   = pinnedDate   ?? hoveredDate
   const activeMovers = pinnedMovers ?? hoveredMovers
 
+  const ctxValue = useMemo(() => ({
+    selectedSymbol, selectedCompanyName, selectedIndexId,
+    chartType,       setChartType,
+    timeframe,       setTimeframe,
+    activeIndicators, toggleIndicator,
+    selectSymbol,    isIndex,
+    hoveredDate, pinnedDate, activeDate,
+    hoveredMovers, pinnedMovers, activeMovers,
+    clickedMovers,
+    onHover, onPin, clearPin,
+    disableMovers,
+    activePositions,
+    activePosition: activePositions?.[0] ?? null,
+    sharedPositions, positionsLoading, refreshPositions,
+  }), [
+    selectedSymbol, selectedCompanyName, selectedIndexId,
+    chartType, timeframe, activeIndicators,
+    hoveredDate, pinnedDate, activeDate,
+    hoveredMovers, pinnedMovers, activeMovers,
+    clickedMovers, disableMovers,
+    activePositions, sharedPositions, positionsLoading,
+    setChartType, setTimeframe, toggleIndicator,
+    selectSymbol, isIndex, onHover, onPin, clearPin, refreshPositions,
+  ])
+
   return (
-    <ScreenContext.Provider value={{
-      selectedSymbol, selectedCompanyName, selectedIndexId,
-      chartType,       setChartType,
-      timeframe,       setTimeframe,
-      activeIndicators, toggleIndicator,
-      selectSymbol,    isIndex,
-      hoveredDate, pinnedDate, activeDate,
-      hoveredMovers, pinnedMovers, activeMovers,
-      clickedMovers,
-      onHover, onPin, clearPin,
-      disableMovers,
-      activePositions,
-      // backwards-compat: components that read activePosition get the first entry
-      activePosition: activePositions?.[0] ?? null,
-      // Shared positions — one fetch for all ScreenPage consumers
-      sharedPositions, positionsLoading, refreshPositions,
-    }}>
+    <ScreenContext.Provider value={ctxValue}>
       {children}
     </ScreenContext.Provider>
   )

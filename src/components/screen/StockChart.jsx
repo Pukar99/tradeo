@@ -1,5 +1,5 @@
 // === StockChart.jsx — core chart component: candlestick/line, indicators (MA/EMA/BB/RSI/MACD/ATR), drawing tools, SMC + PA overlays, position lines ===
-import { useEffect, useRef, useState, useCallback } from 'react'
+import { useEffect, useRef, useState, useCallback, useMemo } from 'react'
 import { createPortal } from 'react-dom'
 import { useTheme } from '../../context/ThemeContext'
 import { useScreen } from '../../context/ScreenContext'
@@ -17,6 +17,9 @@ function useFixedDropdown(align = 'right') {
   const [open, setOpen]     = useState(false)
   const [rect, setRect]     = useState(null)
   const triggerRef          = useRef(null)
+  // Ref to the portalled dropdown node — excluded from outside-click so buttons
+  // inside the portal are clickable before the mousedown closes the dropdown.
+  const dropRef             = useRef(null)
 
   const updateRect = useCallback(() => {
     if (triggerRef.current) setRect(triggerRef.current.getBoundingClientRect())
@@ -34,34 +37,36 @@ function useFixedDropdown(align = 'right') {
     }
   }, [open, updateRect])
 
-  // Close on outside click
+  // Close on outside click — excludes both trigger and portal content
   useEffect(() => {
     if (!open) return
     const fn = (e) => {
-      if (triggerRef.current && !triggerRef.current.contains(e.target)) setOpen(false)
+      const inTrigger = triggerRef.current?.contains(e.target)
+      const inDrop    = dropRef.current?.contains(e.target)
+      if (!inTrigger && !inDrop) setOpen(false)
     }
     document.addEventListener('mousedown', fn)
     return () => document.removeEventListener('mousedown', fn)
   }, [open])
 
-  // Compute drop position from latest rect
-  const dropStyle = rect ? {
+  // Compute drop position from latest rect — memoized so portal child doesn't re-render needlessly
+  const dropStyle = useMemo(() => rect ? {
     position: 'fixed',
     top:  rect.bottom + 4,
     ...(align === 'right'
       ? { right: window.innerWidth - rect.right }
       : { left: rect.left }),
     zIndex: 9999,
-  } : {}
+  } : {}, [rect, align])
 
-  // Wrap content in a portal — call this in JSX: {portal(<div>...</div>)}
+  // Wrap content in a portal — ref attached so outside-click excludes portal
   const portal = useCallback((content) => {
     if (!open || !rect) return null
     return createPortal(
-      <div style={dropStyle}>{content}</div>,
+      <div ref={dropRef} style={dropStyle}>{content}</div>,
       document.body
     )
-  }, [open, rect, dropStyle]) // eslint-disable-line react-hooks/exhaustive-deps
+  }, [open, rect, dropStyle])
 
   return { triggerRef, open, setOpen, portal, updateRect }
 }
@@ -69,6 +74,7 @@ function useFixedDropdown(align = 'right') {
 // ── Module-level caches (survive re-renders, shared across StockChart instances) ─
 const _chartCache   = new Map()  // `sym:tf` or `idx:id:tf` → { data, latest, ts }
 const CHART_TTL     = 5 * 60_000  // 5 min — NEPSE data is daily, 5 min is fresh enough
+const _zoomMemory   = new Map()  // `sym:tf` → { from, to } — remembers zoom per symbol+timeframe
 
 // ── Drawing Tools ─────────────────────────────────────────────────────────────
 
@@ -386,32 +392,58 @@ function ChartSymbolSearch() {
   // useFixedDropdown handles open state, positioning, outside-click, and portal
   const { triggerRef, open, setOpen, portal, updateRect } = useFixedDropdown('left')
 
+  // TradingView-style: any printable key typed anywhere (not in another input) → focus search
+  useEffect(() => {
+    const handler = (e) => {
+      // Ignore if already inside any input / textarea / contenteditable
+      const tag = document.activeElement?.tagName
+      if (tag === 'INPUT' || tag === 'TEXTAREA' || document.activeElement?.isContentEditable) return
+      // Ignore modifier-only combos (Ctrl+C, Alt+Tab etc.) and special keys
+      if (e.ctrlKey || e.metaKey || e.altKey) return
+      if (e.key.length !== 1) return  // only single printable characters
+      // Focus the search input and seed the query with the typed character.
+      // Clear native value first so the browser doesn't also insert the char
+      // after focus (double-char bug on some browsers).
+      const inp = inputRef.current
+      if (!inp) return
+      e.preventDefault()
+      inp.value = ''
+      inp.focus()
+      setQuery(e.key.toUpperCase())
+      setOpen(true)
+      updateRect()
+      setCursor(-1)
+    }
+    window.addEventListener('keydown', handler)
+    return () => window.removeEventListener('keydown', handler)
+  }, [setOpen, updateRect])
+
   useEffect(() => {
     getMarketSymbols()
       .then(r => { if (r.data?.stocks?.length) { setSymbols(r.data); setLoadErr(null) } })
       .catch(() => setLoadErr('Symbols unavailable'))
   }, [])
 
-  const allItems = [
+  const allItems = useMemo(() => [
     ...symbols.indexes.map(i => ({ label: i.name, sub: 'Index', indexId: i.index_id, company_name: null })),
     ...symbols.stocks.map(s => ({ label: s.symbol, sub: 'Stock', company_name: s.company_name || null })),
-  ]
+  ], [symbols])
 
-  const q = query.toLowerCase()
-  const filtered = query.length < 1
-    ? allItems.slice(0, 20)
-    : allItems
-        .filter(i =>
-          i.label.toLowerCase().startsWith(q) ||
-          i.label.toLowerCase().includes(q) ||
-          (i.company_name && i.company_name.toLowerCase().includes(q))
-        )
-        // prefix matches first
-        .sort((a, b) =>
-          (a.label.toLowerCase().startsWith(q) ? 0 : 1) -
-          (b.label.toLowerCase().startsWith(q) ? 0 : 1)
-        )
-        .slice(0, 30)
+  const filtered = useMemo(() => {
+    const q = query.toLowerCase()
+    if (query.length < 1) return allItems.slice(0, 20)
+    return allItems
+      .filter(i =>
+        i.label.toLowerCase().startsWith(q) ||
+        i.label.toLowerCase().includes(q) ||
+        (i.company_name && i.company_name.toLowerCase().includes(q))
+      )
+      .sort((a, b) =>
+        (a.label.toLowerCase().startsWith(q) ? 0 : 1) -
+        (b.label.toLowerCase().startsWith(q) ? 0 : 1)
+      )
+      .slice(0, 30)
+  }, [query, allItems])
 
   const handleSelect = useCallback((item) => {
     selectSymbol(item.label, item.indexId || null, null, item.company_name || null)
@@ -465,7 +497,12 @@ function ChartSymbolSearch() {
       {/* Dropdown — portalled to body via useFixedDropdown */}
       {portal(
         <div className="bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-700 rounded-xl shadow-2xl max-h-64 overflow-y-auto" style={{ minWidth: 240 }}>
-          {showList ? (
+          {loadErr ? (
+            <div className="px-3 py-3 text-center">
+              <p className="text-[10px] text-red-400 font-medium">{loadErr}</p>
+              <p className="text-[9px] text-gray-400 mt-0.5">Check your connection</p>
+            </div>
+          ) : showList ? (
             <ul ref={listRef}>
               {filtered.map((item, i) => {
                 const isActive = i === cursor || (cursor === -1 && i === 0 && query.length > 0)
@@ -493,7 +530,7 @@ function ChartSymbolSearch() {
             </ul>
           ) : showEmpty ? (
             <div className="px-3 py-2 text-[10px] text-gray-400">
-              {loadErr || `No results for "${query}"`}
+              No results for &quot;{query}&quot;
             </div>
           ) : null}
         </div>
@@ -504,7 +541,7 @@ function ChartSymbolSearch() {
 
 // ── HUD Controls — timeframe, chart type, indicators ──────────────────────────
 
-const TIMEFRAMES = ['1W', '1M', '3M', '6M', '1Y', '3Y', 'ALL']
+const TIMEFRAMES = ['6M', '1Y', '3Y', 'ALL']
 const INDICATORS = ['MA', 'EMA', 'BB', 'RSI', 'MACD', 'ATR']
 
 // ── Indicator + Drawing Tools dropdown ────────────────────────────────────────
@@ -650,12 +687,17 @@ function ChartHUDPrice({ latestClose, chartData }) {
   const close   = latestClose ?? lastBar?.close
 
   return (
-    <div className="flex flex-col pointer-events-none" translate="no">
+    <div
+      className="flex flex-col pointer-events-none px-2.5 py-1.5 rounded-xl
+                 bg-white/80 dark:bg-gray-950/85 backdrop-blur-md
+                 shadow-md border border-white/70 dark:border-white/[0.12]"
+      translate="no"
+    >
       <div className="flex items-baseline gap-2">
-        <span className="text-[12px] font-bold text-gray-700 dark:text-gray-300 tracking-wide">{selectedSymbol}</span>
+        <span className="text-[11px] font-bold text-gray-500 dark:text-gray-400 tracking-wide">{selectedSymbol}</span>
         {close != null && (
           <>
-            <span className="text-[20px] font-black text-gray-900 dark:text-white tabular-nums leading-none">
+            <span className="text-[19px] font-black text-gray-900 dark:text-white tabular-nums leading-none">
               {parseFloat(close).toLocaleString('en-NP', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
             </span>
             {change != null && (
@@ -667,7 +709,7 @@ function ChartHUDPrice({ latestClose, chartData }) {
         )}
       </div>
       {selectedCompanyName && (
-        <span className="text-[10px] text-gray-400 dark:text-gray-500 leading-tight mt-0.5">{selectedCompanyName}</span>
+        <span className="text-[9px] text-gray-400 dark:text-gray-500 leading-tight mt-0.5 truncate max-w-[200px]">{selectedCompanyName}</span>
       )}
     </div>
   )
@@ -700,7 +742,7 @@ function PositionBadge({ positions, latestClose }) {
   const isSingle = positions.length === 1
 
   return (
-    <div className="absolute bottom-8 left-3 z-20 pointer-events-none" translate="no">
+    <div className="absolute bottom-16 left-3 z-20 pointer-events-none" translate="no">
       <div className="bg-white/96 dark:bg-gray-900/96 backdrop-blur-sm border border-gray-200 dark:border-gray-700 rounded-2xl shadow-lg overflow-hidden w-56">
         {/* Header */}
         <div className={`flex items-center justify-between px-3 py-1.5 ${isLong ? 'bg-blue-50 dark:bg-blue-950/40' : 'bg-red-50 dark:bg-red-950/40'}`}>
@@ -818,8 +860,8 @@ function MoversOverlay({ movers, date, pinned, onClear }) {
   return (
     <div translate="no" className={`absolute top-14 right-2 z-20 w-52 rounded-2xl border shadow-lg backdrop-blur-sm text-[10px] overflow-hidden
       ${pinned
-        ? 'bg-white dark:bg-gray-900 border-blue-200 dark:border-blue-800 ring-1 ring-blue-400/30'
-        : 'bg-white/95 dark:bg-gray-900/95 border-gray-200 dark:border-gray-700'
+        ? 'bg-white dark:bg-gray-900/95 border-blue-200 dark:border-blue-700 ring-1 ring-blue-400/30'
+        : 'bg-white/95 dark:bg-gray-900/90 border-gray-200 dark:border-white/[0.10]'
       }`}>
       <div className="flex items-center justify-between px-3 py-1.5 border-b border-gray-100 dark:border-gray-800">
         <span className="text-[10px] font-semibold text-gray-400 uppercase tracking-widest">{date}</span>
@@ -864,31 +906,36 @@ function MoversOverlay({ movers, date, pinned, onClear }) {
 // ── OHLC Tooltip ──────────────────────────────────────────────────────────────
 
 function OHLCTooltip({ bar, change }) {
-  if (!bar) return null
-  const isUp = (bar.close ?? bar.value) >= (bar.open ?? bar.value)
+  const isUp = bar ? (bar.close ?? bar.value) >= (bar.open ?? bar.value) : true
   return (
-    <div className="absolute top-14 left-3 z-10 pointer-events-none" translate="no">
-      <div className="bg-white/95 dark:bg-gray-900/95 border border-gray-200 dark:border-gray-700 rounded-xl px-3 py-2 shadow-sm">
-        <div className="text-[10px] text-gray-400 mb-1">{bar.time}</div>
-        <div className="flex items-baseline gap-2 mb-1">
-          <span className={`text-[15px] font-bold ${isUp ? 'text-emerald-500' : 'text-red-400'}`}>
-            {(bar.close ?? bar.value)?.toLocaleString()}
-          </span>
-          {change != null && (
-            <span className={`text-[10px] font-semibold ${change >= 0 ? 'text-emerald-500' : 'text-red-400'}`}>
-              {change >= 0 ? '▲' : '▼'} {Math.abs(change).toFixed(2)}%
+    <div
+      className="absolute top-2 right-3 z-10 pointer-events-none"
+      style={{ opacity: bar ? 1 : 0, transition: 'opacity 0.12s ease-out' }}
+      translate="no"
+    >
+      <div className="bg-white/90 dark:bg-gray-950/90 border border-gray-200 dark:border-white/10 rounded-xl px-3 py-2 shadow-lg backdrop-blur-md">
+        {bar && <>
+          <div className="text-[10px] text-gray-400 mb-1">{bar.time}</div>
+          <div className="flex items-baseline gap-2 mb-1">
+            <span className={`text-[15px] font-bold ${isUp ? 'text-emerald-500' : 'text-red-400'}`}>
+              {(bar.close ?? bar.value)?.toLocaleString()}
             </span>
-          )}
-        </div>
-        {bar.open != null && (
-          <div className="grid grid-cols-4 gap-x-3 text-[10px]">
-            {['O','H','L','C'].map(l => <span key={l} className="text-gray-400">{l}</span>)}
-            <span className="text-gray-700 dark:text-gray-300">{bar.open?.toLocaleString()}</span>
-            <span className="text-emerald-500">{bar.high?.toLocaleString()}</span>
-            <span className="text-red-400">{bar.low?.toLocaleString()}</span>
-            <span className="font-semibold text-gray-700 dark:text-gray-300">{bar.close?.toLocaleString()}</span>
+            {change != null && (
+              <span className={`text-[10px] font-semibold ${change >= 0 ? 'text-emerald-500' : 'text-red-400'}`}>
+                {change >= 0 ? '▲' : '▼'} {Math.abs(change).toFixed(2)}%
+              </span>
+            )}
           </div>
-        )}
+          {bar.open != null && (
+            <div className="grid grid-cols-4 gap-x-3 text-[10px]">
+              {['O','H','L','C'].map(l => <span key={l} className="text-gray-400">{l}</span>)}
+              <span className="text-gray-700 dark:text-gray-300">{bar.open?.toLocaleString()}</span>
+              <span className="text-emerald-500">{bar.high?.toLocaleString()}</span>
+              <span className="text-red-400">{bar.low?.toLocaleString()}</span>
+              <span className="font-semibold text-gray-700 dark:text-gray-300">{bar.close?.toLocaleString()}</span>
+            </div>
+          )}
+        </>}
       </div>
     </div>
   )
@@ -898,10 +945,10 @@ function OHLCTooltip({ bar, change }) {
 
 function ChartSkeleton() {
   return (
-    <div className="w-full h-full flex flex-col gap-2 p-4 animate-pulse">
+    <div className="w-full h-full flex flex-col gap-2 p-4 animate-pulse" style={{ background: 'var(--chart-bg, #fafafa)' }}>
       <div className="flex gap-1 items-end h-full">
         {Array.from({ length: 40 }).map((_, i) => (
-          <div key={i} className="flex-1 bg-gray-100 dark:bg-gray-800 rounded-sm"
+          <div key={i} className="flex-1 bg-gray-200 dark:bg-gray-800/80 rounded-sm"
             style={{ height: `${30 + (Math.sin(i * 0.4) * 30 + 40)}%` }} />
         ))}
       </div>
@@ -956,12 +1003,20 @@ export default function StockChart({ hideToolbar = false, onChartReady, smcData 
   // Save drawings to localStorage (called after every add/clear)
   const saveDrawings = useCallback((drawings) => {
     try {
-      if (drawings.length === 0) {
+      // Snapshot the array before serialising — prevents concurrent mutation
+      // during rapid drawing events from corrupting the stored JSON
+      const snapshot = drawings.slice()
+      if (snapshot.length === 0) {
         localStorage.removeItem(drawKey)
       } else {
-        localStorage.setItem(drawKey, JSON.stringify(drawings))
+        localStorage.setItem(drawKey, JSON.stringify(snapshot))
       }
-    } catch { /* storage full or private mode */ }
+    } catch (err) {
+      if (err?.name === 'QuotaExceededError') {
+        console.warn('[Tradeo] Drawing storage full — drawings not saved. Clear browser storage to resume.')
+      }
+      // SecurityError (private mode) — silently ignored
+    }
   }, [drawKey])
 
   // Load saved drawings when symbol/timeframe changes
@@ -996,7 +1051,9 @@ export default function StockChart({ hideToolbar = false, onChartReady, smcData 
   const [actionsReady, setActionsReady] = useState(0)  // bump triggers chart rebuild after fetch
 
   useEffect(() => {
-    if (!activePositions?.length) { positionActionsRef.current = {}; return }
+    // Clear immediately so old markers don't flash on the new symbol's chart
+    positionActionsRef.current = {}
+    if (!activePositions?.length) return
     let cancelled = false
     Promise.all(
       activePositions.map(pos => {
@@ -1018,6 +1075,7 @@ export default function StockChart({ hideToolbar = false, onChartReady, smcData 
 
   const [chartData,      setChartData]      = useState([])
   const [loading,        setLoading]        = useState(true)
+  const [refreshTick,    setRefreshTick]    = useState(0)
   const [error,          setError]          = useState(null)
   const [tooltip,        setTooltip]        = useState(null)
   const [overlayData,    setOverlayData]    = useState(null)
@@ -1239,6 +1297,22 @@ export default function StockChart({ hideToolbar = false, onChartReady, smcData 
     }
   }, [chartBuiltVer, paData, paToggles]) // eslint-disable-line react-hooks/exhaustive-deps
 
+  // ── Refresh handler — clears cache and bumps refreshTick to re-fire fetch effect
+  const handleRefresh = useCallback(() => {
+    const cacheKey = isIndex()
+      ? `idx:${selectedIndexId}:${timeframe}`
+      : `${selectedSymbol}:${timeframe}`
+    _chartCache.delete(cacheKey)
+    setRefreshTick(t => t + 1)
+  }, [isIndex, selectedIndexId, selectedSymbol, timeframe]) // eslint-disable-line react-hooks/exhaustive-deps
+
+  // Always-fresh ref so drawing onContextMenu can call it without stale closure
+  const handleRefreshRef = useRef(handleRefresh)
+  useEffect(() => { handleRefreshRef.current = handleRefresh }, [handleRefresh])
+
+  // Right-click context menu state — position + whether a drawing was hit
+  const [ctxMenu, setCtxMenu] = useState(null) // { x, y, hitIdx } | null
+
   // ── Portal controls into ScreenPage tab bar ───────────────────────────────
   // hideToolbar=true when inside MultiChart panel — panel has its own header controls
   const toolbarPortal = useScreenToolbarSlot(hideToolbar ? null :
@@ -1269,7 +1343,7 @@ export default function StockChart({ hideToolbar = false, onChartReady, smcData 
   )
 
   const C = {
-    bg:     isDark ? '#030712' : '#ffffff',
+    bg:     isDark ? '#0c152936' : '#fafafa',
     grid:   'transparent',
     text:   isDark ? '#6b7280' : '#9ca3af',
     border: isDark ? '#111827' : '#f3f4f6',
@@ -1313,12 +1387,14 @@ export default function StockChart({ hideToolbar = false, onChartReady, smcData 
     }
 
     setLoading(true)
+    let cancelled = false
 
     const req = isIndex()
       ? getIndexChart({ index_id: selectedIndexId, timeframe })
       : getStockChart({ symbol: selectedSymbol, timeframe })
 
     req.then(async r => {
+      if (cancelled) return
       const data = r.data.data || []
       const latest = data.length > 0 ? data[data.length - 1].close : null
       _chartCache.set(cacheKey, { data, latest, ts: Date.now() })
@@ -1370,10 +1446,13 @@ export default function StockChart({ hideToolbar = false, onChartReady, smcData 
         }
       }
     }).catch(e => {
+      if (cancelled) return
       setError(e.response?.data?.error || 'Failed to load chart data')
       setLoading(false)
     })
-  }, [selectedSymbol, selectedIndexId, timeframe]) // eslint-disable-line react-hooks/exhaustive-deps
+
+    return () => { cancelled = true }
+  }, [selectedSymbol, selectedIndexId, timeframe, refreshTick]) // eslint-disable-line react-hooks/exhaustive-deps
 
   // Build / rebuild charts
   useEffect(() => {
@@ -1556,7 +1635,7 @@ export default function StockChart({ hideToolbar = false, onChartReady, smcData 
       main.priceScale('vol').applyOptions({ scaleMargins: { top: 0.75, bottom: 0 } })
       volSeries.setData(chartData.map(d => ({
         time: d.time, value: d.volume || d.turnover || 0,
-        color: d.close >= d.open ? C.up + '44' : C.down + '44',
+        color: d.close >= d.open ? C.up + '70' : C.down + '70',
       })))
 
       if (markers.length) priceSeries.setMarkers(markers)
@@ -1590,6 +1669,11 @@ export default function StockChart({ hideToolbar = false, onChartReady, smcData 
         onPin(param.time, movers)
       })
 
+      // ── Sub-pane sync — one-way only (main → sub) prevents feedback loop.
+      // Guard flag `syncing` stops the sub-pane subscriber from re-updating main.
+      // All unsubscribe functions collected so cleanup removes them precisely.
+      const timeScaleUnsubs = []
+
       // RSI sub-pane
       if (activeIndicators.includes('RSI') && rsiRef.current) {
         const rsiData = calcRSI(chartData)
@@ -1604,8 +1688,11 @@ export default function StockChart({ hideToolbar = false, onChartReady, smcData 
           rc.addLineSeries({ color: C.rsi, lineWidth: 1.5, priceLineVisible: false }).setData(rsiData)
           rc.addLineSeries({ color: C.down + '80', lineWidth: 1, lineStyle: 2, priceLineVisible: false }).setData(rsiData.map(d => ({ time: d.time, value: 70 })))
           rc.addLineSeries({ color: C.up + '80', lineWidth: 1, lineStyle: 2, priceLineVisible: false }).setData(rsiData.map(d => ({ time: d.time, value: 30 })))
-          main.timeScale().subscribeVisibleLogicalRangeChange(r => { if (r) rc.timeScale().setVisibleLogicalRange(r) })
-          rc.timeScale().subscribeVisibleLogicalRangeChange(r => { if (r) main.timeScale().setVisibleLogicalRange(r) })
+          let rsiSyncing = false
+          const unsubMainRsi = main.timeScale().subscribeVisibleLogicalRangeChange(r => {
+            if (r && !rsiSyncing) { rsiSyncing = true; rc.timeScale().setVisibleLogicalRange(r); rsiSyncing = false }
+          })
+          timeScaleUnsubs.push(unsubMainRsi)
         }
       }
 
@@ -1624,7 +1711,11 @@ export default function StockChart({ hideToolbar = false, onChartReady, smcData 
           mc.addHistogramSeries({ priceLineVisible: false }).setData(
             hist.map(d => ({ ...d, color: d.value >= 0 ? C.up + '99' : C.down + '99' }))
           )
-          main.timeScale().subscribeVisibleLogicalRangeChange(r => { if (r) mc.timeScale().setVisibleLogicalRange(r) })
+          let macdSyncing = false
+          const unsubMainMacd = main.timeScale().subscribeVisibleLogicalRangeChange(r => {
+            if (r && !macdSyncing) { macdSyncing = true; mc.timeScale().setVisibleLogicalRange(r); macdSyncing = false }
+          })
+          timeScaleUnsubs.push(unsubMainMacd)
         }
       }
 
@@ -1639,65 +1730,98 @@ export default function StockChart({ hideToolbar = false, onChartReady, smcData 
           })
           chartsRef.current.atr = ac
           ac.addLineSeries({ color: '#f59e0b', lineWidth: 1.5, priceLineVisible: false, title: 'ATR14' }).setData(atrData)
-          main.timeScale().subscribeVisibleLogicalRangeChange(r => { if (r) ac.timeScale().setVisibleLogicalRange(r) })
+          let atrSyncing = false
+          const unsubMainAtr = main.timeScale().subscribeVisibleLogicalRangeChange(r => {
+            if (r && !atrSyncing) { atrSyncing = true; ac.timeScale().setVisibleLogicalRange(r); atrSyncing = false }
+          })
+          timeScaleUnsubs.push(unsubMainAtr)
         }
       }
 
-      main.timeScale().fitContent()
+      // ── Zoom logic ─────────────────────────────────────────────────────────
+      // Priority: positions > saved zoom > default 120-bar window
+      const zoomKey = isIndex()
+        ? `idx:${selectedIndexId}:${timeframe}`
+        : `${selectedSymbol}:${timeframe}`
 
-      // If positions are loaded, scroll to show from the earliest entry date so
-      // position lines span most of the chart instead of a sliver on the right edge
-      if (activePositions?.length) {
-        const allEntryDates = []
-        activePositions.forEach(p => {
-          const ed = p.entry_date || p.date   // handle both nav paths
-          if (ed) allEntryDates.push(ed.slice(0, 10))
-          // Also include Add Position dates so scroll range covers the full trade
-          const id = p.id || p.trade_id
-          const rows = id ? (positionActionsRef.current[id] || []) : []
-          rows.forEach(row => { if (row.date) allEntryDates.push(row.date.slice(0, 10)) })
-        })
-        const earliest = allEntryDates.filter(Boolean).sort()[0]
-        if (earliest) {
-          const entryIdx = chartData.findIndex(d => d.time >= earliest)
-          if (entryIdx > 0) {
-            const viewStart = Math.max(0, entryIdx - 20)
-            // Use logical range (bar indices) — more reliable than date strings
-            main.timeScale().setVisibleLogicalRange({
-              from: viewStart,
-              to:   chartData.length + 3,
-            })
+      const applyZoom = () => {
+        // 1. Position view — scroll to show entry date
+        if (activePositions?.length) {
+          const allEntryDates = []
+          activePositions.forEach(p => {
+            const ed = p.entry_date || p.date
+            if (ed) allEntryDates.push(ed.slice(0, 10))
+            const id = p.id || p.trade_id
+            const rows = id ? (positionActionsRef.current[id] || []) : []
+            rows.forEach(row => { if (row.date) allEntryDates.push(row.date.slice(0, 10)) })
+          })
+          const earliest = allEntryDates.filter(Boolean).sort()[0]
+          if (earliest) {
+            const entryIdx = chartData.findIndex(d => d.time >= earliest)
+            if (entryIdx > 0) {
+              main.timeScale().setVisibleLogicalRange({
+                from: Math.max(0, entryIdx - 20),
+                to:   chartData.length + 3,
+              })
+              return
+            }
           }
         }
+
+        // 2. Saved zoom — restore last known position for this symbol+timeframe
+        const saved = _zoomMemory.get(zoomKey)
+        if (saved) {
+          main.timeScale().setVisibleLogicalRange(saved)
+          return
+        }
+
+        // 3. Default — show last 120 bars (~6 months) so candles are readable
+        const defaultBars = 120
+        const from = Math.max(0, chartData.length - defaultBars)
+        main.timeScale().setVisibleLogicalRange({ from, to: chartData.length + 3 })
       }
 
-      // Resize both width AND height
-      roRef.current = new ResizeObserver(() => {
-        if (mainRef.current && chartsRef.current.main) {
-          chartsRef.current.main.applyOptions({
-            width:  mainRef.current.clientWidth,
-            height: mainRef.current.clientHeight,
-          })
-        }
-        if (rsiRef.current && chartsRef.current.rsi) {
-          chartsRef.current.rsi.applyOptions({
-            width:  rsiRef.current.clientWidth,
-            height: rsiRef.current.clientHeight,
-          })
-        }
-        if (macdRef.current && chartsRef.current.macd) {
-          chartsRef.current.macd.applyOptions({
-            width:  macdRef.current.clientWidth,
-            height: macdRef.current.clientHeight,
-          })
-        }
-        if (atrRef.current && chartsRef.current.atr) {
-          chartsRef.current.atr.applyOptions({
-            width:  atrRef.current.clientWidth,
-            height: atrRef.current.clientHeight,
-          })
-        }
+      applyZoom()
+
+      // Save zoom whenever the user scrolls or scales — cap map at 100 entries
+      const unsubZoom = main.timeScale().subscribeVisibleLogicalRangeChange(range => {
+        if (!range) return
+        if (_zoomMemory.size >= 100) _zoomMemory.delete(_zoomMemory.keys().next().value)
+        _zoomMemory.set(zoomKey, { from: range.from, to: range.to })
       })
+      timeScaleUnsubs.push(unsubZoom)
+
+      // Resize — batched via RAF so rapid resize events collapse into one frame
+      let resizeRaf = null
+      roRef.current = new ResizeObserver(() => {
+        if (resizeRaf) cancelAnimationFrame(resizeRaf)
+        resizeRaf = requestAnimationFrame(() => {
+          if (mainRef.current && chartsRef.current.main) {
+            chartsRef.current.main.applyOptions({
+              width:  mainRef.current.clientWidth,
+              height: mainRef.current.clientHeight,
+            })
+          }
+          if (rsiRef.current && chartsRef.current.rsi) {
+            chartsRef.current.rsi.applyOptions({
+              width:  rsiRef.current.clientWidth,
+              height: rsiRef.current.clientHeight,
+            })
+          }
+          if (macdRef.current && chartsRef.current.macd) {
+            chartsRef.current.macd.applyOptions({
+              width:  macdRef.current.clientWidth,
+              height: macdRef.current.clientHeight,
+            })
+          }
+          if (atrRef.current && chartsRef.current.atr) {
+            chartsRef.current.atr.applyOptions({
+              width:  atrRef.current.clientWidth,
+              height: atrRef.current.clientHeight,
+            })
+          }
+        }) // end RAF
+      })  // end ResizeObserver
       if (mainRef.current) roRef.current.observe(mainRef.current)
     })
 
@@ -1705,11 +1829,29 @@ export default function StockChart({ hideToolbar = false, onChartReady, smcData 
       cancelled = true
       if (pendingHover.current) clearTimeout(pendingHover.current)
       if (roRef.current) { roRef.current.disconnect(); roRef.current = null }
+      // Unsubscribe all time-scale listeners before removing charts
+      timeScaleUnsubs.forEach(fn => { try { fn?.() } catch (_) {} })
       onChartReadyRef.current?.(null, null)  // clear stale refs in parent before removing
       Object.values(chartsRef.current).forEach(c => { try { c.remove() } catch (_) {} })
       chartsRef.current = {}
     }
-  }, [chartData, isDark, chartType, activeIndicators, activePositions, actionsReady]) // eslint-disable-line react-hooks/exhaustive-deps
+  }, [chartData, chartType, activeIndicators, activePositions, actionsReady]) // eslint-disable-line react-hooks/exhaustive-deps
+
+  // Apply theme color changes without rebuilding the chart — avoids full rebuild on dark/light toggle
+  useEffect(() => {
+    const bg   = isDark ? '#0d1117' : '#fafafa'
+    const text = isDark ? '#6b7280' : '#9ca3af'
+    const border = isDark ? '#111827' : '#f3f4f6'
+    Object.values(chartsRef.current).forEach(c => {
+      try {
+        c.applyOptions({
+          layout: { background: { color: bg }, textColor: text },
+          rightPriceScale: { borderColor: border },
+          timeScale: { borderColor: border },
+        })
+      } catch (_) {}
+    })
+  }, [isDark])
 
   useEffect(() => {
     pinnedDateRef.current = pinnedDate
@@ -1735,6 +1877,7 @@ export default function StockChart({ hideToolbar = false, onChartReady, smcData 
     function repaint() {
       syncSize()
       const ctx = canvas.getContext('2d')
+      if (!ctx) return
       renderDrawings(ctx, canvas, chart, ps, drawingsRef.current, drawPreviewRef.current, isDark)
     }
 
@@ -1775,10 +1918,10 @@ export default function StockChart({ hideToolbar = false, onChartReady, smcData 
     function repaintNow() {
       const chart = getCtx(), ps = getPs(), canvas = canvasRef.current
       if (!chart || !ps || !canvas) return
-      // sync size
       canvas.width  = container.clientWidth
       canvas.height = container.clientHeight
       const ctx = canvas.getContext('2d')
+      if (!ctx) return
       renderDrawings(ctx, canvas, chart, ps, drawingsRef.current, drawPreviewRef.current, isDark)
     }
 
@@ -1887,26 +2030,24 @@ export default function StockChart({ hideToolbar = false, onChartReady, smcData 
       e.preventDefault()
       const tool = activeToolRef.current
 
+      // Cancel in-progress drawing first — no menu
       if (tool && drawPreviewRef.current) {
-        // Cancel in-progress drawing
         drawPreviewRef.current = null
         scheduleRepaint()
         return
       }
 
-      // No active tool — right-click on a committed drawing to delete it
-      const rect = container.getBoundingClientRect()
-      const mx = e.clientX - rect.left
-      const my = e.clientY - rect.top
+      // Hit-test committed drawings
+      const bRect = container.getBoundingClientRect()
+      const mx = e.clientX - bRect.left
+      const my = e.clientY - bRect.top
       const chart = getCtx(), ps = getPs()
-      if (!chart || !ps) return
-      const hitIdx = hitTestDrawing(mx, my, drawingsRef.current, chart, ps)
-      if (hitIdx >= 0) {
-        drawingsRef.current.splice(hitIdx, 1)
-        saveDrawingsRef.current(drawingsRef.current)
-        setDrawVersion(v => v + 1)
-        scheduleRepaint()
-      }
+      const hitIdx = (chart && ps)
+        ? hitTestDrawing(mx, my, drawingsRef.current, chart, ps)
+        : -1
+
+      // Show context menu at cursor position
+      setCtxMenu({ x: e.clientX, y: e.clientY, hitIdx })
     }
 
     function onMouseLeave() {
@@ -1943,7 +2084,7 @@ export default function StockChart({ hideToolbar = false, onChartReady, smcData 
       container.removeEventListener('mouseleave',  onMouseLeave)
       window.removeEventListener('keydown',        onKeyDown)
     }
-  }, [chartBuiltVer, isDark]) // eslint-disable-line react-hooks/exhaustive-deps
+  }, [chartBuiltVer]) // eslint-disable-line react-hooks/exhaustive-deps
 
   const showRSI   = activeIndicators.includes('RSI')
   const showMACD  = activeIndicators.includes('MACD')
@@ -1970,7 +2111,59 @@ export default function StockChart({ hideToolbar = false, onChartReady, smcData 
     <>
     {/* Portal the toolbar controls up into ScreenPage's tab bar slot */}
     {toolbarPortal}
-    <div className="flex flex-col w-full h-full bg-white dark:bg-gray-950 overflow-hidden">
+
+    {/* ── Right-click context menu ─────────────────────────────────────────── */}
+    {ctxMenu && createPortal(
+      <>
+        {/* Backdrop — click outside closes */}
+        <div className="fixed inset-0 z-[9998]" onClick={() => setCtxMenu(null)} />
+        <div
+          className="fixed z-[9999] min-w-[160px] bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-700 rounded-xl shadow-2xl overflow-hidden py-1 animate-menu-in"
+          style={{
+            left: Math.min(ctxMenu.x, window.innerWidth  - 176),
+            top:  Math.min(ctxMenu.y, window.innerHeight - (ctxMenu.hitIdx >= 0 ? 108 : 52)),
+          }}
+        >
+          {/* Refresh */}
+          <button
+            onClick={() => { handleRefreshRef.current(); setCtxMenu(null) }}
+            className="w-full flex items-center gap-2.5 px-3 py-2 text-[11px] font-semibold text-gray-700 dark:text-gray-200 hover:bg-blue-50 dark:hover:bg-blue-950/40 hover:text-blue-600 transition-colors text-left"
+          >
+            <svg className="w-3.5 h-3.5 shrink-0" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round">
+              <path d="M3 12a9 9 0 0 1 9-9 9.75 9.75 0 0 1 6.74 2.74L21 8" />
+              <path d="M21 3v5h-5" />
+              <path d="M21 12a9 9 0 0 1-9 9 9.75 9.75 0 0 1-6.74-2.74L3 16" />
+              <path d="M3 21v-5h5" />
+            </svg>
+            Refresh Chart
+          </button>
+
+          {/* Delete drawing — only when a drawing was hit */}
+          {ctxMenu.hitIdx >= 0 && (
+            <>
+              <div className="h-px bg-gray-100 dark:bg-gray-800 mx-2 my-1" />
+              <button
+                onClick={() => {
+                  drawingsRef.current.splice(ctxMenu.hitIdx, 1)
+                  saveDrawingsRef.current(drawingsRef.current)
+                  setDrawVersion(v => v + 1)
+                  setCtxMenu(null)
+                }}
+                className="w-full flex items-center gap-2.5 px-3 py-2 text-[11px] font-semibold text-red-500 hover:bg-red-50 dark:hover:bg-red-950/40 transition-colors text-left"
+              >
+                <svg className="w-3.5 h-3.5 shrink-0" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round">
+                  <polyline points="3 6 5 6 21 6" /><path d="M19 6l-1 14H6L5 6" /><path d="M10 11v6M14 11v6" /><path d="M9 6V4h6v2" />
+                </svg>
+                Delete Drawing
+              </button>
+            </>
+          )}
+        </div>
+      </>,
+      document.body
+    )}
+
+    <div className="flex flex-col w-full h-full overflow-hidden" style={{ background: isDark ? '#0d1117' : '#fafafa' }}>
 
       {/* ── Overlays (absolute inside the chart area below) ── */}
 
@@ -1978,12 +2171,14 @@ export default function StockChart({ hideToolbar = false, onChartReady, smcData 
       {loading ? (
         <ChartSkeleton />
       ) : (
-        <div className="relative flex-1 flex flex-col min-h-0 overflow-hidden">
+        <div className="relative flex-1 flex flex-col min-h-0 overflow-hidden animate-chart-in">
 
-          {/* Price overlay top-left */}
+          {/* Price overlay top-left — key on symbol so it fades on symbol change */}
           <div className="absolute top-2 left-3 z-20 pointer-events-none">
             {chartData.length > 0 && (
-              <ChartHUDPrice latestClose={latestClose} chartData={chartData} />
+              <div key={selectedSymbol} className="animate-fade-up">
+                <ChartHUDPrice latestClose={latestClose} chartData={chartData} />
+              </div>
             )}
           </div>
 
@@ -2031,7 +2226,7 @@ export default function StockChart({ hideToolbar = false, onChartReady, smcData 
           </div>
 
           {showRSI && (
-            <div className="w-full shrink-0 border-t border-gray-100 dark:border-gray-800 flex flex-col" style={{ height: `${subPanePct}%` }}>
+            <div className="w-full shrink-0 flex flex-col" style={{ borderTop: isDark ? '1px solid #1c2333' : '1px solid #f3f4f6' }} style={{ height: `${subPanePct}%` }}>
               <SubPaneLabel title="RSI" sub="14" color="#a78bfa"
                 legend={[{ color: '#ef444480', label: '70 OB' }, { color: '#10b98180', label: '30 OS' }]} />
               <div ref={rsiRef} className="w-full flex-1 min-h-0" />
@@ -2039,7 +2234,7 @@ export default function StockChart({ hideToolbar = false, onChartReady, smcData 
           )}
 
           {showMACD && (
-            <div className="w-full shrink-0 border-t border-gray-100 dark:border-gray-800 flex flex-col" style={{ height: `${subPanePct}%` }}>
+            <div className="w-full shrink-0 flex flex-col" style={{ borderTop: isDark ? '1px solid #1c2333' : '1px solid #f3f4f6' }} style={{ height: `${subPanePct}%` }}>
               <SubPaneLabel title="MACD" sub="12 / 26 / 9" color="#60a5fa"
                 legend={[{ color: '#60a5fa', label: 'MACD' }, { color: '#f59e0b', label: 'Signal' }]} />
               <div ref={macdRef} className="w-full flex-1 min-h-0" />
@@ -2047,7 +2242,7 @@ export default function StockChart({ hideToolbar = false, onChartReady, smcData 
           )}
 
           {showATR && (
-            <div className="w-full shrink-0 border-t border-gray-100 dark:border-gray-800 flex flex-col" style={{ height: `${subPanePct}%` }}>
+            <div className="w-full shrink-0 flex flex-col" style={{ borderTop: isDark ? '1px solid #1c2333' : '1px solid #f3f4f6' }} style={{ height: `${subPanePct}%` }}>
               <SubPaneLabel title="ATR" sub="14" color="#f59e0b"
                 legend={[{ color: '#f59e0b', label: 'ATR' }]} />
               <div ref={atrRef} className="w-full flex-1 min-h-0" />

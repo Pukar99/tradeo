@@ -227,25 +227,26 @@ export async function getDayFull(date) {
 }
 
 // IPO + news feed — changes infrequently, cache 30 min.
-let _feedPromise = null
+// Each source deduped independently so a partial cache miss only refetches the stale one.
+let _ipoPromise  = null
+let _newsPromise = null
 export async function getMarketFeed() {
   const cachedIpos = gCache.get('feed-ipos')
   const cachedNews = gCache.get('feed-news')
-  if (cachedIpos !== undefined && cachedNews !== undefined) {
-    return [cachedIpos, cachedNews]
-  }
-  // Single in-flight promise — prevents parallel mounts from doubling the request
-  if (!_feedPromise) {
-    _feedPromise = Promise.all([_getIPOs(), _getMarketNews()])
-      .then(([ir, nr]) => {
-        gCache.set('feed-ipos', ir, TTL.FEED)
-        gCache.set('feed-news', nr, TTL.FEED)
-        _feedPromise = null
-        return [ir, nr]
-      })
-      .catch(e => { _feedPromise = null; throw e })
-  }
-  return _feedPromise
+
+  const ipoFetch = cachedIpos !== undefined
+    ? Promise.resolve(cachedIpos)
+    : (_ipoPromise || (_ipoPromise = _getIPOs()
+        .then(r => { gCache.set('feed-ipos', r, TTL.FEED); _ipoPromise = null; return r })
+        .catch(e => { _ipoPromise = null; throw e })))
+
+  const newsFetch = cachedNews !== undefined
+    ? Promise.resolve(cachedNews)
+    : (_newsPromise || (_newsPromise = _getMarketNews()
+        .then(r => { gCache.set('feed-news', r, TTL.FEED); _newsPromise = null; return r })
+        .catch(e => { _newsPromise = null; throw e })))
+
+  return Promise.all([ipoFetch, newsFetch])
 }
 
 // Dashboard init — cached 1 min client-side so navigating back to / is instant.

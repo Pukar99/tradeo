@@ -25,7 +25,7 @@ const DEFAULT_TOGGLES = {
 }
 
 // Timeframe → days mapping (same as SMC — timeframe drives scan period)
-const TIMEFRAME_DAYS = { '1W': 30, '1M': 60, '3M': 125, '6M': 180, '1Y': 280, '3Y': 750, 'ALL': 1500 }
+const TIMEFRAME_DAYS = { '6M': 180, '1Y': 280, '3Y': 750, 'ALL': 750 }
 
 // ── Config persistence ────────────────────────────────────────────────────────
 function loadConfig() {
@@ -179,7 +179,7 @@ function PASymbolSearch() {
 }
 
 // ── Inline timeframe chips ────────────────────────────────────────────────────
-const TIMEFRAMES = ['1W', '1M', '3M', '6M', '1Y', '3Y', 'ALL']
+const TIMEFRAMES = ['6M', '1Y', '3Y', 'ALL']
 function PATimeframes() {
   const { timeframe, setTimeframe } = useScreen() || {}
   return (

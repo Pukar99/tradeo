@@ -30,7 +30,7 @@ const DEFAULT_TOGGLES = {
 }
 
 // Map chart timeframe to SMC scan days — timeframe drives everything, no separate selector
-const TIMEFRAME_DAYS = { '1W': 30, '1M': 60, '3M': 125, '6M': 180, '1Y': 280, '3Y': 750, 'ALL': 1500 }
+const TIMEFRAME_DAYS = { '6M': 180, '1Y': 280, '3Y': 750, 'ALL': 750 }
 
 // ── Config persistence ────────────────────────────────────────────────────────
 function loadConfig() {
@@ -180,7 +180,7 @@ function SMCSymbolSearch() {
 }
 
 // ── Inline timeframe chips ────────────────────────────────────────────────────
-const TIMEFRAMES = ['1W', '1M', '3M', '6M', '1Y', '3Y', 'ALL']
+const TIMEFRAMES = ['6M', '1Y', '3Y', 'ALL']
 function SMCTimeframes() {
   const { timeframe, setTimeframe } = useScreen() || {}
   return (
