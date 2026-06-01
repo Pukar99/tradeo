@@ -366,7 +366,7 @@ const WatchlistCard = memo(function WatchlistCard({ w, selected, onSelect, onEdi
 // ── Main ──────────────────────────────────────────────────────────────────────
 
 export default function LeftPanel() {
-  const { selectedSymbol, selectSymbol, isIndex, sharedPositions, refreshPositions } = useScreen()
+  const { selectedSymbol, selectSymbol, isIndex, sharedPositions, refreshPositions, positionsLoading } = useScreen()
 
   const positions = useMemo(() => (sharedPositions || [])
     .filter(p => p.status === 'OPEN' || p.status === 'PARTIAL')
