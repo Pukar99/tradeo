@@ -26,13 +26,14 @@ export function getRedirectFrom() {
 }
 
 export default function PrivateRoute({ children }) {
-  const { user } = useAuth()
+  const { user, loading } = useAuth()
   const location = useLocation()
 
+  // Wait for /api/auth/me to resolve before deciding — prevents flash redirect on refresh
+  if (loading) return null
+
   if (!user) {
-    // Save intended destination synchronously before redirecting
     saveRedirectFrom(location.pathname + location.search)
-    // <Navigate> redirects during render — zero flash, no useEffect delay
     return <Navigate to="/login" replace />
   }
 

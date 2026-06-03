@@ -50,10 +50,8 @@ if (import.meta.env.DEV) {
 }
 
 API.interceptors.request.use((config) => {
-  const token = localStorage.getItem('token')
-  if (token) {
-    config.headers.Authorization = `Bearer ${token}`
-  }
+  // Auth is cookie-only (SEC-001) — no Authorization header needed.
+  // withCredentials: true (set on the instance) sends the httpOnly cookie automatically.
 
   // Dedup identical GET requests fired within DEDUP_MS of each other.
   // Stores the in-flight promise so all callers get the same result — no forever-pending promises.
@@ -104,18 +102,14 @@ API.interceptors.response.use(
       if (entry) { entry.reject(error); _inFlight.delete(key) }
     }
     if (error.response?.status === 401) {
-      const hadToken = !!localStorage.getItem('token')
-      localStorage.removeItem('token')
-      localStorage.removeItem('user')
-      // Only force-redirect when the user HAD a token that expired mid-session.
-      // If there was no token, the user is simply unauthenticated — let the page
-      // handle it gracefully (show a login wall inline, not a hard redirect).
-      if (hadToken) {
-        const onAuthPage = ['/login', '/signup'].some(p => window.location.pathname.startsWith(p))
-        if (!onAuthPage) {
-          sessionStorage.setItem('authExpiredMsg', 'Your session has expired. Please log in again.')
-          window.location.href = '/login'
-        }
+      // Cookie expired mid-session — redirect to login unless already on auth pages.
+      // Skip for /api/auth/me (the init check in AuthContext) — that 401 is expected
+      // when the user is logged out and should not trigger a redirect.
+      const isInitCheck = error.config?.url?.includes('/api/auth/me')
+      const onAuthPage  = ['/login', '/signup'].some(p => window.location.pathname.startsWith(p))
+      if (!isInitCheck && !onAuthPage) {
+        sessionStorage.setItem('authExpiredMsg', 'Your session has expired. Please log in again.')
+        window.location.href = '/login'
       }
     }
     return Promise.reject(error)

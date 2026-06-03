@@ -1081,12 +1081,11 @@ function AIChat({ isFullPage = false, onClose }) {
       const ctrl = new AbortController()
       abortCtrlRef.current = ctrl
 
-      let token = null
-      try { token = localStorage.getItem('token') } catch { /* private browsing */ }
       const response = await fetch(`${BASE_URL}/api/chat/agent`, {
         method: 'POST',
         signal: ctrl.signal,
-        headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
+        credentials: 'include', // send httpOnly cookie (SEC-001 — no localStorage token)
+        headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           message: text,
           // Exclude streaming/incomplete messages from history — they have empty content

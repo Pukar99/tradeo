@@ -1,74 +1,43 @@
 // =============================================================================
 // AuthContext.jsx — Authentication state: user, login, logout, updateUser
+// Token lives in httpOnly cookie only — never localStorage (SEC-001)
 // =============================================================================
 
-import { createContext, useContext, useState } from 'react'
+import { createContext, useContext, useState, useEffect } from 'react'
 import { clearUserCache } from '../utils/globalCache'
 import { API } from '../api'
 
 const AuthContext = createContext()
 
-function isTokenExpired(token) {
-  if (!token) return true
-  try {
-    const payload = JSON.parse(atob(token.split('.')[1]))
-    // exp is in seconds, Date.now() in ms
-    return payload.exp * 1000 < Date.now()
-  } catch {
-    return true
-  }
-}
-
-function safeParseUser() {
-  try {
-    const token = localStorage.getItem('token')
-    if (isTokenExpired(token)) {
-      localStorage.removeItem('token')
-      localStorage.removeItem('user')
-      return null
-    }
-    return JSON.parse(localStorage.getItem('user')) || null
-  } catch {
-    localStorage.removeItem('user')
-    return null
-  }
-}
-
 export function AuthProvider({ children }) {
-  const [user, setUser] = useState(safeParseUser)
+  const [user, setUser]       = useState(null)
+  const [loading, setLoading] = useState(true)
 
-  const login = (userData, token) => {
-    localStorage.setItem('token', token)
-    localStorage.setItem('user', JSON.stringify(userData))
+  // On mount — verify cookie with server, hydrate user state
+  useEffect(() => {
+    API.get('/api/auth/me')
+      .then(({ data }) => setUser(data.user))
+      .catch(() => setUser(null))
+      .finally(() => setLoading(false))
+  }, [])
+
+  const login = (userData) => {
     sessionStorage.setItem('ipoAutoApplyPending', '1')
     setUser(userData)
   }
 
   const updateUser = (updatedData) => {
-    let existing = null
-    try {
-      existing = JSON.parse(localStorage.getItem('user')) || {}
-    } catch {
-      existing = {}
-    }
-    const updated = { ...existing, ...updatedData }
-    localStorage.setItem('user', JSON.stringify(updated))
-    setUser(updated)
+    setUser(prev => prev ? { ...prev, ...updatedData } : updatedData)
   }
 
   const logout = () => {
-    // Clear HttpOnly cookie on the server first (fire-and-forget — don't block UI)
     API.post('/api/auth/logout').catch(() => {})
-    localStorage.removeItem('token')
-    localStorage.removeItem('user')
-    // Clear once-per-session flags so they fire again on next login
-    sessionStorage.removeItem('ipoAutoApplyPending')
     clearUserCache()
     setUser(null)
   }
 
   return (
-    <AuthContext.Provider value={{ user, login, logout, updateUser }}>
+    <AuthContext.Provider value={{ user, login, logout, updateUser, loading }}>
       {children}
     </AuthContext.Provider>
   )
