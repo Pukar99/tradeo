@@ -12,7 +12,6 @@ function Sparkline({ equityCurve }) {
   const step  = W / Math.max(pts.length - 1, 1)
   const toY   = (v) => H - ((v - minV) / range) * (H - 4) - 2
   const poly  = pts.map((v, i) => `${(i * step).toFixed(1)},${toY(v).toFixed(1)}`).join(' ')
-  const fill  = pts.map((v, i) => `${(i * step).toFixed(1)},${toY(v).toFixed(1)}`).join(' ')
   const endUp = pts[pts.length - 1] >= 0
   const col   = endUp ? '#10b981' : '#f87171'
 
@@ -25,7 +24,7 @@ function Sparkline({ equityCurve }) {
         </linearGradient>
       </defs>
       <polygon
-        points={`0,${H} ${fill} ${((pts.length - 1) * step).toFixed(1)},${H}`}
+        points={`0,${H} ${poly} ${((pts.length - 1) * step).toFixed(1)},${H}`}
         fill="url(#tc-spark-grad)"
       />
       <polyline

@@ -105,6 +105,11 @@ function Navbar({ autoHide = false, hidden = false, onMouseEnter, onMouseLeave }
     setMobileMenuOpen(false)
   }, [location.pathname])
 
+  // ── Close mobile menu when navbar slides away (auto-hide pages only) ────────
+  useEffect(() => {
+    if (hidden) setMobileMenuOpen(false)
+  }, [hidden])
+
   // ── Reset avatar error when user avatar_url changes ─────────────────────────
   useEffect(() => {
     setAvatarError(false)

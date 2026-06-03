@@ -1,6 +1,6 @@
 // === PositionRow.jsx — expandable position card: stats, SL/TP/RR, action history expand, context menu ===
 
-import { useState, useEffect, useCallback } from 'react'
+import { useState, useEffect, useCallback, useRef } from 'react'
 import { getTradeHistory } from '../../api'
 import { useContextMenu } from '../ContextMenu'
 import ActionHistory from './ActionHistory'
@@ -22,6 +22,7 @@ export default function PositionRow({ position, ltp, onAdd, onPartialExit, onClo
   const [expanded,   setExpanded]   = useState(false)
   const [actions,    setActions]    = useState(null)
   const [fetched,    setFetched]    = useState(false)
+  const fetchedRef = useRef(false)
   const [loading,    setLoading]    = useState(false)
   const [error,      setError]      = useState(null)
   const [editTarget, setEditTarget] = useState(null)
@@ -58,26 +59,14 @@ export default function PositionRow({ position, ltp, onAdd, onPartialExit, onClo
     ? (Math.abs(parseFloat(position.tp) - wacc) / Math.abs(parseFloat(position.sl) - wacc)).toFixed(1)
     : null
 
-  const fetchHistory = useCallback(async () => {
-    if (fetched) return
+  const loadHistory = useCallback(async (force = false) => {
+    if (!force && fetchedRef.current) return
     setLoading(true)
     try {
       const res = await getTradeHistory(position.trade_id)
       setActions(res.data)
       setFetched(true)
-    } catch {
-      setError('Failed to load history')
-    } finally {
-      setLoading(false)
-    }
-  }, [position.trade_id, fetched])
-
-  const refreshHistory = useCallback(async () => {
-    setLoading(true)
-    try {
-      const res = await getTradeHistory(position.trade_id)
-      setActions(res.data)
-      setFetched(true)
+      fetchedRef.current = true
     } catch {
       setError('Failed to load history')
     } finally {
@@ -86,8 +75,8 @@ export default function PositionRow({ position, ltp, onAdd, onPartialExit, onClo
   }, [position.trade_id])
 
   useEffect(() => {
-    if (expanded && !fetched) fetchHistory()
-  }, [expanded, fetchHistory, fetched])
+    if (expanded && !fetched) loadHistory()
+  }, [expanded, fetched, loadHistory])
 
   // When parent triggers a refresh (trade saved/closed/exited), clear the
   // cached actions so the next expand (or immediate if already open) re-fetches.
@@ -95,7 +84,8 @@ export default function PositionRow({ position, ltp, onAdd, onPartialExit, onClo
     if (refreshTick === undefined) return
     setActions(null)
     setFetched(false)
-    if (expanded) refreshHistory()
+    fetchedRef.current = false
+    if (expanded) loadHistory(true)
   }, [refreshTick]) // eslint-disable-line react-hooks/exhaustive-deps
 
   const menuItems = isClosed
@@ -246,7 +236,7 @@ export default function PositionRow({ position, ltp, onAdd, onPartialExit, onClo
                 actions={actions}
                 direction={direction}
                 onEdit={a => setEditTarget(a)}
-                onDelete={a => onDeleteAction(a, refreshHistory)}
+                onDelete={a => onDeleteAction(a, () => loadHistory(true))}
               />
             )}
           </div>

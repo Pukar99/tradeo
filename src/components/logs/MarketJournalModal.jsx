@@ -78,11 +78,9 @@ export default function MarketJournalModal({ entry, onClose, onSaved }) {
     setSaving(true); setSaveErr(null)
     try {
       const res = await updateMarketJournal(entry.date, form)
-      onSaved(res.data)
-      onClose()
+      onSaved(res.data) // caller closes the modal — don't setState after this
     } catch (err) {
       setSaveErr(err.response?.data?.error || 'Failed to save')
-    } finally {
       setSaving(false)
     }
   }

@@ -1,5 +1,5 @@
 // === LogsPage.jsx — logs page: Trades / Market / Audit / Stats tabs, shared toolbar, position fetch, chat refresh ===
-import { useState, useEffect, useCallback, useMemo, lazy, Suspense } from 'react'
+import { useState, useEffect, useCallback, useMemo, lazy, Suspense, useRef } from 'react'
 import { useSearchParams } from 'react-router-dom'
 import { getMarketJournals, autoCreateMarketJournal } from '../api'
 import { getBatchPrices, getPositions, clearEligibilityCache } from '../utils/globalCache'
@@ -34,6 +34,15 @@ export default function LogsPage() {
     const t = searchParams.get('tab')
     return TABS.some(tab => tab.key === t) ? t : 'trades'
   })
+  // Sync tab if searchParams changes while component is already mounted
+  const prevTabParam = useRef(searchParams.get('tab'))
+  useEffect(() => {
+    const t = searchParams.get('tab')
+    if (t !== prevTabParam.current) {
+      prevTabParam.current = t
+      if (TABS.some(tab => tab.key === t)) setActiveTab(t)
+    }
+  }, [searchParams])
   const [error,      setError]      = useState(null)
 
   // Shared log view — persists across Trades + Market tabs
@@ -91,12 +100,15 @@ export default function LogsPage() {
       const all = journalsRes.data || []
       setMarketJournals(all)
 
-      // Backfill news for recent entries that have none — parallel, max 5
-      const missing = all.filter(e => !e.news).slice(0, 5)
-      if (missing.length > 0) {
-        await Promise.all(missing.map(e => autoCreateMarketJournal(e.date).catch(() => {})))
-        const refreshed = await getMarketJournals()
-        setMarketJournals(refreshed.data || [])
+      // Backfill news for recent entries that have none — once per session only
+      if (!sessionStorage.getItem('mj_backfilled')) {
+        sessionStorage.setItem('mj_backfilled', '1')
+        const missing = all.filter(e => !e.news).slice(0, 5)
+        if (missing.length > 0) {
+          await Promise.all(missing.map(e => autoCreateMarketJournal(e.date).catch(() => {})))
+          const refreshed = await getMarketJournals()
+          setMarketJournals(refreshed.data || [])
+        }
       }
     } catch (err) {
       console.error('[fetchMarketJournals]', err?.message)

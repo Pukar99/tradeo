@@ -1,6 +1,5 @@
 // === AuditTab.jsx — trade audit tab: KPI grid, equity curve, tax/fees estimates, share modal (PNG + PDF) ===
 import { useState, useEffect, useCallback, useMemo, useRef, useId } from 'react'
-import { useTheme } from '../../context/ThemeContext'
 import { useAuth } from '../../context/AuthContext'
 import { getTradeActions } from '../../utils/globalCache'
 import TraderCard from './TraderCard'
@@ -130,6 +129,11 @@ ${cardDataUrl ? `<img src="${cardDataUrl}" class="card-img" alt="Trader Card"/>`
 </body></html>`
 
       const win = window.open('', '_blank')
+      if (!win) {
+        setErr('Popup blocked. Allow popups for this site to download the PDF.')
+        setPdfGen(false)
+        return
+      }
       win.document.write(html)
       win.document.close()
       win.focus()
@@ -222,7 +226,6 @@ function rangeToFromTo(range) {
 
 // ── Main AuditTab ─────────────────────────────────────────────────────────────
 export default function AuditTab({ range = '1M', symbol = 'all', onSymbolsLoaded, shareOpen = false, onShareClose }) {
-  const { isDark } = useTheme()
   const { user }   = useAuth()
   const uid        = useId()
   const gradId     = `audit-eq-grad-${uid}`
@@ -340,10 +343,8 @@ export default function AuditTab({ range = '1M', symbol = 'all', onSymbolsLoaded
       if (dd > maxDDPct) maxDDPct = dd
     }
 
-    // Best / worst
-    // best/worst — from Close Position actions only (they carry realized_pnl)
-    const closeActions = closed.filter(t => t.action_type === 'Close Position' || t.action_type === 'Partial Exit')
-    const sortedByPnl  = [...closeActions].sort((a, b) => (parseFloat(b.realized_pnl) || 0) - (parseFloat(a.realized_pnl) || 0))
+    // Best / worst — closed already contains only Close Position + Partial Exit rows
+    const sortedByPnl  = [...closed].sort((a, b) => (parseFloat(b.realized_pnl) || 0) - (parseFloat(a.realized_pnl) || 0))
     const bestTrade    = sortedByPnl[0] || null
     const worstTrade   = sortedByPnl[sortedByPnl.length - 1] || null
 
