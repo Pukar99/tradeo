@@ -1,11 +1,15 @@
 // === SMCChartPage.jsx — SMC chart tab: StockChart + SMC overlays (BOS/CHoCH/OB/FVG/Sweeps/Entry), left/right panels, toolbar ===
 import { useState, useEffect, useCallback, useMemo, useRef } from 'react'
-import { createPortal } from 'react-dom'
 import { ScreenProvider, useScreen } from '../../context/ScreenContext'
 import StockChart from './StockChart'
 import { useScreenToolbarSlot } from '../../pages/ScreenPage'
 import { getSMCScan } from '../../api'
 import { getMarketSymbols } from '../../utils/globalCache'
+import {
+  ToolbarDivider, ToolbarSymbolSearch, ToolbarTimeframes,
+  ToolbarToggleChip, ToolbarConfigButton, ToolbarConfigTitle,
+  ToolbarConfigSection,
+} from './ScreenToolbarAtoms'
 
 // ── Constants ─────────────────────────────────────────────────────────────────
 const DEFAULT_CONFIG = {
@@ -41,272 +45,87 @@ function saveConfig(cfg) {
   try { localStorage.setItem('smc_config', JSON.stringify(cfg)) } catch {}
 }
 
-// ── useFixedDropdown ──────────────────────────────────────────────────────────
-function useFixedDropdown(align = 'left') {
-  const [open, setOpen] = useState(false)
-  const [rect, setRect] = useState(null)
-  const triggerRef      = useRef(null)
-
-  const updateRect = useCallback(() => {
-    if (triggerRef.current) setRect(triggerRef.current.getBoundingClientRect())
-  }, [])
-
-  useEffect(() => {
-    if (!open) return
-    updateRect()
-    window.addEventListener('resize', updateRect)
-    window.addEventListener('scroll', updateRect, true)
-    return () => {
-      window.removeEventListener('resize', updateRect)
-      window.removeEventListener('scroll', updateRect, true)
-    }
-  }, [open, updateRect])
-
-  useEffect(() => {
-    if (!open) return
-    const fn = (e) => {
-      if (triggerRef.current && !triggerRef.current.contains(e.target)) setOpen(false)
-    }
-    document.addEventListener('mousedown', fn)
-    return () => document.removeEventListener('mousedown', fn)
-  }, [open])
-
-  const dropStyle = rect ? {
-    position: 'fixed',
-    top: rect.bottom + 4,
-    ...(align === 'right' ? { right: window.innerWidth - rect.right } : { left: rect.left }),
-    zIndex: 9999,
-  } : {}
-
-  const portal = useCallback((content) => {
-    if (!open || !rect) return null
-    return createPortal(<div style={dropStyle}>{content}</div>, document.body)
-  }, [open, rect, dropStyle]) // eslint-disable-line react-hooks/exhaustive-deps
-
-  return { triggerRef, open, setOpen, portal, updateRect }
-}
-
-// ── Toggle chip ───────────────────────────────────────────────────────────────
-function ToggleChip({ label, active, onClick, activeColor }) {
-  return (
-    <button
-      onClick={onClick}
-      aria-pressed={active}
-      className={`min-h-[28px] px-2 py-0.5 rounded text-[10px] font-semibold transition-all border whitespace-nowrap ${
-        active
-          ? `text-white border-transparent`
-          : 'border-gray-200 dark:border-gray-700 text-gray-500 dark:text-gray-400 hover:border-gray-300'
-      }`}
-      style={active ? { backgroundColor: activeColor } : {}}
-    >
-      {label}
-    </button>
-  )
-}
-
-// ── Inline symbol search for SMC toolbar ─────────────────────────────────────
-function SMCSymbolSearch() {
-  const { selectedSymbol, selectSymbol } = useScreen() || {}
-  const [query, setQuery]   = useState('')
-  const [items, setItems]   = useState([])
-  const [open,  setOpen]    = useState(false)
-  const [cursor, setCursor] = useState(-1)
-  const inputRef = useRef(null)
-  const listRef  = useRef(null)
-  const mouseDownInList = useRef(false)
-  const { triggerRef, open: ddOpen, setOpen: setDDOpen, portal, updateRect } = useFixedDropdown('left')
-
-  useEffect(() => {
-    getMarketSymbols()
-      .then(r => { if (r.data?.stocks?.length) setItems(r.data.stocks) })
-      .catch(() => {})
-  }, [])
-
-  const q = query.toLowerCase()
-  const filtered = query.length < 1
-    ? items.slice(0, 20)
-    : items.filter(s => s.symbol.toLowerCase().startsWith(q) || s.symbol.toLowerCase().includes(q) || (s.company_name && s.company_name.toLowerCase().includes(q))).slice(0, 30)
-
-  const handleSelect = useCallback((item) => {
-    selectSymbol?.(item.symbol, null, null, item.company_name ?? null)
-    setQuery(''); setDDOpen(false); setCursor(-1)
-  }, [selectSymbol, setDDOpen])
-
-  function handleKey(e) {
-    if (!ddOpen) { setDDOpen(true); updateRect(); return }
-    if (e.key === 'ArrowDown') { e.preventDefault(); setCursor(c => Math.min(c + 1, filtered.length - 1)) }
-    if (e.key === 'ArrowUp')   { e.preventDefault(); setCursor(c => Math.max(c - 1, 0)) }
-    if (e.key === 'Enter') { const t = cursor >= 0 ? filtered[cursor] : filtered[0]; if (t) handleSelect(t) }
-    if (e.key === 'Escape') { setDDOpen(false); setCursor(-1) }
-  }
-
-  useEffect(() => {
-    if (cursor >= 0 && listRef.current) listRef.current.children[cursor]?.scrollIntoView({ block: 'nearest' })
-  }, [cursor])
-
-  return (
-    <div className="shrink-0" ref={triggerRef} onClick={() => { setDDOpen(true); updateRect(); setTimeout(() => inputRef.current?.focus(), 30) }}>
-      <div className="flex items-center gap-1 px-1.5 py-0.5 rounded-md bg-gray-100 dark:bg-gray-800 cursor-pointer hover:bg-gray-200 dark:hover:bg-gray-700 transition-colors">
-        <svg className="w-2.5 h-2.5 text-gray-400 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-          <path strokeLinecap="round" strokeLinejoin="round" d="M21 21l-4.35-4.35M17 11A6 6 0 1 1 5 11a6 6 0 0 1 12 0z" />
-        </svg>
-        <input ref={inputRef} value={query}
-          onChange={e => { setQuery(e.target.value.toUpperCase()); setDDOpen(true); updateRect(); setCursor(-1) }}
-          onFocus={() => { setDDOpen(true); updateRect() }}
-          onBlur={() => { if (!mouseDownInList.current) setDDOpen(false) }}
-          onKeyDown={handleKey}
-          placeholder={selectedSymbol} autoComplete="off" spellCheck={false}
-          className="bg-transparent text-[10px] font-bold text-gray-700 dark:text-gray-200 placeholder-gray-500 outline-none w-[56px] uppercase" />
-      </div>
-      {portal(
-        <div className="bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-700 rounded-xl shadow-2xl overflow-hidden" style={{ width: 240, maxHeight: 280, overflowY: 'auto' }}>
-          <ul ref={listRef}>
-            {filtered.map((item, i) => (
-              <li key={item.symbol}
-                onMouseDown={() => { mouseDownInList.current = true; handleSelect(item); mouseDownInList.current = false }}
-                className={`flex items-center justify-between px-3 py-1.5 cursor-pointer transition-colors ${i === cursor ? 'bg-blue-50 dark:bg-blue-950/60' : 'hover:bg-gray-50 dark:hover:bg-gray-800'}`}>
-                <div className="flex flex-col min-w-0">
-                  <span className="text-[11px] font-semibold text-gray-800 dark:text-gray-100 leading-tight">{item.symbol}</span>
-                  {item.company_name && <span className="text-[10px] text-gray-400 truncate leading-tight">{item.company_name}</span>}
-                </div>
-                <span className="shrink-0 ml-2 text-[10px] font-medium px-1.5 py-0.5 rounded bg-gray-100 dark:bg-gray-800 text-gray-500">Stock</span>
-              </li>
-            ))}
-          </ul>
-        </div>
-      )}
-    </div>
-  )
-}
-
-// ── Inline timeframe chips ────────────────────────────────────────────────────
-const TIMEFRAMES = ['6M', '1Y', '3Y', 'ALL']
-function SMCTimeframes() {
-  const { timeframe, setTimeframe } = useScreen() || {}
-  return (
-    <div className="flex items-center gap-0.5 bg-gray-100 dark:bg-gray-800 rounded-md p-0.5 shrink-0">
-      {TIMEFRAMES.map(tf => (
-        <button key={tf} onClick={() => setTimeframe?.(tf)}
-          className={`px-1 py-0.5 rounded text-[9px] font-bold transition-colors whitespace-nowrap ${
-            timeframe === tf
-              ? 'bg-white dark:bg-gray-700 text-gray-900 dark:text-white shadow-sm'
-              : 'text-gray-400 dark:text-gray-500 hover:text-gray-700 dark:hover:text-gray-300'
-          }`}>
-          {tf}
-        </button>
-      ))}
-    </div>
-  )
-}
+const SMC_TIMEFRAMES = ['6M', '1Y', '3Y', 'ALL']
 
 // ── SMC Toolbar ───────────────────────────────────────────────────────────────
-function SMCToolbar({ toggles, setToggles, config, setConfig }) {
-  const configDropdown = useFixedDropdown('right')
-
+function SMCToolbar({ toggles, setToggles, config, setConfig, symbols }) {
   const toggle = (key) => setToggles(prev => ({ ...prev, [key]: !prev[key] }))
-
   const updateConfig = (key, val) => {
     const next = { ...config, [key]: val }
-    setConfig(next)
-    saveConfig(next)
+    setConfig(next); saveConfig(next)
   }
 
   return useScreenToolbarSlot(
     <div className="flex items-center gap-1.5 min-w-0">
 
-      {/* Symbol search — same as General tab */}
-      <SMCSymbolSearch />
+      <ToolbarSymbolSearch symbols={symbols} stocksOnly />
+      <ToolbarDivider />
+      <ToolbarTimeframes frames={SMC_TIMEFRAMES} />
+      <ToolbarDivider />
 
-      <div className="w-px h-3.5 bg-gray-200 dark:bg-gray-700 shrink-0" />
+      <ToolbarToggleChip label="BOS"    active={toggles.showBOS}    onClick={() => toggle('showBOS')}    activeColor="#22c55e" />
+      <ToolbarToggleChip label="CHoCH"  active={toggles.showCHoCH}  onClick={() => toggle('showCHoCH')}  activeColor="#f59e0b" />
+      <ToolbarToggleChip label="OB"     active={toggles.showOB}     onClick={() => toggle('showOB')}     activeColor="#22c55e" />
+      <ToolbarToggleChip label="FVG"    active={toggles.showFVG}    onClick={() => toggle('showFVG')}    activeColor="#3b82f6" />
+      <ToolbarToggleChip label="Sweeps" active={toggles.showSweeps} onClick={() => toggle('showSweeps')} activeColor="#a78bfa" />
+      <ToolbarToggleChip label="Entry"  active={toggles.showEntry}  onClick={() => toggle('showEntry')}  activeColor="#10b981" />
 
-      {/* Timeframes — drives chart view AND SMC scan period */}
-      <SMCTimeframes />
+      <ToolbarDivider />
 
-      <div className="w-px h-3.5 bg-gray-200 dark:bg-gray-700 shrink-0" />
+      <ToolbarConfigButton>
+        <ToolbarConfigTitle>Signal Configuration</ToolbarConfigTitle>
 
-      {/* SMC overlay toggles */}
-      <ToggleChip label="BOS"    active={toggles.showBOS}    onClick={() => toggle('showBOS')}    activeColor="#22c55e" />
-      <ToggleChip label="CHoCH"  active={toggles.showCHoCH}  onClick={() => toggle('showCHoCH')}  activeColor="#f59e0b" />
-      <ToggleChip label="OB"     active={toggles.showOB}     onClick={() => toggle('showOB')}     activeColor="#22c55e" />
-      <ToggleChip label="FVG"    active={toggles.showFVG}    onClick={() => toggle('showFVG')}    activeColor="#3b82f6" />
-      <ToggleChip label="Sweeps" active={toggles.showSweeps} onClick={() => toggle('showSweeps')} activeColor="#a78bfa" />
-      <ToggleChip label="Entry"  active={toggles.showEntry}  onClick={() => toggle('showEntry')}  activeColor="#10b981" />
-
-      <div className="w-px h-3.5 bg-gray-200 dark:bg-gray-700 shrink-0" />
-
-      {/* Config popover ⚙ */}
-      <div ref={configDropdown.triggerRef}>
-        <button
-          onClick={() => { configDropdown.setOpen(v => !v); configDropdown.updateRect() }}
-          className="px-2 py-0.5 rounded text-[10px] font-semibold border border-gray-200 dark:border-gray-700 text-gray-500 dark:text-gray-400 hover:border-gray-300 transition-all"
-        >
-          Config
-        </button>
-        {configDropdown.portal(
-          <div className="bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-700 rounded-xl shadow-2xl p-3 min-w-[220px]">
-            <p className="text-[10px] font-bold uppercase tracking-wide text-gray-400 mb-2">Signal Configuration</p>
-
-            {/* Min score */}
-            <p className="text-[10px] text-gray-500 dark:text-gray-400 mb-1">Min confluence score</p>
-            <div className="flex gap-1 mb-3">
-              {[1,2,3,4,5,6].map(n => (
-                <button key={n} onClick={() => updateConfig('minScore', n)}
-                  className={`w-8 h-8 rounded text-[10px] font-bold transition-colors ${
-                    config.minScore === n
-                      ? 'bg-blue-600 text-white'
-                      : 'bg-gray-100 dark:bg-gray-800 text-gray-500 dark:text-gray-400'
-                  }`}>
-                  {n}
-                </button>
-              ))}
-            </div>
-
-            {/* Conditions */}
-            <p className="text-[10px] text-gray-500 dark:text-gray-400 mb-1">Active conditions</p>
-            <div className="space-y-1.5 mb-3">
-              {[
-                { key: 'useBOS',      label: 'Bullish BOS' },
-                { key: 'useCHoCH',    label: 'Bullish CHoCH' },
-                { key: 'useOB',       label: 'OB Mitigation' },
-                { key: 'useSweep',    label: 'Liquidity Sweep' },
-              ].map(({ key, label }) => (
-                <label key={key} className="flex items-center gap-2 cursor-pointer">
-                  <input type="checkbox" checked={config[key]} onChange={e => updateConfig(key, e.target.checked)}
-                    className="w-3 h-3 rounded accent-blue-600" />
-                  <span className="text-[11px] text-gray-700 dark:text-gray-300">{label}</span>
-                </label>
-              ))}
-
-              {/* Discount with threshold */}
-              <label className="flex items-center gap-2 cursor-pointer">
-                <input type="checkbox" checked={config.useDiscount} onChange={e => updateConfig('useDiscount', e.target.checked)}
-                  className="w-3 h-3 rounded accent-blue-600" />
-                <span className="text-[11px] text-gray-700 dark:text-gray-300">Discount zone ≤</span>
-                <input type="number" value={config.discountPct} min={10} max={50} step={5}
-                  onChange={e => updateConfig('discountPct', parseInt(e.target.value) || 40)}
-                  className="w-8 text-[10px] text-center border border-gray-200 dark:border-gray-700 rounded px-1 py-0.5 bg-white dark:bg-gray-800 text-gray-700 dark:text-gray-200" />
-                <span className="text-[10px] text-gray-400">%</span>
-              </label>
-
-              {/* FVG with distance */}
-              <label className="flex items-center gap-2 cursor-pointer">
-                <input type="checkbox" checked={config.useFVG} onChange={e => updateConfig('useFVG', e.target.checked)}
-                  className="w-3 h-3 rounded accent-blue-600" />
-                <span className="text-[11px] text-gray-700 dark:text-gray-300">FVG fill ≤</span>
-                <input type="number" value={config.fvgMaxDistPct} min={1} max={10} step={1}
-                  onChange={e => updateConfig('fvgMaxDistPct', parseInt(e.target.value) || 3)}
-                  className="w-8 text-[10px] text-center border border-gray-200 dark:border-gray-700 rounded px-1 py-0.5 bg-white dark:bg-gray-800 text-gray-700 dark:text-gray-200" />
-                <span className="text-[10px] text-gray-400">%</span>
-              </label>
-            </div>
-
-            <button onClick={() => { setConfig(DEFAULT_CONFIG); saveConfig(DEFAULT_CONFIG) }}
-              className="text-[10px] text-blue-500 hover:underline">
-              Reset to defaults
-            </button>
+        <ToolbarConfigSection label="Min confluence score">
+          <div className="flex gap-1">
+            {[1,2,3,4,5,6].map(n => (
+              <button key={n} onClick={() => updateConfig('minScore', n)}
+                className={`w-8 h-8 rounded text-[10px] font-bold transition-colors ${
+                  config.minScore === n
+                    ? 'bg-blue-600 text-white'
+                    : 'bg-gray-100 dark:bg-gray-800 text-gray-500 dark:text-gray-400 hover:bg-gray-200 dark:hover:bg-gray-700'
+                }`}>{n}</button>
+            ))}
           </div>
-        )}
-      </div>
+        </ToolbarConfigSection>
+
+        <ToolbarConfigSection label="Active conditions">
+          <div className="space-y-1.5">
+            {[
+              { key: 'useBOS',   label: 'Bullish BOS' },
+              { key: 'useCHoCH', label: 'Bullish CHoCH' },
+              { key: 'useOB',    label: 'OB Mitigation' },
+              { key: 'useSweep', label: 'Liquidity Sweep' },
+            ].map(({ key, label }) => (
+              <label key={key} className="flex items-center gap-2 cursor-pointer">
+                <input type="checkbox" checked={config[key]} onChange={e => updateConfig(key, e.target.checked)}
+                  className="w-3 h-3 rounded accent-blue-600" />
+                <span className="text-[11px] text-gray-700 dark:text-gray-300">{label}</span>
+              </label>
+            ))}
+            <label className="flex items-center gap-2 cursor-pointer">
+              <input type="checkbox" checked={config.useDiscount} onChange={e => updateConfig('useDiscount', e.target.checked)}
+                className="w-3 h-3 rounded accent-blue-600" />
+              <span className="text-[11px] text-gray-700 dark:text-gray-300">Discount zone ≤</span>
+              <input type="number" value={config.discountPct} min={10} max={50} step={5}
+                onChange={e => updateConfig('discountPct', parseInt(e.target.value) || 40)}
+                className="w-8 text-[10px] text-center border border-gray-200 dark:border-gray-700 rounded px-1 py-0.5 bg-white dark:bg-gray-800 text-gray-700 dark:text-gray-200" />
+              <span className="text-[10px] text-gray-400">%</span>
+            </label>
+            <label className="flex items-center gap-2 cursor-pointer">
+              <input type="checkbox" checked={config.useFVG} onChange={e => updateConfig('useFVG', e.target.checked)}
+                className="w-3 h-3 rounded accent-blue-600" />
+              <span className="text-[11px] text-gray-700 dark:text-gray-300">FVG fill ≤</span>
+              <input type="number" value={config.fvgMaxDistPct} min={1} max={10} step={1}
+                onChange={e => updateConfig('fvgMaxDistPct', parseInt(e.target.value) || 3)}
+                className="w-8 text-[10px] text-center border border-gray-200 dark:border-gray-700 rounded px-1 py-0.5 bg-white dark:bg-gray-800 text-gray-700 dark:text-gray-200" />
+              <span className="text-[10px] text-gray-400">%</span>
+            </label>
+          </div>
+        </ToolbarConfigSection>
+
+        <button onClick={() => { setConfig(DEFAULT_CONFIG); saveConfig(DEFAULT_CONFIG) }}
+          className="text-[10px] text-blue-500 hover:underline">Reset to defaults</button>
+      </ToolbarConfigButton>
 
     </div>
   )
@@ -509,7 +328,7 @@ function SMCRightPanel({ smcData, signals, kpis, config }) {
           <button key={id} onClick={() => setTab(id)}
             className={`flex-1 py-1.5 text-[10px] font-semibold transition-colors ${
               tab === id
-                ? 'text-blue-600 dark:text-blue-400 border-b-2 border-blue-600 dark:border-blue-400'
+                ? 'text-blue-600 dark:text-blue-400 border-b-2 border-blue-600 dark:border-blue-400 animate-scale-in'
                 : 'text-gray-400 dark:text-gray-500 hover:text-gray-600'
             }`}>
             {label}
@@ -517,7 +336,7 @@ function SMCRightPanel({ smcData, signals, kpis, config }) {
         ))}
       </div>
 
-      <div className="flex-1 overflow-y-auto min-h-0 divide-y divide-gray-100 dark:divide-gray-800">
+      <div key={tab} className="flex-1 overflow-y-auto min-h-0 divide-y divide-gray-100 dark:divide-gray-800 animate-tab-in">
 
         {tab === 'signals' && (
           <>
@@ -879,13 +698,24 @@ function computeBiasScore(smcData, currentPrice) {
 // ── SMC Inner — reads ScreenContext ──────────────────────────────────────────
 function SMCInner() {
   const { selectedSymbol, timeframe, isIndex, latestClose } = useScreen() || {}
+  const [leftOpen,  setLeftOpen]  = useState(() => localStorage.getItem('tradeo_smc_leftOpen')  !== 'false')
+  const [rightOpen, setRightOpen] = useState(() => localStorage.getItem('tradeo_smc_rightOpen') !== 'false')
+  const toggleLeft  = () => setLeftOpen(v  => { localStorage.setItem('tradeo_smc_leftOpen',  String(!v)); return !v })
+  const toggleRight = () => setRightOpen(v => { localStorage.setItem('tradeo_smc_rightOpen', String(!v)); return !v })
 
-  const [smcData,   setSmcData]   = useState(null)
-  const [loading,   setLoading]   = useState(false)
-  const [chartData, setChartData] = useState([])  // state (not ref) so useMemo reacts
-  const [toggles,   setToggles]   = useState(DEFAULT_TOGGLES)
-  const [config,    setConfig]    = useState(() => loadConfig())
+  const [smcData,    setSmcData]   = useState(null)
+  const [loading,    setLoading]   = useState(false)
+  const [chartData,  setChartData] = useState([])  // state (not ref) so useMemo reacts
+  const [toggles,    setToggles]   = useState(DEFAULT_TOGGLES)
+  const [config,     setConfig]    = useState(() => loadConfig())
+  const [symbols, setSymbols] = useState(null)
   const chartDataRef = useRef([])  // also kept as ref for non-reactive reads
+
+  useEffect(() => {
+    getMarketSymbols()
+      .then(r => { if (r.data?.stocks?.length) setSymbols(r.data) })
+      .catch(() => {})
+  }, [])
 
   const isStock = !isIndex?.()
 
@@ -924,24 +754,77 @@ function SMCInner() {
     smcSignals: isStock ? signals : [],
   }), [smcData, toggles, signals, isStock])
 
+  const handleChartDataReady = useCallback((data) => {
+    chartDataRef.current = data
+    setChartData(data)
+  }, [])
+
   return (
     <>
       {/* Toolbar injected into Screen tab bar */}
       <SMCToolbar
         toggles={toggles} setToggles={setToggles}
         config={config} setConfig={setConfig}
+        symbols={symbols}
       />
 
-      {/* 3-panel layout — identical ratios to General tab */}
-      <div className="flex-1 flex overflow-hidden min-h-0">
+      {/* 3-panel layout */}
+      <div className="flex-1 flex overflow-hidden min-h-0 animate-fade-up">
 
-        {/* Left panel */}
-        <div className="w-[10%] min-w-[120px] max-w-[180px] border-r border-gray-100 dark:border-gray-800 overflow-y-auto hidden lg:flex flex-col shrink-0">
-          <SMCLeftPanel smcData={isStock ? smcData : null} biasScore={biasScore} chartData={chartData} currentPrice={currentPrice} />
+        {/* Left panel — collapsible glass */}
+        <div className={`hidden lg:flex flex-col shrink-0 overflow-y-auto relative
+                        bg-white/50 dark:bg-gray-950/60 backdrop-blur-2xl
+                        shadow-[1px_0_0_rgba(255,255,255,0.18),2px_0_12px_rgba(0,0,0,0.06)]
+                        dark:shadow-[1px_0_0_rgba(255,255,255,0.07),2px_0_16px_rgba(0,0,0,0.4)]
+                        transition-all duration-200 ease-in-out
+                        ${leftOpen ? 'w-[13%] min-w-[150px] max-w-[200px]' : 'w-0 min-w-0 max-w-0 overflow-hidden'} ${!leftOpen ? 'screen-panel-collapsed' : ''}`}>
+          <div className="screen-panel-content flex flex-col h-full">
+            <SMCLeftPanel smcData={isStock ? smcData : null} biasScore={biasScore} chartData={chartData} currentPrice={currentPrice} />
+          </div>
         </div>
 
-        {/* Center chart */}
-        <div className="flex-1 min-h-0 overflow-hidden">
+        {/* Center chart — toggle buttons on both edges */}
+        <div className="flex-1 min-h-0 overflow-hidden relative">
+          {/* Left toggle */}
+          <button
+            onClick={toggleLeft}
+            title={leftOpen ? 'Hide left panel' : 'Show left panel'}
+            className="hidden lg:flex absolute left-0 top-1/2 -translate-y-1/2 z-30
+                       h-12 w-4 items-center justify-center
+                       bg-white/70 dark:bg-gray-800/70 backdrop-blur-sm
+                       border-y border-r border-gray-200/60 dark:border-gray-700/50
+                       rounded-r-lg shadow-sm text-gray-400 dark:text-gray-500
+                       hover:bg-white dark:hover:bg-gray-700
+                       hover:text-blue-500 dark:hover:text-blue-400
+                       transition-all duration-150"
+          >
+            <svg className={`w-2.5 h-2.5 transition-transform duration-200 ${leftOpen ? '' : 'rotate-180'}`}
+              viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2.5}
+              strokeLinecap="round" strokeLinejoin="round">
+              <polyline points="15 18 9 12 15 6" />
+            </svg>
+          </button>
+
+          {/* Right toggle */}
+          <button
+            onClick={toggleRight}
+            title={rightOpen ? 'Hide right panel' : 'Show right panel'}
+            className="hidden lg:flex absolute right-0 top-1/2 -translate-y-1/2 z-30
+                       h-12 w-4 items-center justify-center
+                       bg-white/70 dark:bg-gray-800/70 backdrop-blur-sm
+                       border-y border-l border-gray-200/60 dark:border-gray-700/50
+                       rounded-l-lg shadow-sm text-gray-400 dark:text-gray-500
+                       hover:bg-white dark:hover:bg-gray-700
+                       hover:text-blue-500 dark:hover:text-blue-400
+                       transition-all duration-150"
+          >
+            <svg className={`w-2.5 h-2.5 transition-transform duration-200 ${rightOpen ? 'rotate-180' : ''}`}
+              viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2.5}
+              strokeLinecap="round" strokeLinejoin="round">
+              <polyline points="15 18 9 12 15 6" />
+            </svg>
+          </button>
+
           {loading && (
             <div className="absolute top-2 right-3 z-30 pointer-events-none">
               <span className="text-[9px] text-gray-400 bg-white/80 dark:bg-gray-900/80 px-2 py-0.5 rounded-full border border-gray-200 dark:border-gray-700">
@@ -952,16 +835,20 @@ function SMCInner() {
           <StockChart
             hideToolbar
             {...smcOverlayData}
-            onChartDataReady={(data) => {
-              chartDataRef.current = data
-              setChartData(data)
-            }}
+            onChartDataReady={handleChartDataReady}
           />
         </div>
 
-        {/* Right panel */}
-        <div className="w-[15%] min-w-[160px] max-w-[240px] border-l border-gray-100 dark:border-gray-800 hidden lg:flex flex-col shrink-0">
-          <SMCRightPanel smcData={isStock ? smcData : null} signals={signals} kpis={kpis} config={config} />
+        {/* Right panel — collapsible glass */}
+        <div className={`hidden lg:flex flex-col shrink-0 overflow-y-auto relative
+                        bg-white/50 dark:bg-gray-950/60 backdrop-blur-2xl
+                        shadow-[-1px_0_0_rgba(255,255,255,0.18),-2px_0_12px_rgba(0,0,0,0.06)]
+                        dark:shadow-[-1px_0_0_rgba(255,255,255,0.07),-2px_0_16px_rgba(0,0,0,0.4)]
+                        transition-all duration-200 ease-in-out
+                        ${rightOpen ? 'w-[15%] min-w-[160px] max-w-[240px]' : 'w-0 min-w-0 max-w-0 overflow-hidden'} ${!rightOpen ? 'screen-panel-collapsed' : ''}`}>
+          <div className="screen-panel-content flex flex-col h-full">
+            <SMCRightPanel smcData={isStock ? smcData : null} signals={signals} kpis={kpis} config={config} />
+          </div>
         </div>
       </div>
     </>

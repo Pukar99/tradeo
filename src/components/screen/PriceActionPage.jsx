@@ -1,11 +1,15 @@
 // === PriceActionPage.jsx — Price Action chart tab: swings (HH/HL/LH/LL), S/R, demand/supply zones, volume spikes, patterns ===
 import { useState, useEffect, useCallback, useMemo, useRef } from 'react'
-import { createPortal } from 'react-dom'
 import { ScreenProvider, useScreen } from '../../context/ScreenContext'
 import StockChart from './StockChart'
 import { useScreenToolbarSlot } from '../../pages/ScreenPage'
 import { getPriceActionScan } from '../../api'
 import { getMarketSymbols } from '../../utils/globalCache'
+import {
+  ToolbarDivider, ToolbarSymbolSearch, ToolbarTimeframes,
+  ToolbarToggleChip, ToolbarConfigButton, ToolbarConfigTitle,
+  ToolbarConfigSection, ToolbarSegment,
+} from './ScreenToolbarAtoms'
 
 // ── Constants ─────────────────────────────────────────────────────────────────
 const DEFAULT_CONFIG = {
@@ -36,272 +40,66 @@ function saveConfig(cfg) {
   try { localStorage.setItem('pa_config', JSON.stringify(cfg)) } catch {}
 }
 
-// ── useFixedDropdown ──────────────────────────────────────────────────────────
-function useFixedDropdown(align = 'left') {
-  const [open, setOpen] = useState(false)
-  const [rect, setRect] = useState(null)
-  const triggerRef      = useRef(null)
-
-  const updateRect = useCallback(() => {
-    if (triggerRef.current) setRect(triggerRef.current.getBoundingClientRect())
-  }, [])
-
-  useEffect(() => {
-    if (!open) return
-    updateRect()
-    window.addEventListener('resize', updateRect)
-    window.addEventListener('scroll', updateRect, true)
-    return () => {
-      window.removeEventListener('resize', updateRect)
-      window.removeEventListener('scroll', updateRect, true)
-    }
-  }, [open, updateRect])
-
-  useEffect(() => {
-    if (!open) return
-    const fn = (e) => {
-      if (triggerRef.current && !triggerRef.current.contains(e.target)) setOpen(false)
-    }
-    document.addEventListener('mousedown', fn)
-    return () => document.removeEventListener('mousedown', fn)
-  }, [open])
-
-  const dropStyle = rect ? {
-    position: 'fixed',
-    top: rect.bottom + 4,
-    ...(align === 'right' ? { right: window.innerWidth - rect.right } : { left: rect.left }),
-    zIndex: 9999,
-  } : {}
-
-  const portal = useCallback((content) => {
-    if (!open || !rect) return null
-    return createPortal(<div style={dropStyle}>{content}</div>, document.body)
-  }, [open, rect, dropStyle]) // eslint-disable-line react-hooks/exhaustive-deps
-
-  return { triggerRef, open, setOpen, portal, updateRect }
-}
-
-// ── Toggle chip ───────────────────────────────────────────────────────────────
-function ToggleChip({ label, active, onClick, activeColor }) {
-  return (
-    <button
-      onClick={onClick}
-      aria-pressed={active}
-      className={`min-h-[28px] px-2 py-0.5 rounded text-[10px] font-semibold transition-all border whitespace-nowrap ${
-        active
-          ? 'text-white border-transparent'
-          : 'border-gray-200 dark:border-gray-700 text-gray-500 dark:text-gray-400 hover:border-gray-300'
-      }`}
-      style={active ? { backgroundColor: activeColor } : {}}
-    >
-      {label}
-    </button>
-  )
-}
-
-// ── Inline symbol search ──────────────────────────────────────────────────────
-function PASymbolSearch() {
-  const { selectedSymbol, selectSymbol } = useScreen() || {}
-  const [query,  setQuery]  = useState('')
-  const [items,  setItems]  = useState([])
-  const [cursor, setCursor] = useState(-1)
-  const inputRef            = useRef(null)
-  const listRef             = useRef(null)
-  const mouseDownInList     = useRef(false)
-  const { triggerRef, open: ddOpen, setOpen: setDDOpen, portal, updateRect } = useFixedDropdown('left')
-
-  useEffect(() => {
-    getMarketSymbols()
-      .then(r => { if (r.data?.stocks?.length) setItems(r.data.stocks) })
-      .catch(() => {})
-  }, [])
-
-  const q        = query.toLowerCase()
-  const filtered = query.length < 1
-    ? items.slice(0, 20)
-    : items.filter(s =>
-        s.symbol.toLowerCase().startsWith(q) ||
-        s.symbol.toLowerCase().includes(q) ||
-        (s.company_name && s.company_name.toLowerCase().includes(q))
-      ).slice(0, 30)
-
-  const handleSelect = useCallback((item) => {
-    selectSymbol?.(item.symbol, null, null, item.company_name ?? null)
-    setQuery(''); setDDOpen(false); setCursor(-1)
-  }, [selectSymbol, setDDOpen])
-
-  function handleKey(e) {
-    if (!ddOpen) { setDDOpen(true); updateRect(); return }
-    if (e.key === 'ArrowDown') { e.preventDefault(); setCursor(c => Math.min(c + 1, filtered.length - 1)) }
-    if (e.key === 'ArrowUp')   { e.preventDefault(); setCursor(c => Math.max(c - 1, 0)) }
-    if (e.key === 'Enter')     { const t = cursor >= 0 ? filtered[cursor] : filtered[0]; if (t) handleSelect(t) }
-    if (e.key === 'Escape')    { setDDOpen(false); setCursor(-1) }
-  }
-
-  useEffect(() => {
-    if (cursor >= 0 && listRef.current) listRef.current.children[cursor]?.scrollIntoView({ block: 'nearest' })
-  }, [cursor])
-
-  return (
-    <div className="shrink-0" ref={triggerRef}
-      onClick={() => { setDDOpen(true); updateRect(); setTimeout(() => inputRef.current?.focus(), 30) }}>
-      <div className="flex items-center gap-1 px-1.5 py-0.5 rounded-md bg-gray-100 dark:bg-gray-800 cursor-pointer hover:bg-gray-200 dark:hover:bg-gray-700 transition-colors">
-        <svg className="w-2.5 h-2.5 text-gray-400 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-          <path strokeLinecap="round" strokeLinejoin="round" d="M21 21l-4.35-4.35M17 11A6 6 0 1 1 5 11a6 6 0 0 1 12 0z" />
-        </svg>
-        <input ref={inputRef} value={query}
-          onChange={e => { setQuery(e.target.value.toUpperCase()); setDDOpen(true); updateRect(); setCursor(-1) }}
-          onFocus={() => { setDDOpen(true); updateRect() }}
-          onBlur={() => { if (!mouseDownInList.current) setDDOpen(false) }}
-          onKeyDown={handleKey}
-          placeholder={selectedSymbol} autoComplete="off" spellCheck={false}
-          className="bg-transparent text-[10px] font-bold text-gray-700 dark:text-gray-200 placeholder-gray-500 outline-none w-[56px] uppercase" />
-      </div>
-      {portal(
-        <div className="bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-700 rounded-xl shadow-2xl overflow-hidden" style={{ width: 240, maxHeight: 280, overflowY: 'auto' }}>
-          <ul ref={listRef}>
-            {filtered.map((item, i) => (
-              <li key={item.symbol}
-                onMouseDown={() => { mouseDownInList.current = true; handleSelect(item); mouseDownInList.current = false }}
-                className={`flex items-center justify-between px-3 py-1.5 cursor-pointer transition-colors ${i === cursor ? 'bg-blue-50 dark:bg-blue-950/60' : 'hover:bg-gray-50 dark:hover:bg-gray-800'}`}>
-                <div className="flex flex-col min-w-0">
-                  <span className="text-[11px] font-semibold text-gray-800 dark:text-gray-100 leading-tight">{item.symbol}</span>
-                  {item.company_name && <span className="text-[10px] text-gray-400 truncate leading-tight">{item.company_name}</span>}
-                </div>
-                <span className="shrink-0 ml-2 text-[10px] font-medium px-1.5 py-0.5 rounded bg-gray-100 dark:bg-gray-800 text-gray-500">Stock</span>
-              </li>
-            ))}
-          </ul>
-        </div>
-      )}
-    </div>
-  )
-}
-
-// ── Inline timeframe chips ────────────────────────────────────────────────────
-const TIMEFRAMES = ['6M', '1Y', '3Y', 'ALL']
-function PATimeframes() {
-  const { timeframe, setTimeframe } = useScreen() || {}
-  return (
-    <div className="flex items-center gap-0.5 bg-gray-100 dark:bg-gray-800 rounded-md p-0.5 shrink-0">
-      {TIMEFRAMES.map(tf => (
-        <button key={tf} onClick={() => setTimeframe?.(tf)}
-          className={`px-1 py-0.5 rounded text-[9px] font-bold transition-colors whitespace-nowrap ${
-            timeframe === tf
-              ? 'bg-white dark:bg-gray-700 text-gray-900 dark:text-white shadow-sm'
-              : 'text-gray-400 dark:text-gray-500 hover:text-gray-700 dark:hover:text-gray-300'
-          }`}>
-          {tf}
-        </button>
-      ))}
-    </div>
-  )
-}
+const PA_TIMEFRAMES = ['6M', '1Y', '3Y', 'ALL']
 
 // ── PA Toolbar ────────────────────────────────────────────────────────────────
-function PAToolbar({ toggles, setToggles, config, setConfig }) {
-  const configDrop = useFixedDropdown('right')
-  const toggle     = (key) => setToggles(prev => ({ ...prev, [key]: !prev[key] }))
-
+function PAToolbar({ toggles, setToggles, config, setConfig, symbols }) {
+  const toggle = (key) => setToggles(prev => ({ ...prev, [key]: !prev[key] }))
   const updateConfig = (key, val) => {
     const next = { ...config, [key]: val }
-    setConfig(next)
-    saveConfig(next)
+    setConfig(next); saveConfig(next)
   }
 
   return useScreenToolbarSlot(
     <div className="flex items-center gap-1.5 min-w-0">
 
-      <PASymbolSearch />
+      <ToolbarSymbolSearch symbols={symbols} stocksOnly />
+      <ToolbarDivider />
+      <ToolbarTimeframes frames={PA_TIMEFRAMES} />
+      <ToolbarDivider />
 
-      <div className="w-px h-3.5 bg-gray-200 dark:bg-gray-700 shrink-0" />
+      <ToolbarToggleChip label="Swings"    active={toggles.showSwings}   onClick={() => toggle('showSwings')}   activeColor="#3b82f6" />
+      <ToolbarToggleChip label="Trend"     active={toggles.showTrend}    onClick={() => toggle('showTrend')}    activeColor="#22c55e" />
+      <ToolbarToggleChip label="S/R"       active={toggles.showSR}       onClick={() => toggle('showSR')}       activeColor="#f97316" />
+      <ToolbarToggleChip label="D/S Zones" active={toggles.showZones}    onClick={() => toggle('showZones')}    activeColor="#8b5cf6" />
+      <ToolbarToggleChip label="Volume"    active={toggles.showVolume}   onClick={() => toggle('showVolume')}   activeColor="#a855f7" />
+      <ToolbarToggleChip label="Patterns"  active={toggles.showPatterns} onClick={() => toggle('showPatterns')} activeColor="#f59e0b" />
 
-      <PATimeframes />
+      <ToolbarDivider />
 
-      <div className="w-px h-3.5 bg-gray-200 dark:bg-gray-700 shrink-0" />
+      <ToolbarConfigButton>
+        <ToolbarConfigTitle>Price Action Config</ToolbarConfigTitle>
 
-      {/* Overlay toggles */}
-      <ToggleChip label="Swings"    active={toggles.showSwings}   onClick={() => toggle('showSwings')}   activeColor="#3b82f6" />
-      <ToggleChip label="Trend"     active={toggles.showTrend}    onClick={() => toggle('showTrend')}    activeColor="#22c55e" />
-      <ToggleChip label="S/R"       active={toggles.showSR}       onClick={() => toggle('showSR')}       activeColor="#f97316" />
-      <ToggleChip label="D/S Zones" active={toggles.showZones}    onClick={() => toggle('showZones')}    activeColor="#8b5cf6" />
-      <ToggleChip label="Volume"    active={toggles.showVolume}   onClick={() => toggle('showVolume')}   activeColor="#a855f7" />
-      <ToggleChip label="Patterns"  active={toggles.showPatterns} onClick={() => toggle('showPatterns')} activeColor="#f59e0b" />
+        <ToolbarConfigSection label="S/R cluster tolerance">
+          <ToolbarSegment
+            options={[1.0, 1.5, 2.0, 2.5].map(v => ({ v, label: `${v}%` }))}
+            value={config.clusterPct}
+            onChange={v => updateConfig('clusterPct', v)}
+            activeColor="bg-orange-500"
+          />
+        </ToolbarConfigSection>
 
-      <div className="w-px h-3.5 bg-gray-200 dark:bg-gray-700 shrink-0" />
+        <ToolbarConfigSection label="D/S min move">
+          <ToolbarSegment
+            options={[2, 3, 5].map(v => ({ v, label: `${v}%` }))}
+            value={config.dsMovePct}
+            onChange={v => updateConfig('dsMovePct', v)}
+            activeColor="bg-purple-500"
+          />
+        </ToolbarConfigSection>
 
-      {/* Config popover */}
-      <div ref={configDrop.triggerRef}>
-        <button
-          onClick={() => { configDrop.setOpen(v => !v); configDrop.updateRect() }}
-          className="px-2 py-0.5 rounded text-[10px] font-semibold border border-gray-200 dark:border-gray-700 text-gray-500 dark:text-gray-400 hover:border-gray-300 transition-all"
-        >
-          Config
-        </button>
-        {configDrop.portal(
-          <div className="bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-700 rounded-xl shadow-2xl p-3 min-w-[220px]">
-            <p className="text-[10px] font-bold uppercase tracking-wide text-gray-400 mb-3">Price Action Config</p>
+        <ToolbarConfigSection label="Volume spike threshold">
+          <ToolbarSegment
+            options={[1.5, 2.0, 2.5, 3.0].map(v => ({ v, label: `${v}×` }))}
+            value={config.volMultiplier}
+            onChange={v => updateConfig('volMultiplier', v)}
+            activeColor="bg-purple-600"
+          />
+        </ToolbarConfigSection>
 
-            <div className="space-y-3">
-              {/* S/R clustering */}
-              <div>
-                <p className="text-[10px] text-gray-500 dark:text-gray-400 mb-1">S/R cluster tolerance</p>
-                <div className="flex gap-1">
-                  {[1.0, 1.5, 2.0, 2.5].map(v => (
-                    <button key={v} onClick={() => updateConfig('clusterPct', v)}
-                      className={`flex-1 py-0.5 rounded text-[9px] font-bold transition-colors ${
-                        config.clusterPct === v
-                          ? 'bg-orange-500 text-white'
-                          : 'bg-gray-100 dark:bg-gray-800 text-gray-500'
-                      }`}>
-                      {v}%
-                    </button>
-                  ))}
-                </div>
-              </div>
-
-              {/* D/S threshold */}
-              <div>
-                <p className="text-[10px] text-gray-500 dark:text-gray-400 mb-1">D/S min move</p>
-                <div className="flex gap-1">
-                  {[2, 3, 5].map(v => (
-                    <button key={v} onClick={() => updateConfig('dsMovePct', v)}
-                      className={`flex-1 py-0.5 rounded text-[9px] font-bold transition-colors ${
-                        config.dsMovePct === v
-                          ? 'bg-purple-500 text-white'
-                          : 'bg-gray-100 dark:bg-gray-800 text-gray-500'
-                      }`}>
-                      {v}%
-                    </button>
-                  ))}
-                </div>
-              </div>
-
-              {/* Volume spike */}
-              <div>
-                <p className="text-[10px] text-gray-500 dark:text-gray-400 mb-1">Volume spike threshold</p>
-                <div className="flex gap-1">
-                  {[1.5, 2.0, 2.5, 3.0].map(v => (
-                    <button key={v} onClick={() => updateConfig('volMultiplier', v)}
-                      className={`flex-1 py-0.5 rounded text-[9px] font-bold transition-colors ${
-                        config.volMultiplier === v
-                          ? 'bg-purple-600 text-white'
-                          : 'bg-gray-100 dark:bg-gray-800 text-gray-500'
-                      }`}>
-                      {v}×
-                    </button>
-                  ))}
-                </div>
-              </div>
-            </div>
-
-            <button onClick={() => { setConfig(DEFAULT_CONFIG); saveConfig(DEFAULT_CONFIG) }}
-              className="mt-3 text-[10px] text-blue-500 hover:underline">
-              Reset to defaults
-            </button>
-          </div>
-        )}
-      </div>
+        <button onClick={() => { setConfig(DEFAULT_CONFIG); saveConfig(DEFAULT_CONFIG) }}
+          className="text-[10px] text-blue-500 hover:underline">Reset to defaults</button>
+      </ToolbarConfigButton>
 
     </div>
   )
@@ -551,7 +349,7 @@ function PARightPanel({ paData, kpis }) {
           <button key={id} onClick={() => setTab(id)}
             className={`flex-1 py-1.5 text-[10px] font-semibold transition-colors ${
               tab === id
-                ? 'text-blue-600 dark:text-blue-400 border-b-2 border-blue-600 dark:border-blue-400'
+                ? 'text-blue-600 dark:text-blue-400 border-b-2 border-blue-600 dark:border-blue-400 animate-scale-in'
                 : 'text-gray-400 dark:text-gray-500 hover:text-gray-600'
             }`}>
             {label}
@@ -559,7 +357,7 @@ function PARightPanel({ paData, kpis }) {
         ))}
       </div>
 
-      <div className="flex-1 overflow-y-auto min-h-0 divide-y divide-gray-100 dark:divide-gray-800">
+      <div key={tab} className="flex-1 overflow-y-auto min-h-0 divide-y divide-gray-100 dark:divide-gray-800 animate-tab-in">
 
         {tab === 'signals' && (
           <>
@@ -643,7 +441,7 @@ function PARightPanel({ paData, kpis }) {
                     <span className="text-[9px] text-gray-400 font-bold text-right">PRICE</span>
                     <span className="text-[9px] text-gray-400 font-bold text-right">TOUCHES</span>
                   </div>
-                  {support_resistance.map((z, i) => (
+                  {[...support_resistance].sort((a, b) => b.touches - a.touches).slice(0, 10).map((z, i) => (
                     <div key={i} className="grid grid-cols-3 gap-1 items-center">
                       <span className={`text-[9px] font-bold uppercase ${z.type === 'resistance' ? 'text-red-500' : 'text-green-600 dark:text-green-400'}`}>
                         {z.type === 'resistance' ? 'Res' : 'Sup'}
@@ -766,18 +564,28 @@ function computePAKPIs(paData, chartData) {
 
 // ── PA Inner ──────────────────────────────────────────────────────────────────
 function PAInner() {
-  const { selectedSymbol, timeframe, isIndex } = useScreen() || {}
+  const { selectedSymbol, timeframe, isIndex, latestClose } = useScreen() || {}
+  const [leftOpen,  setLeftOpen]  = useState(() => localStorage.getItem('tradeo_pa_leftOpen')  !== 'false')
+  const [rightOpen, setRightOpen] = useState(() => localStorage.getItem('tradeo_pa_rightOpen') !== 'false')
+  const toggleLeft  = () => setLeftOpen(v  => { localStorage.setItem('tradeo_pa_leftOpen',  String(!v)); return !v })
+  const toggleRight = () => setRightOpen(v => { localStorage.setItem('tradeo_pa_rightOpen', String(!v)); return !v })
 
-  const [paData,    setPaData]    = useState(null)
-  const [loading,   setLoading]   = useState(false)
-  const [chartData, setChartData] = useState([])
-  const [toggles,   setToggles]   = useState(DEFAULT_TOGGLES)
-  const [config,    setConfig]    = useState(() => loadConfig())
+  const [paData,     setPaData]     = useState(null)
+  const [loading,    setLoading]    = useState(false)
+  const [chartData,  setChartData]  = useState([])
+  const [toggles,    setToggles]    = useState(DEFAULT_TOGGLES)
+  const [config,     setConfig]     = useState(() => loadConfig())
+  const [symbols, setSymbols] = useState(null)
   const chartDataRef = useRef([])
 
-  const isStock = !isIndex?.()
+  useEffect(() => {
+    getMarketSymbols()
+      .then(r => { if (r.data?.stocks?.length) setSymbols(r.data) })
+      .catch(() => {})
+  }, [])
 
-  const days = TIMEFRAME_DAYS[timeframe] ?? 280
+  const isStock = !isIndex?.()
+  const days    = TIMEFRAME_DAYS[timeframe] ?? 280
 
   const fetchPA = useCallback(async (sym, d) => {
     if (!sym || !isStock) return
@@ -797,7 +605,7 @@ function PAInner() {
     else setPaData(null)
   }, [selectedSymbol, days, fetchPA, isStock])
 
-  const currentPrice = chartData?.[chartData.length - 1]?.close ?? 0
+  const currentPrice = latestClose ?? chartData?.[chartData.length - 1]?.close ?? 0
 
   const kpis = useMemo(() => computePAKPIs(paData, chartData), [paData, chartData])
 
@@ -806,26 +614,79 @@ function PAInner() {
     paToggles: toggles,
   }), [paData, toggles, isStock])
 
+  const handleChartDataReady = useCallback((data) => {
+    chartDataRef.current = data
+    setChartData(data)
+  }, [])
+
   return (
     <>
       <PAToolbar
         toggles={toggles} setToggles={setToggles}
         config={config}   setConfig={setConfig}
+        symbols={symbols}
       />
 
-      <div className="flex-1 flex overflow-hidden min-h-0">
+      <div className="flex-1 flex overflow-hidden min-h-0 animate-fade-up">
 
-        {/* Left panel */}
-        <div className="w-[10%] min-w-[120px] max-w-[180px] border-r border-gray-100 dark:border-gray-800 overflow-y-auto hidden lg:flex flex-col shrink-0">
-          <PALeftPanel
-            paData={isStock ? paData : null}
-            chartData={chartData}
-            currentPrice={currentPrice}
-          />
+        {/* Left panel — collapsible glass */}
+        <div className={`hidden lg:flex flex-col shrink-0 overflow-y-auto relative
+                        bg-white/50 dark:bg-gray-950/60 backdrop-blur-2xl
+                        shadow-[1px_0_0_rgba(255,255,255,0.18),2px_0_12px_rgba(0,0,0,0.06)]
+                        dark:shadow-[1px_0_0_rgba(255,255,255,0.07),2px_0_16px_rgba(0,0,0,0.4)]
+                        transition-all duration-200 ease-in-out
+                        ${leftOpen ? 'w-[13%] min-w-[150px] max-w-[200px]' : 'w-0 min-w-0 max-w-0 overflow-hidden'} ${!leftOpen ? 'screen-panel-collapsed' : ''}`}>
+          <div className="screen-panel-content flex flex-col h-full">
+            <PALeftPanel
+              paData={isStock ? paData : null}
+              chartData={chartData}
+              currentPrice={currentPrice}
+            />
+          </div>
         </div>
 
-        {/* Center chart */}
+        {/* Center chart — toggle buttons on both edges */}
         <div className="flex-1 min-h-0 overflow-hidden relative">
+          {/* Left toggle */}
+          <button
+            onClick={toggleLeft}
+            title={leftOpen ? 'Hide left panel' : 'Show left panel'}
+            className="hidden lg:flex absolute left-0 top-1/2 -translate-y-1/2 z-30
+                       h-12 w-4 items-center justify-center
+                       bg-white/70 dark:bg-gray-800/70 backdrop-blur-sm
+                       border-y border-r border-gray-200/60 dark:border-gray-700/50
+                       rounded-r-lg shadow-sm text-gray-400 dark:text-gray-500
+                       hover:bg-white dark:hover:bg-gray-700
+                       hover:text-blue-500 dark:hover:text-blue-400
+                       transition-all duration-150"
+          >
+            <svg className={`w-2.5 h-2.5 transition-transform duration-200 ${leftOpen ? '' : 'rotate-180'}`}
+              viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2.5}
+              strokeLinecap="round" strokeLinejoin="round">
+              <polyline points="15 18 9 12 15 6" />
+            </svg>
+          </button>
+
+          {/* Right toggle */}
+          <button
+            onClick={toggleRight}
+            title={rightOpen ? 'Hide right panel' : 'Show right panel'}
+            className="hidden lg:flex absolute right-0 top-1/2 -translate-y-1/2 z-30
+                       h-12 w-4 items-center justify-center
+                       bg-white/70 dark:bg-gray-800/70 backdrop-blur-sm
+                       border-y border-l border-gray-200/60 dark:border-gray-700/50
+                       rounded-l-lg shadow-sm text-gray-400 dark:text-gray-500
+                       hover:bg-white dark:hover:bg-gray-700
+                       hover:text-blue-500 dark:hover:text-blue-400
+                       transition-all duration-150"
+          >
+            <svg className={`w-2.5 h-2.5 transition-transform duration-200 ${rightOpen ? 'rotate-180' : ''}`}
+              viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2.5}
+              strokeLinecap="round" strokeLinejoin="round">
+              <polyline points="15 18 9 12 15 6" />
+            </svg>
+          </button>
+
           {loading && (
             <div className="absolute top-2 right-3 z-30 pointer-events-none">
               <span className="text-[9px] text-gray-400 bg-white/80 dark:bg-gray-900/80 px-2 py-0.5 rounded-full border border-gray-200 dark:border-gray-700">
@@ -836,16 +697,20 @@ function PAInner() {
           <StockChart
             hideToolbar
             {...paOverlayData}
-            onChartDataReady={(data) => {
-              chartDataRef.current = data
-              setChartData(data)
-            }}
+            onChartDataReady={handleChartDataReady}
           />
         </div>
 
-        {/* Right panel */}
-        <div className="w-[15%] min-w-[160px] max-w-[240px] border-l border-gray-100 dark:border-gray-800 hidden lg:flex flex-col shrink-0">
-          <PARightPanel paData={isStock ? paData : null} kpis={kpis} />
+        {/* Right panel — collapsible glass */}
+        <div className={`hidden lg:flex flex-col shrink-0 overflow-y-auto relative
+                        bg-white/50 dark:bg-gray-950/60 backdrop-blur-2xl
+                        shadow-[-1px_0_0_rgba(255,255,255,0.18),-2px_0_12px_rgba(0,0,0,0.06)]
+                        dark:shadow-[-1px_0_0_rgba(255,255,255,0.07),-2px_0_16px_rgba(0,0,0,0.4)]
+                        transition-all duration-200 ease-in-out
+                        ${rightOpen ? 'w-[15%] min-w-[160px] max-w-[240px]' : 'w-0 min-w-0 max-w-0 overflow-hidden'} ${!rightOpen ? 'screen-panel-collapsed' : ''}`}>
+          <div className="screen-panel-content flex flex-col h-full">
+            <PARightPanel paData={isStock ? paData : null} kpis={kpis} />
+          </div>
         </div>
       </div>
     </>

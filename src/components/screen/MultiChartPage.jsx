@@ -1,55 +1,10 @@
 // === MultiChartPage.jsx — multi-panel chart view: 2/3/4 layout, per-panel symbol+timeframe, data sync, crosshair sync ===
 import { useState, useRef, useCallback, useEffect, useMemo, memo } from 'react'
-import { createPortal } from 'react-dom'
 import { ScreenProvider, useScreen } from '../../context/ScreenContext'
 import StockChart from './StockChart'
 import { useScreenToolbarSlot } from '../../pages/ScreenPage'
 import { getMarketSymbols } from '../../utils/globalCache'
-
-// ── useFixedDropdown ──────────────────────────────────────────────────────────
-function useFixedDropdown(align = 'left') {
-  const [open, setOpen] = useState(false)
-  const [rect, setRect] = useState(null)
-  const triggerRef      = useRef(null)
-
-  const updateRect = useCallback(() => {
-    if (triggerRef.current) setRect(triggerRef.current.getBoundingClientRect())
-  }, [])
-
-  useEffect(() => {
-    if (!open) return
-    updateRect()
-    window.addEventListener('resize', updateRect)
-    window.addEventListener('scroll', updateRect, true)
-    return () => {
-      window.removeEventListener('resize', updateRect)
-      window.removeEventListener('scroll', updateRect, true)
-    }
-  }, [open, updateRect])
-
-  useEffect(() => {
-    if (!open) return
-    const fn = (e) => {
-      if (triggerRef.current && !triggerRef.current.contains(e.target)) setOpen(false)
-    }
-    document.addEventListener('mousedown', fn)
-    return () => document.removeEventListener('mousedown', fn)
-  }, [open])
-
-  const dropStyle = rect ? {
-    position: 'fixed',
-    top: rect.bottom + 4,
-    ...(align === 'right' ? { right: window.innerWidth - rect.right } : { left: rect.left }),
-    zIndex: 9999,
-  } : {}
-
-  const portal = useCallback((content) => {
-    if (!open || !rect) return null
-    return createPortal(<div style={dropStyle}>{content}</div>, document.body)
-  }, [open, rect, dropStyle]) // eslint-disable-line react-hooks/exhaustive-deps
-
-  return { triggerRef, open, setOpen, portal, updateRect }
-}
+import { useFixedDropdown, ToolbarDivider, ToolbarToggleChip } from './ScreenToolbarAtoms'
 
 // ── Constants ─────────────────────────────────────────────────────────────────
 const DEFAULT_PANEL = { symbol: 'NEPSE', indexId: 12, isIndex: true, timeframe: '1Y', companyName: null }
@@ -88,26 +43,19 @@ function LayoutIcon({ layout }) {
 }
 
 // ── Symbol search ─────────────────────────────────────────────────────────────
-function PanelSymbolSearch({ onExternalChange }) {
+function PanelSymbolSearch({ onExternalChange, allSymbols }) {
   const { selectedSymbol, selectSymbol } = useScreen()
   const [query,   setQuery]   = useState('')
-  const [symbols, setSymbols] = useState({ stocks: [], indexes: [] })
   const [cursor,  setCursor]  = useState(-1)
   const inputRef              = useRef(null)
   const listRef               = useRef(null)
   const mouseDownInList       = useRef(false)
   const { triggerRef, open, setOpen, portal, updateRect } = useFixedDropdown('left')
 
-  useEffect(() => {
-    getMarketSymbols()
-      .then(r => { if (r.data?.stocks?.length) setSymbols(r.data) })
-      .catch(() => {})
-  }, [])
-
   const allItems = useMemo(() => [
-    ...symbols.indexes.map(i => ({ label: i.name, sub: 'Index', indexId: i.index_id, companyName: null })),
-    ...symbols.stocks.map(s => ({ label: s.symbol, sub: 'Stock', indexId: null, companyName: s.company_name || null })),
-  ], [symbols])
+    ...(allSymbols?.indexes ?? []).map(i => ({ label: i.name, sub: 'Index', indexId: i.index_id, companyName: null })),
+    ...(allSymbols?.stocks  ?? []).map(s => ({ label: s.symbol, sub: 'Stock', indexId: null, companyName: s.company_name || null })),
+  ], [allSymbols])
 
   const q = query.toLowerCase()
   const filtered = query.length < 1
@@ -190,7 +138,7 @@ function PanelSymbolSearch({ onExternalChange }) {
 }
 
 // ── Per-panel header ──────────────────────────────────────────────────────────
-function PanelHeader({ panelIdx, isActive, onActivate, onExternalSymbolChange, onExternalTimeframeChange }) {
+function PanelHeader({ panelIdx, isActive, onActivate, onExternalSymbolChange, onExternalTimeframeChange, allSymbols }) {
   const { timeframe, setTimeframe, chartType, setChartType } = useScreen()
 
   const handleTimeframe = useCallback((tf) => {
@@ -201,11 +149,11 @@ function PanelHeader({ panelIdx, isActive, onActivate, onExternalSymbolChange, o
   return (
     <div
       onClick={e => { e.stopPropagation(); onActivate(panelIdx) }}
-      className="shrink-0 flex items-center gap-1.5 px-2 h-8 border-b border-gray-100 dark:border-gray-800 bg-white dark:bg-gray-950 cursor-pointer select-none"
+      className="shrink-0 flex items-center gap-1 px-2 h-8 border-b border-gray-100 dark:border-gray-800 bg-white dark:bg-gray-950 cursor-pointer select-none overflow-hidden"
     >
       <div className={`w-1.5 h-1.5 rounded-full shrink-0 transition-colors ${isActive ? 'bg-blue-500' : 'bg-gray-200 dark:bg-gray-700'}`} />
 
-      <PanelSymbolSearch onExternalChange={onExternalSymbolChange} />
+      <PanelSymbolSearch onExternalChange={onExternalSymbolChange} allSymbols={allSymbols} />
 
       <div className="w-px h-3.5 bg-gray-200 dark:bg-gray-700 shrink-0" />
 
@@ -226,7 +174,7 @@ function PanelHeader({ panelIdx, isActive, onActivate, onExternalSymbolChange, o
       <div className="w-px h-3.5 bg-gray-200 dark:bg-gray-700 shrink-0" />
 
       <div className="flex items-center gap-0.5 bg-gray-100 dark:bg-gray-800 rounded-md p-0.5 shrink-0">
-        {[['candlestick', 'Candle'], ['line', 'Line']].map(([type, label]) => (
+        {[['candlestick', 'C'], ['line', 'L']].map(([type, label]) => (
           <button key={type}
             onClick={e => { e.stopPropagation(); setChartType(type) }}
             className={`px-1.5 py-0.5 rounded text-[9px] font-semibold transition-colors ${
@@ -239,7 +187,7 @@ function PanelHeader({ panelIdx, isActive, onActivate, onExternalSymbolChange, o
         ))}
       </div>
 
-      <span className="ml-auto text-[9px] font-bold text-gray-200 dark:text-gray-800 shrink-0">{panelIdx + 1}</span>
+      <span className="ml-auto pl-1 text-[9px] font-bold text-gray-300 dark:text-gray-600 shrink-0">{panelIdx + 1}</span>
     </div>
   )
 }
@@ -257,10 +205,10 @@ function SyncBridge({ onSelectSymbolReady, onSetTimeframeReady }) {
 // ── ChartPanel ────────────────────────────────────────────────────────────────
 function ChartPanel({ panelIdx, panelState, isActive, onActivate,
                       onExternalSymbolChange, onExternalTimeframeChange,
-                      onChartReady, onSelectSymbolReady, onSetTimeframeReady }) {
+                      onChartReady, onSelectSymbolReady, onSetTimeframeReady, allSymbols }) {
   const stableOnChartReady = useCallback(
-    (chart, series) => onChartReady(panelIdx, chart, series),
-    [onChartReady, panelIdx]
+    (chart, series) => onChartReady(chart, series),
+    [onChartReady]
   )
   return (
     <ScreenProvider
@@ -288,6 +236,7 @@ function ChartPanel({ panelIdx, panelState, isActive, onActivate,
           onActivate={onActivate}
           onExternalSymbolChange={onExternalSymbolChange}
           onExternalTimeframeChange={onExternalTimeframeChange}
+          allSymbols={allSymbols}
         />
         <div className="flex-1 overflow-hidden min-h-0">
           <StockChart
@@ -313,6 +262,7 @@ const ChartPanelWrapper = memo(function ChartPanelWrapper({
   onChartReady: parentChartReady,
   onSelectSymbolReady: parentSymbolReady,
   onSetTimeframeReady: parentTimeframeReady,
+  allSymbols,
 }) {
   const handleSymbol     = useCallback((sym, indexId, name) => parentSymbolHandler(panelIdx, sym, indexId, name),    [parentSymbolHandler, panelIdx])
   const handleTimeframe  = useCallback((tf)                  => parentTimeframeHandler(panelIdx, tf),                [parentTimeframeHandler, panelIdx])
@@ -331,6 +281,7 @@ const ChartPanelWrapper = memo(function ChartPanelWrapper({
       onChartReady={handleChartReady}
       onSelectSymbolReady={handleSymbolRdy}
       onSetTimeframeReady={handleTfRdy}
+      allSymbols={allSymbols}
     />
   )
 })
@@ -352,25 +303,9 @@ function MultiChartToolbar({ layout, setLayout, syncData, setSyncData, syncCross
         ))}
       </div>
 
-      <div className="w-px h-3.5 bg-gray-200 dark:bg-gray-700 shrink-0" />
-
-      <button onClick={() => setSyncData(v => !v)}
-        className={`px-2 py-0.5 rounded text-[10px] font-semibold transition-all border ${
-          syncData
-            ? 'bg-blue-600 border-blue-600 text-white'
-            : 'border-gray-200 dark:border-gray-700 text-gray-500 dark:text-gray-400 hover:border-gray-300 dark:hover:border-gray-600'
-        }`}>
-        {syncData ? 'Sync ON' : 'Sync'}
-      </button>
-
-      <button onClick={() => setSyncCross(v => !v)}
-        className={`px-2 py-0.5 rounded text-[10px] font-semibold transition-all border ${
-          syncCross
-            ? 'bg-violet-600 border-violet-600 text-white'
-            : 'border-gray-200 dark:border-gray-700 text-gray-500 dark:text-gray-400 hover:border-gray-300 dark:hover:border-gray-600'
-        }`}>
-        {syncCross ? 'Crosshair ON' : 'Crosshair'}
-      </button>
+      <ToolbarDivider />
+      <ToolbarToggleChip label={syncData  ? 'Sync ON'      : 'Sync'}      active={syncData}  onClick={() => setSyncData(v  => !v)} activeColor="#2563eb" />
+      <ToolbarToggleChip label={syncCross ? 'Crosshair ON' : 'Crosshair'} active={syncCross} onClick={() => setSyncCross(v => !v)} activeColor="#7c3aed" />
     </div>
   )
 }
@@ -394,11 +329,14 @@ export default function MultiChartPage() {
   const chartRefs         = useRef(Array(MAX_PANELS).fill(null))
   const seriesRefs        = useRef(Array(MAX_PANELS).fill(null))
   const syncingRef        = useRef(false)
-  const crosshairUnsubs   = useRef({})
   const syncCrossRef      = useRef(syncCross)
+  const syncDataRef       = useRef(syncData)
+  const panelCountRef     = useRef(layout)
   useEffect(() => { syncCrossRef.current = syncCross }, [syncCross])
+  useEffect(() => { syncDataRef.current  = syncData  }, [syncData])
 
   const panelCount = layout
+  useEffect(() => { panelCountRef.current = panelCount }, [panelCount])
 
   // FIX MC04: debounced saveState — 500ms after last change
   const saveTimerRef = useRef(null)
@@ -420,96 +358,119 @@ export default function MultiChartPage() {
 
   const handleExternalSymbolChange = useCallback((sourceIdx, sym, indexId, companyName) => {
     setPanels(prev => prev.map((p, i) => i === sourceIdx ? { ...p, symbol: sym, indexId: indexId ?? p.indexId, isIndex: indexId != null, companyName: companyName ?? null } : p))
-    if (!syncData) return
+    if (!syncDataRef.current) return
     selectSymbolRefs.current.forEach((fn, i) => {
-      if (i === sourceIdx || i >= panelCount || !fn) return
+      if (i === sourceIdx || i >= panelCountRef.current || !fn) return
       fn(sym, indexId ?? null, null, companyName ?? null)
     })
-  }, [syncData, panelCount])
+  }, [])
 
   const handleExternalTimeframeChange = useCallback((sourceIdx, tf) => {
     setPanels(prev => prev.map((p, i) => i === sourceIdx ? { ...p, timeframe: tf } : p))
-    if (!syncData) return
+    if (!syncDataRef.current) return
     setTimeframeRefs.current.forEach((fn, i) => {
-      if (i === sourceIdx || i >= panelCount || !fn) return
+      if (i === sourceIdx || i >= panelCountRef.current || !fn) return
       fn(tf)
     })
-  }, [syncData, panelCount])
+  }, [])
+
+  const [allSymbols, setAllSymbols] = useState(null)
+  useEffect(() => {
+    getMarketSymbols()
+      .then(r => { if (r.data?.stocks?.length) setAllSymbols(r.data) })
+      .catch(() => {})
+  }, [])
+
+  const rewireTimerRef  = useRef(null)
+  const triggerRewireRef = useRef(null)  // set by crosshair effect to its rewire fn
 
   const handleChartReady = useCallback((idx, chart, series) => {
     chartRefs.current[idx]  = chart
     seriesRefs.current[idx] = series
+    if (!syncCrossRef.current) return
+    // Debounce: panels load in rapid succession — wait 200ms for all to settle
+    clearTimeout(rewireTimerRef.current)
+    rewireTimerRef.current = setTimeout(() => triggerRewireRef.current?.(), 200)
   }, [])
 
-  // Central crosshair sync — exact DataLab PerformanceChart pattern.
-  // Runs when syncCross toggles. Retries every 150ms (up to 40x = 6s) until
-  // all active panels have chart + series refs populated.
-  // Wires every unique panel pair bidirectionally — no duplicate subscriptions.
+  // Central crosshair sync.
+  // Wires every unique panel pair bidirectionally. Exposed via triggerRewireRef so
+  // handleChartReady can re-wire after a symbol change without a state update.
   const allUnsubsRef = useRef([])
-  useEffect(() => {
-    // Always clear previous subs first
+
+  function unsub() {
     allUnsubsRef.current.forEach(fn => { try { fn() } catch (_) {} })
     allUnsubsRef.current = []
-    if (!syncCross) return
+  }
+
+  function wireCrosshair(n) {
+    unsub()
+
+    function sub(src, srcS, tgt, tgtS) {
+      try {
+        const u = src.subscribeCrosshairMove(p => {
+          if (syncingRef.current) return
+          syncingRef.current = true
+          try {
+            if (!p.time || !p.point) {
+              tgt.clearCrosshairPosition()
+            } else {
+              const bar = p.seriesData?.get(srcS)
+              const price = bar?.close ?? bar?.value ?? null
+              if (price != null) tgt.setCrosshairPosition(price, p.time, tgtS)
+            }
+          } catch (_) {}
+          syncingRef.current = false
+        })
+        if (u) allUnsubsRef.current.push(u)
+      } catch (_) {}
+      try {
+        const uR = src.timeScale().subscribeVisibleLogicalRangeChange(r => {
+          if (syncingRef.current || !r) return
+          syncingRef.current = true
+          try { tgt.timeScale().setVisibleLogicalRange(r) } catch (_) {}
+          syncingRef.current = false
+        })
+        if (uR) allUnsubsRef.current.push(uR)
+      } catch (_) {}
+    }
+
+    for (let i = 0; i < n; i++) {
+      for (let j = i + 1; j < n; j++) {
+        const ci = chartRefs.current[i], si = seriesRefs.current[i]
+        const cj = chartRefs.current[j], sj = seriesRefs.current[j]
+        if (!ci || !si || !cj || !sj) continue
+        sub(ci, si, cj, sj)
+        sub(cj, sj, ci, si)
+      }
+    }
+  }
+
+  useEffect(() => {
+    unsub()
+    if (!syncCross) { triggerRewireRef.current = null; return }
 
     let attempts = 0
     let tid
 
     function tryWire() {
       const n = panelCount
-      // Check all active panels have refs
       for (let i = 0; i < n; i++) {
         if (!chartRefs.current[i] || !seriesRefs.current[i]) {
           if (++attempts < 40) { tid = setTimeout(tryWire, 150); return }
-          return // give up after 6s
+          return
         }
       }
-
-      // All ready — wire every unique pair (i, j) bidirectionally
-      function sub(src, srcS, tgt, tgtS) {
-        try {
-          const u = src.subscribeCrosshairMove(p => {
-            if (syncingRef.current) return
-            syncingRef.current = true
-            try {
-              if (!p.time || !p.point) {
-                tgt.clearCrosshairPosition()
-              } else {
-                const bar = p.seriesData?.get(srcS)
-                const price = bar?.close ?? bar?.value ?? null
-                if (price != null) tgt.setCrosshairPosition(price, p.time, tgtS)
-              }
-            } catch (_) {}
-            syncingRef.current = false
-          })
-          if (u) allUnsubsRef.current.push(u)
-        } catch (_) {}
-        try {
-          const uR = src.timeScale().subscribeVisibleLogicalRangeChange(r => {
-            if (syncingRef.current || !r) return
-            syncingRef.current = true
-            try { tgt.timeScale().setVisibleLogicalRange(r) } catch (_) {}
-            syncingRef.current = false
-          })
-          if (uR) allUnsubsRef.current.push(uR)
-        } catch (_) {}
-      }
-
-      for (let i = 0; i < n; i++) {
-        for (let j = i + 1; j < n; j++) {
-          const ci = chartRefs.current[i], si = seriesRefs.current[i]
-          const cj = chartRefs.current[j], sj = seriesRefs.current[j]
-          sub(ci, si, cj, sj)  // i → j
-          sub(cj, sj, ci, si)  // j → i
-        }
-      }
+      wireCrosshair(n)
+      triggerRewireRef.current = () => wireCrosshair(panelCountRef.current)
     }
 
-    tid = setTimeout(tryWire, 300) // initial delay matches DataLab
+    tid = setTimeout(tryWire, 300)
     return () => {
       clearTimeout(tid)
-      allUnsubsRef.current.forEach(fn => { try { fn() } catch (_) {} })
-      allUnsubsRef.current = []
+      clearTimeout(rewireTimerRef.current)
+      triggerRewireRef.current = null
+      unsub()
     }
   }, [syncCross, panelCount]) // eslint-disable-line react-hooks/exhaustive-deps
 
@@ -519,19 +480,22 @@ export default function MultiChartPage() {
       gridTemplateColumns: '1fr 1fr',
       gridTemplateRows: '1fr 1fr',
       gridTemplateAreas: '"p0 p1" "p2 p2"',
-      height: '100%',
+      flex: 1,
+      minHeight: 0,
     }
     if (layout === 4) return {
       display: 'grid',
       gridTemplateColumns: '1fr 1fr',
       gridTemplateRows: '1fr 1fr',
-      height: '100%',
+      flex: 1,
+      minHeight: 0,
     }
     return {
       display: 'grid',
       gridTemplateColumns: '1fr 1fr',
       gridTemplateRows: '1fr',
-      height: '100%',
+      flex: 1,
+      minHeight: 0,
     }
   }, [layout])
 
@@ -576,6 +540,7 @@ export default function MultiChartPage() {
           onChartReady={noopChartReady}
           onSelectSymbolReady={handleSelectSymbolReady}
           onSetTimeframeReady={handleSetTimeframeReady}
+          allSymbols={allSymbols}
         />
         <p className="shrink-0 text-center text-[10px] text-gray-400 py-1 border-t border-gray-100 dark:border-gray-800">
           MultiChart shows all panels on wider screens
@@ -585,7 +550,7 @@ export default function MultiChartPage() {
       {/* Desktop grid — FIX MC02: ChartPanelWrapper is memo'd, stable parent handlers
           passed as props. No inline arrows in the map → SyncBridge re-fires only when
           actually needed (symbol/timeframe change), not every render. */}
-      <div className="hidden md:block flex-1 min-h-0" style={{ height: '100%' }}>
+      <div className="hidden md:flex flex-col flex-1 min-h-0">
         <div style={gridStyle}>
           {Array.from({ length: panelCount }).map((_, idx) => (
             <div key={idx} style={panelStyle(idx)} className={panelBorderClass(idx)}>
@@ -599,6 +564,7 @@ export default function MultiChartPage() {
                 onChartReady={handleChartReady}
                 onSelectSymbolReady={handleSelectSymbolReady}
                 onSetTimeframeReady={handleSetTimeframeReady}
+                allSymbols={allSymbols}
               />
             </div>
           ))}
