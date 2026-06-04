@@ -515,12 +515,13 @@ function CenterDashboard({ navigate, initData, onRefresh, onDataReady }) {
     const todayStr        = new Date().toISOString().slice(0, 10)
     // 2-month window for Realized P/L and Win Rate
     const twoMonthsAgo   = new Date(); twoMonthsAgo.setMonth(twoMonthsAgo.getMonth() - 2); twoMonthsAgo.setHours(0,0,0,0)
-    const recent         = closed.filter(t => t.last_action_at && new Date(t.last_action_at) >= twoMonthsAgo)
+    // Backend /init maps last_action_at → updated_at in the trade shape
+    const recent         = closed.filter(t => t.updated_at && new Date(t.updated_at) >= twoMonthsAgo)
     const totalRealized  = recent.reduce((s, t) => s + (parseFloat(t.realized_pnl) || 0), 0)
     const profitable     = recent.filter(t => (parseFloat(t.realized_pnl) || 0) > 0).length
     const winRate        = recent.length > 0 ? Math.round((profitable / recent.length) * 100) : 0
     const todayPnl       = closed
-      .filter(t => t.last_action_at?.slice(0, 10) === todayStr)
+      .filter(t => t.updated_at?.slice(0, 10) === todayStr)
       .reduce((s, t) => s + (parseFloat(t.realized_pnl) || 0), 0)
     const totalInvested  = openWithPrices.reduce((s, t) => s + (t.entry_price * t.quantity), 0)
     const currentValue   = openWithPrices.reduce((s, t) => s + ((t.currentPrice || t.entry_price) * t.quantity), 0)
