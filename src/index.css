@@ -261,3 +261,152 @@ html {
 .animate-soft-bounce {
   animation: softBounce 1s ease-in-out infinite;
 }
+
+/* ── Tab content fade-in (Screen / SMC / PA tab switches) ───────────────────*/
+@keyframes tabIn {
+  from { opacity: 0; transform: translateY(4px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+.animate-tab-in {
+  animation: tabIn 0.18s ease-out both;
+}
+
+/* ── Screen collapsible panel system ────────────────────────────────────────
+   .screen-panel-collapsed hides content visually during width:0 transition
+   .screen-panel-content prevents layout bleed while panel is animating
+   ─────────────────────────────────────────────────────────────────────────── */
+.screen-panel-collapsed .screen-panel-content {
+  opacity: 0;
+  pointer-events: none;
+}
+.screen-panel-content {
+  transition: opacity 150ms ease-out;
+}
+
+/* ── HomePage interactive card system ───────────────────────────────────────
+   hp-card / hp-stat / hp-watch-item / hp-alert-row / hp-drawdown
+   All hover effects are pointer-device only (no sticky-hover on iOS touch)
+   ─────────────────────────────────────────────────────────────────────────── */
+
+.hp-card {
+  cursor: default;
+  position: relative;
+  overflow: hidden;
+}
+.hp-card::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(135deg, rgba(255,255,255,0.12) 0%, transparent 60%);
+  opacity: 0;
+  pointer-events: none;
+  z-index: 1;
+  border-radius: inherit;
+}
+
+.hp-stat {
+  cursor: default;
+  position: relative;
+  overflow: hidden;
+}
+.hp-stat::after {
+  content: '';
+  position: absolute;
+  bottom: 0; left: 0; right: 0;
+  height: 2px;
+  background: linear-gradient(90deg, #3b82f6, #22c55e);
+  transform: scaleX(0);
+  transform-origin: left;
+  border-radius: 0 0 1px 1px;
+}
+
+.hp-watch-item {
+  position: relative;
+}
+.hp-watch-item::before {
+  content: '';
+  position: absolute;
+  left: 0; top: 20%; bottom: 20%;
+  width: 2px;
+  background: #3b82f6;
+  border-radius: 0 2px 2px 0;
+  transform: scaleY(0);
+  transform-origin: center;
+}
+
+.hp-alert-row {
+  transition: background 160ms ease-out;
+}
+
+@media (hover: hover) and (pointer: fine) {
+  .hp-card {
+    transition: transform 220ms ease-out, box-shadow 220ms ease-out;
+  }
+  .hp-card::before {
+    transition: opacity 220ms ease-out;
+  }
+  .hp-card:hover {
+    transform: translateY(-3px);
+    box-shadow:
+      0 16px 40px rgba(0, 0, 0, 0.10),
+      0 4px 12px  rgba(0, 0, 0, 0.06),
+      inset 0 1px 0 rgba(255, 255, 255, 0.85);
+  }
+  .hp-card:hover::before { opacity: 1; }
+  .dark .hp-card:hover {
+    box-shadow:
+      0 16px 40px rgba(0, 0, 0, 0.50),
+      0 4px 12px  rgba(0, 0, 0, 0.30),
+      inset 0 1px 0 rgba(255, 255, 255, 0.10);
+  }
+
+  .hp-stat {
+    transition: transform 200ms ease-out, box-shadow 200ms ease-out, border-color 200ms ease-out;
+  }
+  .hp-stat::after {
+    transition: transform 260ms cubic-bezier(0.22, 1, 0.36, 1);
+  }
+  .hp-stat:hover {
+    transform: translateY(-2px);
+    box-shadow:
+      0 8px 24px rgba(59, 130, 246, 0.12),
+      0 2px 8px  rgba(0, 0, 0, 0.06),
+      inset 0 1px 0 rgba(255, 255, 255, 0.85);
+  }
+  .hp-stat:hover::after { transform: scaleX(1); }
+  .dark .hp-stat:hover {
+    box-shadow:
+      0 8px 24px rgba(59, 130, 246, 0.20),
+      0 2px 8px  rgba(0, 0, 0, 0.35),
+      inset 0 1px 0 rgba(255, 255, 255, 0.08);
+  }
+
+  .hp-watch-item {
+    transition: background 180ms ease-out, padding-left 180ms ease-out;
+  }
+  .hp-watch-item::before {
+    transition: transform 200ms cubic-bezier(0.22, 1, 0.36, 1);
+  }
+  .hp-watch-item:hover {
+    background: rgba(255,255,255,0.45) !important;
+    padding-left: 14px;
+  }
+  .hp-watch-item:hover::before { transform: scaleY(1); }
+  .dark .hp-watch-item:hover { background: rgba(255,255,255,0.06) !important; }
+
+  .hp-alert-row {
+    transition: background 160ms ease-out, transform 160ms ease-out;
+  }
+  .hp-alert-row:hover { transform: translateX(2px); }
+}
+
+@keyframes drawdownShake {
+  0%, 100% { transform: translateX(0); }
+  20%       { transform: translateX(-2px); }
+  40%       { transform: translateX(2px); }
+  60%       { transform: translateX(-1px); }
+  80%       { transform: translateX(1px); }
+}
+.hp-drawdown {
+  animation: drawdownShake 0.5s ease-out 0.6s both;
+}
