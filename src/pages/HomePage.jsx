@@ -1401,33 +1401,33 @@ function LoggedInHome() {
 
   return (
     <>
-    <div className="w-full px-3 sm:px-4 py-3 sm:py-4 pb-safe min-h-[100dvh] bg-gradient-to-br from-slate-100 via-gray-50 to-blue-50/30 dark:from-gray-950 dark:via-gray-950 dark:to-slate-900">
+    {/* Use flex-col so side columns can stretch to remaining height without hardcoding greeting bar px */}
+    <div className="w-full px-3 sm:px-4 py-3 sm:py-4 pb-safe min-h-[100dvh] flex flex-col bg-gradient-to-br from-slate-100 via-gray-50 to-blue-50/30 dark:from-gray-950 dark:via-gray-950 dark:to-slate-900">
 
-      {/* Greeting bar */}
-      <div className="flex items-center justify-between mb-3 sm:mb-4 px-1 animate-fade-up">
+      {/* Greeting bar — shrinks to its content, never stretches */}
+      <div className="flex items-center justify-between mb-3 sm:mb-4 px-1 animate-fade-up flex-shrink-0">
         <div>
           <p className="text-sm font-semibold text-gray-800 dark:text-gray-200">
             {getGreeting()}, {user?.name?.split(' ')[0] || 'Trader'} 👋
           </p>
           <p className="text-[11px] text-gray-400 mt-0.5">{today}</p>
         </div>
-        {/* Live pill — visible on all sizes on mobile, shown as dot+text on desktop */}
         <div className="flex items-center gap-1.5 bg-green-50 dark:bg-green-900/20 border border-green-200 dark:border-green-800/40 rounded-full px-2.5 py-1">
           <div className="w-1.5 h-1.5 bg-green-500 rounded-full animate-pulse flex-shrink-0" />
           <span className="text-[10px] font-semibold text-green-600 dark:text-green-400">Live</span>
         </div>
       </div>
 
-      {/* 3-Column Layout — mobile: center then 2×2 panels grid; desktop: 3-col */}
-      <div className="grid grid-cols-12 gap-3 sm:gap-4">
+      {/* 3-Column Layout — flex-1 so it fills exactly the remaining height */}
+      <div className="flex-1 min-h-0 grid grid-cols-12 gap-3 sm:gap-4">
 
         {/* CENTER — always first on mobile */}
-        <div className="col-span-12 lg:col-span-6 order-1 lg:order-2">
+        <div className="col-span-12 lg:col-span-6 order-1 lg:order-2 min-h-0">
           <CenterDashboard navigate={navigate} initData={initData} onRefresh={onRefresh} />
         </div>
 
-        {/* LEFT column — desktop only: stacked 35/65 rows */}
-        <div className="hidden lg:grid col-span-3 order-1 gap-3 hp-side-left" style={{ gridTemplateRows: '35fr 65fr', height: 'calc(100dvh - 56px - 80px)' }}>
+        {/* LEFT column — desktop only: stacked 35/65 rows, fills remaining height exactly */}
+        <div className="hidden lg:grid col-span-3 order-1 gap-3 min-h-0" style={{ gridTemplateRows: '35fr 65fr' }}>
           {initData
             ? <>
                 <TaskBoard initData={initData.tasks} mindsetContent={initData.mindset?.content} />
@@ -1440,8 +1440,8 @@ function LoggedInHome() {
           }
         </div>
 
-        {/* RIGHT column — desktop only: stacked 35/65 rows */}
-        <div className="hidden lg:grid col-span-3 order-3 gap-3 hp-side-right" style={{ gridTemplateRows: '35fr 65fr', height: 'calc(100dvh - 56px - 80px)' }}>
+        {/* RIGHT column — desktop only: stacked 35/65 rows, fills remaining height exactly */}
+        <div className="hidden lg:grid col-span-3 order-3 gap-3 min-h-0" style={{ gridTemplateRows: '35fr 65fr' }}>
           {initData
             ? <DisciplineScore initData={initData.discipline} />
             : <div className="rounded-2xl bg-gray-100 dark:bg-gray-800 animate-pulse min-h-[120px]" />
