@@ -1,7 +1,7 @@
 // === PositionRow.jsx — expandable position card: stats, SL/TP/RR, action history expand, context menu ===
 
 import { useState, useEffect, useCallback, useRef } from 'react'
-import { getTradeHistory } from '../../api'
+import { getTradeHistory } from '../../utils/globalCache'
 import { useContextMenu } from '../ContextMenu'
 import ActionHistory from './ActionHistory'
 import EditActionModal from './EditActionModal'
@@ -250,7 +250,7 @@ export default function PositionRow({ position, ltp, onAdd, onPartialExit, onClo
 function StatCell({ label, value, mono, color, sub, subColor }) {
   return (
     <div className="text-right">
-      <div className="text-[10px] text-gray-500 dark:text-gray-500 uppercase tracking-wide mb-0.5">{label}</div>
+      <div className="text-[10px] font-semibold text-gray-500 dark:text-gray-500 uppercase tracking-wide mb-0.5">{label}</div>
       <div className={`text-[12px] ${mono ? 'font-mono' : ''} ${color || 'text-gray-900 dark:text-gray-200'}`}>{value}</div>
       {sub && <div className={`text-[10px] font-mono ${subColor || 'text-gray-500 dark:text-gray-400'}`}>{sub}</div>}
     </div>

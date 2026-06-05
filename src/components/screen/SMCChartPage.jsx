@@ -132,17 +132,17 @@ function SMCToolbar({ toggles, setToggles, config, setConfig, symbols }) {
 }
 
 // ── SMC Left Panel ────────────────────────────────────────────────────────────
-function SMCLeftPanel({ smcData, biasScore, chartData, currentPrice }) {
+function SMCLeftPanel({ smcData, chartData, currentPrice }) {
   if (!smcData) return (
     <div className="flex-1 overflow-y-auto p-3 space-y-3">
-      <p className="text-[9px] font-bold uppercase tracking-widest text-gray-400">How to use</p>
+      <p className="text-[10px] font-semibold uppercase tracking-widest text-gray-400">How to use</p>
       <div className="space-y-2">
         {[
           { step: '1', text: 'Search a stock in the toolbar above' },
-          { step: '2', text: 'Select a timeframe (1M, 3M, 1Y…)' },
-          { step: '3', text: 'Toggle BOS, OB, FVG to show overlays on chart' },
-          { step: '4', text: 'Turn on Entry to see buy signal markers' },
-          { step: '5', text: 'Use Config to adjust signal sensitivity' },
+          { step: '2', text: 'Select a timeframe (6M, 1Y, 3Y…)' },
+          { step: '3', text: 'Toggle BOS, OB, FVG to see overlays' },
+          { step: '4', text: 'Turn on Entry for buy signal markers' },
+          { step: '5', text: 'Use Config to tune signal sensitivity' },
         ].map(({ step, text }) => (
           <div key={step} className="flex gap-2">
             <span className="shrink-0 w-4 h-4 rounded-full bg-blue-100 dark:bg-blue-900/40 text-blue-600 dark:text-blue-400 text-[9px] font-bold flex items-center justify-center">{step}</span>
@@ -151,7 +151,7 @@ function SMCLeftPanel({ smcData, biasScore, chartData, currentPrice }) {
         ))}
       </div>
       <div className="pt-2 border-t border-gray-100 dark:border-gray-800">
-        <p className="text-[9px] font-bold uppercase tracking-widest text-gray-400 mb-1">Overlays</p>
+        <p className="text-[10px] font-semibold uppercase tracking-widest text-gray-400 mb-1.5">Overlays</p>
         {[
           { color: '#22c55e', label: 'BOS — Break of Structure' },
           { color: '#f59e0b', label: 'CHoCH — Trend reversal' },
@@ -171,132 +171,117 @@ function SMCLeftPanel({ smcData, biasScore, chartData, currentPrice }) {
 
   const { bos, choch, order_blocks, fvg, sweeps } = smcData
 
-  const lastBullBOS  = [...bos].filter(b => b.type === 'bullish').pop()
-  const lastChoch    = choch[choch.length - 1]
-  const bullBOS      = bos.filter(b => b.type === 'bullish').length
-  const bearBOS      = bos.filter(b => b.type === 'bearish').length
-  const bullOB       = order_blocks.filter(o => o.type === 'bullish')
-  const bearOB       = order_blocks.filter(o => o.type === 'bearish')
-  const bullFVG      = fvg.filter(f => f.type === 'bullish' && !f.mitigated)
-  const buySweeps    = sweeps.filter(s => s.type === 'buy_side')
-  const nearestOB    = bullOB[bullOB.length - 1]
-  const nearestFVG   = bullFVG[bullFVG.length - 1]
+  const lastBOS    = [...bos].pop()
+  const lastBullBOS = [...bos].filter(b => b.type === 'bullish').pop()
+  const lastChoch  = choch[choch.length - 1]
+  const bullOB     = order_blocks.filter(o => o.type === 'bullish')
+  const bearOB     = order_blocks.filter(o => o.type === 'bearish')
+  const bullFVG    = fvg.filter(f => f.type === 'bullish' && !f.mitigated)
+  const buySweeps  = sweeps.filter(s => s.type === 'buy_side')
 
+  // Zone position using full chart range — stable, matches signal computation
   const rangeHigh = chartData?.length ? Math.max(...chartData.map(d => d.high)) : 0
   const rangeLow  = chartData?.length ? Math.min(...chartData.map(d => d.low))  : 0
+  const posPct = (rangeHigh > rangeLow && currentPrice)
+    ? Math.round((currentPrice - rangeLow) / (rangeHigh - rangeLow) * 100)
+    : null
+  const posLabel = posPct === null ? null
+    : posPct <= 35 ? 'DISCOUNT' : posPct >= 65 ? 'PREMIUM' : 'EQUILIBRIUM'
 
-  const LABEL = 'text-[10px] font-bold uppercase tracking-widest text-gray-400 dark:text-gray-500'
-  const VAL   = 'text-[11px] font-semibold text-gray-800 dark:text-gray-100'
+  const LABEL = 'text-[10px] font-semibold uppercase tracking-widest text-gray-400 dark:text-gray-500'
   const SUB   = 'text-[10px] text-gray-500 dark:text-gray-400'
+  const ROW   = 'flex items-center justify-between py-0.5'
 
   return (
     <div className="flex-1 overflow-y-auto min-h-0 bg-white dark:bg-gray-950 divide-y divide-gray-100 dark:divide-gray-800">
 
-      {/* Section 1 — Bias */}
-      <div className="p-3 space-y-2">
-        <p className={LABEL}>Bias</p>
-        <div className="flex items-center gap-2">
-          <span className="text-[13px] font-bold" style={{ color: biasScore.color }}>
-            {biasScore.label}
-          </span>
-          <span className="text-[10px] text-gray-400">{biasScore.score}/100</span>
-        </div>
-        {/* Score bar */}
-        <div className="h-1.5 w-full bg-gray-100 dark:bg-gray-800 rounded-full overflow-hidden">
-          <div className="h-full rounded-full transition-all duration-500"
-            style={{ width: `${biasScore.score}%`, backgroundColor: biasScore.color }} />
-        </div>
-      </div>
-
-      {/* Section 2 — Structure */}
+      {/* Section 1 — Market Structure */}
       <div className="p-3 space-y-2">
         <p className={LABEL}>Structure</p>
-        {lastBullBOS ? (
-          <div>
-            <p className={SUB}>Last BOS</p>
-            <p className="text-[11px] font-semibold text-green-600 dark:text-green-400">▲ Bullish</p>
-            <p className={SUB}>{lastBullBOS.date} · {lastBullBOS.level?.toFixed(2)}</p>
-          </div>
-        ) : <p className={SUB}>No bullish BOS</p>}
 
-        {lastChoch ? (
-          <div className="mt-1">
-            <p className={SUB}>Last CHoCH</p>
-            <p className={`text-[11px] font-semibold ${lastChoch.type === 'bullish' ? 'text-amber-500' : 'text-red-500'}`}>
-              {lastChoch.type === 'bullish' ? '▲' : '▼'} {lastChoch.type}
-            </p>
-            <p className={SUB}>{lastChoch.date}</p>
-          </div>
-        ) : null}
+        {/* Last BOS */}
+        <div className={ROW}>
+          <span className={SUB}>Last BOS</span>
+          {lastBOS ? (
+            <span className={`text-[10px] font-semibold ${lastBOS.type === 'bullish' ? 'text-green-600 dark:text-green-400' : 'text-red-500'}`}>
+              {lastBOS.type === 'bullish' ? '▲' : '▼'} {lastBOS.type === 'bullish' ? 'Bull' : 'Bear'}
+            </span>
+          ) : <span className={SUB}>—</span>}
+        </div>
+        {lastBOS && <p className="text-[9px] text-gray-400 -mt-1.5">{lastBOS.date} · {parseFloat(lastBOS.level).toFixed(2)}</p>}
 
-        <div className="flex gap-2 mt-1">
-          <span className="text-[10px] bg-green-100 dark:bg-green-900/30 text-green-700 dark:text-green-400 px-1.5 py-0.5 rounded-full font-semibold">{bullBOS} Bull</span>
-          <span className="text-[10px] bg-red-100 dark:bg-red-900/30 text-red-700 dark:text-red-400 px-1.5 py-0.5 rounded-full font-semibold">{bearBOS} Bear</span>
+        {/* Last CHoCH */}
+        <div className={ROW}>
+          <span className={SUB}>Last CHoCH</span>
+          {lastChoch ? (
+            <span className={`text-[10px] font-semibold ${lastChoch.type === 'bullish' ? 'text-amber-500' : 'text-red-500'}`}>
+              {lastChoch.type === 'bullish' ? '▲' : '▼'} {lastChoch.type === 'bullish' ? 'Bull' : 'Bear'}
+            </span>
+          ) : <span className={SUB}>—</span>}
+        </div>
+        {lastChoch && <p className="text-[9px] text-gray-400 -mt-1.5">{lastChoch.date}</p>}
+      </div>
+
+      {/* Section 2 — Zone Position */}
+      <div className="p-3 space-y-2">
+        <p className={LABEL}>Zone Position</p>
+        {posLabel ? (
+          <div className="flex items-center justify-between">
+            <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full ${
+              posLabel === 'DISCOUNT'
+                ? 'bg-green-100 dark:bg-green-900/30 text-green-700 dark:text-green-400'
+                : posLabel === 'PREMIUM'
+                ? 'bg-red-100 dark:bg-red-900/30 text-red-500'
+                : 'bg-gray-100 dark:bg-gray-800 text-gray-500 dark:text-gray-400'
+            }`}>{posLabel}</span>
+            <span className="text-[10px] font-semibold tabular-nums text-gray-600 dark:text-gray-300">{posPct}%</span>
+          </div>
+        ) : <span className={SUB}>—</span>}
+        <div className="flex justify-between">
+          <span className={SUB}>H: {rangeHigh ? rangeHigh.toFixed(2) : '—'}</span>
+          <span className={SUB}>L: {rangeLow ? rangeLow.toFixed(2) : '—'}</span>
         </div>
       </div>
 
-      {/* Section 3 — Zone Position */}
-      <div className="p-3 space-y-2">
-        <p className={LABEL}>Zone Position</p>
-        <div className={`px-2 py-1 rounded-md text-[10px] font-bold inline-block ${
-          biasScore.posLabel === 'DISCOUNT'
-            ? 'bg-green-100 dark:bg-green-900/30 text-green-700 dark:text-green-400'
-            : biasScore.posLabel === 'PREMIUM'
-            ? 'bg-red-100 dark:bg-red-900/30 text-red-700 dark:text-red-400'
-            : 'bg-gray-100 dark:bg-gray-800 text-gray-600 dark:text-gray-400'
-        }`}>
-          {biasScore.posLabel} {biasScore.posPct}%
-        </div>
-        <div className="space-y-0.5">
-          <p className={SUB}>H: {rangeHigh.toFixed(2)}</p>
-          <p className={SUB}>L: {rangeLow.toFixed(2)}</p>
-        </div>
-
+      {/* Section 3 — Active Zones */}
+      <div className="p-3 space-y-1.5">
         <p className={LABEL}>Active Zones</p>
-        <div className="space-y-1">
-          <div className="flex items-center justify-between">
-            <span className={SUB}>OB</span>
-            <div className="flex gap-1">
-              <span className="text-[10px] text-green-600 dark:text-green-400 font-semibold">▲{bullOB.length}</span>
-              <span className="text-[10px] text-red-500 font-semibold">▼{bearOB.length}</span>
-            </div>
-          </div>
-          <div className="flex items-center justify-between">
-            <span className={SUB}>FVG</span>
-            <div className="flex gap-1">
-              <span className="text-[10px] text-blue-600 dark:text-blue-400 font-semibold">▲{bullFVG.length}</span>
-            </div>
-          </div>
-          <div className="flex items-center justify-between">
-            <span className={SUB}>Sweeps</span>
-            <span className="text-[10px] text-purple-600 dark:text-purple-400 font-semibold">{buySweeps.length}</span>
-          </div>
+        <div className={ROW}>
+          <span className={SUB}>Bull OB</span>
+          <span className="text-[10px] font-semibold text-green-600 dark:text-green-400">{bullOB.length}</span>
         </div>
-
-        {nearestOB && (
-          <div className="mt-1">
-            <p className={SUB}>Nearest Bull OB</p>
-            <p className="text-[10px] text-green-600 dark:text-green-400 font-mono">{nearestOB.low?.toFixed(2)}–{nearestOB.high?.toFixed(2)}</p>
-          </div>
-        )}
-        {nearestFVG && (
-          <div className="mt-1">
-            <p className={SUB}>Nearest FVG</p>
-            <p className="text-[10px] text-blue-600 dark:text-blue-400 font-mono">{nearestFVG.bottom?.toFixed(2)}–{nearestFVG.top?.toFixed(2)}</p>
-          </div>
-        )}
+        <div className={ROW}>
+          <span className={SUB}>Bear OB</span>
+          <span className="text-[10px] font-semibold text-red-500">{bearOB.length}</span>
+        </div>
+        <div className={ROW}>
+          <span className={SUB}>Bull FVG</span>
+          <span className="text-[10px] font-semibold text-blue-600 dark:text-blue-400">{bullFVG.length}</span>
+        </div>
+        <div className={ROW}>
+          <span className={SUB}>Buy Sweeps</span>
+          <span className="text-[10px] font-semibold text-purple-600 dark:text-purple-400">{buySweeps.length}</span>
+        </div>
       </div>
     </div>
   )
 }
 
 // ── SMC Right Panel ───────────────────────────────────────────────────────────
-function SMCRightPanel({ smcData, signals, kpis, config }) {
-  const [tab, setTab] = useState('signals')
-
-  const LABEL = 'text-[10px] font-bold uppercase tracking-widest text-gray-400 dark:text-gray-500'
-  const VAL   = 'text-[12px] font-bold tabular-nums text-gray-800 dark:text-gray-100'
+function SMCRightPanel({ smcData, signals }) {
+  const LABEL = 'text-[10px] font-semibold uppercase tracking-widest text-gray-400 dark:text-gray-500'
   const SUB   = 'text-[10px] text-gray-500 dark:text-gray-400'
+  const VAL   = 'text-[11px] font-semibold tabular-nums text-gray-800 dark:text-gray-100'
+  const ROW   = 'flex items-center justify-between py-0.5'
+
+  const CONDITIONS = [
+    { key: 'bos',      label: 'BOS',      color: '#22c55e' },
+    { key: 'choch',    label: 'CHoCH',    color: '#f59e0b' },
+    { key: 'discount', label: 'Discount', color: '#3b82f6' },
+    { key: 'ob',       label: 'OB',       color: '#22c55e' },
+    { key: 'fvg',      label: 'FVG',      color: '#3b82f6' },
+    { key: 'sweep',    label: 'Sweep',    color: '#a78bfa' },
+  ]
 
   if (!smcData) return (
     <div className="flex-1 flex items-center justify-center p-3">
@@ -304,179 +289,106 @@ function SMCRightPanel({ smcData, signals, kpis, config }) {
     </div>
   )
 
-  const lastSignal = signals?.[signals.length - 1]
-  const recentSignals = signals?.slice(-5).reverse() || []
-
-  const CONDITIONS = [
-    { key: 'bos',      label: 'BOS' },
-    { key: 'choch',    label: 'CHoCH' },
-    { key: 'discount', label: 'Discount' },
-    { key: 'ob',       label: 'OB' },
-    { key: 'fvg',      label: 'FVG' },
-    { key: 'sweep',    label: 'Sweep' },
-  ]
-
+  const lastSignal    = signals?.[signals.length - 1]
+  const recentSignals = signals?.slice(-8).reverse() || []
   const bullOBs  = smcData.order_blocks.filter(o => o.type === 'bullish').slice(-5).reverse()
   const bullFVGs = smcData.fvg.filter(f => f.type === 'bullish' && !f.mitigated).slice(-5).reverse()
 
   return (
-    <div className="flex-1 flex flex-col overflow-hidden min-h-0 bg-white dark:bg-gray-950">
+    <div className="flex-1 overflow-y-auto min-h-0 bg-white dark:bg-gray-950 divide-y divide-gray-100 dark:divide-gray-800">
 
-      {/* Inner tabs */}
-      <div className="shrink-0 flex border-b border-gray-100 dark:border-gray-800">
-        {[['signals', 'Signals'], ['zones', 'Zones']].map(([id, label]) => (
-          <button key={id} onClick={() => setTab(id)}
-            className={`flex-1 py-1.5 text-[10px] font-semibold transition-colors ${
-              tab === id
-                ? 'text-blue-600 dark:text-blue-400 border-b-2 border-blue-600 dark:border-blue-400 animate-scale-in'
-                : 'text-gray-400 dark:text-gray-500 hover:text-gray-600'
-            }`}>
-            {label}
-          </button>
-        ))}
-      </div>
-
-      <div key={tab} className="flex-1 overflow-y-auto min-h-0 divide-y divide-gray-100 dark:divide-gray-800 animate-tab-in">
-
-        {tab === 'signals' && (
+      {/* Last Signal */}
+      <div className="p-3 space-y-2">
+        <p className={LABEL}>Last Signal</p>
+        {lastSignal ? (
           <>
-            {/* Last Signal */}
-            <div className="p-3">
-              <p className={LABEL}>Last Signal</p>
-              {lastSignal ? (
-                <div className="mt-1.5 space-y-1">
-                  <div className="flex items-center justify-between">
-                    <span className="text-[11px] font-bold text-green-600 dark:text-green-400">▲ BUY</span>
-                    <span className="text-[10px] bg-green-100 dark:bg-green-900/30 text-green-700 px-1.5 py-0.5 rounded-full font-bold">{lastSignal.score}/6</span>
-                  </div>
-                  <p className={SUB}>{lastSignal.date}</p>
-                  <p className="text-[10px] font-mono text-gray-600 dark:text-gray-400">Entry: {lastSignal.entryPrice?.toFixed(2)}</p>
-                  <div className="grid grid-cols-2 gap-x-2 gap-y-0.5 mt-1">
-                    {CONDITIONS.map(({ key, label }) => (
-                      <div key={key} className="flex items-center gap-1">
-                        <span className={`text-[9px] ${lastSignal.conditions[key] ? 'text-green-500' : 'text-gray-300 dark:text-gray-700'}`}>
-                          {lastSignal.conditions[key] ? '✓' : '✗'}
-                        </span>
-                        <span className={`text-[9px] ${lastSignal.conditions[key] ? 'text-gray-600 dark:text-gray-300' : 'text-gray-300 dark:text-gray-700'}`}>{label}</span>
-                      </div>
-                    ))}
-                  </div>
-                </div>
-              ) : <p className={SUB + ' mt-1'}>No signals yet</p>}
+            <div className="flex items-center justify-between">
+              <span className="text-[11px] font-bold text-green-600 dark:text-green-400">▲ BUY</span>
+              <span className="text-[10px] font-bold bg-green-100 dark:bg-green-900/30 text-green-700 dark:text-green-400 px-1.5 py-0.5 rounded-full">
+                {lastSignal.score}/6
+              </span>
             </div>
-
-            {/* Signal History */}
-            <div className="p-3">
-              <p className={LABEL}>History</p>
-              {recentSignals.length ? (
-                <div className="mt-1.5 space-y-1.5">
-                  {recentSignals.map((sig, i) => (
-                    <div key={i} className="flex items-center justify-between py-0.5">
-                      <div>
-                        <span className="text-[10px] font-semibold text-green-600 dark:text-green-400">▲</span>
-                        <span className="text-[10px] text-gray-600 dark:text-gray-400 ml-1">{sig.date}</span>
-                      </div>
-                      <span className="text-[10px] font-bold text-gray-700 dark:text-gray-300">{sig.score}/6</span>
-                    </div>
-                  ))}
-                </div>
-              ) : <p className={SUB + ' mt-1'}>No signals in period</p>}
-            </div>
-
-            {/* KPIs */}
-            <div className="p-3">
-              <p className={LABEL}>Performance</p>
-              {kpis ? (
-                <div className="mt-1.5 space-y-1.5">
-                  {[
-                    { label: 'Win Rate',       value: `${kpis.winRate.toFixed(1)}%` },
-                    { label: 'Avg R:R',        value: kpis.avgRR.toFixed(2) },
-                    { label: 'Profit Factor',  value: kpis.profitFactor.toFixed(2) },
-                    { label: 'Avg Win',        value: `+${kpis.avgWinPct.toFixed(1)}%` },
-                    { label: 'Max Con. Loss',  value: kpis.maxConsLosses },
-                  ].map(({ label, value }) => (
-                    <div key={label} className="flex items-center justify-between">
-                      <span className={SUB}>{label}</span>
-                      <span className={VAL}>{value}</span>
-                    </div>
-                  ))}
-                  <p className="text-[9px] text-gray-300 dark:text-gray-700 mt-1">
-                    {kpis.wins}W / {kpis.losses}L of {kpis.totalSignals} closed
-                  </p>
-                </div>
-              ) : (
-                <p className={SUB + ' mt-1'}>Not enough closed signals</p>
-              )}
+            <p className={SUB}>{lastSignal.date}</p>
+            <p className="text-[10px] font-mono text-gray-500 dark:text-gray-400">
+              @ {lastSignal.entryPrice?.toFixed(2)}
+            </p>
+            {/* Condition dots — lit = met, dim = not met */}
+            <div className="flex flex-wrap gap-1 pt-0.5">
+              {CONDITIONS.map(({ key, label, color }) => (
+                <span key={key}
+                  className="text-[9px] font-semibold px-1.5 py-0.5 rounded-full border"
+                  style={lastSignal.conditions[key]
+                    ? { color, borderColor: color + '60', background: color + '18' }
+                    : { color: '#9ca3af', borderColor: '#e5e7eb', background: 'transparent' }
+                  }>
+                  {label}
+                </span>
+              ))}
             </div>
           </>
-        )}
+        ) : <p className={SUB}>No signals in period</p>}
+      </div>
 
-        {tab === 'zones' && (
-          <>
-            {/* Bullish Order Blocks */}
-            <div className="p-3">
-              <p className={LABEL}>Order Blocks (Bull)</p>
-              {bullOBs.length ? (
-                <div className="mt-1.5 space-y-1.5">
-                  {bullOBs.map((ob, i) => (
-                    <div key={i} className="flex items-center justify-between">
-                      <span className="text-[10px] font-mono text-green-600 dark:text-green-400">{ob.low?.toFixed(2)}–{ob.high?.toFixed(2)}</span>
-                      <span className={SUB}>{ob.date?.slice(5)}</span>
-                    </div>
-                  ))}
-                </div>
-              ) : <p className={SUB + ' mt-1'}>None detected</p>}
-            </div>
-
-            {/* Bullish FVGs */}
-            <div className="p-3">
-              <p className={LABEL}>Fair Value Gaps (Bull)</p>
-              {bullFVGs.length ? (
-                <div className="mt-1.5 space-y-1.5">
-                  {bullFVGs.map((f, i) => (
-                    <div key={i} className="flex items-center justify-between">
-                      <span className="text-[10px] font-mono text-blue-600 dark:text-blue-400">{f.bottom?.toFixed(2)}–{f.top?.toFixed(2)}</span>
-                      <span className={SUB}>{f.date?.slice(5)}</span>
-                    </div>
-                  ))}
-                </div>
-              ) : <p className={SUB + ' mt-1'}>None active</p>}
-            </div>
-
-            {/* Zone KPIs */}
-            <div className="p-3">
-              <p className={LABEL}>Zone Stats</p>
-              <div className="mt-1.5 space-y-1.5">
-                {(() => {
-                  const bullOBCount  = smcData.order_blocks.filter(o => o.type === 'bullish').length
-                  const bearOBCount  = smcData.order_blocks.filter(o => o.type === 'bearish').length
-                  const activeFVGs   = smcData.fvg.filter(f => f.type === 'bullish').length
-                  return (
-                    <>
-                      <div className="flex justify-between">
-                        <span className={SUB}>Active Bull OBs</span>
-                        <span className={VAL}>{bullOBCount}</span>
-                      </div>
-                      <div className="flex justify-between">
-                        <span className={SUB}>Active Bull FVGs</span>
-                        <span className={VAL}>{activeFVGs}</span>
-                      </div>
-                      <div className="flex justify-between">
-                        <span className={SUB}>Buy Signals</span>
-                        <span className={VAL}>{signals?.length ?? 0}</span>
-                      </div>
-                      <div className="flex justify-between">
-                        <span className={SUB}>Closed (W/L)</span>
-                        <span className={VAL}>{kpis ? `${kpis.wins}/${kpis.losses}` : '—'}</span>
-                      </div>
-                    </>
-                  )
-                })()}
-              </div>
-            </div>
-          </>
+      {/* Signal History */}
+      <div className="p-3 space-y-1">
+        <p className={LABEL}>History</p>
+        {recentSignals.length ? recentSignals.map((sig, i) => (
+          <div key={i} className={ROW}>
+            <span className={SUB}>{sig.date}</span>
+            <span className="text-[10px] font-semibold text-green-600 dark:text-green-400">{sig.score}/6</span>
+          </div>
+        )) : <p className={SUB}>—</p>}
+        {signals?.length > 8 && (
+          <p className="text-[9px] text-gray-400 pt-0.5">{signals.length} total in period</p>
         )}
       </div>
+
+      {/* Zone Stats */}
+      <div className="p-3 space-y-1.5">
+        <p className={LABEL}>Zone Stats</p>
+        <div className={ROW}>
+          <span className={SUB}>Buy signals</span>
+          <span className={VAL}>{signals?.length ?? 0}</span>
+        </div>
+        <div className={ROW}>
+          <span className={SUB}>Active OBs</span>
+          <span className="text-[11px] font-semibold text-green-600 dark:text-green-400">{bullOBs.length}</span>
+        </div>
+        <div className={ROW}>
+          <span className={SUB}>Active FVGs</span>
+          <span className="text-[11px] font-semibold text-blue-600 dark:text-blue-400">{bullFVGs.length}</span>
+        </div>
+      </div>
+
+      {/* Bullish OB list */}
+      {bullOBs.length > 0 && (
+        <div className="p-3 space-y-1">
+          <p className={LABEL}>Bull Order Blocks</p>
+          {bullOBs.map((ob, i) => (
+            <div key={i} className={ROW}>
+              <span className="text-[10px] font-mono text-green-600 dark:text-green-400">
+                {parseFloat(ob.low).toFixed(2)}–{parseFloat(ob.high).toFixed(2)}
+              </span>
+              <span className={SUB}>{ob.date?.slice(5)}</span>
+            </div>
+          ))}
+        </div>
+      )}
+
+      {/* Bullish FVG list */}
+      {bullFVGs.length > 0 && (
+        <div className="p-3 space-y-1">
+          <p className={LABEL}>Bull FVGs</p>
+          {bullFVGs.map((f, i) => (
+            <div key={i} className={ROW}>
+              <span className="text-[10px] font-mono text-blue-600 dark:text-blue-400">
+                {parseFloat(f.bottom).toFixed(2)}–{parseFloat(f.top).toFixed(2)}
+              </span>
+              <span className={SUB}>{f.date?.slice(5)}</span>
+            </div>
+          ))}
+        </div>
+      )}
     </div>
   )
 }
@@ -564,136 +476,6 @@ function computeSignals(smcData, config, chartData) {
   return signals
 }
 
-function computeKPIs(signals, smcData, chartData) {
-  if (!signals?.length || !chartData?.length || !smcData) return null
-  const results = []
-
-  signals.forEach(sig => {
-    const entryIdx = chartData.findIndex(d => d.time === sig.date)
-    if (entryIdx < 0 || entryIdx >= chartData.length - 3) return
-
-    // SL: below the triggering bullish OB zone bottom, or 2% below entry
-    const nearOB = smcData.order_blocks
-      .filter(o => o.type === 'bullish' && o.date <= sig.date)
-      .sort((a, b) => b.date.localeCompare(a.date))[0]
-    const sl = nearOB
-      ? parseFloat(nearOB.low) * 0.998   // 0.2% below OB bottom as buffer
-      : sig.entryPrice * 0.98
-
-    // TP: next bullish BOS level above entry price (the next structural high to break)
-    const nextBOS = smcData.bos
-      .filter(b => b.type === 'bullish' && b.date > sig.date && parseFloat(b.level) > sig.entryPrice)
-      .sort((a, b) => a.date.localeCompare(b.date))[0]
-    const tp = nextBOS
-      ? parseFloat(nextBOS.level)
-      : sig.entryPrice + 2 * (sig.entryPrice - sl)  // fallback: 2R target
-
-    // Validate SL/TP make sense
-    if (tp <= sig.entryPrice || sl >= sig.entryPrice || (sig.entryPrice - sl) < 0.1) return
-
-    const riskPts   = sig.entryPrice - sl
-    const rewardPts = tp - sig.entryPrice
-    const rr        = rewardPts / riskPts
-
-    // Walk forward: whichever hits first — SL or TP
-    let outcome = null
-    for (let j = entryIdx + 1; j < chartData.length; j++) {
-      const c = chartData[j]
-      if (c.low  <= sl) { outcome = 'loss'; break }
-      if (c.high >= tp) { outcome = 'win';  break }
-    }
-    if (!outcome) return // still open — exclude from closed stats
-
-    const pctGain = outcome === 'win' ? rewardPts / sig.entryPrice * 100 : -(riskPts / sig.entryPrice * 100)
-    results.push({ outcome, rr, pctGain })
-  })
-
-  if (!results.length) return null
-
-  const wins   = results.filter(r => r.outcome === 'win')
-  const losses = results.filter(r => r.outcome === 'loss')
-
-  // Profit factor = gross profit / gross loss (in R units)
-  const grossProfit = wins.reduce((s, r) => s + r.rr, 0)
-  const grossLoss   = losses.length  // each loss = 1R
-
-  let maxConsLoss = 0, cur = 0
-  results.forEach(r => {
-    if (r.outcome === 'loss') { cur++; maxConsLoss = Math.max(maxConsLoss, cur) }
-    else cur = 0
-  })
-
-  return {
-    winRate:       Math.round(wins.length / results.length * 100),
-    avgRR:         wins.length ? +(grossProfit / wins.length).toFixed(2) : 0,
-    profitFactor:  grossLoss > 0 ? +(grossProfit / grossLoss).toFixed(2) : grossProfit > 0 ? 99 : 0,
-    avgWinPct:     wins.length ? +(wins.reduce((s, r) => s + r.pctGain, 0) / wins.length).toFixed(2) : 0,
-    maxConsLosses: maxConsLoss,
-    totalSignals:  results.length,
-    wins:          wins.length,
-    losses:        losses.length,
-  }
-}
-
-function computeBiasScore(smcData, currentPrice) {
-  if (!smcData) return { score: 0, label: 'NO DATA', color: '#9ca3af', posPct: 50, posLabel: 'EQUILIBRIUM' }
-
-  let score = 0
-  const { bos, choch, order_blocks, sweeps, fvg } = smcData
-
-  // BOS ratio — recent structure more important than historical
-  const recentBOS  = bos.slice(-20)  // last 20 BOS events
-  const bullBOS    = recentBOS.filter(b => b.type === 'bullish').length
-  const totalBOS   = recentBOS.length
-  if (totalBOS > 0) score += (bullBOS / totalBOS) * 35
-
-  // Last CHoCH direction — high weight, rare signal
-  const lastChoch = choch[choch.length - 1]
-  if (lastChoch?.type === 'bullish') score += 20
-
-  // Price vs OB/FVG zones — is current price near a bullish zone?
-  const bullOBs  = order_blocks.filter(o => o.type === 'bullish')
-  const nearBullZone = bullOBs.some(o =>
-    currentPrice >= parseFloat(o.low) * 0.97 &&
-    currentPrice <= parseFloat(o.high) * 1.03
-  ) || fvg.some(f =>
-    f.type === 'bullish' &&
-    currentPrice >= parseFloat(f.bottom) * 0.97 &&
-    currentPrice <= parseFloat(f.top) * 1.03
-  )
-  if (nearBullZone) score += 25
-
-  // OB ratio — more bullish OBs detected = more bullish bias
-  const totalOB = order_blocks.length
-  const bullOBcount = bullOBs.length
-  if (totalOB > 0) score += (bullOBcount / totalOB) * 10
-
-  // Recent buy-side sweep — last 20 candles (sharp reversal signal)
-  if (sweeps.slice(-5).some(s => s.type === 'buy_side')) score += 10
-
-  // Compute price position using all detected swing levels as range proxy
-  const allLevels = [
-    ...bos.map(b => parseFloat(b.level)),
-    ...order_blocks.map(o => parseFloat(o.high)),
-    ...order_blocks.map(o => parseFloat(o.low)),
-  ].filter(Boolean)
-
-  let posPct = 50
-  if (allLevels.length >= 2) {
-    const high = Math.max(...allLevels)
-    const low  = Math.min(...allLevels)
-    posPct = high === low ? 50 : Math.round((currentPrice - low) / (high - low) * 100)
-  }
-
-  const s = Math.min(100, Math.round(score))
-  return {
-    score:    s,
-    label:    s >= 70 ? 'STRONG BULL' : s >= 50 ? 'MILD BULL' : s >= 35 ? 'RANGING' : 'BEARISH',
-    color:    s >= 70 ? '#22c55e' : s >= 50 ? '#86efac' : s >= 35 ? '#f59e0b' : '#ef4444',
-    posPct,
-    posLabel: posPct <= 35 ? 'DISCOUNT' : posPct >= 65 ? 'PREMIUM' : 'EQUILIBRIUM',
-  }
-}
 
 // ── SMC Inner — reads ScreenContext ──────────────────────────────────────────
 function SMCInner() {
@@ -744,9 +526,7 @@ function SMCInner() {
   const currentPrice = latestClose ?? 0
 
   // chartData state ensures useMemo re-runs when chart loads
-  const signals   = useMemo(() => computeSignals(smcData, config, chartData),   [smcData, config, chartData])
-  const kpis      = useMemo(() => computeKPIs(signals, smcData, chartData),     [signals, smcData, chartData])
-  const biasScore = useMemo(() => computeBiasScore(smcData, currentPrice),       [smcData, currentPrice])
+  const signals = useMemo(() => computeSignals(smcData, config, chartData), [smcData, config, chartData])
 
   const smcOverlayData = useMemo(() => ({
     smcData:    isStock ? smcData : null,
@@ -779,7 +559,7 @@ function SMCInner() {
                         transition-all duration-200 ease-in-out
                         ${leftOpen ? 'w-[13%] min-w-[150px] max-w-[200px]' : 'w-0 min-w-0 max-w-0 overflow-hidden'} ${!leftOpen ? 'screen-panel-collapsed' : ''}`}>
           <div className="screen-panel-content flex flex-col h-full">
-            <SMCLeftPanel smcData={isStock ? smcData : null} biasScore={biasScore} chartData={chartData} currentPrice={currentPrice} />
+            <SMCLeftPanel smcData={isStock ? smcData : null} chartData={chartData} currentPrice={currentPrice} />
           </div>
         </div>
 
@@ -847,7 +627,7 @@ function SMCInner() {
                         transition-all duration-200 ease-in-out
                         ${rightOpen ? 'w-[15%] min-w-[160px] max-w-[240px]' : 'w-0 min-w-0 max-w-0 overflow-hidden'} ${!rightOpen ? 'screen-panel-collapsed' : ''}`}>
           <div className="screen-panel-content flex flex-col h-full">
-            <SMCRightPanel smcData={isStock ? smcData : null} signals={signals} kpis={kpis} config={config} />
+            <SMCRightPanel smcData={isStock ? smcData : null} signals={signals} />
           </div>
         </div>
       </div>

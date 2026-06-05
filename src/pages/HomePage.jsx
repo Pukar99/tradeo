@@ -11,11 +11,9 @@ import { useState, useEffect, useCallback, useRef, useMemo } from 'react'
 import { useEscapeKey } from '../hooks/useEscapeKey'
 import NEPSEChart from '../components/NEPSEChart'
 import {
-  getDashboardInit as _getDashboardInit,
   addToWatchlist, updateWatchlist, removeFromWatchlist,
-  getMarketSymbols,
 } from '../api'
-import { getDashboardInit } from '../utils/globalCache'
+import { getDashboardInit, getMarketSymbols } from '../utils/globalCache'
 
 const MOTIVATIONAL_QUOTES = [
   "The market is a device for transferring money from the impatient to the patient.",
@@ -148,13 +146,13 @@ function LoggedOutHome() {
           {/* Center column */}
           <div className="col-span-6 flex flex-col gap-4">
             <div className="bg-white dark:bg-gray-800 rounded-2xl shadow-sm border border-gray-100 dark:border-gray-700 overflow-hidden filter blur-[2px]">
-              <div className="flex items-center justify-between px-5 py-3 border-b border-gray-100 dark:border-gray-700">
+              <div className="flex items-center justify-between px-3 py-3 border-b border-gray-100 dark:border-gray-700">
                 <h3 className="text-sm font-semibold text-gray-900 dark:text-white">Open Positions</h3>
                 <span className="text-xs text-gray-400">4 active</span>
               </div>
               <div className="divide-y divide-gray-50 dark:divide-gray-700">
                 {dummyTrades.map((t, i) => (
-                  <div key={i} className="flex items-center justify-between px-5 py-2.5">
+                  <div key={i} className="flex items-center justify-between px-3 py-2.5">
                     <div className="flex items-center gap-2">
                       <StockAvatar symbol={t.symbol} size="w-7 h-7" />
                       <div>
@@ -171,7 +169,7 @@ function LoggedOutHome() {
               </div>
             </div>
             <div className="bg-white dark:bg-gray-800 rounded-2xl shadow-sm border border-gray-100 dark:border-gray-700 overflow-hidden filter blur-[2px]">
-              <div className="flex items-center justify-between px-5 py-3 border-b border-gray-100 dark:border-gray-700">
+              <div className="flex items-center justify-between px-3 py-3 border-b border-gray-100 dark:border-gray-700">
                 <h3 className="text-sm font-semibold text-gray-900 dark:text-white">Watchlist</h3>
               </div>
               <div className="p-3 grid grid-cols-4 gap-2">
@@ -393,7 +391,7 @@ function AlertsWidget({ initData }) {
   return (
     <div className="hp-card bg-white/70 dark:bg-gray-900/60 backdrop-blur-md rounded-2xl border border-white/60 dark:border-white/10 shadow-sm overflow-hidden h-full flex flex-col min-h-0">
       <div className="flex items-center justify-between px-4 py-3 border-b border-gray-100 dark:border-gray-800 flex-shrink-0">
-        <h3 className="text-[11px] font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-widest">Alerts</h3>
+        <h3 className="text-[10px] font-semibold text-gray-400 uppercase tracking-widest">Alerts</h3>
         {alerts.length > 0 && (
           <span className="w-4 h-4 rounded-full bg-red-500 text-white text-[10px] font-bold flex items-center justify-center">
             {alerts.length > 9 ? '9+' : alerts.length}
@@ -415,7 +413,7 @@ function AlertsWidget({ initData }) {
                 onClick={() => navigate(a.to)}
                 className={`hp-alert-row w-full text-left flex items-center gap-2.5 px-3 py-2.5 border-l-2 ${severityClass[a.severity]}`}
               >
-                <span className="text-sm flex-shrink-0">{iconMap[a.type]}</span>
+                <span className="text-[13px] flex-shrink-0">{iconMap[a.type]}</span>
                 <span className={`text-[11px] font-medium leading-snug ${textClass[a.severity]}`}>{a.label}</span>
               </button>
             ))}
@@ -439,8 +437,8 @@ function AlertsWidget({ initData }) {
 function StatCard({ label, value, color, sub }) {
   return (
     <div className="hp-stat bg-white/70 dark:bg-gray-900/60 backdrop-blur-md rounded-xl sm:rounded-2xl px-3 sm:px-4 py-2.5 sm:py-3 border border-white/60 dark:border-white/10 shadow-sm">
-      <p className="text-[9px] sm:text-[10px] font-medium text-gray-400 uppercase tracking-wide mb-0.5 sm:mb-1 truncate">{label}</p>
-      <p className={`text-sm sm:text-lg font-bold tracking-tight leading-none ${color}`}>{value}</p>
+      <p className="text-[10px] font-medium text-gray-400 uppercase tracking-wide mb-0.5 sm:mb-1 truncate">{label}</p>
+      <p className={`text-base sm:text-lg font-bold tracking-tight leading-none ${color}`}>{value}</p>
       {sub && <p className="hidden sm:block text-[10px] text-gray-400 mt-0.5">{sub}</p>}
     </div>
   )
@@ -764,7 +762,7 @@ function CenterDashboard({ navigate, initData, onRefresh, onDataReady }) {
           <div className="flex-1" />
           <div className="h-6 bg-gray-100 dark:bg-gray-800 rounded-lg w-40" />
         </div>
-        <div className="grid grid-cols-4 gap-1.5 p-1.5">
+        <div className="grid grid-cols-4 gap-2 p-2">
           {[1,2,3,4].map(i => (
             <div key={i} className="bg-gray-50 dark:bg-gray-800/50 rounded-xl px-1.5 py-1.5 space-y-1.5">
               <div className="flex items-center gap-1">
@@ -996,7 +994,7 @@ function CenterDashboard({ navigate, initData, onRefresh, onDataReady }) {
 
         {/* Header row */}
         <div className="flex items-center gap-2 px-3 py-2.5 border-b border-gray-100 dark:border-gray-800 overflow-x-auto no-scrollbar">
-          <p className="text-[10px] font-bold uppercase tracking-widest text-gray-400 shrink-0">Watchlist</p>
+          <p className="text-[10px] font-semibold uppercase tracking-widest text-gray-400 shrink-0">Watchlist</p>
           <div className="flex-1 shrink-0 min-w-[8px]" />
           {/* Tab pill group */}
           <div className="flex items-center bg-gray-100 dark:bg-gray-800 rounded-lg p-0.5 shrink-0">
@@ -1267,7 +1265,7 @@ function CenterDashboard({ navigate, initData, onRefresh, onDataReady }) {
             )}
           </div>
         ) : (
-        <div className="grid grid-cols-4 gap-1.5 p-1.5">
+        <div className="grid grid-cols-4 gap-2 p-2">
           {filteredWatch.length === 0 ? (
             <div className="col-span-4 py-8 text-center">
               <p className="text-[11px] text-gray-400">No stocks in {watchlistTab === 'active' ? 'Active' : 'Pre-Watch'}</p>
@@ -1330,8 +1328,8 @@ function CenterDashboard({ navigate, initData, onRefresh, onDataReady }) {
                   {/* Status badges */}
                   {(isExpired || inGrace) && (
                     <div className="flex gap-1">
-                      {isExpired && <span className="text-[7px] px-1 py-0.5 rounded bg-gray-100 dark:bg-gray-700 text-gray-400 font-semibold uppercase tracking-wide">Exp</span>}
-                      {inGrace   && <span className="text-[7px] px-1 py-0.5 rounded bg-amber-100 dark:bg-amber-900/30 text-amber-600 dark:text-amber-400 font-semibold uppercase tracking-wide">Grace</span>}
+                      {isExpired && <span className="text-[8px] px-1 py-0.5 rounded bg-gray-100 dark:bg-gray-700 text-gray-400 font-semibold uppercase tracking-wide">Exp</span>}
+                      {inGrace   && <span className="text-[8px] px-1 py-0.5 rounded bg-amber-100 dark:bg-amber-900/30 text-amber-600 dark:text-amber-400 font-semibold uppercase tracking-wide">Grace</span>}
                     </div>
                   )}
 
@@ -1377,7 +1375,7 @@ function LoggedInHome() {
   // gCache-backed fetch — survives navigate-away-and-back within 60s TTL
   const fetchDashboard = useCallback(async (force = false) => {
     try {
-      const res = await getDashboardInit(() => _getDashboardInit(), force)
+      const res = await getDashboardInit(force)
       setInitData(res.data)
     } catch (err) {
       console.error(err)

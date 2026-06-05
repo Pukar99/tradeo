@@ -2,13 +2,12 @@
 
 import { useState, useEffect, useRef, useCallback, forwardRef, useImperativeHandle } from 'react'
 import { useTheme } from '../../context/ThemeContext'
-import { getIndexChart, getStockChart, getMarketSymbols } from '../../api'
+import { getIndexChart, getStockChart } from '../../api'
+import { getMarketSymbols } from '../../utils/globalCache'
 
-// ── Module-level cache (shared across all MiniChart instances) ────────────────
+// ── Module-level OHLCV cache (shared across all MiniChart instances) ──────────
 const _cache    = new Map()  // `sym:tf` or `idx:id:tf` → { data, ts }
-const _symCache = { data: null, ts: 0 }
 const CACHE_TTL = 5 * 60_000
-const SYM_TTL   = 60 * 60_000
 
 const INDEX_LIST = [
   { index_id: 12, name: 'NEPSE' },
@@ -33,14 +32,7 @@ function MiniSymbolSearch({ symbol, isIdx, onSelect }) {
   const mouseDownInList = useRef(false)
 
   useEffect(() => {
-    if (_symCache.data && Date.now() - _symCache.ts < SYM_TTL) {
-      setItems(_symCache.data); return
-    }
-    getMarketSymbols().then(r => {
-      _symCache.data = r.data
-      _symCache.ts   = Date.now()
-      setItems(r.data)
-    }).catch(() => {})
+    getMarketSymbols().then(r => setItems(r.data)).catch(() => {})
   }, [])
 
   const allItems = [

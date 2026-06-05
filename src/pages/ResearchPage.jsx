@@ -152,7 +152,7 @@ function EligibilityBanner({ eligibility }) {
           return (
             <div key={label} className="space-y-1.5">
               <div className="flex items-baseline justify-between">
-                <span className="text-[10px] uppercase tracking-wider text-gray-400">{label}</span>
+                <span className="text-[10px] font-semibold uppercase tracking-wider text-gray-400">{label}</span>
                 <span className={`text-[11px] font-bold ${met ? 'text-emerald-500' : 'text-gray-600 dark:text-gray-300'}`}>
                   {prefix}{val}{suffix}
                 </span>

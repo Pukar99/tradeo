@@ -12,7 +12,7 @@ import { useToolbarSlot } from '../../pages/DataLabPage'
 // DESIGN TOKENS
 // ─────────────────────────────────────────────────────────────────────────────
 const CARD   = 'bg-white dark:bg-gray-900 rounded-2xl border border-gray-100 dark:border-gray-800'
-const LABEL  = 'text-[10px] font-bold uppercase tracking-widest text-gray-400'
+const LABEL  = 'text-[10px] font-semibold uppercase tracking-widest text-gray-400'
 const STITLE = 'text-[11px] font-semibold text-gray-700 dark:text-gray-200'
 const SVAL   = 'text-[13px] font-bold tabular-nums'
 

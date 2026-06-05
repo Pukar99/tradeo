@@ -2,7 +2,7 @@
 // DisciplineScore.jsx — circular ring + dimension bars for trading discipline
 // =============================================================================
 import { useState, useEffect } from 'react'
-import { getDiscipline } from '../../api'
+import { getDiscipline } from '../../utils/globalCache'
 
 const GRADE = (s) => {
   if (s >= 85) return { letter: 'A+', color: 'text-emerald-500', ring: '#10b981' }

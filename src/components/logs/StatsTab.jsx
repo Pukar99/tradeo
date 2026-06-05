@@ -6,7 +6,7 @@ import {
 
 // ── Design tokens (match DataLab) ─────────────────────────────────────────────
 const CARD  = 'bg-white dark:bg-gray-900 rounded-2xl border border-gray-100 dark:border-gray-800'
-const LABEL = 'text-[10px] font-bold uppercase tracking-widest text-gray-400'
+const LABEL = 'text-[10px] font-semibold uppercase tracking-widest text-gray-400'
 const SVAL  = 'text-[15px] font-black tracking-tight tabular-nums leading-tight'
 
 // ── Range config ──────────────────────────────────────────────────────────────

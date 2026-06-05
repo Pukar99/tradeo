@@ -2,7 +2,8 @@
 import { useState, useEffect, useCallback, useMemo, lazy, Suspense, useRef } from 'react'
 import { useSearchParams } from 'react-router-dom'
 import { getMarketJournals, autoCreateMarketJournal } from '../api'
-import { getBatchPrices, getPositions, clearEligibilityCache } from '../utils/globalCache'
+import { today } from '../utils/format'
+import { getBatchPrices, getPositions, clearEligibilityCache, clearPositionsCache } from '../utils/globalCache'
 import { useChatRefresh } from '../utils/chatEvents'
 
 import TradeActionsTab  from '../components/logs/TradeActionsTab'
@@ -94,8 +95,7 @@ export default function LogsPage() {
 
   const fetchMarketJournals = useCallback(async () => {
     try {
-      const today = new Date().toISOString().split('T')[0]
-      await autoCreateMarketJournal(today)
+      await autoCreateMarketJournal(today())
       const journalsRes = await getMarketJournals()
       const all = journalsRes.data || []
       setMarketJournals(all)
@@ -127,6 +127,7 @@ export default function LogsPage() {
 
   const handleRefresh = useCallback(() => {
     clearEligibilityCache()
+    clearPositionsCache()
     fetchData()
   }, [fetchData])
 
@@ -340,7 +341,7 @@ export default function LogsPage() {
             onClick={() => setAddModal(true)}
             aria-label="Add new trade"
             className="shrink-0 flex items-center gap-1 px-2 py-0.5 text-[10px] font-bold rounded-md bg-blue-600 hover:bg-blue-500 active:bg-blue-700 text-white transition-colors whitespace-nowrap">
-            <span className="text-[12px] leading-none">+</span>
+            <span className="text-sm leading-none">+</span>
             <span className="hidden xs:inline">New Trade</span>
             <span className="xs:hidden">New</span>
           </button>

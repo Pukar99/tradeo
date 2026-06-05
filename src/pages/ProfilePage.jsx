@@ -2,7 +2,8 @@
 import { useState, useEffect, useRef, useCallback } from 'react'
 import { useAuth } from '../context/AuthContext'
 import { useNavigate } from 'react-router-dom'
-import { getProfile, updateProfile, uploadAvatar, changePassword } from '../api'
+import { updateProfile, uploadAvatar, changePassword } from '../api'
+import { getProfile, clearProfileCache } from '../utils/globalCache'
 
 const MAX_AVATAR_SIZE = 5 * 1024 * 1024 // 5 MB
 const ALLOWED_IMAGE_TYPES = ['image/jpeg', 'image/jpg', 'image/png', 'image/gif', 'image/webp']
@@ -11,8 +12,8 @@ function StatCard({ label, value, color = 'text-gray-900 dark:text-white', sub }
   return (
     <div className="bg-gray-50 dark:bg-gray-700 rounded-xl p-4 text-center flex flex-col justify-center min-h-[88px]">
       <p className={`text-2xl font-bold ${color}`}>{value}</p>
-      <p className="text-xs text-gray-400 mt-1">{label}</p>
-      {sub && <p className="text-xs text-gray-400 mt-0.5">{sub}</p>}
+      <p className="text-[10px] font-semibold uppercase tracking-wider text-gray-400 mt-1">{label}</p>
+      {sub && <p className="text-[10px] text-gray-400 mt-0.5">{sub}</p>}
     </div>
   )
 }
@@ -97,6 +98,7 @@ function ProfilePage() {
       const formData = new FormData()
       formData.append('avatar', file)
       const res = await uploadAvatar(formData)
+      clearProfileCache()
       setProfile(prev => ({
         ...prev,
         user: { ...prev.user, avatar_url: res.data.avatar_url }
@@ -126,6 +128,7 @@ function ProfilePage() {
     setSaveError('')
     try {
       const res = await updateProfile(form)
+      clearProfileCache()
       setProfile(prev => ({ ...prev, user: { ...prev.user, ...res.data } }))
       updateUser({ name: form.name.trim() })
       setEditing(false)
@@ -366,21 +369,21 @@ function ProfilePage() {
           <div className="grid grid-cols-2 sm:grid-cols-4 gap-4 mt-6">
             <div className="bg-white bg-opacity-5 rounded-xl p-3 text-center border border-white border-opacity-10">
               <p className="text-2xl font-bold text-white">{profile.stats.totalTrades}</p>
-              <p className="text-xs text-gray-400 mt-1">Total Trades</p>
+              <p className="text-[10px] font-semibold uppercase tracking-wider text-gray-400 mt-1">Total Trades</p>
             </div>
             <div className="bg-white bg-opacity-5 rounded-xl p-3 text-center border border-white border-opacity-10">
               <p className={`text-2xl font-bold ${profile.stats.winRate >= 50 ? 'text-green-400' : 'text-red-400'}`}>
                 {profile.stats.winRate}%
               </p>
-              <p className="text-xs text-gray-400 mt-1">Win Rate</p>
+              <p className="text-[10px] font-semibold uppercase tracking-wider text-gray-400 mt-1">Win Rate</p>
             </div>
             <div className="bg-white bg-opacity-5 rounded-xl p-3 text-center border border-white border-opacity-10">
               <p className="text-2xl font-bold text-blue-400">🔥 {profile.discipline.streak}</p>
-              <p className="text-xs text-gray-400 mt-1">Day Streak</p>
+              <p className="text-[10px] font-semibold uppercase tracking-wider text-gray-400 mt-1">Day Streak</p>
             </div>
             <div className="bg-white bg-opacity-5 rounded-xl p-3 text-center border border-white border-opacity-10">
               <p className="text-2xl font-bold text-purple-400">{profile.research.totalPosts}</p>
-              <p className="text-xs text-gray-400 mt-1">Research Posts</p>
+              <p className="text-[10px] font-semibold uppercase tracking-wider text-gray-400 mt-1">Research Posts</p>
             </div>
           </div>
         </div>

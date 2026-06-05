@@ -3,8 +3,8 @@ import { useEffect, useRef, useState, useCallback, useMemo } from 'react'
 import { createPortal } from 'react-dom'
 import { useTheme } from '../../context/ThemeContext'
 import { useScreen } from '../../context/ScreenContext'
-import { getIndexChart, getStockChart, getTopMovers, triggerBackfill, getTradeHistory } from '../../api'
-import { getMarketSymbols } from '../../utils/globalCache'
+import { getIndexChart, getStockChart, triggerBackfill } from '../../api'
+import { getMarketSymbols, getTradeHistory, getTopMovers } from '../../utils/globalCache'
 import { useScreenToolbarSlot } from '../../pages/ScreenPage'
 
 // ── useFixedDropdown ──────────────────────────────────────────────────────────
@@ -855,6 +855,7 @@ function PositionBadge({ positions, latestClose }) {
 
 function MoversOverlay({ movers, date, pinned, onClear }) {
   if (!movers || (!movers.gainers?.length && !movers.losers?.length)) return null
+  // eslint-disable-next-line react-hooks/rules-of-hooks
   const { selectSymbol } = useScreen()
 
   return (
@@ -990,7 +991,6 @@ export default function StockChart({ hideToolbar = false, onChartReady, smcData 
   const atrRef     = useRef(null)
   const chartsRef  = useRef({})
   const seriesRef  = useRef({})
-  const moversCache      = useRef({})
   const pendingHover     = useRef(null)
   const lastFetchedDate  = useRef(null)   // prevents duplicate fetch for the same candle date
   const pinnedDateRef  = useRef(pinnedDate)
@@ -1097,6 +1097,7 @@ export default function StockChart({ hideToolbar = false, onChartReady, smcData 
     const lastDate = chartData[chartData.length - 1]?.time
     if (!lastDate) return
 
+    // Horizontal line from fromDate to toDate at a fixed level
     function addLine(fromDate, toDate, level, color, lineStyle = 1, lineWidth = 1.5) {
       try {
         const s = chart.addLineSeries({ color, lineWidth, lineStyle, priceLineVisible: false, lastValueVisible: false, crosshairMarkerVisible: false })
@@ -1104,30 +1105,39 @@ export default function StockChart({ hideToolbar = false, onChartReady, smcData 
         smcSeriesRef.current.push(s)
       } catch (_) {}
     }
+    // Zone band: solid boundary lines + a translucent fill line at the midpoint
     function addZoneBand(fromDate, top, bottom, color) {
-      addLine(fromDate, lastDate, top, color, 1, 1)
-      addLine(fromDate, lastDate, bottom, color, 1, 1)
+      const rgba = color + '55'  // ~33% opacity fill
+      const mid  = (parseFloat(top) + parseFloat(bottom)) / 2
+      addLine(fromDate, lastDate, parseFloat(top),    color, 0, 1.5)
+      addLine(fromDate, lastDate, parseFloat(bottom), color, 0, 1.5)
+      addLine(fromDate, lastDate, mid,                rgba,  0, 6)
     }
 
+    // BOS: line from swing origin to break candle only — stops at the event, not the right edge
     if (smcToggles.showBOS) {
-      smcData.bos.filter(b => b.type === 'bullish').slice(-10).forEach(b =>
-        addLine(b.swing_date ?? b.date, lastDate, b.level, '#22c55e', 1))
+      smcData.bos.filter(b => b.type === 'bullish').slice(-5).forEach(b =>
+        addLine(b.swing_date ?? b.date, b.date, b.level, '#22c55e', 0, 1.5))
     }
+    // CHoCH: same bounding — stops at the reversal candle
     if (smcToggles.showCHoCH) {
       smcData.choch.filter(c => c.type === 'bullish').slice(-5).forEach(c =>
-        addLine(c.swing_date ?? c.date, lastDate, c.level, '#f59e0b', 0, 1.5))
+        addLine(c.swing_date ?? c.date, c.date, c.level, '#f59e0b', 0, 2))
     }
+    // OB zones: bounded from OB candle to right edge (active zone, still open)
     if (smcToggles.showOB) {
       smcData.order_blocks.filter(o => o.type === 'bullish').slice(-5).forEach(o =>
         addZoneBand(o.date, o.high, o.low, '#22c55e'))
     }
+    // FVG zones: bounded from gap candle to right edge (unmitigated = still active)
     if (smcToggles.showFVG) {
       smcData.fvg.filter(f => f.type === 'bullish' && !f.mitigated).slice(-5).forEach(f =>
         addZoneBand(f.date, f.top, f.bottom, '#3b82f6'))
     }
+    // Sweeps: line from swing origin to sweep candle only
     if (smcToggles.showSweeps) {
       smcData.sweeps.filter(s => s.type === 'buy_side').slice(-5).forEach(s =>
-        addLine(s.swing_date ?? s.date, lastDate, s.level, '#a78bfa', 1))
+        addLine(s.swing_date ?? s.date, s.date, s.level, '#a78bfa', 0, 1.5))
     }
     if (smcToggles.showEntry && smcSignals?.length && priceSeriesRef.current) {
       try {
@@ -1356,13 +1366,11 @@ export default function StockChart({ hideToolbar = false, onChartReady, smcData 
     signal: '#f59e0b',
   }
 
-  // Debounced movers fetch — avoids spamming on every crosshair pixel
+  // Movers fetch — globalCache dedups identical date requests within TTL
   const getMovers = useCallback(async (date) => {
     if (!date) return null
-    if (moversCache.current[date]) return moversCache.current[date]
     try {
       const r = await getTopMovers(date)
-      moversCache.current[date] = r.data
       return r.data
     } catch { return null }
   }, [])

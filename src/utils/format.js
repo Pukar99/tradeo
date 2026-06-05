@@ -62,14 +62,19 @@ export function nepseCGT(netGain, entryDateStr, exitDateStr) {
 // 2. NUMBER FORMATTERS
 // =============================================================================
 
-// Absolute Rupees — no sign, rounded integer. e.g. fmtRs(-500) → 'Rs.500'
-export const fmtRs = (n) =>
-  `Rs.${Math.abs(Math.round(parseFloat(n) || 0)).toLocaleString()}`
+// Today's date as YYYY-MM-DD string — used for date input defaults and max caps
+export const today = () => new Date().toISOString().split('T')[0]
 
-// Signed Rupees — explicit +/- prefix. e.g. fmtRsSigned(-800) → '-Rs.800'
+// Absolute Rupees — no sign, rounded integer. e.g. fmtRs(-500) → 'Rs.500'
+// forex=true switches to USD display: fmtRs(12.5, true) → '$12.50'
+export const fmtRs = (n, forex = false) => forex
+  ? `$${Math.abs(parseFloat(n) || 0).toFixed(2)}`
+  : `Rs.${Math.abs(Math.round(parseFloat(n) || 0)).toLocaleString()}`
+
+// Signed Rupees — explicit +/− prefix. e.g. fmtRsSigned(-800) → '−Rs.800'
 export const fmtRsSigned = (n) => {
   const v = parseFloat(n) || 0
-  return `${v >= 0 ? '+' : '-'}Rs.${Math.abs(Math.round(v)).toLocaleString()}`
+  return `${v >= 0 ? '+' : '−'}Rs.${Math.abs(Math.round(v)).toLocaleString()}`
 }
 
 // Decimal number with 2dp — returns '—' for null/undefined/NaN

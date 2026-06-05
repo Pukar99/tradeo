@@ -2,33 +2,12 @@
 import { useState, useCallback } from 'react'
 import { useEscapeKey } from '../../hooks/useEscapeKey'
 import { partialExitPosition } from '../../api'
-import { fmt } from '../../utils/format'
+import { fmt, today } from '../../utils/format'
+import { EMOTIONAL_STATES, EXIT_REASONS, EMOTION_COLOR, EXIT_REASON_COLOR } from './tradeConstants'
 import { clearPositionsCache } from '../../utils/globalCache'
-
-const EMOTIONAL_STATES = ['Confident', 'Calm', 'Anxious', 'Fearful', 'Greedy', 'FOMO', 'Neutral']
-const EXIT_REASONS     = ['Target Hit', 'SL Hit', 'Manual Exit', 'Reversal Signal', 'Time Stop']
-
-const EMOTION_COLOR = {
-  Confident:'border-blue-400 bg-blue-50 dark:bg-blue-900/30 text-blue-700 dark:text-blue-300',
-  Calm:     'border-emerald-400 bg-emerald-50 dark:bg-emerald-900/30 text-emerald-700 dark:text-emerald-300',
-  Anxious:  'border-yellow-400 bg-yellow-50 dark:bg-yellow-900/30 text-yellow-700 dark:text-yellow-300',
-  Fearful:  'border-orange-400 bg-orange-50 dark:bg-orange-900/30 text-orange-700 dark:text-orange-300',
-  Greedy:   'border-red-400 bg-red-50 dark:bg-red-900/30 text-red-700 dark:text-red-300',
-  FOMO:     'border-purple-400 bg-purple-50 dark:bg-purple-900/30 text-purple-700 dark:text-purple-300',
-  Neutral:  'border-gray-400 bg-gray-100 dark:bg-gray-800 text-gray-600 dark:text-gray-400',
-}
-const EXIT_REASON_COLOR = {
-  'Target Hit':       'border-emerald-400 bg-emerald-50 dark:bg-emerald-900/30 text-emerald-700 dark:text-emerald-300',
-  'SL Hit':           'border-red-400 bg-red-50 dark:bg-red-900/30 text-red-700 dark:text-red-300',
-  'Manual Exit':      'border-blue-400 bg-blue-50 dark:bg-blue-900/30 text-blue-700 dark:text-blue-300',
-  'Reversal Signal':  'border-purple-400 bg-purple-50 dark:bg-purple-900/30 text-purple-700 dark:text-purple-300',
-  'Time Stop':        'border-yellow-400 bg-yellow-50 dark:bg-yellow-900/30 text-yellow-700 dark:text-yellow-300',
-}
 
 const INPUT = 'w-full px-3 py-2 text-[12px] rounded-lg border border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-800/80 text-gray-900 dark:text-gray-100 placeholder-gray-400 focus:outline-none focus:ring-1 focus:ring-yellow-500 focus:border-yellow-500 transition-all'
 const LABEL = 'block text-[10px] font-semibold uppercase tracking-widest text-gray-400 dark:text-gray-500 mb-1.5'
-const today = () => new Date().toISOString().split('T')[0]
-
 // Parses broker SMS for exit price, qty, date
 function parseBrokerMessage(text) {
   const t = text.replace(/\s+/g, ' ').trim()

@@ -264,7 +264,7 @@ function TabStrip({ tabs, active, onChange, lockedIds = [] }) {
         const isActive = active === t.id
         return (
           <button key={t.id} onClick={() => onChange(t.id)}
-            className={`flex items-center gap-1 px-2.5 py-1 rounded-md text-[10px] font-bold transition-all whitespace-nowrap ${
+            className={`flex items-center gap-1 px-2.5 py-1 rounded-md text-[10px] font-semibold transition-all whitespace-nowrap ${
               isActive
                 ? 'bg-white dark:bg-gray-700 text-gray-900 dark:text-white shadow-sm animate-scale-in'
                 : locked

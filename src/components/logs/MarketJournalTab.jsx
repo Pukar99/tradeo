@@ -311,13 +311,13 @@ function GalleryCard({ entry, onOpen }) {
         <div className="flex items-center gap-2">
           {entry.total_volume != null && (
             <div className="flex-1 bg-gray-50 dark:bg-gray-800/60 rounded-lg px-2 py-1.5">
-              <p className="text-[10px] text-gray-400 uppercase tracking-wide">Vol</p>
+              <p className="text-[10px] text-gray-400 uppercase tracking-widest">Vol</p>
               <p className="text-[11px] font-bold font-mono text-gray-800 dark:text-gray-200">{fmtVol(entry.total_volume)}</p>
             </div>
           )}
           {topGainer && (
             <div className="flex-1 bg-emerald-50 dark:bg-emerald-900/20 rounded-lg px-2 py-1.5">
-              <p className="text-[10px] text-emerald-500 uppercase tracking-wide">Best</p>
+              <p className="text-[10px] text-emerald-500 uppercase tracking-widest">Best</p>
               <p className="text-[11px] font-bold text-emerald-600 dark:text-emerald-400 truncate">
                 {topGainer.symbol} <span className="font-mono">+{parseFloat(topGainer.diff_pct).toFixed(1)}%</span>
               </p>
@@ -325,7 +325,7 @@ function GalleryCard({ entry, onOpen }) {
           )}
           {topLoser && (
             <div className="flex-1 bg-red-50 dark:bg-red-900/20 rounded-lg px-2 py-1.5">
-              <p className="text-[10px] text-red-400 uppercase tracking-wide">Worst</p>
+              <p className="text-[10px] text-red-400 uppercase tracking-widest">Worst</p>
               <p className="text-[11px] font-bold text-red-500 dark:text-red-400 truncate">
                 {topLoser.symbol} <span className="font-mono">{parseFloat(topLoser.diff_pct).toFixed(1)}%</span>
               </p>
@@ -351,7 +351,7 @@ function GalleryCard({ entry, onOpen }) {
                   className="rounded px-1 py-1 text-center"
                   style={{ background: bg }}
                 >
-                  <p className="text-[9px] text-gray-500 dark:text-gray-400 truncate leading-none mb-0.5">{s.name}</p>
+                  <p className="text-[10px] text-gray-500 dark:text-gray-400 truncate leading-none mb-0.5">{s.name}</p>
                   <p className={`text-[10px] font-bold leading-none ${
                     pc > 0 ? 'text-emerald-600 dark:text-emerald-400'
                     : pc < 0 ? 'text-red-500 dark:text-red-400'
@@ -371,7 +371,7 @@ function GalleryCard({ entry, onOpen }) {
             {journalLabels.map((label, i) => (
               <div key={label} className="flex flex-col items-center gap-0.5">
                 <div className={`w-1.5 h-1.5 rounded-full ${filledFields[i]?.trim() ? 'bg-amber-400' : 'bg-gray-200 dark:bg-gray-700'}`} />
-                <span className="text-[9px] text-gray-400 font-medium">{label}</span>
+                <span className="text-[10px] text-gray-400 font-medium">{label}</span>
               </div>
             ))}
           </div>
@@ -423,7 +423,7 @@ function EntryCard({ entry, news, onOpen }) {
   const filledCount = [entry.pre_market, entry.during_market, entry.post_market, entry.market_surprise]
     .filter(v => v?.trim()).length
 
-  const LABEL = 'text-[10px] font-bold uppercase tracking-widest text-gray-400 dark:text-gray-500 mb-1'
+  const LABEL = 'text-[10px] font-semibold uppercase tracking-widest text-gray-400 dark:text-gray-500 mb-1'
   const NOTE  = 'text-[11px] text-gray-700 dark:text-gray-300 leading-relaxed whitespace-pre-wrap'
 
   return (
@@ -510,7 +510,7 @@ function EntryCard({ entry, news, onOpen }) {
               { label: 'Breadth',     value: entry.advancing != null ? `${entry.advancing}↑  ${entry.declining}↓  ${entry.unchanged}→` : '—', color: 'text-gray-800 dark:text-gray-200' },
             ].map(({ label, value, color }) => (
               <div key={label} className="bg-gray-50 dark:bg-gray-800/50 rounded-lg px-3 py-2">
-                <p className="text-[10px] text-gray-400 uppercase tracking-wide mb-0.5">{label}</p>
+                <p className="text-[10px] text-gray-400 uppercase tracking-widest mb-0.5">{label}</p>
                 <p className={`text-[12px] font-bold tabular-nums ${color}`}>{value}</p>
               </div>
             ))}

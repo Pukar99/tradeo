@@ -1,13 +1,11 @@
 // === Watchlist.jsx ===
 import { useState, useEffect, useCallback, useRef, useMemo } from 'react'
 import {
-  getWatchlist,
   addToWatchlist,
   updateWatchlist,
   removeFromWatchlist,
-  getMarketSymbols,
 } from '../../api'
-import { getBatchPrices } from '../../utils/globalCache'
+import { getBatchPrices, getWatchlist, getMarketSymbols, clearWatchlistCache } from '../../utils/globalCache'
 import { useContextMenu } from '../ContextMenu'
 import { useChatRefresh } from '../../utils/chatEvents'
 
@@ -193,7 +191,7 @@ function EditWatchlistModal({ item, onClose, onSaved }) {
       <div className="relative bg-white dark:bg-gray-900 rounded-2xl shadow-2xl border border-gray-200 dark:border-gray-700 w-full max-w-sm z-10 overflow-hidden">
         <div className="flex items-center justify-between px-4 py-3 border-b border-gray-100 dark:border-gray-800">
           <div>
-            <p className="text-[11px] font-bold uppercase tracking-widest text-gray-400">Edit</p>
+            <p className="text-[11px] font-semibold uppercase tracking-widest text-gray-400">Edit</p>
             <p className="text-[13px] font-bold text-gray-800 dark:text-gray-100 mt-0.5" translate="no">{item.symbol}</p>
           </div>
           <button onClick={onClose} className="w-7 h-7 flex items-center justify-center rounded-full hover:bg-gray-100 dark:hover:bg-gray-800 text-gray-400 text-lg">×</button>
@@ -202,7 +200,7 @@ function EditWatchlistModal({ item, onClose, onSaved }) {
           <div className="grid grid-cols-2 gap-2">
             {FIELDS.map(([label, key, type]) => (
               <div key={key}>
-                <label className="block text-[10px] font-bold uppercase tracking-widest text-gray-400 mb-1">{label}</label>
+                <label className="block text-[10px] font-semibold uppercase tracking-widest text-gray-400 mb-1">{label}</label>
                 <input
                   type={type}
                   value={form[key]}
@@ -213,7 +211,7 @@ function EditWatchlistModal({ item, onClose, onSaved }) {
             ))}
           </div>
           <div>
-            <label className="block text-[10px] font-bold uppercase tracking-widest text-gray-400 mb-1">Notes</label>
+            <label className="block text-[10px] font-semibold uppercase tracking-widest text-gray-400 mb-1">Notes</label>
             <input
               type="text"
               value={form.notes}
@@ -397,7 +395,7 @@ function AddForm({ symbol, refPrice, onAdd, onCancel }) {
             ['Watch High (Rs)',  'watch_high',  'number'],
           ].map(([label, key, type]) => (
             <div key={key}>
-              <label className="block text-[10px] font-bold uppercase tracking-widest text-gray-400 mb-1">{label}</label>
+              <label className="block text-[10px] font-semibold uppercase tracking-widest text-gray-400 mb-1">{label}</label>
               <input
                 type={type}
                 value={form[key]}
@@ -417,7 +415,7 @@ function AddForm({ symbol, refPrice, onAdd, onCancel }) {
         </div>
 
         <div>
-          <label className="block text-[10px] font-bold uppercase tracking-widest text-gray-400 mb-1">Notes</label>
+          <label className="block text-[10px] font-semibold uppercase tracking-widest text-gray-400 mb-1">Notes</label>
           <input
             type="text"
             value={form.notes}
@@ -519,6 +517,7 @@ function Watchlist() {
 
   const handleAdd = async (data) => {
     await addToWatchlist(data)
+    clearWatchlistCache()
     setAddState(null)
     await fetchWatchlist()
   }
@@ -528,6 +527,7 @@ function Watchlist() {
     setWatchlist(prev => prev.filter(w => w.id !== id))
     try {
       await removeFromWatchlist(id)
+      clearWatchlistCache()
     } catch {
       if (snapshot) setWatchlist(prev => [...prev, snapshot])
     }
@@ -556,7 +556,7 @@ function Watchlist() {
         <EditWatchlistModal
           item={editItem}
           onClose={() => setEditItem(null)}
-          onSaved={() => { setEditItem(null); fetchWatchlist() }}
+          onSaved={() => { clearWatchlistCache(); setEditItem(null); fetchWatchlist() }}
         />
       )}
 

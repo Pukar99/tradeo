@@ -1,7 +1,7 @@
 {
   "name": "tradeo",
   "private": true,
-  "version": "2.11.0",
+  "version": "2.11.1",
   "type": "module",
   "scripts": {
     "dev": "vite",
@@ -17,6 +17,8 @@
     "test:e2e:report": "playwright show-report",
     "test:perf": "k6 run tests/perf/load.js",
     "test:perf:burst": "k6 run --env SCENARIO=concurrent_burst tests/perf/load.js",
+    "lint": "eslint src",
+    "lint:ci": "eslint src --max-warnings 0",
     "test:ci": "vitest run --coverage && playwright test --reporter=list"
   },
   "dependencies": {
@@ -35,12 +37,18 @@
     "recharts": "^3.8.1"
   },
   "devDependencies": {
+    "@eslint/js": "^9.39.4",
     "@playwright/test": "^1.59.1",
     "@testing-library/jest-dom": "^6.9.1",
     "@testing-library/react": "^16.3.2",
     "@vitejs/plugin-react": "^4.3.1",
     "@vitest/coverage-v8": "^2.1.8",
     "autoprefixer": "^10.4.20",
+    "eslint": "^9.39.4",
+    "eslint-plugin-react": "^7.37.5",
+    "eslint-plugin-react-hooks": "^7.1.1",
+    "eslint-plugin-react-refresh": "^0.5.2",
+    "globals": "^17.6.0",
     "jsdom": "^29.0.2",
     "playwright": "^1.59.1",
     "postcss": "^8.4.47",

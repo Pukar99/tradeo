@@ -71,7 +71,7 @@ function TradeModal({ side, symbol, onClose, onSaved }) {
             ['Quantity', 'quantity', 'No. of shares'],
           ].map(([label, key, ph]) => (
             <div key={key}>
-              <label className="block text-[9px] font-bold uppercase tracking-widest text-gray-400 mb-1">{label}</label>
+              <label className="block text-[10px] font-semibold uppercase tracking-widest text-gray-400 mb-1">{label}</label>
               <input
                 type="number"
                 value={form[key]}
@@ -82,7 +82,7 @@ function TradeModal({ side, symbol, onClose, onSaved }) {
             </div>
           ))}
           <div>
-            <label className="block text-[9px] font-bold uppercase tracking-widest text-gray-400 mb-1">Notes</label>
+            <label className="block text-[10px] font-semibold uppercase tracking-widest text-gray-400 mb-1">Notes</label>
             <input
               type="text"
               value={form.notes}
@@ -202,17 +202,17 @@ function EditWatchItemForm({ item, onClose, onSaved }) {
       <div className="grid grid-cols-2 gap-2">
         {[['Watch Low (Rs)', 'watch_low', 'number'], ['Watch High (Rs)', 'watch_high', 'number'], ['Price Alert (Rs)', 'price_alert', 'number'], ['Alert Date', 'alert_date', 'date']].map(([label, key, type]) => (
           <div key={key}>
-            <label className="block text-[9px] font-bold uppercase tracking-widest text-gray-400 mb-1">{label}</label>
+            <label className="block text-[10px] font-semibold uppercase tracking-widest text-gray-400 mb-1">{label}</label>
             <input type={type} value={form[key]} onChange={e => setForm(f => ({ ...f, [key]: e.target.value }))} className={inp} />
           </div>
         ))}
       </div>
       <div>
-        <label className="block text-[9px] font-bold uppercase tracking-widest text-gray-400 mb-1">Notes</label>
+        <label className="block text-[10px] font-semibold uppercase tracking-widest text-gray-400 mb-1">Notes</label>
         <input type="text" value={form.notes} onChange={e => setForm(f => ({ ...f, notes: e.target.value }))} placeholder="Why are you watching this?" className={inp} />
       </div>
       <div>
-        <label className="block text-[9px] font-bold uppercase tracking-widest text-gray-400 mb-1">Category</label>
+        <label className="block text-[10px] font-semibold uppercase tracking-widest text-gray-400 mb-1">Category</label>
         <select value={form.category} onChange={e => setForm(f => ({ ...f, category: e.target.value }))} className={inp}>
           <option value="active">Active</option>
           <option value="pre">Pre-Watch</option>

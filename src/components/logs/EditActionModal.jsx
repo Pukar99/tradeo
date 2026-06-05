@@ -3,11 +3,10 @@
 import { useState, useCallback } from 'react'
 import { useEscapeKey } from '../../hooks/useEscapeKey'
 import { updateTradeAction } from '../../api'
-import { fmt } from '../../utils/format'
+import { fmt, today } from '../../utils/format'
+import { EMOTIONAL_STATES, EXIT_REASONS } from './tradeConstants'
 
 const MARKET_CONDITIONS  = ['Bullish', 'Bearish', 'Sideways', 'Volatile', 'Low Vol']
-const EMOTIONAL_STATES   = ['Confident', 'Calm', 'Anxious', 'Fearful', 'Greedy', 'FOMO', 'Neutral']
-const EXIT_REASONS       = ['Target Hit', 'SL Hit', 'Manual Exit', 'Reversal Signal', 'Time Stop']
 
 const INPUT = 'w-full px-3 py-2 text-[12px] rounded-lg border border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-800/80 text-gray-900 dark:text-gray-100 placeholder-gray-400 focus:outline-none focus:ring-1 focus:ring-blue-500 focus:border-blue-500 transition-all'
 const LABEL = 'block text-[10px] font-semibold uppercase tracking-widest text-gray-400 dark:text-gray-500 mb-1.5'
@@ -40,8 +39,6 @@ export default function EditActionModal({ action, onClose, onSaved }) {
 
   const set    = (k, v) => setForm(f => ({ ...f, [k]: v }))
   const toggle = (k, v) => setForm(f => ({ ...f, [k]: f[k] === v ? '' : v }))
-  const today  = () => new Date().toISOString().split('T')[0]
-
   const handleSubmit = useCallback(async e => {
     e.preventDefault()
     setError(null)

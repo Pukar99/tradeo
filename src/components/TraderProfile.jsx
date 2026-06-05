@@ -29,7 +29,7 @@ function StatPill({ label, value, color = 'text-gray-700 dark:text-gray-200' }) 
   return (
     <div className="flex flex-col items-center bg-gray-50 dark:bg-gray-800/60 rounded-xl px-3 py-2 border border-gray-100 dark:border-gray-800">
       <span className={`text-[13px] font-bold ${color}`}>{value}</span>
-      <span className="text-[10px] text-gray-400 uppercase tracking-widest mt-0.5">{label}</span>
+      <span className="text-[10px] font-semibold text-gray-400 uppercase tracking-widest mt-0.5">{label}</span>
     </div>
   )
 }

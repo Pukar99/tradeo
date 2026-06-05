@@ -146,13 +146,11 @@ export const getTopMovers       = (date)          => API.get('/api/market/top-mo
 export const getDaySummary      = (date)          => API.get('/api/market/day-summary', { params: { date } })
 export const getDayFull         = (date)          => API.get('/api/market/day-full', { params: { date } })
 export const getNepseChart      = (range = '1m')  => API.get('/api/market/nepse-chart', { params: { range } })
-export const getAIReport        = ()              => API.get('/api/market/ai-report')
 export const getIPOs            = ()              => API.get('/api/market/ipos')
 export const getMarketNews      = ()              => API.get('/api/market/news')
 export const triggerBackfill    = (date)          => API.post('/api/market/backfill', { date })
 export const getSMCScan         = (params)        => API.get('/api/smc/scan', { params })
 export const getPriceActionScan = (params)        => API.get('/api/market/price-action', { params })
-export const getWhatIf          = (params)        => API.get('/api/market/what-if', { params })
 
 
 // =============================================================================
@@ -261,9 +259,6 @@ export const getSectorMonth       = (params, cfg) => API.get('/api/insight/secto
 export const scanBreakdown        = (data)        => API.post('/api/breakdown/scan', data)
 export const getSectorYear        = (params, cfg) => API.get('/api/breakdown/sector-year', { params, ...cfg })
 export const getSectorCycles      = (data, cfg)   => API.post('/api/breakdown/sector-cycles', data, cfg)
-export const getSectorHistory     = (params)      => API.get('/api/breakdown/sector-history', { params })
-export const getStockReturns      = (params)      => API.get('/api/breakdown/stock-returns', { params })
-export const getStockMonthDetail  = (params)      => API.get('/api/breakdown/stock-month-detail', { params })
 export const getSectorMonthStocks = (params, cfg) => API.get('/api/breakdown/sector-month-stocks', { params, ...cfg })
 export const getMarketCycles      = (params, cfg) => API.get('/api/breakdown/market-cycles', { params, ...cfg })
 export const runDropAnalysis      = (data, cfg)   => API.post('/api/breakdown/drop-analysis', data, cfg)

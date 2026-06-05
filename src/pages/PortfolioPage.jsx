@@ -5,6 +5,7 @@ import { useAuth } from '../context/AuthContext'
 import { useLanguage } from '../context/LanguageContext'
 import { getPositions, getTradeActions, getBatchPrices } from '../utils/globalCache'
 import { useChatRefresh } from '../utils/chatEvents'
+import { fmtRs, fmtPct } from '../utils/format'
 import {
   PieChart, Pie, Cell, Tooltip, ResponsiveContainer,
   BarChart, Bar, XAxis, YAxis, ReferenceLine,
@@ -13,10 +14,6 @@ import {
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
 
-const fmtRs  = (n, forex = false) => forex
-  ? `$${Math.abs(n).toFixed(2)}`
-  : `Rs.${Math.abs(Math.round(n)).toLocaleString()}`
-const fmtPct = (n) => `${n >= 0 ? '+' : ''}${parseFloat(n).toFixed(2)}%`
 const signCls = (n) => n >= 0 ? 'text-emerald-500' : 'text-red-400'
 const signBg  = (n) => n >= 0 ? 'bg-emerald-50 dark:bg-emerald-900/20' : 'bg-red-50 dark:bg-red-900/20'
 
@@ -257,7 +254,7 @@ function MonthlyPnlChart({ closedTrades }) {
       ) : (
         <ResponsiveContainer width="100%" height={110}>
           <BarChart data={months} barSize={14} margin={{ top: 4, right: 0, left: 0, bottom: 0 }}>
-            <XAxis dataKey="label" axisLine={false} tickLine={false} tick={{ fontSize: 8, fill: '#9ca3af' }} dy={4} />
+            <XAxis dataKey="label" axisLine={false} tickLine={false} tick={{ fontSize: 9, fill: '#9ca3af' }} dy={4} />
             <YAxis hide domain={[-maxAbs * 1.2, maxAbs * 1.2]} />
             <ReferenceLine y={0} stroke="#e5e7eb" strokeWidth={1} />
             <Tooltip
@@ -375,8 +372,6 @@ function PortfolioPage() {
 
   const { user }   = useAuth()
   const navigate   = useNavigate()
-  const fmtC = (n) => `Rs.${Math.abs(Math.round(n)).toLocaleString()}`
-
   const fetchData = useCallback(async () => {
     try {
       const [posRes, actRes] = await Promise.all([
@@ -528,9 +523,9 @@ function PortfolioPage() {
   const sortVal = (p) => {
     if (sort.col === 'last_action_at') return p.last_action_at ?? ''
     if (sort.col === 'symbol')         return p.symbol ?? ''
-    if (sort.col === 'wacc')           return Number(p.wacc) ?? 0
+    if (sort.col === 'wacc')           return Number(p.wacc) || 0
     if (sort.col === 'pnl')            return closedPnlByTrade[p.trade_id] ?? 0
-    if (sort.col === 'qty')            return Number(p.total_qty) ?? 0
+    if (sort.col === 'qty')            return Number(p.total_qty) || 0
     return ''
   }
   const histPositions = positions
@@ -657,7 +652,7 @@ function PortfolioPage() {
           {[
             {
               label: 'Total P&L',
-              value: `${totalPnl >= 0 ? '+' : ''}${fmtC(totalPnl)}`,
+              value: `${totalPnl >= 0 ? '+' : ''}${fmtRs(totalPnl)}`,
               cls: signCls(totalPnl),
               sub: 'realized + unrealized',
               accent: totalPnl >= 0 ? 'border-t-emerald-400' : 'border-t-red-400',
@@ -668,23 +663,23 @@ function PortfolioPage() {
             },
             {
               label: 'Realized',
-              value: `${totalRealized >= 0 ? '+' : ''}${fmtC(totalRealized)}`,
+              value: `${totalRealized >= 0 ? '+' : ''}${fmtRs(totalRealized)}`,
               cls: signCls(totalRealized),
               sub: `${closedTrades.length} closed trades`,
               accent: 'border-t-blue-400',
               detail: [
-                bestTrade  ? { label: 'Best',  value: `+${fmtC(bestTrade.realized_pnl)}`,  cls: 'text-emerald-500' } : null,
-                worstTrade ? { label: 'Worst', value: fmtC(worstTrade.realized_pnl), cls: 'text-red-400' } : null,
+                bestTrade  ? { label: 'Best',  value: `+${fmtRs(bestTrade.realized_pnl)}`,  cls: 'text-emerald-500' } : null,
+                worstTrade ? { label: 'Worst', value: fmtRs(worstTrade.realized_pnl), cls: 'text-red-400' } : null,
               ].filter(Boolean),
             },
             {
               label: 'Unrealized',
-              value: `${totalUnrealized >= 0 ? '+' : ''}${fmtC(totalUnrealized)}`,
+              value: `${totalUnrealized >= 0 ? '+' : ''}${fmtRs(totalUnrealized)}`,
               cls: signCls(totalUnrealized),
               sub: `${openPositions.length} open${ltpLoading ? ' · updating…' : ''}`,
               accent: 'border-t-violet-400',
               detail: [
-                { label: 'Invested', value: fmtC(totalInvested), cls: 'text-gray-600 dark:text-gray-300' },
+                { label: 'Invested', value: fmtRs(totalInvested), cls: 'text-gray-600 dark:text-gray-300' },
                 currentDrawdown > 0 ? { label: 'Max DD', value: `${maxDrawdown.toFixed(1)}%`, cls: 'text-red-400' } : null,
               ].filter(Boolean),
             },
@@ -699,7 +694,7 @@ function PortfolioPage() {
                 <div className="flex items-center gap-3 border-t border-gray-50 dark:border-gray-800 pt-2.5">
                   {s.detail.map((d, j) => (
                     <div key={j}>
-                      <p className="text-[10px] text-gray-400 uppercase tracking-widest">{d.label}</p>
+                      <p className="text-[10px] font-semibold text-gray-400 uppercase tracking-widest">{d.label}</p>
                       <p className={`text-[11px] font-bold tabular-nums ${d.cls}`}>{d.value}</p>
                     </div>
                   ))}
@@ -713,7 +708,7 @@ function PortfolioPage() {
       {/* ── Row 2: Top 10 recent trades ─────────────────────────────────────── */}
       <div className="bg-white dark:bg-gray-900 rounded-2xl border border-gray-100 dark:border-gray-800 overflow-hidden">
         <div className="px-5 py-3.5 border-b border-gray-100 dark:border-gray-800 flex items-center justify-between">
-          <p className="text-[11px] font-semibold uppercase tracking-widest text-gray-400">Recent Trades</p>
+          <p className="text-[10px] font-semibold uppercase tracking-widest text-gray-400">Recent Trades</p>
           <span className="text-[10px] text-gray-400">last {Math.min(top10Recent.length, 10)} entries</span>
         </div>
         {top10Recent.length === 0 ? (
@@ -729,7 +724,7 @@ function PortfolioPage() {
               <thead>
                 <tr className="border-b border-gray-50 dark:border-gray-800/60 bg-gray-50/30 dark:bg-gray-800/10">
                   {['Date', 'Symbol', 'Action', 'Qty', 'Price', 'P&L', 'Setup'].map((h, i) => (
-                    <th key={i} className="px-4 py-2 text-left text-[10px] font-bold text-gray-400 uppercase tracking-widest">{h}</th>
+                    <th key={i} className="px-4 py-2.5 text-left text-[10px] font-semibold text-gray-400 uppercase tracking-widest">{h}</th>
                   ))}
                 </tr>
               </thead>
@@ -758,12 +753,12 @@ function PortfolioPage() {
                       </td>
                       <td className="px-4 py-2.5 text-[10px] text-gray-600 dark:text-gray-400 tabular-nums">{row.quantity}</td>
                       <td className="px-4 py-2.5 text-[10px] font-medium text-gray-700 dark:text-gray-300 tabular-nums">
-                        {fmtC(parseFloat(row.entry_price || row.exit_price) || 0)}
+                        {fmtRs(parseFloat(row.entry_price || row.exit_price) || 0)}
                       </td>
                       <td className="px-4 py-2.5">
                         {isClose && pnl !== 0 ? (
                           <span className={`text-[11px] font-bold tabular-nums ${signCls(pnl)}`}>
-                            {pnl >= 0 ? '+' : ''}{fmtC(pnl)}
+                            {pnl >= 0 ? '+' : ''}{fmtRs(pnl)}
                           </span>
                         ) : <span className="text-[10px] text-gray-300 dark:text-gray-700">—</span>}
                       </td>
@@ -783,7 +778,7 @@ function PortfolioPage() {
       <div className="bg-white dark:bg-gray-900 rounded-2xl border border-gray-100 dark:border-gray-800 overflow-hidden">
         <div className="px-5 py-3.5 border-b border-gray-100 dark:border-gray-800 flex items-center justify-between">
           <div className="flex items-center gap-2">
-            <p className="text-[11px] font-semibold uppercase tracking-widest text-gray-400">Holdings</p>
+            <p className="text-[10px] font-semibold uppercase tracking-widest text-gray-400">Holdings</p>
             <span className="text-[10px] font-semibold px-1.5 py-0.5 rounded-full bg-blue-50 dark:bg-blue-900/20 text-blue-500">{openPositions.length}</span>
           </div>
           {ltpLoading && (
@@ -808,7 +803,7 @@ function PortfolioPage() {
                 <thead>
                   <tr className="border-b border-gray-100 dark:border-gray-800">
                     {['Symbol', 'Dir', 'Qty / WACC', 'LTP', 'P&L', 'Invested', 'SL / TP', ''].map((h, i) => (
-                      <th key={i} className="px-3 py-2.5 text-left text-[10px] font-bold text-gray-400 uppercase tracking-widest first:px-4">
+                      <th key={i} className="px-3 py-2.5 text-left text-[10px] font-semibold text-gray-400 uppercase tracking-widest first:px-4">
                         {h}
                       </th>
                     ))}
@@ -858,13 +853,13 @@ function PortfolioPage() {
                           {p.unrealizedPnl != null ? (
                             <div>
                               <p className={`text-[11px] font-bold tabular-nums ${signCls(pnl)}`}>
-                                {pnl >= 0 ? '+' : ''}{fmtC(pnl)}
+                                {pnl >= 0 ? '+' : ''}{fmtRs(pnl)}
                               </p>
                               <p className={`text-[10px] font-medium ${signCls(pnlPct)}`}>{fmtPct(pnlPct)}</p>
                             </div>
                           ) : <span className="text-[10px] text-gray-300 dark:text-gray-700">—</span>}
                         </td>
-                        <td className="px-3 py-3 text-[10px] text-gray-400 tabular-nums">{fmtC(invested)}</td>
+                        <td className="px-3 py-3 text-[10px] text-gray-400 tabular-nums">{fmtRs(invested)}</td>
                         <td className="px-3 py-3">
                           <div className="text-[10px] space-y-0.5">
                             {p.sl ? <p className="text-red-400">SL {p.sl}</p> : <p className="text-gray-300 dark:text-gray-700">No SL</p>}
@@ -887,10 +882,10 @@ function PortfolioPage() {
             </div>
             <div className="px-5 py-3 border-t border-gray-100 dark:border-gray-800 flex items-center justify-between">
               <span className="text-[10px] text-gray-400">
-                Total invested: <span className="font-semibold text-gray-700 dark:text-gray-300">{fmtC(totalInvested)}</span>
+                Total invested: <span className="font-semibold text-gray-700 dark:text-gray-300">{fmtRs(totalInvested)}</span>
               </span>
               <span className={`text-[11px] font-bold ${signCls(totalUnrealized)}`}>
-                {totalUnrealized >= 0 ? '+' : ''}{fmtC(totalUnrealized)} unrealized
+                {totalUnrealized >= 0 ? '+' : ''}{fmtRs(totalUnrealized)} unrealized
               </span>
             </div>
           </>
@@ -901,7 +896,7 @@ function PortfolioPage() {
       <div className="bg-white dark:bg-gray-900 rounded-2xl border border-gray-100 dark:border-gray-800 overflow-hidden">
 
         <div className="px-5 py-3.5 border-b border-gray-100 dark:border-gray-800 flex items-center gap-3 flex-wrap">
-          <p className="text-[11px] font-semibold uppercase tracking-widest text-gray-400">Trade History</p>
+          <p className="text-[10px] font-semibold uppercase tracking-widest text-gray-400">Trade History</p>
           <div className="ml-auto flex items-center gap-2 flex-wrap">
             <div className="relative">
               <svg className="w-3 h-3 text-gray-400 absolute left-2 top-1/2 -translate-y-1/2" fill="none" viewBox="0 0 24 24" stroke="currentColor">
@@ -963,7 +958,7 @@ function PortfolioPage() {
                     <th
                       key={i}
                       onClick={() => c.key && toggleSort(c.key)}
-                      className={`px-4 py-2.5 text-left text-[10px] font-bold text-gray-400 uppercase tracking-widest select-none whitespace-nowrap ${c.sortable ? 'cursor-pointer hover:text-gray-600 dark:hover:text-gray-300 transition-colors' : ''}`}
+                      className={`px-4 py-2.5 text-left text-[10px] font-semibold text-gray-400 uppercase tracking-widest select-none whitespace-nowrap ${c.sortable ? 'cursor-pointer hover:text-gray-600 dark:hover:text-gray-300 transition-colors' : ''}`}
                     >
                       {c.label}{c.key && <SortIcon col={c.key} sort={sort} />}
                     </th>
@@ -992,7 +987,7 @@ function PortfolioPage() {
                       </td>
                       <td className="px-4 py-3 text-[10px] text-gray-600 dark:text-gray-400 tabular-nums">{p.total_qty}</td>
                       <td className="px-4 py-3 text-[10px] font-medium text-gray-700 dark:text-gray-300 tabular-nums whitespace-nowrap">
-                        {fmtC(parseFloat(p.wacc) || 0)}
+                        {fmtRs(parseFloat(p.wacc) || 0)}
                       </td>
                       <td className="px-4 py-3">
                         <div className="text-[10px] space-y-0.5">
@@ -1004,7 +999,7 @@ function PortfolioPage() {
                       <td className="px-4 py-3 whitespace-nowrap">
                         {(p.status === 'CLOSED' || p.status === 'PARTIAL') ? (
                           <span className={`text-[11px] font-bold tabular-nums ${signCls(pnl)}`}>
-                            {pnl >= 0 ? '+' : ''}{fmtC(pnl)}
+                            {pnl >= 0 ? '+' : ''}{fmtRs(pnl)}
                           </span>
                         ) : <span className="text-[10px] text-gray-300 dark:text-gray-700">—</span>}
                       </td>

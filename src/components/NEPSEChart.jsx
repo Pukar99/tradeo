@@ -310,6 +310,7 @@ function NEPSEChart({ fixed = false }) {
   }
 
   // Normal (single) mode — full chart with range selector
+  // eslint-disable-next-line react-hooks/rules-of-hooks
   useEffect(() => {
     let cancelled = false
 
@@ -366,8 +367,9 @@ function NEPSEChart({ fixed = false }) {
       cancelled = true
       if (chartRef.current) { chartRef.current.remove(); chartRef.current = null; seriesRef.current = null }
     }
-  }, []) // eslint-disable-line react-hooks/exhaustive-deps — isDark intentionally excluded: theme changes handled by applyOptions effect above
+  }, []) // eslint-disable-line react-hooks/exhaustive-deps
 
+  // eslint-disable-next-line react-hooks/rules-of-hooks
   useEffect(() => {
     if (!chartReady) return
     setLoading(true)

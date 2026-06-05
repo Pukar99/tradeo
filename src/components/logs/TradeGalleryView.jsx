@@ -3,9 +3,10 @@
 import { useState, useMemo, useEffect, useRef, useCallback } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { useTheme } from '../../context/ThemeContext'
-import { getStockChart, getTradeHistory } from '../../api'
+import { getStockChart } from '../../api'
+import { getTradeHistory } from '../../utils/globalCache'
 import { useContextMenu } from '../ContextMenu'
-import { fmt } from '../../utils/format'
+import { fmt, today } from '../../utils/format'
 
 // ── Module-level chart data cache ─────────────────────────────────────────────
 const _cache = new Map()
@@ -20,8 +21,6 @@ function shiftDate(dateStr, days) {
   return d.toISOString().slice(0, 10)
 }
 
-// Today as YYYY-MM-DD
-function today() { return new Date().toISOString().slice(0, 10) }
 
 // Marker shape + color per action type
 const ACTION_MARKER = {
@@ -592,7 +591,7 @@ function GalleryCard({ position, ltp, onAdd, onPartialExit, onClose, onDelete })
 function StatBox({ label, value, mono, color }) {
   return (
     <div className="bg-gray-50 dark:bg-gray-800/50 rounded-xl px-2.5 py-2">
-      <div className="text-[10px] text-gray-400 dark:text-gray-500 uppercase tracking-wide mb-0.5 truncate">{label}</div>
+      <div className="text-[10px] font-semibold text-gray-400 dark:text-gray-500 uppercase tracking-wide mb-0.5 truncate">{label}</div>
       <div className={`text-[12px] ${mono ? 'font-mono' : 'font-semibold'} truncate ${color || 'text-gray-900 dark:text-gray-200'}`}>{value}</div>
     </div>
   )

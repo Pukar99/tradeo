@@ -92,7 +92,7 @@ function nameSwings(raw) {
 
 // ── Shared design tokens ──────────────────────────────────────────────────────
 const CARD   = 'bg-white dark:bg-gray-900 rounded-2xl border border-gray-100 dark:border-gray-800'
-const LABEL  = 'text-[10px] font-bold uppercase tracking-widest text-gray-400'
+const LABEL  = 'text-[10px] font-semibold uppercase tracking-widest text-gray-400'
 const STITLE = 'text-[11px] font-semibold text-gray-700 dark:text-gray-200'
 const SVAL   = 'text-[13px] font-bold tabular-nums'
 
@@ -768,7 +768,7 @@ function CycleRow({ cycle, nRet, sRet, symbol, max, isActive, isStart, onClick }
         <div className="flex-1 min-w-0 space-y-0.5">
           {/* NEPSE row */}
           <div className="flex items-center gap-1.5">
-            <span className="w-6 shrink-0 text-[9px] font-bold uppercase tracking-wider text-blue-400">NEP</span>
+            <span className="w-6 shrink-0 text-[10px] font-bold uppercase tracking-wider text-blue-400">NEP</span>
             <div className="relative flex-1 h-2 bg-gray-100 dark:bg-gray-800 rounded-sm overflow-hidden">
               <div className="absolute inset-y-0 left-1/2 w-px bg-gray-300 dark:bg-gray-600" />
               <div className="absolute top-0 h-full rounded-sm"
@@ -781,7 +781,7 @@ function CycleRow({ cycle, nRet, sRet, symbol, max, isActive, isStart, onClick }
           {/* Stock row */}
           {symbol && (
             <div className="flex items-center gap-1.5">
-              <span className="w-6 shrink-0 text-[9px] font-bold uppercase tracking-wider text-amber-500 truncate">{symbol.slice(0, 4)}</span>
+              <span className="w-6 shrink-0 text-[10px] font-bold uppercase tracking-wider text-amber-500 truncate">{symbol.slice(0, 4)}</span>
               <div className="relative flex-1 h-2 bg-gray-100 dark:bg-gray-800 rounded-sm overflow-hidden">
                 <div className="absolute inset-y-0 left-1/2 w-px bg-gray-300 dark:bg-gray-600" />
                 <div className="absolute top-0 h-full rounded-sm"

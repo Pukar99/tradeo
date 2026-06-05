@@ -167,7 +167,7 @@ function AppContent() {
     }
     window.addEventListener('mousemove', handler, { passive: true })
     return () => window.removeEventListener('mousemove', handler)
-  }, []) // eslint-disable-line react-hooks/exhaustive-deps — uses refs, no deps needed
+  }, []) // eslint-disable-line react-hooks/exhaustive-deps
 
   // Reset auto-hide whenever route changes (page unmount handles deactivate,
   // but guard against edge cases where navigate happens without full unmount)

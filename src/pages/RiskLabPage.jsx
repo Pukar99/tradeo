@@ -28,7 +28,7 @@ const LABEL = "block text-[10px] font-semibold uppercase tracking-wider text-gra
 function StatCard({ label, value, color = 'text-gray-800 dark:text-gray-100' }) {
   return (
     <div className="bg-gray-50 dark:bg-gray-800/60 rounded-xl p-3 text-center border border-gray-100 dark:border-gray-800">
-      <p className="text-[10px] uppercase tracking-wider text-gray-400 mb-0.5">{label}</p>
+      <p className="text-[10px] font-semibold uppercase tracking-wider text-gray-400 mb-0.5">{label}</p>
       <p className={`text-[13px] font-bold ${color}`}>{value}</p>
     </div>
   )
@@ -240,7 +240,7 @@ function NEPSECalculator() {
                   </p>
                 </div>
                 <div className="text-right">
-                  <p className="text-[10px] uppercase tracking-wider text-gray-400">Break-even</p>
+                  <p className="text-[10px] font-semibold uppercase tracking-wider text-gray-400">Break-even</p>
                   <p className="text-base font-bold text-gray-800 dark:text-gray-100 mt-0.5">Rs.{result.breakEven}</p>
                   {result.bonusShares > 0 && (
                     <p className="text-[10px] text-blue-400">Adj. Rs.{result.adjustedCostPerShare}</p>
@@ -254,7 +254,7 @@ function NEPSECalculator() {
                   { label: 'Charges', value: `Rs.${Math.round(result.totalCharges).toLocaleString()}`, red: true },
                 ].map((s, i) => (
                   <div key={i} className="bg-white/60 dark:bg-gray-900/60 rounded-xl p-2 text-center border border-white/50 dark:border-gray-800/50">
-                    <p className="text-[10px] text-gray-400 uppercase tracking-wider">{s.label}</p>
+                    <p className="text-[10px] font-semibold text-gray-400 uppercase tracking-wider">{s.label}</p>
                     <p className={`text-[11px] font-bold mt-0.5 ${s.red ? 'text-red-400' : 'text-gray-700 dark:text-gray-200'}`}>{s.value}</p>
                   </div>
                 ))}

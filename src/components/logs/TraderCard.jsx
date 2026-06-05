@@ -1,5 +1,6 @@
 // === TraderCard.jsx — shareable performance card (dark, forwardRef for html2canvas PNG export) ===
 import { forwardRef } from 'react'
+import { fmtRsSigned as fmtPnl } from '../../utils/format'
 
 // Equity sparkline as a pure SVG — no Recharts dep, renders correctly in html2canvas
 function Sparkline({ equityCurve }) {
@@ -42,9 +43,6 @@ function Sparkline({ equityCurve }) {
 // Always dark card — theme-independent (for PNG export)
 // Uses forwardRef so AuditTab can pass ref for html2canvas capture
 const TraderCard = forwardRef(function TraderCard({ kpis, dateLabel, user }, ref) {
-  const fmtPnl = (n) =>
-    `${n >= 0 ? '+' : '−'}Rs.${Math.abs(Math.round(n)).toLocaleString()}`
-
   const name    = user?.name || 'Trader'
   const initials = name.split(' ').map(w => w[0]?.toUpperCase() || '').slice(0, 2).join('')
   const avatar  = user?.avatar_url || null

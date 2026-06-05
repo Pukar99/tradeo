@@ -3,14 +3,14 @@ import { useState, useEffect, useCallback, useMemo, useRef, useId } from 'react'
 import { useAuth } from '../../context/AuthContext'
 import { getTradeActions } from '../../utils/globalCache'
 import TraderCard from './TraderCard'
-import { nepseCharges, nepseCGT } from '../../utils/format'
+import { nepseCharges, nepseCGT, fmtRs as fmtAbs, fmtRsSigned as fmtPnl, today } from '../../utils/format'
 
 // ── KPI card ──────────────────────────────────────────────────────────────────
 function KpiCard({ label, value, valueClass = 'text-gray-900 dark:text-white', sub, icon }) {
   return (
     <div className="bg-white dark:bg-gray-900 rounded-xl border border-gray-100 dark:border-gray-800 px-4 py-3.5 flex flex-col gap-0.5">
       <div className="flex items-center justify-between mb-1">
-        <p className="text-[10px] uppercase tracking-widest font-bold text-gray-400">{label}</p>
+        <p className="text-[10px] uppercase tracking-widest font-semibold text-gray-400">{label}</p>
         {icon && <span className="text-[13px]">{icon}</span>}
       </div>
       <p className={`text-[15px] font-black tracking-tight tabular-nums leading-tight ${valueClass}`}>{value}</p>
@@ -173,7 +173,7 @@ ${cardDataUrl ? `<img src="${cardDataUrl}" class="card-img" alt="Trader Card"/>`
         <div className="p-5 space-y-5">
           {/* Card preview */}
           <div>
-            <p className="text-[10px] uppercase tracking-widest font-bold text-gray-400 mb-3">Trader Card Preview</p>
+            <p className="text-[10px] uppercase tracking-widest font-semibold text-gray-400 mb-3">Trader Card Preview</p>
             <div className="flex justify-center">
               <TraderCard ref={cardRef} kpis={kpis} trades={trades} dateLabel={dateLabel} user={user} />
             </div>
@@ -216,12 +216,12 @@ ${cardDataUrl ? `<img src="${cardDataUrl}" class="card-img" alt="Trader Card"/>`
 
 // ── Range → from/to ──────────────────────────────────────────────────────────
 function rangeToFromTo(range) {
-  const today = new Date().toISOString().slice(0, 10)
-  if (range === '1M') return { from: today.slice(0, 7) + '-01', to: today }
-  if (range === '3M') { const d = new Date(); d.setMonth(d.getMonth() - 3); return { from: d.toISOString().slice(0, 10), to: today } }
-  if (range === '6M') { const d = new Date(); d.setMonth(d.getMonth() - 6); return { from: d.toISOString().slice(0, 10), to: today } }
-  if (range === '1Y') return { from: `${new Date().getFullYear()}-01-01`, to: today }
-  return { from: null, to: today }
+  const todayStr = today()
+  if (range === '1M') return { from: todayStr.slice(0, 7) + '-01', to: todayStr }
+  if (range === '3M') { const d = new Date(); d.setMonth(d.getMonth() - 3); return { from: d.toISOString().slice(0, 10), to: todayStr } }
+  if (range === '6M') { const d = new Date(); d.setMonth(d.getMonth() - 6); return { from: d.toISOString().slice(0, 10), to: todayStr } }
+  if (range === '1Y') return { from: `${new Date().getFullYear()}-01-01`, to: todayStr }
+  return { from: null, to: todayStr }
 }
 
 // ── Main AuditTab ─────────────────────────────────────────────────────────────
@@ -402,9 +402,6 @@ export default function AuditTab({ range = '1M', symbol = 'all', onSymbolsLoaded
     }
   }, [rangedTrades, closed, entryDateMap])
 
-  const fmtPnl = (n) => `${n >= 0 ? '+' : '−'}Rs.${Math.abs(Math.round(n)).toLocaleString()}`
-  const fmtAbs = (n) => `Rs.${Math.abs(Math.round(n)).toLocaleString()}`
-
   const pnlColor = (n) => n > 0 ? 'text-emerald-500' : n < 0 ? 'text-red-400' : 'text-gray-400'
 
   const dateLabel = !appliedFrom
@@ -466,13 +463,13 @@ export default function AuditTab({ range = '1M', symbol = 'all', onSymbolsLoaded
             {scriptKpis && (
               <div className="flex items-center gap-4">
                 <div className="text-right">
-                  <p className="text-[10px] uppercase tracking-widest font-bold text-gray-400">Win Rate</p>
+                  <p className="text-[10px] uppercase tracking-widest font-semibold text-gray-400">Win Rate</p>
                   <p className={`text-[13px] font-bold tabular-nums ${scriptKpis.winRate >= 50 ? 'text-emerald-500' : 'text-red-400'}`}>
                     {scriptKpis.winRate.toFixed(0)}% ({scriptKpis.winCount}/{scriptKpis.count})
                   </p>
                 </div>
                 <div className="text-right">
-                  <p className="text-[10px] uppercase tracking-widest font-bold text-gray-400">Net P&L</p>
+                  <p className="text-[10px] uppercase tracking-widest font-semibold text-gray-400">Net P&L</p>
                   <p className={`text-[13px] font-bold tabular-nums ${scriptKpis.total >= 0 ? 'text-emerald-500' : 'text-red-400'}`}>
                     {scriptKpis.total >= 0 ? '+' : '−'}Rs.{Math.abs(Math.round(scriptKpis.total)).toLocaleString()}
                   </p>
@@ -490,7 +487,7 @@ export default function AuditTab({ range = '1M', symbol = 'all', onSymbolsLoaded
                 <thead>
                   <tr className="border-b border-gray-100 dark:border-gray-800">
                     {['Date', 'Action', 'Qty', 'Entry', 'Exit', 'Hold', 'P&L'].map(h => (
-                      <th key={h} className="text-left px-4 py-2 text-[10px] uppercase tracking-widest font-bold text-gray-400">{h}</th>
+                      <th key={h} className="text-left px-4 py-2 text-[10px] uppercase tracking-widest font-semibold text-gray-400">{h}</th>
                     ))}
                   </tr>
                 </thead>
@@ -538,7 +535,7 @@ export default function AuditTab({ range = '1M', symbol = 'all', onSymbolsLoaded
         <>
           {/* ── KPI Grid Row 1: Core ── */}
           <div>
-            <p className="text-[10px] uppercase tracking-widest font-bold text-gray-400 mb-2">Performance</p>
+            <p className="text-[10px] uppercase tracking-widest font-semibold text-gray-400 mb-2">Performance</p>
             <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
               <KpiCard
                 label="Total Trades"
@@ -572,7 +569,7 @@ export default function AuditTab({ range = '1M', symbol = 'all', onSymbolsLoaded
 
           {/* ── KPI Grid Row 2: P&L Breakdown ── */}
           <div>
-            <p className="text-[10px] uppercase tracking-widest font-bold text-gray-400 mb-2">P&L Breakdown</p>
+            <p className="text-[10px] uppercase tracking-widest font-semibold text-gray-400 mb-2">P&L Breakdown</p>
             <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
               <KpiCard
                 label="Gross Profit"
@@ -597,7 +594,7 @@ export default function AuditTab({ range = '1M', symbol = 'all', onSymbolsLoaded
 
           {/* ── KPI Grid Row 3: Tax & Fees ── */}
           <div>
-            <p className="text-[10px] uppercase tracking-widest font-bold text-gray-400 mb-2">Tax & Fees (Nepal)</p>
+            <p className="text-[10px] uppercase tracking-widest font-semibold text-gray-400 mb-2">Tax & Fees (Nepal)</p>
               <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
                 <KpiCard
                   label="Est. Broker Fees"
@@ -625,7 +622,7 @@ export default function AuditTab({ range = '1M', symbol = 'all', onSymbolsLoaded
 
           {/* ── KPI Grid Row 4: Risk & Timing ── */}
           <div>
-            <p className="text-[10px] uppercase tracking-widest font-bold text-gray-400 mb-2">Risk & Timing</p>
+            <p className="text-[10px] uppercase tracking-widest font-semibold text-gray-400 mb-2">Risk & Timing</p>
             <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
               <KpiCard
                 label="Avg R:R"
@@ -656,14 +653,14 @@ export default function AuditTab({ range = '1M', symbol = 'all', onSymbolsLoaded
           {/* ── Best / Worst ── */}
           {(kpis.bestTrade || kpis.worstTrade) && (
             <div>
-              <p className="text-[10px] uppercase tracking-widest font-bold text-gray-400 mb-2">Best & Worst Trade</p>
+              <p className="text-[10px] uppercase tracking-widest font-semibold text-gray-400 mb-2">Best & Worst Trade</p>
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
                 {kpis.bestTrade && (
                   <div className="bg-white dark:bg-gray-900 rounded-xl border border-emerald-100 dark:border-emerald-800/30 px-4 py-3 flex items-center justify-between">
                     <div className="flex items-center gap-3">
                       <div className="w-1.5 h-8 rounded-full bg-emerald-400 flex-shrink-0" />
                       <div>
-                        <p className="text-[10px] uppercase tracking-widest font-bold text-gray-400">Best Trade</p>
+                        <p className="text-[10px] uppercase tracking-widest font-semibold text-gray-400">Best Trade</p>
                         <p className="text-[13px] font-bold text-gray-900 dark:text-white mt-0.5">{kpis.bestTrade.symbol}</p>
                         <p className="text-[10px] text-gray-400">{kpis.bestTrade.date} · {kpis.bestTrade.position}</p>
                       </div>
@@ -676,7 +673,7 @@ export default function AuditTab({ range = '1M', symbol = 'all', onSymbolsLoaded
                     <div className="flex items-center gap-3">
                       <div className="w-1.5 h-8 rounded-full bg-red-400 flex-shrink-0" />
                       <div>
-                        <p className="text-[10px] uppercase tracking-widest font-bold text-gray-400">Worst Trade</p>
+                        <p className="text-[10px] uppercase tracking-widest font-semibold text-gray-400">Worst Trade</p>
                         <p className="text-[13px] font-bold text-gray-900 dark:text-white mt-0.5">{kpis.worstTrade.symbol}</p>
                         <p className="text-[10px] text-gray-400">{kpis.worstTrade.date} · {kpis.worstTrade.position}</p>
                       </div>
@@ -691,7 +688,7 @@ export default function AuditTab({ range = '1M', symbol = 'all', onSymbolsLoaded
           {/* ── Equity sparkline ── */}
           {kpis.equityCurve.length > 1 && (
             <div>
-              <p className="text-[10px] uppercase tracking-widest font-bold text-gray-400 mb-2">Cumulative Equity Curve</p>
+              <p className="text-[10px] uppercase tracking-widest font-semibold text-gray-400 mb-2">Cumulative Equity Curve</p>
               <div className="bg-white dark:bg-gray-900 rounded-xl border border-gray-100 dark:border-gray-800 p-4">
                 {(() => {
                   const pts  = kpis.equityCurve

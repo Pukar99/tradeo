@@ -176,7 +176,7 @@ function InfoButton({ tab }) {
           style={{ top: rect.bottom + 5, right: window.innerWidth - rect.right }}
         >
           <div className="pt-3 pb-1 px-4">
-            <p className="text-[10px] font-bold uppercase tracking-widest text-blue-500">{tab.label}</p>
+            <p className="text-[10px] font-semibold uppercase tracking-widest text-blue-500">{tab.label}</p>
             <p className="text-[10px] text-gray-400 dark:text-gray-500 mt-0.5">{tab.hint}</p>
           </div>
           <ul className="px-4 pb-3 pt-2 space-y-2">

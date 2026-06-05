@@ -1,14 +1,10 @@
 // === RightPanel.jsx — screen right panel: date nav, gainers/losers/volume/summary tabs, market intel feed, all-movers modal ===
 import { useState, useEffect, useCallback, useRef } from 'react'
 import { createPortal } from 'react-dom'
-import { getTopMovers } from '../../api'
-import { getMarketDates, getDayFull, getMarketFeed } from '../../utils/globalCache'
+import { getMarketDates, getDayFull, getMarketFeed, getTopMovers } from '../../utils/globalCache'
 import { useScreen } from '../../context/ScreenContext'
 import { useEscapeKey } from '../../hooks/useEscapeKey'
 import { safeUrl } from '../../utils/format'
-
-// Module-level cache for full movers data — avoids re-fetching when modal is reopened
-const _moversFullCache = new Map() // date → { gainers, losers, ... }
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
 
@@ -140,12 +136,9 @@ function AllMoversModal({ date, onClose }) {
 
   useEffect(() => {
     if (!date) return
-    // Serve from cache — movers for a past date never change
-    const cached = _moversFullCache.get(date)
-    if (cached) { setData(cached); return }
     let cancelled = false
     getTopMovers(date)
-      .then(r => { if (!cancelled) { _moversFullCache.set(date, r.data); setData(r.data) } })
+      .then(r => { if (!cancelled) setData(r.data) })
       .catch(() => { if (!cancelled) setErr('Failed to load') })
     return () => { cancelled = true }
   }, [date])
@@ -262,7 +255,7 @@ function SummaryTab({ summary, selectSymbol }) {
             <div className="grid grid-cols-3 gap-x-2">
               {[['Open', nepse.open], ['High', nepse.high], ['Low', nepse.low]].map(([l, v]) => (
                 <div key={l}>
-                  <p className="text-[9px] text-gray-400 uppercase">{l}</p>
+                  <p className="text-[10px] text-gray-400 uppercase">{l}</p>
                   <p className="text-[10px] font-semibold text-gray-600 dark:text-gray-400 tabular-nums">
                     {v?.toLocaleString('en-NP', { maximumFractionDigits: 2 })}
                   </p>
@@ -270,7 +263,7 @@ function SummaryTab({ summary, selectSymbol }) {
               ))}
             </div>
             {nepse.turnover > 0 && (
-              <p className="text-[9px] text-gray-400 mt-1.5">
+              <p className="text-[10px] text-gray-400 mt-1.5">
                 Turnover: Rs {(nepse.turnover / 1e8).toFixed(2)} Cr
               </p>
             )}
@@ -293,7 +286,7 @@ function SummaryTab({ summary, selectSymbol }) {
               ].map(([val, lbl, cls]) => (
                 <div key={lbl} className="text-center">
                   <p className={`text-[12px] font-bold ${cls}`}>{val}</p>
-                  <p className="text-[9px] text-gray-400 uppercase">{lbl}</p>
+                  <p className="text-[10px] text-gray-400 uppercase">{lbl}</p>
                 </div>
               ))}
             </div>
@@ -302,11 +295,11 @@ function SummaryTab({ summary, selectSymbol }) {
               <div className="h-full bg-red-400"     style={{ width: `${decPct}%` }} />
             </div>
             <div className="flex justify-between mt-1">
-              <span className="text-[9px] text-emerald-500">{advPct.toFixed(0)}% adv.</span>
+              <span className="text-[10px] text-emerald-500">{advPct.toFixed(0)}% adv.</span>
               {breadth.totalTurnover > 0 && (
-                <span className="text-[9px] text-gray-400">Rs {(breadth.totalTurnover / 1e8).toFixed(1)} Cr</span>
+                <span className="text-[10px] text-gray-400">Rs {(breadth.totalTurnover / 1e8).toFixed(1)} Cr</span>
               )}
-              <span className="text-[9px] text-gray-400">{breadth.total} traded</span>
+              <span className="text-[10px] text-gray-400">{breadth.total} traded</span>
             </div>
           </div>
         )
@@ -519,7 +512,7 @@ export default function RightPanel() {
           <button
             key={key}
             onClick={() => setMoverTab(key)}
-            className={`flex-1 py-1.5 rounded-lg text-[9px] font-bold transition-all ${
+            className={`flex-1 py-1.5 rounded-lg text-[10px] font-semibold transition-all ${
               moverTab === key
                 ? `bg-white dark:bg-gray-700/90 ${cfg.color} shadow-sm animate-scale-in`
                 : 'text-gray-400 dark:text-gray-500 hover:text-gray-600 dark:hover:text-gray-300'
