@@ -79,7 +79,10 @@ API.interceptors.request.use((config) => {
   return config
 })
 
-// Auto-logout on 401; dedup cancellations resolve/reject via the shared in-flight promise
+// Auto-logout on 401/403; dedup cancellations resolve/reject via the shared in-flight promise
+// 403 path: attempt one silent refresh then retry; if refresh fails → redirect to login.
+let _refreshPromise = null  // deduplicate concurrent 403s into a single refresh call
+
 API.interceptors.response.use(
   (response) => {
     // Resolve the shared promise so any dedup'd callers also get the result
@@ -90,7 +93,7 @@ API.interceptors.response.use(
     }
     return response
   },
-  (error) => {
+  async (error) => {
     if (error._dedup) {
       // Return the shared promise — dedup'd caller gets same resolution/rejection as primary
       return error._sharedPromise
@@ -101,17 +104,43 @@ API.interceptors.response.use(
       const entry = _inFlight.get(key)
       if (entry) { entry.reject(error); _inFlight.delete(key) }
     }
-    if (error.response?.status === 401) {
-      // Cookie expired mid-session — redirect to login unless already on auth pages.
-      // Skip for /api/auth/me (the init check in AuthContext) — that 401 is expected
-      // when the user is logged out and should not trigger a redirect.
-      const isInitCheck = error.config?.url?.includes('/api/auth/me')
-      const onAuthPage  = ['/login', '/signup'].some(p => window.location.pathname.startsWith(p))
-      if (!isInitCheck && !onAuthPage) {
+
+    const status     = error.response?.status
+    const url        = error.config?.url || ''
+    const onAuthPage = ['/login', '/signup'].some(p => window.location.pathname.startsWith(p))
+
+    if (status === 401) {
+      // 401 from /api/auth/me is expected when logged out — don't redirect
+      if (!url.includes('/api/auth/me') && !onAuthPage) {
         sessionStorage.setItem('authExpiredMsg', 'Your session has expired. Please log in again.')
         window.location.href = '/login'
       }
+      return Promise.reject(error)
     }
+
+    if (status === 403 && !error.config?._retried && !onAuthPage) {
+      // Skip refresh loop for auth endpoints themselves
+      if (url.includes('/api/auth/')) return Promise.reject(error)
+
+      error.config._retried = true
+
+      // Deduplicate: if a refresh is already in-flight, wait for it
+      if (!_refreshPromise) {
+        _refreshPromise = API.post('/api/auth/refresh').finally(() => { _refreshPromise = null })
+      }
+
+      try {
+        await _refreshPromise
+        // Retry original request — cookie is now fresh
+        return API(error.config)
+      } catch {
+        // Refresh failed — session is truly dead
+        sessionStorage.setItem('authExpiredMsg', 'Your session has expired. Please log in again.')
+        window.location.href = '/login'
+        return Promise.reject(error)
+      }
+    }
+
     return Promise.reject(error)
   }
 )
@@ -125,8 +154,9 @@ axios.get(`${BASE_URL}/`, { timeout: 60000 }).catch(() => {})
 // 2. AUTH
 // =============================================================================
 
-export const loginUser  = (data) => API.post('/api/auth/login', data)
-export const signupUser = (data) => API.post('/api/auth/signup', data)
+export const loginUser     = (data) => API.post('/api/auth/login', data)
+export const signupUser    = (data) => API.post('/api/auth/signup', data)
+export const deleteAccount = (data) => API.delete('/api/auth/account', { data })
 
 
 // =============================================================================

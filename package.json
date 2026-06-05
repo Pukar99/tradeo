@@ -1,7 +1,7 @@
 {
   "name": "tradeo",
   "private": true,
-  "version": "2.11.1",
+  "version": "2.12.0",
   "type": "module",
   "scripts": {
     "dev": "vite",
@@ -33,6 +33,7 @@
     "react": "^18.3.1",
     "react-dom": "^18.3.1",
     "react-hot-toast": "^2.6.0",
+    "react-is": "^18.3.1",
     "react-router-dom": "^7.14.0",
     "recharts": "^3.8.1"
   },

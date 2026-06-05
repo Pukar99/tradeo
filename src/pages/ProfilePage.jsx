@@ -2,7 +2,7 @@
 import { useState, useEffect, useRef, useCallback } from 'react'
 import { useAuth } from '../context/AuthContext'
 import { useNavigate } from 'react-router-dom'
-import { updateProfile, uploadAvatar, changePassword } from '../api'
+import { updateProfile, uploadAvatar, changePassword, deleteAccount } from '../api'
 import { getProfile, clearProfileCache } from '../utils/globalCache'
 
 const MAX_AVATAR_SIZE = 5 * 1024 * 1024 // 5 MB
@@ -19,7 +19,7 @@ function StatCard({ label, value, color = 'text-gray-900 dark:text-white', sub }
 }
 
 function ProfilePage() {
-  const { user, updateUser } = useAuth()
+  const { user, updateUser, logout } = useAuth()
   const navigate = useNavigate()
   const fileInputRef = useRef(null)
   const [profile, setProfile] = useState(null)
@@ -48,6 +48,10 @@ function ProfilePage() {
   const [passwordError, setPasswordError] = useState('')
   const [passwordSuccess, setPasswordSuccess] = useState('')
   const [savingPassword, setSavingPassword] = useState(false)
+  const [showDeleteForm, setShowDeleteForm] = useState(false)
+  const [deletePassword, setDeletePassword] = useState('')
+  const [deleteError, setDeleteError] = useState('')
+  const [deleting, setDeleting] = useState(false)
 
   // Auth redirect — use useEffect, never navigate during render
   useEffect(() => {
@@ -190,6 +194,22 @@ function ProfilePage() {
       setPasswordError(err.response?.data?.message || 'Failed to change password')
     } finally {
       setSavingPassword(false)
+    }
+  }
+
+  const handleDeleteAccount = async (e) => {
+    e.preventDefault()
+    setDeleteError('')
+    if (!deletePassword) { setDeleteError('Password is required'); return }
+    setDeleting(true)
+    try {
+      await deleteAccount({ password: deletePassword })
+      logout()
+      navigate('/login')
+    } catch (err) {
+      setDeleteError(err.response?.data?.message || 'Failed to delete account. Please try again.')
+    } finally {
+      setDeleting(false)
     }
   }
 
@@ -542,6 +562,54 @@ function ProfilePage() {
                 </button>
               </form>
             </div>
+          )}
+        </div>
+      )}
+
+      {/* ── Danger Zone ── */}
+      {editing && (
+        <div className="bg-white dark:bg-gray-800 rounded-2xl p-5 shadow-sm border border-red-200 dark:border-red-900/50 mb-6">
+          <div className="flex items-center justify-between">
+            <div>
+              <h3 className="text-sm font-semibold text-red-600 dark:text-red-400">Delete Account</h3>
+              <p className="text-xs text-gray-500 dark:text-gray-400 mt-0.5">Permanently removes all your data. This cannot be undone.</p>
+            </div>
+            <button
+              type="button"
+              onClick={() => { setShowDeleteForm(!showDeleteForm); setDeleteError(''); setDeletePassword('') }}
+              className="text-xs font-semibold text-red-500 hover:text-red-700 dark:hover:text-red-300 transition-colors px-3 py-1.5 rounded-lg border border-red-200 dark:border-red-800 hover:bg-red-50 dark:hover:bg-red-900/20"
+            >
+              {showDeleteForm ? 'Cancel' : 'Delete Account'}
+            </button>
+          </div>
+          {showDeleteForm && (
+            <form onSubmit={handleDeleteAccount} className="mt-4 pt-4 border-t border-red-100 dark:border-red-900/40">
+              {deleteError && (
+                <div className="bg-red-50 dark:bg-red-900/30 text-red-600 dark:text-red-300 px-3 py-2 rounded-xl text-sm mb-3 flex items-center justify-between">
+                  <span>{deleteError}</span>
+                  <button type="button" onClick={() => setDeleteError('')} className="ml-2 text-red-400 hover:text-red-600">✕</button>
+                </div>
+              )}
+              <p className="text-xs text-gray-500 dark:text-gray-400 mb-3">Enter your password to confirm deletion of all trades, journals, research, and settings.</p>
+              <div className="flex items-center gap-3">
+                <input
+                  type="password"
+                  autoComplete="current-password"
+                  value={deletePassword}
+                  onChange={e => setDeletePassword(e.target.value)}
+                  placeholder="Your password"
+                  className="flex-1 border border-red-200 dark:border-red-800 dark:bg-gray-700 dark:text-white rounded-xl px-3 py-2 text-sm focus:outline-none focus:border-red-500"
+                  required
+                />
+                <button
+                  type="submit"
+                  disabled={deleting}
+                  className="bg-red-600 text-white px-5 py-2 rounded-xl text-sm font-semibold hover:bg-red-700 disabled:opacity-50 transition-colors whitespace-nowrap"
+                >
+                  {deleting ? 'Deleting...' : 'Confirm Delete'}
+                </button>
+              </div>
+            </form>
           )}
         </div>
       )}
