@@ -260,7 +260,7 @@ function SignupPage() {
     setLoading(true)
     try {
       const { data } = await signupUser({ name: name.trim(), email: email.trim(), password })
-      login(data.user)
+      login(data.user, data.token)
       navigate('/')
     } catch (err) {
       setServerError(err.response?.data?.message || 'Signup failed. Please try again.')

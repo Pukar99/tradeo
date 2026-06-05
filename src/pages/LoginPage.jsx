@@ -210,7 +210,7 @@ function LoginPage() {
     setLoading(true)
     try {
       const { data } = await loginUser({ email: email.trim(), password })
-      login(data.user)
+      login(data.user, data.token)
       navigate(getRedirectFrom(), { replace: true })
     } catch (err) {
       setServerError(err.response?.data?.message || 'Login failed. Please try again.')

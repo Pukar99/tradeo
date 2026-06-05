@@ -50,8 +50,9 @@ if (import.meta.env.DEV) {
 }
 
 API.interceptors.request.use((config) => {
-  // Auth is cookie-only (SEC-001) — no Authorization header needed.
-  // withCredentials: true (set on the instance) sends the httpOnly cookie automatically.
+  // Cookie preferred; Bearer fallback for Safari ITP (temporary until custom domain)
+  const stored = localStorage.getItem('auth_token')
+  if (stored) config.headers['Authorization'] = `Bearer ${stored}`
 
   // Dedup identical GET requests fired within DEDUP_MS of each other.
   // Stores the in-flight promise so all callers get the same result — no forever-pending promises.
@@ -130,8 +131,8 @@ API.interceptors.response.use(
       }
 
       try {
-        await _refreshPromise
-        // Retry original request — cookie is now fresh
+        const { data } = await _refreshPromise
+        if (data?.token) localStorage.setItem('auth_token', data.token)
         return API(error.config)
       } catch {
         // Refresh failed — session is truly dead
