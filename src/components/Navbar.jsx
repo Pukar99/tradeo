@@ -12,6 +12,7 @@ import { Link, useLocation, useNavigate } from 'react-router-dom'
 import { useAuth } from '../context/AuthContext'
 import { useTheme } from '../context/ThemeContext'
 import { useLanguage } from '../context/LanguageContext'
+import { getNotifications, markNotificationRead, markAllNotificationsRead } from '../api/notifications'
 
 // =============================================================================
 // 1. LOGO
@@ -66,6 +67,13 @@ function Navbar({ autoHide = false, hidden = false, onMouseEnter, onMouseLeave }
   const [avatarError, setAvatarError] = useState(false)
   const dropdownRef = useRef(null)
 
+  // Notification bell
+  const [bellOpen,    setBellOpen]    = useState(false)
+  const [notifs,      setNotifs]      = useState([])
+  const [unread,      setUnread]      = useState(0)
+  const bellRef    = useRef(null)
+  const notifDirty = useRef(true)  // true = needs fetch
+
   // useMemo — t changes only on language toggle, not on every render
   const NAV_LINKS = useMemo(() => [
     { path: '/',          label: t('nav.home')      },
@@ -87,22 +95,24 @@ function Navbar({ autoHide = false, hidden = false, onMouseEnter, onMouseLeave }
     return () => document.removeEventListener('mousedown', handleClickOutside)
   }, [])
 
-  // ── Close dropdown + mobile menu on Escape ──────────────────────────────────
+  // ── Close dropdown + mobile menu + bell on Escape ────────────────────────────
   useEffect(() => {
     const handleKeyDown = (e) => {
       if (e.key === 'Escape') {
         setDropdownOpen(false)
         setMobileMenuOpen(false)
+        setBellOpen(false)
       }
     }
     document.addEventListener('keydown', handleKeyDown)
     return () => document.removeEventListener('keydown', handleKeyDown)
   }, [])
 
-  // ── Close mobile menu + dropdown when route changes ─────────────────────────
+  // ── Close mobile menu + dropdown + bell when route changes ──────────────────
   useEffect(() => {
     setDropdownOpen(false)
     setMobileMenuOpen(false)
+    setBellOpen(false)
   }, [location.pathname])
 
   // ── Close mobile menu when navbar slides away (auto-hide pages only) ────────
@@ -114,6 +124,53 @@ function Navbar({ autoHide = false, hidden = false, onMouseEnter, onMouseLeave }
   useEffect(() => {
     setAvatarError(false)
   }, [user?.avatar_url])
+
+  // ── Notifications: fetch once on login, refetch when bell opens ──────────────
+  const fetchNotifs = useCallback(async () => {
+    if (!notifDirty.current) return
+    notifDirty.current = false
+    try {
+      const { data } = await getNotifications()
+      setNotifs(data.notifications || [])
+      setUnread(data.unread || 0)
+    } catch {
+      // silent — bell just shows nothing
+    }
+  }, [])
+
+  useEffect(() => {
+    if (user) { notifDirty.current = true; fetchNotifs() }
+    else       { setNotifs([]); setUnread(0) }
+  }, [user, fetchNotifs])
+
+  useEffect(() => {
+    if (bellOpen) fetchNotifs()
+  }, [bellOpen, fetchNotifs])
+
+  // ── Close bell on outside click ──────────────────────────────────────────────
+  useEffect(() => {
+    const handler = (e) => {
+      if (bellRef.current && !bellRef.current.contains(e.target)) setBellOpen(false)
+    }
+    document.addEventListener('mousedown', handler)
+    return () => document.removeEventListener('mousedown', handler)
+  }, [])
+
+  async function handleMarkRead(id) {
+    try {
+      await markNotificationRead(id)
+      setNotifs(prev => prev.map(n => n.id === id ? { ...n, read: true } : n))
+      setUnread(prev => Math.max(0, prev - 1))
+    } catch { /* silent */ }
+  }
+
+  async function handleMarkAllRead() {
+    try {
+      await markAllNotificationsRead()
+      setNotifs(prev => prev.map(n => ({ ...n, read: true })))
+      setUnread(0)
+    } catch { /* silent */ }
+  }
 
   const isActive = useCallback((path) => {
     if (path === '/') return location.pathname === '/'
@@ -179,6 +236,21 @@ function Navbar({ autoHide = false, hidden = false, onMouseEnter, onMouseLeave }
               )}
             </Link>
           ))}
+          {user?.is_admin && (
+            <Link
+              to="/admin"
+              className={`relative px-3 py-4 text-sm font-medium transition-colors ${
+                isActive('/admin')
+                  ? 'text-green-600 dark:text-white'
+                  : 'text-gray-500 dark:text-gray-400 hover:text-gray-900 dark:hover:text-gray-200'
+              }`}
+            >
+              Admin
+              {isActive('/admin') && (
+                <span className="absolute bottom-0 left-0 right-0 h-0.5 bg-green-500 rounded-t-full animate-scale-x-in origin-left" />
+              )}
+            </Link>
+          )}
         </div>
       </div>
 
@@ -212,6 +284,78 @@ function Navbar({ autoHide = false, hidden = false, onMouseEnter, onMouseLeave }
             </svg>
           )}
         </button>
+
+        {/* Notification bell — only when logged in */}
+        {user && (
+          <div className="relative" ref={bellRef}>
+            <button
+              onClick={() => setBellOpen(prev => !prev)}
+              aria-label={unread > 0 ? `${unread} unread notifications` : 'Notifications'}
+              className="relative w-11 h-11 rounded-lg flex items-center justify-center text-gray-500 dark:text-gray-400 hover:text-gray-900 dark:hover:text-white hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors"
+            >
+              <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                <path strokeLinecap="round" strokeLinejoin="round" d="M15 17h5l-1.405-1.405A2.032 2.032 0 0118 14.158V11a6.002 6.002 0 00-4-5.659V5a2 2 0 10-4 0v.341C7.67 6.165 6 8.388 6 11v3.159c0 .538-.214 1.055-.595 1.436L4 17h5m6 0v1a3 3 0 11-6 0v-1m6 0H9" />
+              </svg>
+              {unread > 0 && (
+                <span className="absolute top-1.5 right-1.5 w-4 h-4 bg-red-500 rounded-full flex items-center justify-center">
+                  <span className="text-[9px] font-bold text-white leading-none">
+                    {unread > 9 ? '9+' : unread}
+                  </span>
+                </span>
+              )}
+            </button>
+
+            {bellOpen && (
+              <div className="absolute right-0 top-full mt-2 w-80 bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-700 rounded-xl shadow-lg overflow-hidden z-[60]">
+                {/* Header */}
+                <div className="flex items-center justify-between px-4 py-2.5 border-b border-gray-100 dark:border-gray-800">
+                  <p className="text-xs font-semibold text-gray-900 dark:text-white">Notifications</p>
+                  {unread > 0 && (
+                    <button
+                      onClick={handleMarkAllRead}
+                      className="text-[10px] text-green-600 dark:text-green-400 hover:underline font-semibold"
+                    >
+                      Mark all read
+                    </button>
+                  )}
+                </div>
+                {/* Items */}
+                <div className="max-h-80 overflow-y-auto divide-y divide-gray-100 dark:divide-gray-800/60">
+                  {notifs.length === 0 ? (
+                    <div className="flex items-center justify-center py-8 text-xs text-gray-400 dark:text-gray-500">
+                      No notifications
+                    </div>
+                  ) : (
+                    notifs.map(n => (
+                      <button
+                        key={n.id}
+                        onClick={() => !n.read && handleMarkRead(n.id)}
+                        className={`w-full text-left px-4 py-3 transition-colors ${
+                          n.read
+                            ? 'hover:bg-gray-50 dark:hover:bg-gray-800/40'
+                            : 'bg-green-50 dark:bg-green-900/10 hover:bg-green-100 dark:hover:bg-green-900/20'
+                        }`}
+                      >
+                        <div className="flex items-start gap-2">
+                          {!n.read && (
+                            <span className="mt-1.5 w-1.5 h-1.5 rounded-full bg-green-500 flex-shrink-0" />
+                          )}
+                          <div className="flex-1 min-w-0" style={n.read ? { paddingLeft: '14px' } : {}}>
+                            <p className="text-xs font-semibold text-gray-900 dark:text-white truncate">{n.title}</p>
+                            <p className="text-[10px] text-gray-500 dark:text-gray-400 mt-0.5 line-clamp-2">{n.body}</p>
+                            <p className="text-[10px] text-gray-400 dark:text-gray-500 mt-1">
+                              {new Date(n.created_at).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}
+                            </p>
+                          </div>
+                        </div>
+                      </button>
+                    ))
+                  )}
+                </div>
+              </div>
+            )}
+          </div>
+        )}
 
         {user ? (
           /* ── User profile dropdown ─────────────────────────────────────── */
@@ -356,6 +500,20 @@ function Navbar({ autoHide = false, hidden = false, onMouseEnter, onMouseLeave }
                 )}
               </Link>
             ))}
+            {user?.is_admin && (
+              <Link
+                to="/admin"
+                onClick={() => setMobileMenuOpen(false)}
+                className={`flex items-center justify-between px-4 py-3 min-h-[48px] rounded-xl text-sm font-semibold transition-all ${
+                  isActive('/admin')
+                    ? 'bg-green-500 text-white shadow-sm shadow-green-500/30'
+                    : 'text-gray-600 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-800/80 hover:text-gray-900 dark:hover:text-white'
+                }`}
+              >
+                <span>Admin</span>
+                {isActive('/admin') && <span className="w-1.5 h-1.5 rounded-full bg-white/80" />}
+              </Link>
+            )}
           </div>
           {user && (
             <div className="px-4 pb-3 pt-1 border-t border-gray-100 dark:border-gray-800/60">

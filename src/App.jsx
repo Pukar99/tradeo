@@ -12,6 +12,7 @@ import { getProfile } from './utils/globalCache'
 import Navbar from './components/Navbar'
 import FloatingChat from './components/FloatingChat'
 import PrivateRoute from './components/PrivateRoute'
+import AdminRoute from './components/AdminRoute'
 
 // Lazy-loaded pages — each becomes its own JS chunk, reducing initial bundle size
 const HomePage           = lazy(() => import('./pages/HomePage'))
@@ -28,6 +29,7 @@ const ProfilePage        = lazy(() => import('./pages/ProfilePage'))
 const ChatPage           = lazy(() => import('./pages/ChatPage'))
 const DataLabPage        = lazy(() => import('./pages/DataLabPage'))
 const ExplorePage        = lazy(() => import('./pages/ExplorePage'))
+const AdminPage          = lazy(() => import('./pages/AdminPage'))
 
 // ── Navbar auto-hide context ──────────────────────────────────────────────────
 // Pages that want the auto-hide behaviour call useNavbarAutoHide() on mount.
@@ -268,6 +270,7 @@ function AppContent() {
             <Route path="/datalab" element={<DataLabPage />} />
             <Route path="/explore" element={<ExplorePage />} />
             <Route path="/explore/:tab" element={<ExplorePage />} />
+            <Route path="/admin" element={<AdminRoute><AdminPage /></AdminRoute>} />
             <Route path="/login" element={<LoginPage />} />
             <Route path="/signup" element={<SignupPage />} />
             <Route path="*" element={<NotFoundPage />} />

@@ -5,6 +5,7 @@ import { useNavbarAutoHide, useNavbarState } from '../App'
 import { createPortal } from 'react-dom'
 import { ComplexTabProvider } from '../hooks/useComplexTab.jsx'
 import ErrorBoundary from '../components/ErrorBoundary'
+import UpgradePrompt from '../components/UpgradePrompt'
 import { useAuth } from '../context/AuthContext'
 
 // ── Toolbar slot — portal approach ────────────────────────────────────────────
@@ -240,6 +241,7 @@ function TabContent({ activeTab }) {
   )
 
   if (activeTab === 'insight') return (
+    user.tier === 'basic' && !user?.is_admin ? <UpgradePrompt feature="Insight" /> :
     <ComplexTabProvider>
       <ErrorBoundary label="Insight">
         <Suspense fallback={<TabLoader />}>
@@ -250,6 +252,7 @@ function TabContent({ activeTab }) {
   )
 
   if (activeTab === 'breakdown') return (
+    user.tier === 'basic' && !user?.is_admin ? <UpgradePrompt feature="Breakdown" /> :
     <ComplexTabProvider>
       <ErrorBoundary label="Breakdown">
         <Suspense fallback={<TabLoader />}>

@@ -350,6 +350,16 @@ function ProfilePage() {
                 <div className="flex items-center gap-3 flex-wrap mb-1">
                   <h1 className="text-2xl font-bold text-white">{profile.user.name}</h1>
 
+                  <span className={`text-xs font-medium px-2 py-0.5 rounded-full border ${
+                    profile.user.tier === 'premium'
+                      ? 'bg-amber-500 bg-opacity-20 text-amber-400 border-amber-500 border-opacity-30'
+                      : profile.user.tier === 'pro'
+                        ? 'bg-blue-500 bg-opacity-20 text-blue-400 border-blue-500 border-opacity-30'
+                        : 'bg-gray-500 bg-opacity-20 text-gray-400 border-gray-500 border-opacity-30'
+                  }`}>
+                    {profile.user.tier === 'premium' ? 'Premium' : profile.user.tier === 'pro' ? 'Pro' : 'Basic'}
+                  </span>
+
                   {profile.isEligible && (
                     <span className="bg-green-500 bg-opacity-20 text-green-400 border border-green-500 border-opacity-30 text-xs font-medium px-2 py-0.5 rounded-full">
                       ✓ Research Eligible

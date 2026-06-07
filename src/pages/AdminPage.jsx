@@ -1,0 +1,73 @@
+// === AdminPage.jsx ===
+import { useState } from 'react'
+import UsersTab from '../components/admin/UsersTab'
+import ContentTab from '../components/admin/ContentTab'
+import SystemTab from '../components/admin/SystemTab'
+import FeatureFlagsTab from '../components/admin/FeatureFlagsTab'
+import BroadcastTab from '../components/admin/BroadcastTab'
+import AuditLogTab from '../components/admin/AuditLogTab'
+
+const TABS = [
+  { id: 'users',   label: 'Users'         },
+  { id: 'content', label: 'Content'       },
+  { id: 'system',  label: 'System'        },
+  { id: 'flags',   label: 'Feature Flags' },
+  { id: 'broadcast', label: 'Broadcast'   },
+  { id: 'ai',      label: 'AI Usage'      },
+  { id: 'audit',   label: 'Audit Log'     },
+]
+
+function ComingSoon({ label }) {
+  return (
+    <div className="flex flex-col items-center justify-center py-24 gap-2">
+      <p className="text-sm font-semibold text-gray-400 dark:text-gray-500">{label}</p>
+      <p className="text-xs text-gray-400 dark:text-gray-600">Coming in a future session</p>
+    </div>
+  )
+}
+
+export default function AdminPage() {
+  const [tab, setTab] = useState('users')
+
+  return (
+    <div className="min-h-screen bg-gray-50 dark:bg-gray-950 pt-[56px]">
+      <div className="max-w-6xl mx-auto px-4 py-6">
+        {/* Header */}
+        <div className="mb-4">
+          <h1 className="text-lg font-bold text-gray-900 dark:text-white">Admin</h1>
+          <p className="text-xs text-gray-500 dark:text-gray-400">Control panel</p>
+        </div>
+
+        {/* Tab strip */}
+        <div className="bg-white dark:bg-gray-900 rounded-xl border border-gray-200 dark:border-gray-800 overflow-hidden">
+          <div className="px-3 py-1 border-b border-gray-200 dark:border-gray-800">
+            <div className="flex items-center gap-0.5 bg-gray-100 dark:bg-gray-800 rounded-lg p-0.5 w-fit">
+              {TABS.map(t => (
+                <button
+                  key={t.id}
+                  onClick={() => setTab(t.id)}
+                  className={`px-3 py-1.5 text-[10px] font-semibold rounded-md transition-all ${
+                    tab === t.id
+                      ? 'bg-white dark:bg-gray-700 text-gray-900 dark:text-white shadow-sm'
+                      : 'text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-300'
+                  }`}
+                >
+                  {t.label}
+                </button>
+              ))}
+            </div>
+          </div>
+
+          {/* Tab content */}
+          {tab === 'users'     && <UsersTab />}
+          {tab === 'content'   && <ContentTab />}
+          {tab === 'system'    && <SystemTab />}
+          {tab === 'flags'     && <FeatureFlagsTab />}
+          {tab === 'broadcast' && <BroadcastTab />}
+          {tab === 'ai'        && <ComingSoon label="AI Usage" />}
+          {tab === 'audit'     && <AuditLogTab />}
+        </div>
+      </div>
+    </div>
+  )
+}

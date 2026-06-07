@@ -12,6 +12,7 @@ import LeftPanel                from '../components/screen/LeftPanel'
 import RightPanel               from '../components/screen/RightPanel'
 import ErrorBoundary            from '../components/ErrorBoundary'
 import ComingSoon               from '../components/ComingSoon'
+import UpgradePrompt            from '../components/UpgradePrompt'
 
 // ── Screen toolbar slot — same portal pattern as DataLabPage ─────────────────
 const ScreenToolbarSlotCtx = createContext(null)
@@ -79,6 +80,7 @@ const COMPLEX_TABS = [
 // ── Simple mode content ──────────────────────────────────────────────────────
 
 function SimpleContent({ activeTab, mobilePanel, setMobilePanel, leftOpen, toggleLeft, rightOpen, toggleRight }) {
+  const { user } = useAuth()
   if (activeTab === 'MultiChart') return (
     <div key="MultiChart" className="flex-1 min-h-0 flex flex-col animate-tab-in">
       <Suspense fallback={<TabSpinner />}><MultiChartPage /></Suspense>
@@ -86,12 +88,12 @@ function SimpleContent({ activeTab, mobilePanel, setMobilePanel, leftOpen, toggl
   )
   if (activeTab === 'SMC') return (
     <div key="SMC" className="flex-1 min-h-0 flex flex-col animate-tab-in">
-      <Suspense fallback={<TabSpinner />}><SMCChartPage /></Suspense>
+      {user?.tier === 'basic' && !user?.is_admin ? <UpgradePrompt feature="SMC" /> : <Suspense fallback={<TabSpinner />}><SMCChartPage /></Suspense>}
     </div>
   )
   if (activeTab === 'PriceAction') return (
     <div key="PriceAction" className="flex-1 min-h-0 flex flex-col animate-tab-in">
-      <Suspense fallback={<TabSpinner />}><PriceActionPage /></Suspense>
+      {user?.tier === 'basic' && !user?.is_admin ? <UpgradePrompt feature="Price Action" /> : <Suspense fallback={<TabSpinner />}><PriceActionPage /></Suspense>}
     </div>
   )
 
@@ -181,7 +183,9 @@ function SimpleContent({ activeTab, mobilePanel, setMobilePanel, leftOpen, toggl
 // ── Complex mode content ─────────────────────────────────────────────────────
 
 function ComplexContent({ activeTab }) {
+  const { user } = useAuth()
   if (activeTab === 'Backtesting') return (
+    user?.tier === 'basic' && !user?.is_admin ? <UpgradePrompt feature="Backtesting" /> :
     <Suspense fallback={<TabSpinner />}>
       <ErrorBoundary label="Backtesting"><BacktestPage /></ErrorBoundary>
     </Suspense>
