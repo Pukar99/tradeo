@@ -334,9 +334,11 @@ function Navbar({ autoHide = false, hidden = false, onMouseEnter, onMouseLeave }
           )}
         </button>
 
-        {/* Notification bell — only when logged in */}
+        {/* Notification bell — logged in, desktop only.
+            On mobile it would crowd the top bar and push the hamburger off the
+            right edge (overflowed at 320px), so notifications live in the drawer. */}
         {user && (
-          <div className="relative" ref={bellRef}>
+          <div className="relative hidden lg:block" ref={bellRef}>
             <button
               onClick={() => setBellOpen((prev) => !prev)}
               aria-label={unread > 0 ? `${unread} unread notifications` : 'Notifications'}
@@ -429,8 +431,10 @@ function Navbar({ autoHide = false, hidden = false, onMouseEnter, onMouseLeave }
         )}
 
         {user ? (
-          /* ── User profile dropdown ─────────────────────────────────────── */
-          <div className="relative" ref={dropdownRef}>
+          /* ── User profile dropdown — desktop only ──────────────────────────
+             On mobile, profile + logout live in the hamburger drawer; keeping
+             this avatar in the top bar too overflowed the row at 320px. */
+          <div className="relative hidden lg:block" ref={dropdownRef}>
             <button
               onClick={() => setDropdownOpen((prev) => !prev)}
               aria-haspopup="true"
@@ -641,7 +645,68 @@ function Navbar({ autoHide = false, hidden = false, onMouseEnter, onMouseLeave }
             )}
           </div>
           {user ? (
-            <div className="px-4 pb-3 pt-1 border-t border-gray-100 dark:border-gray-800/60">
+            <div className="px-4 pb-3 pt-1 border-t border-gray-100 dark:border-gray-800/60 space-y-1">
+              {/* Notifications — the standalone bell is desktop-only, so surface
+                  it here on mobile. Reuses the same notif state/handlers. */}
+              <div className="rounded-xl bg-gray-50 dark:bg-gray-900/40 overflow-hidden">
+                <div className="flex items-center justify-between px-4 py-2.5">
+                  <span className="flex items-center gap-2 text-sm font-semibold text-gray-700 dark:text-gray-200">
+                    🔔 Notifications
+                    {unread > 0 && (
+                      <span className="min-w-[18px] h-[18px] px-1 inline-flex items-center justify-center bg-red-500 rounded-full text-[10px] font-bold text-white leading-none">
+                        {unread > 9 ? '9+' : unread}
+                      </span>
+                    )}
+                  </span>
+                  {unread > 0 && (
+                    <button
+                      onClick={handleMarkAllRead}
+                      className="text-[10px] text-green-600 dark:text-green-400 hover:underline font-semibold"
+                    >
+                      Mark all read
+                    </button>
+                  )}
+                </div>
+                {notifs.length > 0 && (
+                  <div className="max-h-44 overflow-y-auto divide-y divide-gray-100 dark:divide-gray-800/60 border-t border-gray-100 dark:border-gray-800/60">
+                    {notifs.slice(0, 6).map((n) => (
+                      <button
+                        key={n.id}
+                        onClick={() => !n.read && handleMarkRead(n.id)}
+                        className={`w-full text-left px-4 py-2.5 transition-colors ${
+                          n.read
+                            ? 'hover:bg-gray-100 dark:hover:bg-gray-800/40'
+                            : 'bg-green-50 dark:bg-green-900/10'
+                        }`}
+                      >
+                        <div className="flex items-start gap-2">
+                          {!n.read && (
+                            <span className="mt-1.5 w-1.5 h-1.5 rounded-full bg-green-500 flex-shrink-0" />
+                          )}
+                          <div className="flex-1 min-w-0" style={n.read ? { paddingLeft: '14px' } : {}}>
+                            <p className="text-xs font-semibold text-gray-900 dark:text-white truncate">
+                              {n.title}
+                            </p>
+                            <p className="text-[10px] text-gray-500 dark:text-gray-400 mt-0.5 line-clamp-2">
+                              {n.body}
+                            </p>
+                          </div>
+                        </div>
+                      </button>
+                    ))}
+                  </div>
+                )}
+              </div>
+
+              {/* Profile — moved off the top bar on mobile */}
+              <Link
+                to="/profile"
+                onClick={() => setMobileMenuOpen(false)}
+                className="flex items-center gap-2 px-4 py-3 min-h-[48px] rounded-xl text-sm font-semibold text-gray-600 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-800/80 hover:text-gray-900 dark:hover:text-white transition-all"
+              >
+                <span>👤</span> {t('nav.profile')}
+              </Link>
+
               <button
                 onClick={handleLogout}
                 className="w-full flex items-center gap-2 px-4 py-3 min-h-[48px] rounded-xl text-sm font-semibold text-red-500 hover:bg-red-50 dark:hover:bg-red-900/20 transition-all"
