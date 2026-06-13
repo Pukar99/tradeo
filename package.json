@@ -32,14 +32,14 @@
     "@blocknote/react": "^0.47.3",
     "@mantine/core": "^8.3.18",
     "@mantine/hooks": "^8.3.18",
-    "axios": "^1.14.0",
+    "axios": "^1.17.0",
     "html2canvas": "^1.4.1",
     "lightweight-charts": "^4.2.0",
     "react": "^18.3.1",
     "react-dom": "^18.3.1",
     "react-hot-toast": "^2.6.0",
     "react-is": "^18.3.1",
-    "react-router-dom": "^7.14.0",
+    "react-router-dom": "^7.17.0",
     "recharts": "^3.8.1"
   },
   "devDependencies": {
