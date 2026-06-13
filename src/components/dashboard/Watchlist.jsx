@@ -1,11 +1,12 @@
 // === Watchlist.jsx ===
 import { useState, useEffect, useCallback, useRef, useMemo } from 'react'
+import { addToWatchlist, updateWatchlist, removeFromWatchlist } from '../../api'
 import {
-  addToWatchlist,
-  updateWatchlist,
-  removeFromWatchlist,
-} from '../../api'
-import { getBatchPrices, getWatchlist, getMarketSymbols, clearWatchlistCache } from '../../utils/globalCache'
+  getBatchPrices,
+  getWatchlist,
+  getMarketSymbols,
+  clearWatchlistCache,
+} from '../../utils/globalCache'
 import { useContextMenu } from '../ContextMenu'
 import { useChatRefresh } from '../../utils/chatEvents'
 
@@ -60,36 +61,64 @@ function getAlertMessages(item, today) {
 
   if (item.price_alert) {
     const alert = parseFloat(item.price_alert)
-    const diff  = alert - ltp
-    const pct   = Math.abs((diff / ltp) * 100).toFixed(1)
+    const diff = alert - ltp
+    const pct = Math.abs((diff / ltp) * 100).toFixed(1)
     if (Math.abs(diff) < ltp * 0.02) {
-      msgs.push({ text: 'Near alert level', color: 'text-orange-500 dark:text-orange-400', bg: 'bg-orange-50 dark:bg-orange-900/30' })
+      msgs.push({
+        text: 'Near alert level',
+        color: 'text-orange-500 dark:text-orange-400',
+        bg: 'bg-orange-50 dark:bg-orange-900/30',
+      })
     } else if (diff > 0) {
-      msgs.push({ text: `+Rs.${Math.abs(Math.round(diff)).toLocaleString()} (${pct}%) to alert`, color: 'text-green-600 dark:text-green-400', bg: 'bg-green-50 dark:bg-green-900/30' })
+      msgs.push({
+        text: `+Rs.${Math.abs(Math.round(diff)).toLocaleString()} (${pct}%) to alert`,
+        color: 'text-green-600 dark:text-green-400',
+        bg: 'bg-green-50 dark:bg-green-900/30',
+      })
     } else {
-      msgs.push({ text: `-Rs.${Math.abs(Math.round(diff)).toLocaleString()} (${pct}%) to alert`, color: 'text-red-500 dark:text-red-400', bg: 'bg-red-50 dark:bg-red-900/30' })
+      msgs.push({
+        text: `-Rs.${Math.abs(Math.round(diff)).toLocaleString()} (${pct}%) to alert`,
+        color: 'text-red-500 dark:text-red-400',
+        bg: 'bg-red-50 dark:bg-red-900/30',
+      })
     }
   }
 
   if (item.watch_low && ltp) {
-    const wl   = parseFloat(item.watch_low)
+    const wl = parseFloat(item.watch_low)
     const diff = ltp - wl
-    const pct  = Math.abs((diff / ltp) * 100).toFixed(1)
+    const pct = Math.abs((diff / ltp) * 100).toFixed(1)
     if (diff > 0) {
-      msgs.push({ text: `-Rs.${Math.abs(Math.round(diff)).toLocaleString()} (${pct}%) to watch low`, color: 'text-red-400', bg: 'bg-red-50 dark:bg-red-900/30' })
+      msgs.push({
+        text: `-Rs.${Math.abs(Math.round(diff)).toLocaleString()} (${pct}%) to watch low`,
+        color: 'text-red-400',
+        bg: 'bg-red-50 dark:bg-red-900/30',
+      })
     } else {
-      msgs.push({ text: 'Below watch low', color: 'text-red-500 dark:text-red-400', bg: 'bg-red-50 dark:bg-red-900/30' })
+      msgs.push({
+        text: 'Below watch low',
+        color: 'text-red-500 dark:text-red-400',
+        bg: 'bg-red-50 dark:bg-red-900/30',
+      })
     }
   }
 
   if (item.watch_high && ltp) {
-    const wh   = parseFloat(item.watch_high)
+    const wh = parseFloat(item.watch_high)
     const diff = wh - ltp
-    const pct  = Math.abs((diff / ltp) * 100).toFixed(1)
+    const pct = Math.abs((diff / ltp) * 100).toFixed(1)
     if (diff > 0) {
-      msgs.push({ text: `+Rs.${Math.abs(Math.round(diff)).toLocaleString()} (${pct}%) to watch high`, color: 'text-green-500 dark:text-green-400', bg: 'bg-green-50 dark:bg-green-900/30' })
+      msgs.push({
+        text: `+Rs.${Math.abs(Math.round(diff)).toLocaleString()} (${pct}%) to watch high`,
+        color: 'text-green-500 dark:text-green-400',
+        bg: 'bg-green-50 dark:bg-green-900/30',
+      })
     } else {
-      msgs.push({ text: 'Above watch high', color: 'text-green-500 dark:text-green-400', bg: 'bg-green-50 dark:bg-green-900/30' })
+      msgs.push({
+        text: 'Above watch high',
+        color: 'text-green-500 dark:text-green-400',
+        bg: 'bg-green-50 dark:bg-green-900/30',
+      })
     }
   }
 
@@ -97,15 +126,35 @@ function getAlertMessages(item, today) {
     const alertDate = new Date(item.alert_date + 'T00:00:00')
     const days = Math.ceil((alertDate - today) / (1000 * 60 * 60 * 24))
     if (days < -10) {
-      msgs.push({ text: `Alert expired ${Math.abs(days)} days ago`, color: 'text-gray-400', bg: 'bg-gray-100 dark:bg-gray-800' })
+      msgs.push({
+        text: `Alert expired ${Math.abs(days)} days ago`,
+        color: 'text-gray-400',
+        bg: 'bg-gray-100 dark:bg-gray-800',
+      })
     } else if (days < 0) {
-      msgs.push({ text: `${Math.abs(days)}d overdue — grace period`, color: 'text-amber-500 dark:text-amber-400', bg: 'bg-amber-50 dark:bg-amber-900/30' })
+      msgs.push({
+        text: `${Math.abs(days)}d overdue — grace period`,
+        color: 'text-amber-500 dark:text-amber-400',
+        bg: 'bg-amber-50 dark:bg-amber-900/30',
+      })
     } else if (days === 0) {
-      msgs.push({ text: 'Alert date is today', color: 'text-orange-500 dark:text-orange-400', bg: 'bg-orange-50 dark:bg-orange-900/30' })
+      msgs.push({
+        text: 'Alert date is today',
+        color: 'text-orange-500 dark:text-orange-400',
+        bg: 'bg-orange-50 dark:bg-orange-900/30',
+      })
     } else if (days <= 3) {
-      msgs.push({ text: `${days}d left`, color: 'text-orange-500 dark:text-orange-400', bg: 'bg-orange-50 dark:bg-orange-900/30' })
+      msgs.push({
+        text: `${days}d left`,
+        color: 'text-orange-500 dark:text-orange-400',
+        bg: 'bg-orange-50 dark:bg-orange-900/30',
+      })
     } else if (days <= 14) {
-      msgs.push({ text: `${days}d left`, color: 'text-blue-500 dark:text-blue-400', bg: 'bg-blue-50 dark:bg-blue-900/30' })
+      msgs.push({
+        text: `${days}d left`,
+        color: 'text-blue-500 dark:text-blue-400',
+        bg: 'bg-blue-50 dark:bg-blue-900/30',
+      })
     }
   }
 
@@ -115,10 +164,10 @@ function getAlertMessages(item, today) {
 // ── Price proximity bar (0–100% fill based on distance to alert) ──────────────
 function PriceBar({ item }) {
   if (!item.price_alert || !item.currentPrice) return null
-  const ltp   = item.currentPrice
+  const ltp = item.currentPrice
   const alert = parseFloat(item.price_alert)
-  const pct   = Math.abs((ltp - alert) / ltp) * 100
-  const fill  = Math.max(0, Math.min(100, 100 - pct / 15 * 100))
+  const pct = Math.abs((ltp - alert) / ltp) * 100
+  const fill = Math.max(0, Math.min(100, 100 - (pct / 15) * 100))
   return (
     <div className="mt-1.5 h-1 w-full bg-gray-100 dark:bg-gray-700 rounded-full overflow-hidden">
       <div
@@ -143,31 +192,34 @@ function Skeleton() {
 // ── Edit modal ────────────────────────────────────────────────────────────────
 function EditWatchlistModal({ item, onClose, onSaved }) {
   const [form, setForm] = useState({
-    watch_low:   item.watch_low   != null ? String(item.watch_low)   : '',
-    watch_high:  item.watch_high  != null ? String(item.watch_high)  : '',
+    watch_low: item.watch_low != null ? String(item.watch_low) : '',
+    watch_high: item.watch_high != null ? String(item.watch_high) : '',
     price_alert: item.price_alert != null ? String(item.price_alert) : '',
-    alert_date:  item.alert_date  ? item.alert_date.slice(0, 10) : '',
-    notes:       item.notes       || '',
+    alert_date: item.alert_date ? item.alert_date.slice(0, 10) : '',
+    notes: item.notes || '',
   })
   const [saving, setSaving] = useState(false)
-  const [err,    setErr]    = useState(null)
+  const [err, setErr] = useState(null)
 
   useEffect(() => {
-    const onKey = (e) => { if (e.key === 'Escape') onClose() }
+    const onKey = (e) => {
+      if (e.key === 'Escape') onClose()
+    }
     window.addEventListener('keydown', onKey)
     return () => window.removeEventListener('keydown', onKey)
   }, [onClose])
 
   const handleSave = async (e) => {
     e.preventDefault()
-    setSaving(true); setErr(null)
+    setSaving(true)
+    setErr(null)
     try {
       await updateWatchlist(item.id, {
-        watch_low:   form.watch_low   !== '' ? parseFloat(form.watch_low)   : null,
-        watch_high:  form.watch_high  !== '' ? parseFloat(form.watch_high)  : null,
+        watch_low: form.watch_low !== '' ? parseFloat(form.watch_low) : null,
+        watch_high: form.watch_high !== '' ? parseFloat(form.watch_high) : null,
         price_alert: form.price_alert !== '' ? parseFloat(form.price_alert) : null,
-        alert_date:  form.alert_date  || null,
-        notes:       form.notes       || null,
+        alert_date: form.alert_date || null,
+        notes: form.notes || null,
       })
       onSaved()
       onClose()
@@ -179,49 +231,73 @@ function EditWatchlistModal({ item, onClose, onSaved }) {
   }
 
   const FIELDS = [
-    ['Watch Low (Rs)',  'watch_low',   'number'],
-    ['Watch High (Rs)', 'watch_high',  'number'],
-    ['Price Alert (Rs)','price_alert', 'number'],
-    ['Alert Date',      'alert_date',  'date'],
+    ['Watch Low (Rs)', 'watch_low', 'number'],
+    ['Watch High (Rs)', 'watch_high', 'number'],
+    ['Price Alert (Rs)', 'price_alert', 'number'],
+    ['Alert Date', 'alert_date', 'date'],
   ]
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-4" role="dialog" aria-modal="true">
+    <div
+      className="fixed inset-0 z-50 flex items-center justify-center p-4"
+      role="dialog"
+      aria-modal="true"
+    >
       <div className="absolute inset-0 bg-black/40 backdrop-blur-sm" onClick={onClose} />
       <div className="relative bg-white dark:bg-gray-900 rounded-2xl shadow-2xl border border-gray-200 dark:border-gray-700 w-full max-w-sm z-10 overflow-hidden">
         <div className="flex items-center justify-between px-4 py-3 border-b border-gray-100 dark:border-gray-800">
           <div>
-            <p className="text-[11px] font-semibold uppercase tracking-widest text-gray-400">Edit</p>
-            <p className="text-[13px] font-bold text-gray-800 dark:text-gray-100 mt-0.5" translate="no">{item.symbol}</p>
+            <p className="text-[11px] font-semibold uppercase tracking-widest text-gray-400">
+              Edit
+            </p>
+            <p
+              className="text-[13px] font-bold text-gray-800 dark:text-gray-100 mt-0.5"
+              translate="no"
+            >
+              {item.symbol}
+            </p>
           </div>
-          <button onClick={onClose} className="w-7 h-7 flex items-center justify-center rounded-full hover:bg-gray-100 dark:hover:bg-gray-800 text-gray-400 text-lg">×</button>
+          <button
+            onClick={onClose}
+            className="w-7 h-7 flex items-center justify-center rounded-full hover:bg-gray-100 dark:hover:bg-gray-800 text-gray-400 text-lg"
+          >
+            ×
+          </button>
         </div>
         <form onSubmit={handleSave} className="px-4 py-4 space-y-3">
           <div className="grid grid-cols-2 gap-2">
             {FIELDS.map(([label, key, type]) => (
               <div key={key}>
-                <label className="block text-[10px] font-semibold uppercase tracking-widest text-gray-400 mb-1">{label}</label>
+                <label className="block text-[10px] font-semibold uppercase tracking-widest text-gray-400 mb-1">
+                  {label}
+                </label>
                 <input
                   type={type}
                   value={form[key]}
-                  onChange={e => setForm(f => ({ ...f, [key]: e.target.value }))}
+                  onChange={(e) => setForm((f) => ({ ...f, [key]: e.target.value }))}
                   className="w-full bg-gray-50 dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-xl px-3 py-2 text-[12px] text-gray-800 dark:text-gray-200 outline-none focus:ring-2 focus:ring-blue-300 dark:focus:ring-blue-800"
                 />
               </div>
             ))}
           </div>
           <div>
-            <label className="block text-[10px] font-semibold uppercase tracking-widest text-gray-400 mb-1">Notes</label>
+            <label className="block text-[10px] font-semibold uppercase tracking-widest text-gray-400 mb-1">
+              Notes
+            </label>
             <input
               type="text"
               value={form.notes}
               maxLength={300}
-              onChange={e => setForm(f => ({ ...f, notes: e.target.value }))}
+              onChange={(e) => setForm((f) => ({ ...f, notes: e.target.value }))}
               placeholder="Why are you watching this?"
               className="w-full bg-gray-50 dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-xl px-3 py-2 text-[12px] text-gray-800 dark:text-gray-200 outline-none focus:ring-2 focus:ring-blue-300 dark:focus:ring-blue-800"
             />
           </div>
-          {err && <p className="text-[10px] text-red-500 bg-red-50 dark:bg-red-950 px-3 py-1.5 rounded-lg">{err}</p>}
+          {err && (
+            <p className="text-[10px] text-red-500 bg-red-50 dark:bg-red-950 px-3 py-1.5 rounded-lg">
+              {err}
+            </p>
+          )}
           <button
             type="submit"
             disabled={saving}
@@ -237,18 +313,20 @@ function EditWatchlistModal({ item, onClose, onSaved }) {
 
 // ── Symbol search with auto-suggest ──────────────────────────────────────────
 function SymbolSearch({ symbolList, onSelected, onCancel }) {
-  const [query,    setQuery]    = useState('')
-  const [cursor,   setCursor]   = useState(-1)
-  const inputRef  = useRef(null)
-  const listRef   = useRef(null)
+  const [query, setQuery] = useState('')
+  const [cursor, setCursor] = useState(-1)
+  const inputRef = useRef(null)
+  const listRef = useRef(null)
 
-  useEffect(() => { inputRef.current?.focus() }, [])
+  useEffect(() => {
+    inputRef.current?.focus()
+  }, [])
 
   const suggestions = useMemo(() => {
     const q = query.trim().toUpperCase()
     if (!q) return []
     return symbolList
-      .filter(s => s.symbol.startsWith(q) || s.company_name?.toUpperCase().includes(q))
+      .filter((s) => s.symbol.startsWith(q) || s.company_name?.toUpperCase().includes(q))
       .slice(0, 8)
   }, [query, symbolList])
 
@@ -259,10 +337,10 @@ function SymbolSearch({ symbolList, onSelected, onCancel }) {
   const handleKey = (e) => {
     if (e.key === 'ArrowDown') {
       e.preventDefault()
-      setCursor(c => Math.min(c + 1, suggestions.length - 1))
+      setCursor((c) => Math.min(c + 1, suggestions.length - 1))
     } else if (e.key === 'ArrowUp') {
       e.preventDefault()
-      setCursor(c => Math.max(c - 1, 0))
+      setCursor((c) => Math.max(c - 1, 0))
     } else if (e.key === 'Enter') {
       e.preventDefault()
       if (cursor >= 0 && suggestions[cursor]) select(suggestions[cursor])
@@ -276,21 +354,39 @@ function SymbolSearch({ symbolList, onSelected, onCancel }) {
     <div className="px-3 pt-3 pb-2 border-b border-gray-100 dark:border-gray-800">
       <div className="relative">
         <div className="flex items-center gap-2 bg-gray-50 dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg px-2.5 h-7">
-          <svg className="w-3 h-3 text-gray-400 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-4.35-4.35M17 11A6 6 0 1 1 5 11a6 6 0 0 1 12 0z" />
+          <svg
+            className="w-3 h-3 text-gray-400 shrink-0"
+            fill="none"
+            stroke="currentColor"
+            viewBox="0 0 24 24"
+          >
+            <path
+              strokeLinecap="round"
+              strokeLinejoin="round"
+              strokeWidth={2}
+              d="M21 21l-4.35-4.35M17 11A6 6 0 1 1 5 11a6 6 0 0 1 12 0z"
+            />
           </svg>
           <input
             ref={inputRef}
             type="text"
             value={query}
-            onChange={e => { setQuery(e.target.value.toUpperCase()); setCursor(-1) }}
+            onChange={(e) => {
+              setQuery(e.target.value.toUpperCase())
+              setCursor(-1)
+            }}
             onKeyDown={handleKey}
             placeholder="Type symbol…"
             className="flex-1 bg-transparent text-[11px] text-gray-800 dark:text-gray-100 placeholder-gray-400 outline-none"
             translate="no"
           />
           {query && (
-            <button onClick={() => setQuery('')} className="text-gray-400 hover:text-gray-600 dark:hover:text-gray-300 text-xs leading-none">×</button>
+            <button
+              onClick={() => setQuery('')}
+              className="text-gray-400 hover:text-gray-600 dark:hover:text-gray-300 text-xs leading-none"
+            >
+              ×
+            </button>
           )}
         </div>
 
@@ -310,17 +406,24 @@ function SymbolSearch({ symbolList, onSelected, onCancel }) {
                 } ${i < suggestions.length - 1 ? 'border-b border-gray-100 dark:border-gray-800' : ''}`}
               >
                 <div className="min-w-0">
-                  <p className="text-[11px] font-bold text-gray-900 dark:text-white" translate="no">{s.symbol}</p>
+                  <p className="text-[11px] font-bold text-gray-900 dark:text-white" translate="no">
+                    {s.symbol}
+                  </p>
                   {s.company_name && (
                     <p className="text-[10px] text-gray-400 truncate">{s.company_name}</p>
                   )}
                 </div>
                 {s.price != null && (
                   <div className="text-right shrink-0 ml-2">
-                    <p className="text-[11px] font-semibold text-gray-800 dark:text-gray-200">Rs.{s.price.toLocaleString()}</p>
+                    <p className="text-[11px] font-semibold text-gray-800 dark:text-gray-200">
+                      Rs.{s.price.toLocaleString()}
+                    </p>
                     {s.change != null && (
-                      <p className={`text-[10px] font-medium ${s.change >= 0 ? 'text-green-500' : 'text-red-500'}`}>
-                        {s.change >= 0 ? '+' : ''}{s.change}%
+                      <p
+                        className={`text-[10px] font-medium ${s.change >= 0 ? 'text-green-500' : 'text-red-500'}`}
+                      >
+                        {s.change >= 0 ? '+' : ''}
+                        {s.change}%
                       </p>
                     )}
                   </div>
@@ -345,21 +448,22 @@ function SymbolSearch({ symbolList, onSelected, onCancel }) {
 const EMPTY_FORM = { watch_low: '', watch_high: '', price_alert: '', alert_date: '', notes: '' }
 
 function AddForm({ symbol, refPrice, onAdd, onCancel }) {
-  const [form,   setForm]   = useState(EMPTY_FORM)
+  const [form, setForm] = useState(EMPTY_FORM)
   const [adding, setAdding] = useState(false)
-  const [err,    setErr]    = useState(null)
+  const [err, setErr] = useState(null)
 
   const handleSubmit = async (e) => {
     e.preventDefault()
-    setAdding(true); setErr(null)
+    setAdding(true)
+    setErr(null)
     try {
       await onAdd({
         symbol,
-        watch_low:   form.watch_low   ? parseFloat(form.watch_low)   : null,
-        watch_high:  form.watch_high  ? parseFloat(form.watch_high)  : null,
+        watch_low: form.watch_low ? parseFloat(form.watch_low) : null,
+        watch_high: form.watch_high ? parseFloat(form.watch_high) : null,
         price_alert: form.price_alert ? parseFloat(form.price_alert) : null,
-        alert_date:  form.alert_date  || null,
-        notes:       form.notes       || null,
+        alert_date: form.alert_date || null,
+        notes: form.notes || null,
       })
     } catch (e) {
       setErr(e.response?.data?.error || 'Failed to add')
@@ -367,9 +471,10 @@ function AddForm({ symbol, refPrice, onAdd, onCancel }) {
     }
   }
 
-  const priceAlertPct = form.price_alert && refPrice
-    ? ((parseFloat(form.price_alert) - refPrice) / refPrice * 100).toFixed(1)
-    : null
+  const priceAlertPct =
+    form.price_alert && refPrice
+      ? (((parseFloat(form.price_alert) - refPrice) / refPrice) * 100).toFixed(1)
+      : null
   const alertDays = form.alert_date
     ? Math.ceil((new Date(form.alert_date + 'T00:00:00') - new Date()) / (1000 * 60 * 60 * 24))
     : null
@@ -378,55 +483,73 @@ function AddForm({ symbol, refPrice, onAdd, onCancel }) {
     <div className="px-3 py-3 border-b border-gray-100 dark:border-gray-800 bg-gray-50 dark:bg-gray-900/60">
       <div className="flex items-center justify-between mb-2.5">
         <div className="flex items-center gap-2">
-          <p className="text-[12px] font-bold text-gray-800 dark:text-gray-100" translate="no">{symbol}</p>
-          {refPrice && (
-            <p className="text-[11px] text-gray-400">Rs.{refPrice.toLocaleString()}</p>
-          )}
+          <p className="text-[12px] font-bold text-gray-800 dark:text-gray-100" translate="no">
+            {symbol}
+          </p>
+          {refPrice && <p className="text-[11px] text-gray-400">Rs.{refPrice.toLocaleString()}</p>}
         </div>
-        <button onClick={onCancel} className="text-[10px] text-gray-400 hover:text-gray-600 dark:hover:text-gray-300">Cancel</button>
+        <button
+          onClick={onCancel}
+          className="text-[10px] text-gray-400 hover:text-gray-600 dark:hover:text-gray-300"
+        >
+          Cancel
+        </button>
       </div>
 
       <form onSubmit={handleSubmit} className="space-y-2">
         <div className="grid grid-cols-2 gap-2">
           {[
             ['Price Alert (Rs)', 'price_alert', 'number'],
-            ['Alert Date',       'alert_date',  'date'],
-            ['Watch Low (Rs)',   'watch_low',   'number'],
-            ['Watch High (Rs)',  'watch_high',  'number'],
+            ['Alert Date', 'alert_date', 'date'],
+            ['Watch Low (Rs)', 'watch_low', 'number'],
+            ['Watch High (Rs)', 'watch_high', 'number'],
           ].map(([label, key, type]) => (
             <div key={key}>
-              <label className="block text-[10px] font-semibold uppercase tracking-widest text-gray-400 mb-1">{label}</label>
+              <label className="block text-[10px] font-semibold uppercase tracking-widest text-gray-400 mb-1">
+                {label}
+              </label>
               <input
                 type={type}
                 value={form[key]}
-                onChange={e => setForm(f => ({ ...f, [key]: e.target.value }))}
+                onChange={(e) => setForm((f) => ({ ...f, [key]: e.target.value }))}
                 className="w-full bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg px-2.5 py-1.5 text-[11px] text-gray-800 dark:text-gray-200 outline-none focus:ring-2 focus:ring-blue-300 dark:focus:ring-blue-800"
               />
               {key === 'price_alert' && priceAlertPct && (
-                <p className={`text-[10px] mt-0.5 ${parseFloat(priceAlertPct) >= 0 ? 'text-green-500' : 'text-red-400'}`}>
-                  {parseFloat(priceAlertPct) >= 0 ? '+' : ''}{priceAlertPct}% from LTP
+                <p
+                  className={`text-[10px] mt-0.5 ${parseFloat(priceAlertPct) >= 0 ? 'text-green-500' : 'text-red-400'}`}
+                >
+                  {parseFloat(priceAlertPct) >= 0 ? '+' : ''}
+                  {priceAlertPct}% from LTP
                 </p>
               )}
               {key === 'alert_date' && alertDays != null && (
-                <p className="text-[10px] mt-0.5 text-blue-500 dark:text-blue-400">{alertDays}d from today</p>
+                <p className="text-[10px] mt-0.5 text-blue-500 dark:text-blue-400">
+                  {alertDays}d from today
+                </p>
               )}
             </div>
           ))}
         </div>
 
         <div>
-          <label className="block text-[10px] font-semibold uppercase tracking-widest text-gray-400 mb-1">Notes</label>
+          <label className="block text-[10px] font-semibold uppercase tracking-widest text-gray-400 mb-1">
+            Notes
+          </label>
           <input
             type="text"
             value={form.notes}
             maxLength={300}
-            onChange={e => setForm(f => ({ ...f, notes: e.target.value }))}
+            onChange={(e) => setForm((f) => ({ ...f, notes: e.target.value }))}
             placeholder="Why watching?"
             className="w-full bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg px-2.5 py-1.5 text-[11px] text-gray-800 dark:text-gray-200 outline-none focus:ring-2 focus:ring-blue-300 dark:focus:ring-blue-800"
           />
         </div>
 
-        {err && <p className="text-[10px] text-red-500 bg-red-50 dark:bg-red-950 px-2.5 py-1.5 rounded-lg">{err}</p>}
+        {err && (
+          <p className="text-[10px] text-red-500 bg-red-50 dark:bg-red-950 px-2.5 py-1.5 rounded-lg">
+            {err}
+          </p>
+        )}
 
         <button
           type="submit"
@@ -442,14 +565,14 @@ function AddForm({ symbol, refPrice, onAdd, onCancel }) {
 
 // ── Main component ────────────────────────────────────────────────────────────
 function Watchlist() {
-  const [watchlist,   setWatchlist]   = useState([])
-  const [loading,     setLoading]     = useState(true)
-  const [fetchErr,    setFetchErr]    = useState(null)
-  const [activeTab,   setActiveTab]   = useState('active')
-  const [editItem,    setEditItem]    = useState(null)
+  const [watchlist, setWatchlist] = useState([])
+  const [loading, setLoading] = useState(true)
+  const [fetchErr, setFetchErr] = useState(null)
+  const [activeTab, setActiveTab] = useState('active')
+  const [editItem, setEditItem] = useState(null)
 
   // add flow: null | 'search' | { symbol, refPrice }
-  const [addState,    setAddState]    = useState(null)
+  const [addState, setAddState] = useState(null)
 
   // symbol list for autocomplete — loaded once, stored in ref to avoid re-renders
   const symbolListRef = useRef([])
@@ -462,21 +585,25 @@ function Watchlist() {
     setFetchErr(null)
     try {
       const watchRes = await getWatchlist()
-      const watchItems = (watchRes.data || []).filter(w => w.category !== 'portfolio')
+      const watchItems = (watchRes.data || []).filter((w) => w.category !== 'portfolio')
 
-      const symbols = [...new Set(watchItems.map(w => w.symbol))].filter(Boolean)
+      const symbols = [...new Set(watchItems.map((w) => w.symbol))].filter(Boolean)
       let priceMap = {}
       if (symbols.length > 0) {
         try {
           const batchRes = await getBatchPrices(symbols)
           priceMap = batchRes.data.prices || {}
-        } catch { /* prices unavailable — UI still works */ }
+        } catch {
+          /* prices unavailable — UI still works */
+        }
       }
 
-      setWatchlist(watchItems.map(w => {
-        const p = priceMap[w.symbol]
-        return { ...w, currentPrice: p?.price ?? null, change: p?.change ?? null }
-      }))
+      setWatchlist(
+        watchItems.map((w) => {
+          const p = priceMap[w.symbol]
+          return { ...w, currentPrice: p?.price ?? null, change: p?.change ?? null }
+        })
+      )
     } catch {
       setFetchErr('Failed to load watchlist')
     } finally {
@@ -484,13 +611,15 @@ function Watchlist() {
     }
   }, [])
 
-  useEffect(() => { fetchWatchlist() }, [fetchWatchlist])
+  useEffect(() => {
+    fetchWatchlist()
+  }, [fetchWatchlist])
   useChatRefresh(['watchlist'], fetchWatchlist)
 
   // ── Load symbol list for autocomplete ──────────────────────────────────────
   useEffect(() => {
     getMarketSymbols()
-      .then(res => {
+      .then((res) => {
         symbolListRef.current = res.data || []
         setSymbolsReady(true)
       })
@@ -502,13 +631,13 @@ function Watchlist() {
   today.setHours(0, 0, 0, 0)
 
   const classified = useMemo(
-    () => watchlist.map(w => ({ ...w, ...classifyItem(w, today) })),
+    () => watchlist.map((w) => ({ ...w, ...classifyItem(w, today) })),
     [watchlist, today.toDateString()] // eslint-disable-line react-hooks/exhaustive-deps
   )
 
-  const activeItems = classified.filter(w => w.category === 'active')
-  const preItems    = classified.filter(w => w.category === 'pre')
-  const filtered    = activeTab === 'active' ? activeItems : preItems
+  const activeItems = classified.filter((w) => w.category === 'active')
+  const preItems = classified.filter((w) => w.category === 'pre')
+  const filtered = activeTab === 'active' ? activeItems : preItems
 
   // ── Handlers ───────────────────────────────────────────────────────────────
   const handleSymbolSelected = (sym) => {
@@ -523,31 +652,36 @@ function Watchlist() {
   }
 
   const handleRemove = async (id) => {
-    const snapshot = watchlist.find(w => w.id === id)
-    setWatchlist(prev => prev.filter(w => w.id !== id))
+    const snapshot = watchlist.find((w) => w.id === id)
+    setWatchlist((prev) => prev.filter((w) => w.id !== id))
     try {
       await removeFromWatchlist(id)
       clearWatchlistCache()
     } catch {
-      if (snapshot) setWatchlist(prev => [...prev, snapshot])
+      if (snapshot) setWatchlist((prev) => [...prev, snapshot])
     }
   }
 
   // ── Render ─────────────────────────────────────────────────────────────────
-  if (loading) return (
-    <div className="bg-white dark:bg-gray-900 rounded-2xl border border-gray-100 dark:border-gray-800">
-      <Skeleton />
-    </div>
-  )
+  if (loading)
+    return (
+      <div className="bg-white dark:bg-gray-900 rounded-2xl border border-gray-100 dark:border-gray-800">
+        <Skeleton />
+      </div>
+    )
 
-  if (fetchErr) return (
-    <div className="bg-white dark:bg-gray-900 rounded-2xl border border-gray-100 dark:border-gray-800 p-4 flex flex-col items-center gap-3 min-h-[80px] justify-center">
-      <p className="text-[11px] text-red-400">{fetchErr}</p>
-      <button onClick={fetchWatchlist} className="text-[11px] px-3 py-1 rounded-lg bg-gray-100 dark:bg-gray-800 text-gray-600 dark:text-gray-300 hover:bg-gray-200 dark:hover:bg-gray-700">
-        Retry
-      </button>
-    </div>
-  )
+  if (fetchErr)
+    return (
+      <div className="bg-white dark:bg-gray-900 rounded-2xl border border-gray-100 dark:border-gray-800 p-4 flex flex-col items-center gap-3 min-h-[80px] justify-center">
+        <p className="text-[11px] text-red-400">{fetchErr}</p>
+        <button
+          onClick={fetchWatchlist}
+          className="text-[11px] px-3 py-1 rounded-lg bg-gray-100 dark:bg-gray-800 text-gray-600 dark:text-gray-300 hover:bg-gray-200 dark:hover:bg-gray-700"
+        >
+          Retry
+        </button>
+      </div>
+    )
 
   return (
     <div className="bg-white dark:bg-gray-900 rounded-2xl border border-gray-100 dark:border-gray-800 overflow-hidden">
@@ -556,13 +690,19 @@ function Watchlist() {
         <EditWatchlistModal
           item={editItem}
           onClose={() => setEditItem(null)}
-          onSaved={() => { clearWatchlistCache(); setEditItem(null); fetchWatchlist() }}
+          onSaved={() => {
+            clearWatchlistCache()
+            setEditItem(null)
+            fetchWatchlist()
+          }}
         />
       )}
 
       {/* ── Header row: label + tabs + add button ── */}
       <div className="flex items-center gap-2 px-3 py-2.5 border-b border-gray-100 dark:border-gray-800">
-        <p className="text-[10px] font-semibold uppercase tracking-widest text-gray-400 shrink-0">Watchlist</p>
+        <p className="text-[10px] font-semibold uppercase tracking-widest text-gray-400 shrink-0">
+          Watchlist
+        </p>
 
         <div className="flex-1" />
 
@@ -570,11 +710,14 @@ function Watchlist() {
         <div className="flex items-center bg-gray-100 dark:bg-gray-800 rounded-lg p-0.5 shrink-0">
           {[
             { id: 'active', label: `Active${activeItems.length ? ` ${activeItems.length}` : ''}` },
-            { id: 'pre',    label: `Pre-Watch${preItems.length ? ` ${preItems.length}` : ''}` },
-          ].map(tab => (
+            { id: 'pre', label: `Pre-Watch${preItems.length ? ` ${preItems.length}` : ''}` },
+          ].map((tab) => (
             <button
               key={tab.id}
-              onClick={() => { setActiveTab(tab.id); setAddState(null) }}
+              onClick={() => {
+                setActiveTab(tab.id)
+                setAddState(null)
+              }}
               className={`px-2 py-0.5 rounded-md text-[10px] font-semibold transition-all whitespace-nowrap ${
                 activeTab === tab.id
                   ? 'bg-white dark:bg-gray-700 text-gray-900 dark:text-white shadow-sm'
@@ -593,7 +736,12 @@ function Watchlist() {
             className="flex items-center gap-0.5 px-2 py-0.5 rounded-md text-[10px] font-semibold bg-blue-600 hover:bg-blue-700 text-white transition-colors shrink-0"
           >
             <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M12 4v16m8-8H4" />
+              <path
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                strokeWidth={2.5}
+                d="M12 4v16m8-8H4"
+              />
             </svg>
             Add
           </button>
@@ -628,7 +776,9 @@ function Watchlist() {
       <div className="divide-y divide-gray-50 dark:divide-gray-800">
         {filtered.length === 0 ? (
           <div className="py-8 text-center">
-            <p className="text-[11px] text-gray-400">No stocks in {activeTab === 'active' ? 'Active' : 'Pre-Watch'}</p>
+            <p className="text-[11px] text-gray-400">
+              No stocks in {activeTab === 'active' ? 'Active' : 'Pre-Watch'}
+            </p>
             <p className="text-[10px] text-gray-300 dark:text-gray-600 mt-1">
               {activeTab === 'active'
                 ? 'Items auto-promote when alert is within 15% or 2 weeks'
@@ -639,15 +789,20 @@ function Watchlist() {
           filtered.map((item, i) => {
             const alertMsgs = getAlertMessages(item, today)
             const isExpired = item.status === 'expired'
-            const inGrace   = item.status === 'grace'
+            const inGrace = item.status === 'grace'
 
             return (
               <div
                 key={item.id}
                 onContextMenu={onContextMenu([
-                  { label: 'Edit',   icon: '✏️', action: () => setEditItem(item) },
+                  { label: 'Edit', icon: '✏️', action: () => setEditItem(item) },
                   { separator: true },
-                  { label: 'Delete', icon: '🗑️', danger: true, action: () => handleRemove(item.id) },
+                  {
+                    label: 'Delete',
+                    icon: '🗑️',
+                    danger: true,
+                    action: () => handleRemove(item.id),
+                  },
                 ])}
                 className={`px-3 py-2.5 cursor-default transition-colors ${
                   i % 2 === 1
@@ -659,7 +814,9 @@ function Watchlist() {
                 <div className="flex items-start justify-between gap-2" translate="no">
                   <div className="min-w-0 flex-1">
                     <div className="flex items-center gap-1.5 flex-wrap">
-                      <p className={`text-[12px] font-bold ${isExpired ? 'text-gray-400 dark:text-gray-500' : 'text-gray-900 dark:text-white'}`}>
+                      <p
+                        className={`text-[12px] font-bold ${isExpired ? 'text-gray-400 dark:text-gray-500' : 'text-gray-900 dark:text-white'}`}
+                      >
                         {item.symbol}
                       </p>
                       {isExpired && (
@@ -677,18 +834,27 @@ function Watchlist() {
                     {/* Sub-details */}
                     <div className="text-[10px] text-gray-400 mt-0.5 space-y-0.5">
                       {(item.watch_low || item.watch_high) && (
-                        <p>Range: Rs.{item.watch_low ?? '—'} – Rs.{item.watch_high ?? '—'}</p>
+                        <p>
+                          Range: Rs.{item.watch_low ?? '—'} – Rs.{item.watch_high ?? '—'}
+                        </p>
                       )}
                       {item.price_alert && (
                         <p>Alert: Rs.{parseFloat(item.price_alert).toLocaleString()}</p>
                       )}
                       {item.alert_date && (
                         <p className={isExpired ? 'line-through' : ''}>
-                          By: {new Date(item.alert_date + 'T00:00:00').toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}
+                          By:{' '}
+                          {new Date(item.alert_date + 'T00:00:00').toLocaleDateString('en-US', {
+                            month: 'short',
+                            day: 'numeric',
+                            year: 'numeric',
+                          })}
                         </p>
                       )}
                       {item.notes && (
-                        <p className="text-gray-400 dark:text-gray-500 italic truncate max-w-[160px]">"{item.notes}"</p>
+                        <p className="text-gray-400 dark:text-gray-500 italic truncate max-w-[160px]">
+                          "{item.notes}"
+                        </p>
                       )}
                     </div>
                   </div>
@@ -699,8 +865,11 @@ function Watchlist() {
                       {item.currentPrice != null ? `Rs.${item.currentPrice.toLocaleString()}` : '—'}
                     </p>
                     {item.change != null && (
-                      <p className={`text-[10px] font-medium tabular-nums ${item.change >= 0 ? 'text-green-600 dark:text-green-400' : 'text-red-600 dark:text-red-400'}`}>
-                        {item.change >= 0 ? '+' : ''}{item.change}%
+                      <p
+                        className={`text-[10px] font-medium tabular-nums ${item.change >= 0 ? 'text-green-600 dark:text-green-400' : 'text-red-600 dark:text-red-400'}`}
+                      >
+                        {item.change >= 0 ? '+' : ''}
+                        {item.change}%
                       </p>
                     )}
                   </div>

@@ -4,7 +4,11 @@ const ThemeContext = createContext()
 
 export function ThemeProvider({ children }) {
   const [isDark, setIsDark] = useState(() => {
-    try { return localStorage.getItem('theme') === 'dark' } catch { return false }
+    try {
+      return localStorage.getItem('theme') === 'dark'
+    } catch {
+      return false
+    }
   })
 
   useEffect(() => {
@@ -20,13 +24,9 @@ export function ThemeProvider({ children }) {
     if (link) link.href = isDark ? '/favicon-dark.svg' : '/favicon-light.svg'
   }, [isDark])
 
-  const toggleTheme = () => setIsDark(prev => !prev)
+  const toggleTheme = () => setIsDark((prev) => !prev)
 
-  return (
-    <ThemeContext.Provider value={{ isDark, toggleTheme }}>
-      {children}
-    </ThemeContext.Provider>
-  )
+  return <ThemeContext.Provider value={{ isDark, toggleTheme }}>{children}</ThemeContext.Provider>
 }
 
 export function useTheme() {

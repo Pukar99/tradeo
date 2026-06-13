@@ -9,7 +9,7 @@ import {
   deleteResearchComment,
   deleteResearchPost,
   verifyResearchPost,
-  pinResearchPost
+  pinResearchPost,
 } from '../api'
 import { useCreateBlockNote } from '@blocknote/react'
 import { BlockNoteView } from '@blocknote/mantine'
@@ -21,18 +21,30 @@ const ADMIN_USER_ID = 1
 
 const formatDate = (dateStr) => {
   if (!dateStr) return ''
-  return new Date(dateStr).toLocaleDateString('en-US', { year: 'numeric', month: 'short', day: 'numeric' })
+  return new Date(dateStr).toLocaleDateString('en-US', {
+    year: 'numeric',
+    month: 'short',
+    day: 'numeric',
+  })
 }
 
 const formatDateTime = (dateStr) => {
   if (!dateStr) return ''
-  return new Date(dateStr).toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric', hour: '2-digit', minute: '2-digit' })
+  return new Date(dateStr).toLocaleDateString('en-US', {
+    year: 'numeric',
+    month: 'long',
+    day: 'numeric',
+    hour: '2-digit',
+    minute: '2-digit',
+  })
 }
 
 function Avatar({ person, size = 'w-8 h-8' }) {
   const [imgError, setImgError] = useState(false)
   return (
-    <div className={`${size} rounded-full bg-gradient-to-br from-blue-400 to-indigo-500 flex items-center justify-center flex-shrink-0 overflow-hidden`}>
+    <div
+      className={`${size} rounded-full bg-gradient-to-br from-blue-400 to-indigo-500 flex items-center justify-center flex-shrink-0 overflow-hidden`}
+    >
       {person?.avatar_url && !imgError ? (
         <img
           src={person.avatar_url}
@@ -78,7 +90,9 @@ function ResearchViewPage() {
     }
   }, [id])
 
-  useEffect(() => { fetchPost() }, [fetchPost])
+  useEffect(() => {
+    fetchPost()
+  }, [fetchPost])
 
   useEffect(() => {
     if (post?.content && editor && !editorReady) {
@@ -132,59 +146,91 @@ function ResearchViewPage() {
   }
 
   const handleVerify = async () => {
-    try { await verifyResearchPost(id); await fetchPost() } catch (err) {
+    try {
+      await verifyResearchPost(id)
+      await fetchPost()
+    } catch (err) {
       setActionErr(err.response?.data?.error || 'Failed to verify post')
     }
   }
 
   const handlePin = async () => {
-    try { await pinResearchPost(id); await fetchPost() } catch (err) {
+    try {
+      await pinResearchPost(id)
+      await fetchPost()
+    } catch (err) {
       setActionErr(err.response?.data?.error || 'Failed to pin post')
     }
   }
 
   if (!user) return null
 
-  if (loading) return (
-    <div className="w-full px-3 sm:px-6 py-6 max-w-3xl mx-auto">
-      <div className="bg-white dark:bg-gray-900 rounded-2xl border border-gray-100 dark:border-gray-800 p-6 animate-pulse">
-        <div className="h-5 bg-gray-100 dark:bg-gray-800 rounded w-3/4 mb-4" />
-        <div className="h-3 bg-gray-100 dark:bg-gray-800 rounded w-1/3 mb-8" />
-        <div className="space-y-2.5">
-          {[1,2,3,4].map(i => <div key={i} className="h-3 bg-gray-100 dark:bg-gray-800 rounded" style={{ width: `${100 - i*7}%` }} />)}
+  if (loading)
+    return (
+      <div className="w-full px-3 sm:px-6 py-6 max-w-3xl mx-auto">
+        <div className="bg-white dark:bg-gray-900 rounded-2xl border border-gray-100 dark:border-gray-800 p-6 animate-pulse">
+          <div className="h-5 bg-gray-100 dark:bg-gray-800 rounded w-3/4 mb-4" />
+          <div className="h-3 bg-gray-100 dark:bg-gray-800 rounded w-1/3 mb-8" />
+          <div className="space-y-2.5">
+            {[1, 2, 3, 4].map((i) => (
+              <div
+                key={i}
+                className="h-3 bg-gray-100 dark:bg-gray-800 rounded"
+                style={{ width: `${100 - i * 7}%` }}
+              />
+            ))}
+          </div>
         </div>
       </div>
-    </div>
-  )
+    )
 
-  if (fetchError) return (
-    <div className="w-full px-3 sm:px-6 py-6 max-w-3xl mx-auto text-center pt-20">
-      <p className="text-[12px] text-red-400 mb-3">{fetchError}</p>
-      <button onClick={() => { setFetchError(null); setLoading(true); fetchPost() }} className="text-[11px] text-blue-500 hover:underline mr-3">
-        Retry
-      </button>
-      <button onClick={() => navigate('/research')} className="text-[11px] text-gray-400 hover:underline">
-        ← Back to Research Hub
-      </button>
-    </div>
-  )
+  if (fetchError)
+    return (
+      <div className="w-full px-3 sm:px-6 py-6 max-w-3xl mx-auto text-center pt-20">
+        <p className="text-[12px] text-red-400 mb-3">{fetchError}</p>
+        <button
+          onClick={() => {
+            setFetchError(null)
+            setLoading(true)
+            fetchPost()
+          }}
+          className="text-[11px] text-blue-500 hover:underline mr-3"
+        >
+          Retry
+        </button>
+        <button
+          onClick={() => navigate('/research')}
+          className="text-[11px] text-gray-400 hover:underline"
+        >
+          ← Back to Research Hub
+        </button>
+      </div>
+    )
 
-  if (!post) return (
-    <div className="w-full px-3 sm:px-6 py-6 max-w-3xl mx-auto text-center pt-20">
-      <p className="text-[12px] text-gray-400 mb-3">Post not found</p>
-      <button onClick={() => navigate('/research')} className="text-[11px] text-blue-500 hover:underline">
-        ← Back to Research Hub
-      </button>
-    </div>
-  )
+  if (!post)
+    return (
+      <div className="w-full px-3 sm:px-6 py-6 max-w-3xl mx-auto text-center pt-20">
+        <p className="text-[12px] text-gray-400 mb-3">Post not found</p>
+        <button
+          onClick={() => navigate('/research')}
+          className="text-[11px] text-blue-500 hover:underline"
+        >
+          ← Back to Research Hub
+        </button>
+      </div>
+    )
 
   return (
     <div className="w-full px-3 sm:px-6 py-6 max-w-3xl mx-auto space-y-4">
-
       {actionErr && (
         <div className="flex items-center justify-between bg-red-50 dark:bg-red-900/20 border border-red-100 dark:border-red-800/50 rounded-xl px-4 py-2.5">
           <p className="text-[11px] text-red-500">{actionErr}</p>
-          <button onClick={() => setActionErr(null)} className="text-red-400 hover:text-red-600 text-xs ml-3">×</button>
+          <button
+            onClick={() => setActionErr(null)}
+            className="text-red-400 hover:text-red-600 text-xs ml-3"
+          >
+            ×
+          </button>
         </div>
       )}
 
@@ -201,10 +247,11 @@ function ResearchViewPage() {
 
       {/* Article card */}
       <div className="bg-white dark:bg-gray-900 rounded-2xl border border-gray-100 dark:border-gray-800 overflow-hidden">
-
         {/* Top accent bar */}
         {post.is_pinned && <div className="h-0.5 bg-gradient-to-r from-emerald-400 to-teal-400" />}
-        {post.is_verified && !post.is_pinned && <div className="h-0.5 bg-gradient-to-r from-blue-400 to-indigo-400" />}
+        {post.is_verified && !post.is_pinned && (
+          <div className="h-0.5 bg-gradient-to-r from-blue-400 to-indigo-400" />
+        )}
 
         <div className="p-6">
           {/* Badges */}
@@ -236,7 +283,9 @@ function ResearchViewPage() {
             <div className="flex items-center gap-2.5">
               <Avatar person={post.author} size="w-8 h-8" />
               <div>
-                <p className="text-[12px] font-semibold text-gray-800 dark:text-gray-200">{post.author?.name || 'Unknown'}</p>
+                <p className="text-[12px] font-semibold text-gray-800 dark:text-gray-200">
+                  {post.author?.name || 'Unknown'}
+                </p>
                 <p className="text-[10px] text-gray-400">
                   {formatDateTime(post.created_at)}
                   {post.updated_at !== post.created_at && ' · edited'}
@@ -246,12 +295,18 @@ function ResearchViewPage() {
 
             <div className="flex items-center gap-1.5">
               {isAdmin && !post.is_verified && (
-                <button onClick={handleVerify} className="text-[10px] px-2.5 py-1.5 rounded-xl bg-blue-50 dark:bg-blue-900/30 text-blue-600 dark:text-blue-400 hover:bg-blue-100 font-medium transition-colors">
+                <button
+                  onClick={handleVerify}
+                  className="text-[10px] px-2.5 py-1.5 rounded-xl bg-blue-50 dark:bg-blue-900/30 text-blue-600 dark:text-blue-400 hover:bg-blue-100 font-medium transition-colors"
+                >
                   Verify
                 </button>
               )}
               {isAdmin && !post.is_pinned && (
-                <button onClick={handlePin} className="text-[10px] px-2.5 py-1.5 rounded-xl bg-emerald-50 dark:bg-emerald-900/30 text-emerald-600 dark:text-emerald-400 hover:bg-emerald-100 font-medium transition-colors">
+                <button
+                  onClick={handlePin}
+                  className="text-[10px] px-2.5 py-1.5 rounded-xl bg-emerald-50 dark:bg-emerald-900/30 text-emerald-600 dark:text-emerald-400 hover:bg-emerald-100 font-medium transition-colors"
+                >
                   Pin
                 </button>
               )}
@@ -263,7 +318,10 @@ function ResearchViewPage() {
                   >
                     Edit
                   </button>
-                  <button onClick={handleDelete} className="text-[10px] px-2.5 py-1.5 rounded-xl text-red-400 hover:bg-red-50 dark:hover:bg-red-900/30 transition-colors">
+                  <button
+                    onClick={handleDelete}
+                    className="text-[10px] px-2.5 py-1.5 rounded-xl text-red-400 hover:bg-red-50 dark:hover:bg-red-900/30 transition-colors"
+                  >
                     Delete
                   </button>
                 </>
@@ -278,12 +336,24 @@ function ResearchViewPage() {
             <div className="bg-gray-50 dark:bg-gray-800 rounded-xl p-4 flex items-center justify-between">
               <div className="flex items-center gap-3">
                 <div className="w-9 h-9 bg-red-50 dark:bg-red-900/30 rounded-xl flex items-center justify-center">
-                  <svg className="w-4 h-4 text-red-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 21h10a2 2 0 002-2V9.414a1 1 0 00-.293-.707l-5.414-5.414A1 1 0 0012.586 3H7a2 2 0 00-2 2v14a2 2 0 002 2z" />
+                  <svg
+                    className="w-4 h-4 text-red-400"
+                    fill="none"
+                    viewBox="0 0 24 24"
+                    stroke="currentColor"
+                  >
+                    <path
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                      strokeWidth={2}
+                      d="M7 21h10a2 2 0 002-2V9.414a1 1 0 00-.293-.707l-5.414-5.414A1 1 0 0012.586 3H7a2 2 0 00-2 2v14a2 2 0 002 2z"
+                    />
                   </svg>
                 </div>
                 <div>
-                  <p className="text-[12px] font-medium text-gray-800 dark:text-gray-200">{post.pdf_name || 'Research PDF'}</p>
+                  <p className="text-[12px] font-medium text-gray-800 dark:text-gray-200">
+                    {post.pdf_name || 'Research PDF'}
+                  </p>
                   <p className="text-[10px] text-gray-400">PDF Document</p>
                 </div>
               </div>
@@ -312,16 +382,14 @@ function ResearchViewPage() {
 
         {/* Add comment */}
         <form onSubmit={handleComment} className="mb-5">
-          {commentErr && (
-            <p className="text-[10px] text-red-400 mb-2">{commentErr}</p>
-          )}
+          {commentErr && <p className="text-[10px] text-red-400 mb-2">{commentErr}</p>}
           <div className="flex gap-2.5">
             <Avatar person={user} size="w-7 h-7" />
             <div className="flex-1 flex gap-2">
               <input
                 type="text"
                 value={comment}
-                onChange={e => setComment(e.target.value)}
+                onChange={(e) => setComment(e.target.value)}
                 placeholder="Add a comment..."
                 className="flex-1 bg-gray-50 dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-xl px-3 py-2 text-xs text-gray-800 dark:text-white placeholder-gray-400 focus:outline-none focus:border-blue-400 transition-colors"
               />
@@ -338,18 +406,24 @@ function ResearchViewPage() {
 
         {/* Comment list */}
         {!post.comments?.length ? (
-          <p className="text-[11px] text-gray-400 text-center py-6">No comments yet — be the first</p>
+          <p className="text-[11px] text-gray-400 text-center py-6">
+            No comments yet — be the first
+          </p>
         ) : (
           <div className="space-y-4">
-            {post.comments.map(c => (
+            {post.comments.map((c) => (
               <div key={c.id} className="flex gap-2.5 group">
                 <Avatar person={c.author} size="w-7 h-7" />
                 <div className="flex-1">
                   <div className="flex items-baseline gap-2 mb-1">
-                    <span className="text-[11px] font-semibold text-gray-800 dark:text-gray-200">{c.author?.name || 'Unknown'}</span>
+                    <span className="text-[11px] font-semibold text-gray-800 dark:text-gray-200">
+                      {c.author?.name || 'Unknown'}
+                    </span>
                     <span className="text-[10px] text-gray-400">{formatDate(c.created_at)}</span>
                   </div>
-                  <p className="text-[11px] text-gray-600 dark:text-gray-300 leading-relaxed">{c.content}</p>
+                  <p className="text-[11px] text-gray-600 dark:text-gray-300 leading-relaxed">
+                    {c.content}
+                  </p>
                 </div>
                 {(isAdmin || c.user_id === user?.id) && (
                   <button

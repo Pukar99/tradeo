@@ -24,7 +24,10 @@ export const gCache = {
   get(key) {
     const entry = _store.get(key)
     if (!entry) return undefined
-    if (Date.now() > entry.exp) { _store.delete(key); return undefined }
+    if (Date.now() > entry.exp) {
+      _store.delete(key)
+      return undefined
+    }
     return entry.val
   },
 
@@ -37,12 +40,17 @@ export const gCache = {
   has(key) {
     const entry = _store.get(key)
     if (!entry) return false
-    if (Date.now() > entry.exp) { _store.delete(key); return false }
+    if (Date.now() > entry.exp) {
+      _store.delete(key)
+      return false
+    }
     return true
   },
 
   // Invalidate a key (e.g. after a write).
-  del(key) { _store.delete(key) },
+  del(key) {
+    _store.delete(key)
+  },
 
   // Invalidate all keys matching a prefix.
   delPrefix(prefix) {
@@ -52,29 +60,31 @@ export const gCache = {
   },
 
   // Clear everything (e.g. on logout).
-  clear() { _store.clear() },
+  clear() {
+    _store.clear()
+  },
 }
 
 // =============================================================================
 // 2. TTL CONSTANTS
 // =============================================================================
 export const TTL = {
-  SYMBOLS:      60 * 60_000,  // 1 hour — symbol list is stable
-  PROFILE:      10 * 60_000,  // 10 min — profile rarely changes
-  PRICES:        5 * 60_000,  // 5 min  — prices update intraday
-  CHART:        60 * 60_000,  // 1 hour — daily OHLCV doesn't change
-  MOVERS:        5 * 60_000,  // 5 min  — today's movers
-  MOVERS_PAST:  60 * 60_000,  // 1 hour — past date movers never change
-  DASHBOARD:    60 * 1_000,   // 1 min  — dashboard data
-  ELIGIBILITY:  60 * 60_000,  // 1 hour — trade stats change rarely
-  NEPSE_CHART:  10 * 60_000,  // 10 min — EOD data, stable within session
-  SUGGESTIONS:  10 * 60_000,  // 10 min — chat suggestions are static per session
-  POSITIONS:    30 * 1_000,   // 30s    — trade data, invalidated on any write
-  WATCHLIST:     2 * 60_000,  // 2 min  — matches backend _watchlistCache TTL
-  MARKET_DATES: 60 * 60_000,  // 1 hour — trading dates never change once set
-  DAY_FULL:     10 * 60_000,  // 10 min — EOD day data is stable
-  FEED:         30 * 60_000,  // 30 min — IPOs and news change infrequently
-  DISCIPLINE:    5 * 60_000,  // 5 min  — score can change after task/journal write
+  SYMBOLS: 60 * 60_000, // 1 hour — symbol list is stable
+  PROFILE: 10 * 60_000, // 10 min — profile rarely changes
+  PRICES: 5 * 60_000, // 5 min  — prices update intraday
+  CHART: 60 * 60_000, // 1 hour — daily OHLCV doesn't change
+  MOVERS: 5 * 60_000, // 5 min  — today's movers
+  MOVERS_PAST: 60 * 60_000, // 1 hour — past date movers never change
+  DASHBOARD: 60 * 1_000, // 1 min  — dashboard data
+  ELIGIBILITY: 60 * 60_000, // 1 hour — trade stats change rarely
+  NEPSE_CHART: 10 * 60_000, // 10 min — EOD data, stable within session
+  SUGGESTIONS: 10 * 60_000, // 10 min — chat suggestions are static per session
+  POSITIONS: 30 * 1_000, // 30s    — trade data, invalidated on any write
+  WATCHLIST: 2 * 60_000, // 2 min  — matches backend _watchlistCache TTL
+  MARKET_DATES: 60 * 60_000, // 1 hour — trading dates never change once set
+  DAY_FULL: 10 * 60_000, // 10 min — EOD day data is stable
+  FEED: 30 * 60_000, // 30 min — IPOs and news change infrequently
+  DISCIPLINE: 5 * 60_000, // 5 min  — score can change after task/journal write
 }
 
 // =============================================================================
@@ -83,24 +93,24 @@ export const TTL = {
 // Drop-in replacements — same return shape as the raw API functions.
 
 import {
-  getMarketSymbols      as _getMarketSymbols,
-  getProfile            as _getProfile,
-  getDiscipline         as _getDiscipline,
+  getMarketSymbols as _getMarketSymbols,
+  getProfile as _getProfile,
+  getDiscipline as _getDiscipline,
   getResearchEligibility as _getResearchEligibility,
-  getBatchPrices        as _getBatchPrices,
-  getNepseChart         as _getNepseChart,
-  getIndexChart         as _getIndexChart,
-  getChatSuggestions    as _getChatSuggestions,
-  getPositions          as _getPositions,
-  getTradeActions       as _getTradeActions,
-  getTradeHistory       as _getTradeHistory,
-  getWatchlist          as _getWatchlist,
-  getMarketDates        as _getMarketDates,
-  getDayFull            as _getDayFull,
-  getTopMovers          as _getTopMovers,
-  getIPOs               as _getIPOs,
-  getMarketNews         as _getMarketNews,
-  getDashboardInit      as _getDashboardInit,
+  getBatchPrices as _getBatchPrices,
+  getNepseChart as _getNepseChart,
+  getIndexChart as _getIndexChart,
+  getChatSuggestions as _getChatSuggestions,
+  getPositions as _getPositions,
+  getTradeActions as _getTradeActions,
+  getTradeHistory as _getTradeHistory,
+  getWatchlist as _getWatchlist,
+  getMarketDates as _getMarketDates,
+  getDayFull as _getDayFull,
+  getTopMovers as _getTopMovers,
+  getIPOs as _getIPOs,
+  getMarketNews as _getMarketNews,
+  getDashboardInit as _getDashboardInit,
 } from '../api'
 
 export async function getMarketSymbols() {
@@ -238,7 +248,9 @@ export async function getWatchlist() {
   gCache.set('watchlist', result, TTL.WATCHLIST)
   return result
 }
-export function clearWatchlistCache() { gCache.del('watchlist') }
+export function clearWatchlistCache() {
+  gCache.del('watchlist')
+}
 
 // Market dates — stable once set, cache 1 hour.
 export async function getMarketDates() {
@@ -266,8 +278,8 @@ export async function getDayFull(date) {
 export async function getTopMovers(date) {
   const nptDate = new Date(Date.now() + (5 * 60 + 45) * 60 * 1000).toISOString().slice(0, 10)
   const isToday = date === nptDate
-  const key     = `movers:${date}`
-  const cached  = gCache.get(key)
+  const key = `movers:${date}`
+  const cached = gCache.get(key)
   if (cached !== undefined) return cached
   const result = await _getTopMovers(date)
   gCache.set(key, result, isToday ? TTL.MOVERS : TTL.MOVERS_PAST)
@@ -281,13 +293,21 @@ export async function getMarketFeed() {
   const cachedIpos = gCache.get('feed-ipos')
   const cachedNews = gCache.get('feed-news')
 
-  const ipoFetch = cachedIpos !== undefined
-    ? Promise.resolve(cachedIpos)
-    : _getIPOs().then(r => { gCache.set('feed-ipos', r, TTL.FEED); return r })
+  const ipoFetch =
+    cachedIpos !== undefined
+      ? Promise.resolve(cachedIpos)
+      : _getIPOs().then((r) => {
+          gCache.set('feed-ipos', r, TTL.FEED)
+          return r
+        })
 
-  const newsFetch = cachedNews !== undefined
-    ? Promise.resolve(cachedNews)
-    : _getMarketNews().then(r => { gCache.set('feed-news', r, TTL.FEED); return r })
+  const newsFetch =
+    cachedNews !== undefined
+      ? Promise.resolve(cachedNews)
+      : _getMarketNews().then((r) => {
+          gCache.set('feed-news', r, TTL.FEED)
+          return r
+        })
 
   return Promise.all([ipoFetch, newsFetch])
 }
@@ -333,7 +353,11 @@ export function clearUserCache() {
   gCache.delPrefix('positions')
   gCache.delPrefix('trade-history:')
   // Drain any registered module-local caches
-  for (const fn of _cleaners) { try { fn() } catch {} } // eslint-disable-line no-empty
+  for (const fn of _cleaners) {
+    try {
+      fn()
+    } catch {}
+  } // eslint-disable-line no-empty
 }
 
 // Call after closing a trade so the eligibility re-check picks up the new stats

@@ -23,26 +23,36 @@ const ranges = [
 // 1. NEPSE MINI CHART
 // =============================================================================
 
-function NEPSEMiniChart({ data, label, height = 200, onCrosshairMove, syncTime, onRangeChange, syncRange }) {
+function NEPSEMiniChart({
+  data,
+  label,
+  height = 200,
+  onCrosshairMove,
+  syncTime,
+  onRangeChange,
+  syncRange,
+}) {
   const chartContainerRef = useRef(null)
-  const chartRef          = useRef(null)
-  const seriesRef         = useRef(null)
-  const dataRef           = useRef(data)
-  const { isDark }        = useTheme()
-  const [hovered, setHovered]       = useState(null)  // { date, o, h, l, c } from crosshair
+  const chartRef = useRef(null)
+  const seriesRef = useRef(null)
+  const dataRef = useRef(data)
+  const { isDark } = useTheme()
+  const [hovered, setHovered] = useState(null) // { date, o, h, l, c } from crosshair
   const [chartReady, setChartReady] = useState(false)
 
   // Keep dataRef always current without triggering chart reinit
-  useEffect(() => { dataRef.current = data }, [data])
+  useEffect(() => {
+    dataRef.current = data
+  }, [data])
 
   const getThemeOptions = (dark) => ({
     layout: {
       background: { color: dark ? 'rgba(17,24,39,0)' : 'rgba(255,255,255,0)' },
-      textColor:  dark ? '#6b7280' : '#9ca3af',
+      textColor: dark ? '#6b7280' : '#9ca3af',
       fontSize: 10,
     },
     rightPriceScale: { borderColor: dark ? '#1f2937' : '#e5e7eb' },
-    timeScale:        { borderColor: dark ? '#1f2937' : '#e5e7eb' },
+    timeScale: { borderColor: dark ? '#1f2937' : '#e5e7eb' },
   })
 
   const applyData = (d) => {
@@ -50,7 +60,7 @@ function NEPSEMiniChart({ data, label, height = 200, onCrosshairMove, syncTime, 
     seriesRef.current.setData(d)
     const BARS = 28
     const from = d.length > BARS ? d[d.length - BARS].time : d[0].time
-    const to   = d[d.length - 1].time
+    const to = d[d.length - 1].time
     chartRef.current.timeScale().setVisibleRange({ from, to })
     chartRef.current.timeScale().scrollToPosition(2, false)
   }
@@ -61,41 +71,56 @@ function NEPSEMiniChart({ data, label, height = 200, onCrosshairMove, syncTime, 
 
     const initChart = async () => {
       try {
-        await new Promise(r => setTimeout(r, 80))
+        await new Promise((r) => setTimeout(r, 80))
         if (cancelled || !chartContainerRef.current) return
 
         const { createChart } = await import('lightweight-charts')
         if (cancelled || !chartContainerRef.current) return
 
         const chart = createChart(chartContainerRef.current, {
-          width:  chartContainerRef.current.clientWidth || 400,
+          width: chartContainerRef.current.clientWidth || 400,
           height,
           ...getThemeOptions(isDark),
-          grid:         { vertLines: { visible: false }, horzLines: { visible: false } },
-          rightPriceScale: { borderColor: isDark ? '#1f2937' : '#e5e7eb', scaleMargins: { top: 0.1, bottom: 0.1 } },
-          timeScale:    { borderColor: isDark ? '#1f2937' : '#e5e7eb', timeVisible: true, fixLeftEdge: false, fixRightEdge: false },
-          crosshair:    { mode: 1 },
+          grid: { vertLines: { visible: false }, horzLines: { visible: false } },
+          rightPriceScale: {
+            borderColor: isDark ? '#1f2937' : '#e5e7eb',
+            scaleMargins: { top: 0.1, bottom: 0.1 },
+          },
+          timeScale: {
+            borderColor: isDark ? '#1f2937' : '#e5e7eb',
+            timeVisible: true,
+            fixLeftEdge: false,
+            fixRightEdge: false,
+          },
+          crosshair: { mode: 1 },
           handleScroll: { mouseWheel: true, pressedMouseMove: true, horzTouchDrag: true },
-          handleScale:  { mouseWheel: true, pinch: true, axisPressedMouseMove: true },
-          watermark:    { visible: false },
+          handleScale: { mouseWheel: true, pinch: true, axisPressedMouseMove: true },
+          watermark: { visible: false },
         })
 
         const series = chart.addCandlestickSeries({
-          upColor: '#22c55e', downColor: '#ef4444',
-          borderUpColor: '#22c55e', borderDownColor: '#ef4444',
-          wickUpColor: '#22c55e', wickDownColor: '#ef4444',
+          upColor: '#22c55e',
+          downColor: '#ef4444',
+          borderUpColor: '#22c55e',
+          borderDownColor: '#ef4444',
+          wickUpColor: '#22c55e',
+          wickDownColor: '#ef4444',
           priceLineVisible: false,
         })
 
-        chart.subscribeCrosshairMove(param => {
-          if (!param.time) { setHovered(null); onCrosshairMove?.(null); return }
+        chart.subscribeCrosshairMove((param) => {
+          if (!param.time) {
+            setHovered(null)
+            onCrosshairMove?.(null)
+            return
+          }
           const d = param.seriesData?.get(series)
           if (!d) return
           setHovered({ date: param.time, o: d.open, h: d.high, l: d.low, c: d.close })
           onCrosshairMove?.(param.time)
         })
 
-        chart.timeScale().subscribeVisibleTimeRangeChange(range => {
+        chart.timeScale().subscribeVisibleTimeRangeChange((range) => {
           if (range) onRangeChange?.(range)
         })
 
@@ -104,7 +129,7 @@ function NEPSEMiniChart({ data, label, height = 200, onCrosshairMove, syncTime, 
             chart.applyOptions({ width: chartContainerRef.current.clientWidth || 400 })
         }
         window.addEventListener('resize', onResize)
-        chartRef.current  = chart
+        chartRef.current = chart
         seriesRef.current = series
 
         if (!cancelled) {
@@ -114,13 +139,19 @@ function NEPSEMiniChart({ data, label, height = 200, onCrosshairMove, syncTime, 
         }
 
         return () => window.removeEventListener('resize', onResize)
-      } catch (err) { console.error('Chart init error:', err) }
+      } catch (err) {
+        console.error('Chart init error:', err)
+      }
     }
 
     initChart()
     return () => {
       cancelled = true
-      if (chartRef.current) { chartRef.current.remove(); chartRef.current = null; seriesRef.current = null }
+      if (chartRef.current) {
+        chartRef.current.remove()
+        chartRef.current = null
+        seriesRef.current = null
+      }
     }
   }, []) // eslint-disable-line react-hooks/exhaustive-deps
 
@@ -156,17 +187,19 @@ function NEPSEMiniChart({ data, label, height = 200, onCrosshairMove, syncTime, 
     } catch (_) {}
   }, [syncRange])
 
-  const last   = data?.[data.length - 1]
-  const prev   = data?.[data.length - 2]
-  const change = last && prev ? ((last.close - prev.close) / prev.close * 100).toFixed(2) : null
-  const isPos  = parseFloat(change ?? 0) >= 0
+  const last = data?.[data.length - 1]
+  const prev = data?.[data.length - 2]
+  const change = last && prev ? (((last.close - prev.close) / prev.close) * 100).toFixed(2) : null
+  const isPos = parseFloat(change ?? 0) >= 0
 
   // What to show in the header: crosshair data if hovering, else last candle
-  const display = hovered ?? (last ? { date: last.time, o: last.open, h: last.high, l: last.low, c: last.close } : null)
+  const display =
+    hovered ??
+    (last ? { date: last.time, o: last.open, h: last.high, l: last.low, c: last.close } : null)
   const displayChange = hovered
     ? (() => {
         // For hovered candle, % change = (close - open) / open
-        const pct = display ? ((display.c - display.o) / display.o * 100).toFixed(2) : null
+        const pct = display ? (((display.c - display.o) / display.o) * 100).toFixed(2) : null
         return pct
       })()
     : change
@@ -176,7 +209,9 @@ function NEPSEMiniChart({ data, label, height = 200, onCrosshairMove, syncTime, 
     <div className="flex flex-col">
       {/* Header: label + OHLC in one line — crosshair updates live, falls back to last bar */}
       <div className="flex items-center justify-between gap-2 px-3 pt-2 pb-1.5 min-w-0">
-        <span className="text-[10px] font-semibold text-gray-400 uppercase tracking-widest shrink-0">{label}</span>
+        <span className="text-[10px] font-semibold text-gray-400 uppercase tracking-widest shrink-0">
+          {label}
+        </span>
         {display && (
           <div className="flex items-center gap-1.5 flex-wrap justify-end min-w-0">
             {/* Date — only show on hover */}
@@ -185,18 +220,32 @@ function NEPSEMiniChart({ data, label, height = 200, onCrosshairMove, syncTime, 
             )}
             {/* O H L in muted small */}
             <span className="text-[9px] text-gray-400 tabular-nums whitespace-nowrap">
-              O<span className="text-gray-500 dark:text-gray-400 ml-0.5">{display.o.toFixed(0)}</span>
-              {' '}H<span className="text-gray-500 dark:text-gray-400 ml-0.5">{display.h.toFixed(0)}</span>
-              {' '}L<span className="text-gray-500 dark:text-gray-400 ml-0.5">{display.l.toFixed(0)}</span>
+              O
+              <span className="text-gray-500 dark:text-gray-400 ml-0.5">
+                {display.o.toFixed(0)}
+              </span>{' '}
+              H
+              <span className="text-gray-500 dark:text-gray-400 ml-0.5">
+                {display.h.toFixed(0)}
+              </span>{' '}
+              L
+              <span className="text-gray-500 dark:text-gray-400 ml-0.5">
+                {display.l.toFixed(0)}
+              </span>
             </span>
             {/* C highlighted */}
-            <span className={`text-[10px] font-bold tabular-nums ${displayIsPos ? 'text-green-500' : 'text-red-500'}`}>
+            <span
+              className={`text-[10px] font-bold tabular-nums ${displayIsPos ? 'text-green-500' : 'text-red-500'}`}
+            >
               {display.c.toFixed(2)}
             </span>
             {/* % change pill */}
             {displayChange && (
-              <span className={`text-[9px] font-semibold px-1 py-0.5 rounded-full tabular-nums ${displayIsPos ? 'bg-green-100 dark:bg-green-900/40 text-green-600 dark:text-green-400' : 'bg-red-100 dark:bg-red-900/40 text-red-500'}`}>
-                {displayIsPos ? '+' : ''}{displayChange}%
+              <span
+                className={`text-[9px] font-semibold px-1 py-0.5 rounded-full tabular-nums ${displayIsPos ? 'bg-green-100 dark:bg-green-900/40 text-green-600 dark:text-green-400' : 'bg-red-100 dark:bg-red-900/40 text-red-500'}`}
+              >
+                {displayIsPos ? '+' : ''}
+                {displayChange}%
               </span>
             )}
           </div>
@@ -205,7 +254,10 @@ function NEPSEMiniChart({ data, label, height = 200, onCrosshairMove, syncTime, 
 
       <div className="relative">
         {(!data || data.length === 0) && (
-          <div className="absolute inset-0 z-10 flex flex-col justify-center px-4 py-4 space-y-2 animate-pulse bg-white/60 dark:bg-gray-900/60 backdrop-blur-sm" style={{ height }}>
+          <div
+            className="absolute inset-0 z-10 flex flex-col justify-center px-4 py-4 space-y-2 animate-pulse bg-white/60 dark:bg-gray-900/60 backdrop-blur-sm"
+            style={{ height }}
+          >
             <div className="h-2 bg-gray-100 dark:bg-gray-800 rounded w-full" />
             <div className="h-2 bg-gray-100 dark:bg-gray-800 rounded w-3/4" />
             <div className="h-2 bg-gray-100 dark:bg-gray-800 rounded w-1/2" />
@@ -225,33 +277,33 @@ function NEPSEMiniChart({ data, label, height = 200, onCrosshairMove, syncTime, 
 function NEPSEChart({ fixed = false }) {
   const { isDark } = useTheme()
   const [range, setRange] = useState('1y')
-  const [loading, setLoading]           = useState(true)
-  const [stats, setStats]               = useState(null)
-  const [tooltip, setTooltip]           = useState(null)
+  const [loading, setLoading] = useState(true)
+  const [stats, setStats] = useState(null)
+  const [tooltip, setTooltip] = useState(null)
   const [hoveredMovers, setHoveredMovers] = useState(null)
-  const [chartReady, setChartReady]     = useState(false)
-  const [latestDate, setLatestDate]     = useState('')
+  const [chartReady, setChartReady] = useState(false)
+  const [latestDate, setLatestDate] = useState('')
   const chartContainerRef = useRef(null)
-  const chartRef          = useRef(null)
-  const seriesRef         = useRef(null)
-  const moversRef         = useRef({})
+  const chartRef = useRef(null)
+  const seriesRef = useRef(null)
+  const moversRef = useRef({})
 
   // Fixed mode — daily + weekly side-by-side, auto-loads on mount, crosshair synced
-  const [dailyData,   setDailyData]   = useState(null)
-  const [weeklyData,  setWeeklyData]  = useState(null)
-  const [dailySync,       setDailySync]       = useState(null)
-  const [weeklySync,      setWeeklySync]      = useState(null)
-  const [dailyRange,      setDailyRange]      = useState(null)
-  const [weeklyRange,     setWeeklyRange]     = useState(null)
+  const [dailyData, setDailyData] = useState(null)
+  const [weeklyData, setWeeklyData] = useState(null)
+  const [dailySync, setDailySync] = useState(null)
+  const [weeklySync, setWeeklySync] = useState(null)
+  const [dailyRange, setDailyRange] = useState(null)
+  const [weeklyRange, setWeeklyRange] = useState(null)
   const rangeSyncLockRef = useRef(false)
 
   useEffect(() => {
     if (!fixed) return
     _getNepseChartCached('1y')
-      .then(res => setDailyData(res.data.data))
+      .then((res) => setDailyData(res.data.data))
       .catch(() => {})
     getNepseWeeklyChart()
-      .then(res => setWeeklyData(res.data.data))
+      .then((res) => setWeeklyData(res.data.data))
       .catch(() => {})
   }, [fixed])
 
@@ -266,44 +318,93 @@ function NEPSEChart({ fixed = false }) {
   }
 
   if (fixed) {
-    const handleDailyRange  = (r) => { if (rangeSyncLockRef.current) return; rangeSyncLockRef.current = true; setWeeklyRange(r); setTimeout(() => { rangeSyncLockRef.current = false }, 50) }
-    const handleWeeklyRange = (r) => { if (rangeSyncLockRef.current) return; rangeSyncLockRef.current = true; setDailyRange(r);  setTimeout(() => { rangeSyncLockRef.current = false }, 50) }
+    const handleDailyRange = (r) => {
+      if (rangeSyncLockRef.current) return
+      rangeSyncLockRef.current = true
+      setWeeklyRange(r)
+      setTimeout(() => {
+        rangeSyncLockRef.current = false
+      }, 50)
+    }
+    const handleWeeklyRange = (r) => {
+      if (rangeSyncLockRef.current) return
+      rangeSyncLockRef.current = true
+      setDailyRange(r)
+      setTimeout(() => {
+        rangeSyncLockRef.current = false
+      }, 50)
+    }
 
     return (
       <div className="hp-card bg-white/70 dark:bg-gray-900/60 backdrop-blur-md rounded-2xl border border-white/60 dark:border-white/10 shadow-sm overflow-hidden">
         {/* Mobile toggle — D / W pill, hidden on desktop */}
         <div className="flex items-center justify-between px-3 pt-2 pb-0 lg:hidden">
-          <span className="text-[10px] font-semibold uppercase tracking-widest text-gray-400">NEPSE</span>
+          <span className="text-[10px] font-semibold uppercase tracking-widest text-gray-400">
+            NEPSE
+          </span>
           <div className="flex items-center bg-gray-100 dark:bg-gray-800 rounded-lg p-0.5">
-            {[{ id: 'daily', label: 'Daily' }, { id: 'weekly', label: 'Weekly' }].map(t => (
-              <button key={t.id} onClick={() => handleMobileTabSwitch(t.id)}
+            {[
+              { id: 'daily', label: 'Daily' },
+              { id: 'weekly', label: 'Weekly' },
+            ].map((t) => (
+              <button
+                key={t.id}
+                onClick={() => handleMobileTabSwitch(t.id)}
                 className={`px-2.5 py-0.5 rounded-md text-[10px] font-semibold transition-all ${
                   mobileTab === t.id
                     ? 'bg-white dark:bg-gray-700 text-gray-900 dark:text-white shadow-sm'
                     : 'text-gray-500 dark:text-gray-400'
-                }`}>{t.label}</button>
+                }`}
+              >
+                {t.label}
+              </button>
             ))}
           </div>
         </div>
 
         {/* Desktop: side-by-side; Mobile: single panel based on tab */}
         <div className="hidden lg:grid grid-cols-2 divide-x divide-gray-200 dark:divide-gray-700">
-          <NEPSEMiniChart data={dailyData}  label="Daily"  height={200}
-            onCrosshairMove={setWeeklySync} syncTime={dailySync}
-            onRangeChange={handleDailyRange} syncRange={dailyRange} />
-          <NEPSEMiniChart data={weeklyData} label="Weekly" height={200}
-            onCrosshairMove={setDailySync}  syncTime={weeklySync}
-            onRangeChange={handleWeeklyRange} syncRange={weeklyRange} />
+          <NEPSEMiniChart
+            data={dailyData}
+            label="Daily"
+            height={200}
+            onCrosshairMove={setWeeklySync}
+            syncTime={dailySync}
+            onRangeChange={handleDailyRange}
+            syncRange={dailyRange}
+          />
+          <NEPSEMiniChart
+            data={weeklyData}
+            label="Weekly"
+            height={200}
+            onCrosshairMove={setDailySync}
+            syncTime={weeklySync}
+            onRangeChange={handleWeeklyRange}
+            syncRange={weeklyRange}
+          />
         </div>
         <div className="lg:hidden">
-          {mobileTab === 'daily'
-            ? <NEPSEMiniChart data={dailyData}  label="Daily"  height={180}
-                onCrosshairMove={setWeeklySync} syncTime={dailySync}
-                onRangeChange={handleDailyRange} syncRange={dailyRange} />
-            : <NEPSEMiniChart data={weeklyData} label="Weekly" height={180}
-                onCrosshairMove={setDailySync}  syncTime={weeklySync}
-                onRangeChange={handleWeeklyRange} syncRange={weeklyRange} />
-          }
+          {mobileTab === 'daily' ? (
+            <NEPSEMiniChart
+              data={dailyData}
+              label="Daily"
+              height={180}
+              onCrosshairMove={setWeeklySync}
+              syncTime={dailySync}
+              onRangeChange={handleDailyRange}
+              syncRange={dailyRange}
+            />
+          ) : (
+            <NEPSEMiniChart
+              data={weeklyData}
+              label="Weekly"
+              height={180}
+              onCrosshairMove={setDailySync}
+              syncTime={weeklySync}
+              onRangeChange={handleWeeklyRange}
+              syncRange={weeklyRange}
+            />
+          )}
         </div>
       </div>
     )
@@ -316,38 +417,52 @@ function NEPSEChart({ fixed = false }) {
 
     const initChart = async () => {
       try {
-        await new Promise(resolve => setTimeout(resolve, 100))
+        await new Promise((resolve) => setTimeout(resolve, 100))
         if (cancelled || !chartContainerRef.current) return
 
         const { createChart } = await import('lightweight-charts')
         if (cancelled || !chartContainerRef.current) return
 
         const chart = createChart(chartContainerRef.current, {
-          width:  chartContainerRef.current.clientWidth || 800,
+          width: chartContainerRef.current.clientWidth || 800,
           height: 350,
           layout: {
             background: { color: isDark ? '#111827' : '#ffffff' },
-            textColor:  isDark ? '#d1d5db' : '#374151',
+            textColor: isDark ? '#d1d5db' : '#374151',
           },
           grid: {
             vertLines: { color: 'transparent' },
             horzLines: { color: 'transparent' },
           },
           rightPriceScale: { borderColor: isDark ? '#4b5563' : '#e5e7eb' },
-          timeScale:        { borderColor: isDark ? '#4b5563' : '#e5e7eb' },
+          timeScale: { borderColor: isDark ? '#4b5563' : '#e5e7eb' },
         })
 
         const candleSeries = chart.addCandlestickSeries({
-          upColor: '#22c55e', downColor: '#ef4444',
-          borderUpColor: '#22c55e', borderDownColor: '#ef4444',
-          wickUpColor: '#22c55e', wickDownColor: '#ef4444',
+          upColor: '#22c55e',
+          downColor: '#ef4444',
+          borderUpColor: '#22c55e',
+          borderDownColor: '#ef4444',
+          wickUpColor: '#22c55e',
+          wickDownColor: '#ef4444',
         })
 
-        chart.subscribeCrosshairMove(param => {
-          if (!param.time) { setTooltip(null); setHoveredMovers(null); return }
+        chart.subscribeCrosshairMove((param) => {
+          if (!param.time) {
+            setTooltip(null)
+            setHoveredMovers(null)
+            return
+          }
           const data = param.seriesData?.get(candleSeries)
           if (!data) return
-          setTooltip({ date: param.time, open: data.open, high: data.high, low: data.low, close: data.close, change: (((data.close - data.open) / data.open) * 100).toFixed(2) })
+          setTooltip({
+            date: param.time,
+            open: data.open,
+            high: data.high,
+            low: data.low,
+            close: data.close,
+            change: (((data.close - data.open) / data.open) * 100).toFixed(2),
+          })
           setHoveredMovers(moversRef.current[param.time] || null)
         })
 
@@ -356,16 +471,23 @@ function NEPSEChart({ fixed = false }) {
             chart.applyOptions({ width: chartContainerRef.current.clientWidth || 800 })
         }
         window.addEventListener('resize', handleResize)
-        chartRef.current = chart; seriesRef.current = candleSeries
+        chartRef.current = chart
+        seriesRef.current = candleSeries
         if (!cancelled) setChartReady(true)
         return () => window.removeEventListener('resize', handleResize)
-      } catch (err) { console.error('Chart init error:', err) }
+      } catch (err) {
+        console.error('Chart init error:', err)
+      }
     }
 
     initChart()
     return () => {
       cancelled = true
-      if (chartRef.current) { chartRef.current.remove(); chartRef.current = null; seriesRef.current = null }
+      if (chartRef.current) {
+        chartRef.current.remove()
+        chartRef.current = null
+        seriesRef.current = null
+      }
     }
   }, []) // eslint-disable-line react-hooks/exhaustive-deps
 
@@ -374,21 +496,28 @@ function NEPSEChart({ fixed = false }) {
     if (!chartReady) return
     setLoading(true)
     _getNepseChartCached(range)
-      .then(res => {
+      .then((res) => {
         const chartData = res.data.data
         moversRef.current = res.data.movers || {}
-        if (seriesRef.current) { seriesRef.current.setData(chartData); chartRef.current?.timeScale().fitContent() }
+        if (seriesRef.current) {
+          seriesRef.current.setData(chartData)
+          chartRef.current?.timeScale().fitContent()
+        }
         if (chartData.length > 0) {
           const lastCandle = chartData[chartData.length - 1]
           const prevCandle = chartData[chartData.length - 2]
-          const last = lastCandle.close; const first = chartData[0].close
+          const last = lastCandle.close
+          const first = chartData[0].close
           setLatestDate(lastCandle.time)
           setStats({
-            first, last,
-            change: prevCandle ? ((lastCandle.close - prevCandle.close) / prevCandle.close * 100).toFixed(2) : '0.00',
-            periodChange: ((last - first) / first * 100).toFixed(2),
-            high: Math.max(...chartData.map(d => d.high)),
-            low:  Math.min(...chartData.map(d => d.low)),
+            first,
+            last,
+            change: prevCandle
+              ? (((lastCandle.close - prevCandle.close) / prevCandle.close) * 100).toFixed(2)
+              : '0.00',
+            periodChange: (((last - first) / first) * 100).toFixed(2),
+            high: Math.max(...chartData.map((d) => d.high)),
+            low: Math.min(...chartData.map((d) => d.low)),
           })
         }
         setLoading(false)
@@ -405,20 +534,39 @@ function NEPSEChart({ fixed = false }) {
         <div>
           <div className="flex items-center gap-2">
             <h2 className="text-lg font-semibold text-gray-900 dark:text-white">NEPSE Index</h2>
-            {latestDate && <span className="text-xs text-gray-400 bg-gray-100 dark:bg-gray-700 px-2 py-0.5 rounded-full">Data up to {latestDate}</span>}
+            {latestDate && (
+              <span className="text-xs text-gray-400 bg-gray-100 dark:bg-gray-700 px-2 py-0.5 rounded-full">
+                Data up to {latestDate}
+              </span>
+            )}
           </div>
           {stats && (
             <div className="flex items-center gap-3 mt-1 flex-wrap">
-              <span className="text-2xl font-bold text-gray-900 dark:text-white">{stats.last.toFixed(2)}</span>
-              <span className={`text-sm font-medium px-2 py-0.5 rounded-full ${isPositive ? 'bg-green-50 text-green-600' : 'bg-red-50 text-red-500'}`}>{isPositive ? '+' : ''}{stats.change}% last day</span>
-              <span className={`text-xs font-medium px-2 py-0.5 rounded-full ${isPeriodPositive ? 'bg-green-50 text-green-600' : 'bg-red-50 text-red-500'}`}>{isPeriodPositive ? '+' : ''}{stats.periodChange}% ({range.toUpperCase()})</span>
+              <span className="text-2xl font-bold text-gray-900 dark:text-white">
+                {stats.last.toFixed(2)}
+              </span>
+              <span
+                className={`text-sm font-medium px-2 py-0.5 rounded-full ${isPositive ? 'bg-green-50 text-green-600' : 'bg-red-50 text-red-500'}`}
+              >
+                {isPositive ? '+' : ''}
+                {stats.change}% last day
+              </span>
+              <span
+                className={`text-xs font-medium px-2 py-0.5 rounded-full ${isPeriodPositive ? 'bg-green-50 text-green-600' : 'bg-red-50 text-red-500'}`}
+              >
+                {isPeriodPositive ? '+' : ''}
+                {stats.periodChange}% ({range.toUpperCase()})
+              </span>
             </div>
           )}
         </div>
         <div className="flex gap-1">
-          {ranges.map(r => (
-            <button key={r.value} onClick={() => setRange(r.value)}
-              className={`px-2 py-1 rounded text-xs font-medium transition-colors ${range === r.value ? 'bg-blue-600 text-white' : 'bg-gray-100 dark:bg-gray-700 text-gray-600 dark:text-gray-300 hover:bg-gray-200 dark:hover:bg-gray-600'}`}>
+          {ranges.map((r) => (
+            <button
+              key={r.value}
+              onClick={() => setRange(r.value)}
+              className={`px-2 py-1 rounded text-xs font-medium transition-colors ${range === r.value ? 'bg-blue-600 text-white' : 'bg-gray-100 dark:bg-gray-700 text-gray-600 dark:text-gray-300 hover:bg-gray-200 dark:hover:bg-gray-600'}`}
+            >
               {r.label}
             </button>
           ))}
@@ -427,14 +575,21 @@ function NEPSEChart({ fixed = false }) {
 
       {stats && (
         <div className="flex gap-4 mb-2">
-          <span className="text-xs text-gray-500 dark:text-gray-400">High: <span className="text-green-600 font-medium">{stats.high.toFixed(2)}</span></span>
-          <span className="text-xs text-gray-500 dark:text-gray-400">Low: <span className="text-red-500 font-medium">{stats.low.toFixed(2)}</span></span>
+          <span className="text-xs text-gray-500 dark:text-gray-400">
+            High: <span className="text-green-600 font-medium">{stats.high.toFixed(2)}</span>
+          </span>
+          <span className="text-xs text-gray-500 dark:text-gray-400">
+            Low: <span className="text-red-500 font-medium">{stats.low.toFixed(2)}</span>
+          </span>
         </div>
       )}
 
       <div className="relative" style={{ minHeight: '350px' }}>
         {loading && (
-          <div className="absolute inset-0 flex items-center justify-center bg-white dark:bg-gray-800 z-10" style={{ minHeight: '350px' }}>
+          <div
+            className="absolute inset-0 flex items-center justify-center bg-white dark:bg-gray-800 z-10"
+            style={{ minHeight: '350px' }}
+          >
             <p className="text-sm text-gray-400">Loading chart...</p>
           </div>
         )}
@@ -443,17 +598,36 @@ function NEPSEChart({ fixed = false }) {
         {tooltip && (
           <div className="absolute top-2 left-2 bg-gray-900 text-white rounded-lg p-2 text-xs z-20 pointer-events-none">
             <p className="font-medium mb-1">{tooltip.date}</p>
-            <p>O: <span className="text-gray-300">{tooltip.open}</span></p>
-            <p>H: <span className="text-green-400">{tooltip.high}</span></p>
-            <p>L: <span className="text-red-400">{tooltip.low}</span></p>
-            <p>C: <span className={parseFloat(tooltip.change) >= 0 ? 'text-green-400' : 'text-red-400'}>{tooltip.close}</span></p>
-            <p>Chg: <span className={parseFloat(tooltip.change) >= 0 ? 'text-green-400' : 'text-red-400'}>{parseFloat(tooltip.change) >= 0 ? '+' : ''}{tooltip.change}%</span></p>
+            <p>
+              O: <span className="text-gray-300">{tooltip.open}</span>
+            </p>
+            <p>
+              H: <span className="text-green-400">{tooltip.high}</span>
+            </p>
+            <p>
+              L: <span className="text-red-400">{tooltip.low}</span>
+            </p>
+            <p>
+              C:{' '}
+              <span className={parseFloat(tooltip.change) >= 0 ? 'text-green-400' : 'text-red-400'}>
+                {tooltip.close}
+              </span>
+            </p>
+            <p>
+              Chg:{' '}
+              <span className={parseFloat(tooltip.change) >= 0 ? 'text-green-400' : 'text-red-400'}>
+                {parseFloat(tooltip.change) >= 0 ? '+' : ''}
+                {tooltip.change}%
+              </span>
+            </p>
           </div>
         )}
 
         {hoveredMovers && (
           <div className="absolute top-2 right-2 bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-600 rounded-lg p-3 text-xs z-20 pointer-events-none shadow-lg w-64">
-            <p className="font-semibold text-gray-700 dark:text-gray-200 mb-2">Top Movers — {tooltip?.date}</p>
+            <p className="font-semibold text-gray-700 dark:text-gray-200 mb-2">
+              Top Movers — {tooltip?.date}
+            </p>
             <div className="grid grid-cols-2 gap-2">
               <div>
                 <p className="text-green-600 font-medium mb-1">Gainers</p>

@@ -3,6 +3,9 @@
   "private": true,
   "version": "2.12.0",
   "type": "module",
+  "engines": {
+    "node": ">=18"
+  },
   "scripts": {
     "dev": "vite",
     "build": "vite build",
@@ -19,6 +22,8 @@
     "test:perf:burst": "k6 run --env SCENARIO=concurrent_burst tests/perf/load.js",
     "lint": "eslint src",
     "lint:ci": "eslint src --max-warnings 0",
+    "format": "prettier --write .",
+    "format:check": "prettier --check .",
     "test:ci": "vitest run --coverage && playwright test --reporter=list"
   },
   "dependencies": {
@@ -53,6 +58,7 @@
     "jsdom": "^29.0.2",
     "playwright": "^1.59.1",
     "postcss": "^8.4.47",
+    "prettier": "^3.8.4",
     "tailwindcss": "^3.4.14",
     "vite": "^5.4.10",
     "vitest": "^2.1.8"

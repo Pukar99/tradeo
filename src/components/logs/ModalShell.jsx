@@ -22,7 +22,7 @@ export default function ModalShell({
     >
       <div
         className={`w-full ${maxWidth} bg-white dark:bg-gray-950 rounded-2xl shadow-2xl border border-gray-100 dark:border-gray-800 max-h-[92vh] flex flex-col`}
-        onClick={closeOnBackdrop ? e => e.stopPropagation() : undefined}
+        onClick={closeOnBackdrop ? (e) => e.stopPropagation() : undefined}
       >
         <div className="flex items-center justify-between px-4 sm:px-6 py-4 border-b border-gray-100 dark:border-gray-800">
           <div>

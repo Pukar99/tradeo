@@ -9,8 +9,12 @@ export function makeLruCache(max, ttl) {
     get(key) {
       const e = map.get(key)
       if (!e) return null
-      if (Date.now() - e.ts >= ttl) { map.delete(key); return null }
-      map.delete(key); map.set(key, e)
+      if (Date.now() - e.ts >= ttl) {
+        map.delete(key)
+        return null
+      }
+      map.delete(key)
+      map.set(key, e)
       return e.data
     },
     set(key, data) {
@@ -18,6 +22,8 @@ export function makeLruCache(max, ttl) {
       else if (map.size >= max) map.delete(map.keys().next().value)
       map.set(key, { data, ts: Date.now() })
     },
-    clear() { map.clear() },
+    clear() {
+      map.clear()
+    },
   }
 }

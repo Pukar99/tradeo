@@ -12,7 +12,9 @@ function StatCard({ label, value, color = 'text-gray-900 dark:text-white', sub }
   return (
     <div className="bg-gray-50 dark:bg-gray-700 rounded-xl p-4 text-center flex flex-col justify-center min-h-[88px]">
       <p className={`text-2xl font-bold ${color}`}>{value}</p>
-      <p className="text-[10px] font-semibold uppercase tracking-widest text-gray-400 mt-1">{label}</p>
+      <p className="text-[10px] font-semibold uppercase tracking-widest text-gray-400 mt-1">
+        {label}
+      </p>
       {sub && <p className="text-[10px] text-gray-400 mt-0.5">{sub}</p>}
     </div>
   )
@@ -36,14 +38,14 @@ function ProfilePage() {
     name: '',
     bio: '',
     location: '',
-    trading_since: ''
+    trading_since: '',
   })
   const [formErrors, setFormErrors] = useState({})
   const [showPasswordForm, setShowPasswordForm] = useState(false)
   const [passwordForm, setPasswordForm] = useState({
     currentPassword: '',
     newPassword: '',
-    confirmPassword: ''
+    confirmPassword: '',
   })
   const [passwordError, setPasswordError] = useState('')
   const [passwordSuccess, setPasswordSuccess] = useState('')
@@ -67,7 +69,7 @@ function ProfilePage() {
         name: res.data.user.name || '',
         bio: res.data.user.bio || '',
         location: res.data.user.location || '',
-        trading_since: res.data.user.trading_since || ''
+        trading_since: res.data.user.trading_since || '',
       })
     } catch (err) {
       setFetchError(err.response?.data?.message || 'Failed to load profile. Please try again.')
@@ -103,9 +105,9 @@ function ProfilePage() {
       formData.append('avatar', file)
       const res = await uploadAvatar(formData)
       clearProfileCache()
-      setProfile(prev => ({
+      setProfile((prev) => ({
         ...prev,
-        user: { ...prev.user, avatar_url: res.data.avatar_url }
+        user: { ...prev.user, avatar_url: res.data.avatar_url },
       }))
       updateUser({ avatar_url: res.data.avatar_url })
     } catch (err) {
@@ -133,7 +135,7 @@ function ProfilePage() {
     try {
       const res = await updateProfile(form)
       clearProfileCache()
-      setProfile(prev => ({ ...prev, user: { ...prev.user, ...res.data } }))
+      setProfile((prev) => ({ ...prev, user: { ...prev.user, ...res.data } }))
       updateUser({ name: form.name.trim() })
       setEditing(false)
       setFormErrors({})
@@ -151,7 +153,7 @@ function ProfilePage() {
         name: profile.user.name || '',
         bio: profile.user.bio || '',
         location: profile.user.location || '',
-        trading_since: profile.user.trading_since || ''
+        trading_since: profile.user.trading_since || '',
       })
     }
     setEditing(false)
@@ -182,7 +184,7 @@ function ProfilePage() {
     try {
       await changePassword({
         currentPassword: passwordForm.currentPassword,
-        newPassword: passwordForm.newPassword
+        newPassword: passwordForm.newPassword,
       })
       setPasswordSuccess('Password changed successfully!')
       setPasswordForm({ currentPassword: '', newPassword: '', confirmPassword: '' })
@@ -200,7 +202,10 @@ function ProfilePage() {
   const handleDeleteAccount = async (e) => {
     e.preventDefault()
     setDeleteError('')
-    if (!deletePassword) { setDeleteError('Password is required'); return }
+    if (!deletePassword) {
+      setDeleteError('Password is required')
+      return
+    }
     setDeleting(true)
     try {
       await deleteAccount({ password: deletePassword })
@@ -215,7 +220,12 @@ function ProfilePage() {
 
   const getInitials = (name) => {
     if (!name) return '?'
-    return name.split(' ').map(n => n[0]).join('').toUpperCase().slice(0, 2)
+    return name
+      .split(' ')
+      .map((n) => n[0])
+      .join('')
+      .toUpperCase()
+      .slice(0, 2)
   }
 
   const formatDate = (dateStr) => {
@@ -223,7 +233,12 @@ function ProfilePage() {
     // Use ISO string to avoid UTC vs local timezone off-by-one
     const d = new Date(dateStr)
     if (isNaN(d.getTime())) return dateStr
-    return d.toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric', timeZone: 'UTC' })
+    return d.toLocaleDateString('en-US', {
+      year: 'numeric',
+      month: 'long',
+      day: 'numeric',
+      timeZone: 'UTC',
+    })
   }
 
   const getTraderLevel = () => {
@@ -235,60 +250,65 @@ function ProfilePage() {
     return { label: 'Expert', color: 'text-yellow-400', icon: '👑' }
   }
 
-  if (loading) return (
-    <div className="w-full px-3 sm:px-6 pt-4 sm:pt-6 pb-10 max-w-5xl mx-auto animate-pulse">
-      {/* hero banner */}
-      <div className="bg-gray-900 rounded-2xl overflow-hidden mb-6 p-4 sm:p-8">
-        <div className="flex items-start justify-between flex-wrap gap-4">
-          <div className="flex items-center gap-4 sm:gap-6">
-            <div className="w-16 h-16 sm:w-24 sm:h-24 rounded-2xl bg-gray-700" />
-            <div className="space-y-2.5">
-              <div className="h-5 w-32 bg-gray-700 rounded" />
-              <div className="h-3 w-24 bg-gray-700 rounded" />
-              <div className="h-3 w-20 bg-gray-700 rounded" />
+  if (loading)
+    return (
+      <div className="w-full px-3 sm:px-6 pt-4 sm:pt-6 pb-10 max-w-5xl mx-auto animate-pulse">
+        {/* hero banner */}
+        <div className="bg-gray-900 rounded-2xl overflow-hidden mb-6 p-4 sm:p-8">
+          <div className="flex items-start justify-between flex-wrap gap-4">
+            <div className="flex items-center gap-4 sm:gap-6">
+              <div className="w-16 h-16 sm:w-24 sm:h-24 rounded-2xl bg-gray-700" />
+              <div className="space-y-2.5">
+                <div className="h-5 w-32 bg-gray-700 rounded" />
+                <div className="h-3 w-24 bg-gray-700 rounded" />
+                <div className="h-3 w-20 bg-gray-700 rounded" />
+              </div>
             </div>
+            <div className="h-8 w-20 bg-gray-700 rounded-xl" />
           </div>
-          <div className="h-8 w-20 bg-gray-700 rounded-xl" />
+          {/* stat bar */}
+          <div className="mt-6 grid grid-cols-2 sm:grid-cols-4 gap-3">
+            {[1, 2, 3, 4].map((i) => (
+              <div key={i} className="bg-gray-800 rounded-xl p-3 space-y-1.5">
+                <div className="h-5 w-14 bg-gray-700 rounded" />
+                <div className="h-3 w-16 bg-gray-700 rounded" />
+              </div>
+            ))}
+          </div>
         </div>
-        {/* stat bar */}
-        <div className="mt-6 grid grid-cols-2 sm:grid-cols-4 gap-3">
-          {[1, 2, 3, 4].map(i => (
-            <div key={i} className="bg-gray-800 rounded-xl p-3 space-y-1.5">
-              <div className="h-5 w-14 bg-gray-700 rounded" />
-              <div className="h-3 w-16 bg-gray-700 rounded" />
+        {/* tab strip */}
+        <div className="flex gap-1 mb-6">
+          {[1, 2, 3].map((i) => (
+            <div key={i} className="h-8 w-24 bg-gray-100 dark:bg-gray-800 rounded-lg" />
+          ))}
+        </div>
+        {/* stat cards grid */}
+        <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+          {[1, 2, 3, 4, 5, 6, 7, 8].map((i) => (
+            <div key={i} className="bg-gray-50 dark:bg-gray-700 rounded-xl p-4 space-y-2">
+              <div className="h-5 w-16 bg-gray-200 dark:bg-gray-600 rounded mx-auto" />
+              <div className="h-3 w-20 bg-gray-200 dark:bg-gray-600 rounded mx-auto" />
             </div>
           ))}
         </div>
       </div>
-      {/* tab strip */}
-      <div className="flex gap-1 mb-6">
-        {[1, 2, 3].map(i => (
-          <div key={i} className="h-8 w-24 bg-gray-100 dark:bg-gray-800 rounded-lg" />
-        ))}
-      </div>
-      {/* stat cards grid */}
-      <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
-        {[1, 2, 3, 4, 5, 6, 7, 8].map(i => (
-          <div key={i} className="bg-gray-50 dark:bg-gray-700 rounded-xl p-4 space-y-2">
-            <div className="h-5 w-16 bg-gray-200 dark:bg-gray-600 rounded mx-auto" />
-            <div className="h-3 w-20 bg-gray-200 dark:bg-gray-600 rounded mx-auto" />
-          </div>
-        ))}
-      </div>
-    </div>
-  )
+    )
 
-  if (fetchError) return (
-    <div className="w-full px-3 sm:px-6 py-6 flex flex-col items-center justify-center min-h-64 gap-4">
-      <p className="text-red-400 text-sm">{fetchError}</p>
-      <button
-        onClick={() => { setLoading(true); fetchProfile() }}
-        className="px-4 py-2 bg-blue-600 text-white rounded-xl text-sm font-medium hover:bg-blue-700 transition-colors"
-      >
-        Retry
-      </button>
-    </div>
-  )
+  if (fetchError)
+    return (
+      <div className="w-full px-3 sm:px-6 py-6 flex flex-col items-center justify-center min-h-64 gap-4">
+        <p className="text-red-400 text-sm">{fetchError}</p>
+        <button
+          onClick={() => {
+            setLoading(true)
+            fetchProfile()
+          }}
+          className="px-4 py-2 bg-blue-600 text-white rounded-xl text-sm font-medium hover:bg-blue-700 transition-colors"
+        >
+          Retry
+        </button>
+      </div>
+    )
 
   if (!profile) return null
 
@@ -296,7 +316,6 @@ function ProfilePage() {
 
   return (
     <div className="w-full px-3 sm:px-6 pt-4 sm:pt-6 pb-10 max-w-5xl mx-auto">
-
       {/* ── Hero Banner ── */}
       <div className="relative bg-gradient-to-br from-gray-900 via-blue-950 to-gray-900 rounded-2xl overflow-hidden mb-6 shadow-xl">
         <div className="absolute inset-0 opacity-10">
@@ -309,7 +328,9 @@ function ProfilePage() {
             <div className="flex items-center gap-4 sm:gap-6">
               <div className="relative">
                 <div className="w-16 h-16 sm:w-24 sm:h-24 rounded-2xl overflow-hidden border-4 border-white border-opacity-20 shadow-xl">
-                  {profile.user.avatar_url && !avatarImgError && /^https?:\/\//.test(profile.user.avatar_url) ? (
+                  {profile.user.avatar_url &&
+                  !avatarImgError &&
+                  /^https?:\/\//.test(profile.user.avatar_url) ? (
                     <img
                       src={profile.user.avatar_url}
                       alt={profile.user.name}
@@ -318,7 +339,9 @@ function ProfilePage() {
                     />
                   ) : (
                     <div className="w-full h-full bg-gradient-to-br from-blue-500 to-purple-600 flex items-center justify-center">
-                      <span className="text-white text-3xl font-bold">{getInitials(profile.user.name)}</span>
+                      <span className="text-white text-3xl font-bold">
+                        {getInitials(profile.user.name)}
+                      </span>
                     </div>
                   )}
                 </div>
@@ -331,9 +354,24 @@ function ProfilePage() {
                   {uploadingAvatar ? (
                     <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" />
                   ) : (
-                    <svg className="w-4 h-4 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 9a2 2 0 012-2h.93a2 2 0 001.664-.89l.812-1.22A2 2 0 0110.07 4h3.86a2 2 0 011.664.89l.812 1.22A2 2 0 0018.07 7H19a2 2 0 012 2v9a2 2 0 01-2 2H5a2 2 0 01-2-2V9z" />
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 13a3 3 0 11-6 0 3 3 0 016 0z" />
+                    <svg
+                      className="w-4 h-4 text-white"
+                      fill="none"
+                      viewBox="0 0 24 24"
+                      stroke="currentColor"
+                    >
+                      <path
+                        strokeLinecap="round"
+                        strokeLinejoin="round"
+                        strokeWidth={2}
+                        d="M3 9a2 2 0 012-2h.93a2 2 0 001.664-.89l.812-1.22A2 2 0 0110.07 4h3.86a2 2 0 011.664.89l.812 1.22A2 2 0 0018.07 7H19a2 2 0 012 2v9a2 2 0 01-2 2H5a2 2 0 01-2-2V9z"
+                      />
+                      <path
+                        strokeLinecap="round"
+                        strokeLinejoin="round"
+                        strokeWidth={2}
+                        d="M15 13a3 3 0 11-6 0 3 3 0 016 0z"
+                      />
                     </svg>
                   )}
                 </button>
@@ -350,14 +388,20 @@ function ProfilePage() {
                 <div className="flex items-center gap-3 flex-wrap mb-1">
                   <h1 className="text-2xl font-bold text-white">{profile.user.name}</h1>
 
-                  <span className={`text-xs font-medium px-2 py-0.5 rounded-full border ${
-                    profile.user.tier === 'premium'
-                      ? 'bg-amber-500 bg-opacity-20 text-amber-400 border-amber-500 border-opacity-30'
+                  <span
+                    className={`text-xs font-medium px-2 py-0.5 rounded-full border ${
+                      profile.user.tier === 'premium'
+                        ? 'bg-amber-500 bg-opacity-20 text-amber-400 border-amber-500 border-opacity-30'
+                        : profile.user.tier === 'pro'
+                          ? 'bg-blue-500 bg-opacity-20 text-blue-400 border-blue-500 border-opacity-30'
+                          : 'bg-gray-500 bg-opacity-20 text-gray-400 border-gray-500 border-opacity-30'
+                    }`}
+                  >
+                    {profile.user.tier === 'premium'
+                      ? 'Premium'
                       : profile.user.tier === 'pro'
-                        ? 'bg-blue-500 bg-opacity-20 text-blue-400 border-blue-500 border-opacity-30'
-                        : 'bg-gray-500 bg-opacity-20 text-gray-400 border-gray-500 border-opacity-30'
-                  }`}>
-                    {profile.user.tier === 'premium' ? 'Premium' : profile.user.tier === 'pro' ? 'Pro' : 'Basic'}
+                        ? 'Pro'
+                        : 'Basic'}
                   </span>
 
                   {profile.isEligible && (
@@ -368,23 +412,38 @@ function ProfilePage() {
                 </div>
                 <p className="text-gray-400 text-sm mb-2">{profile.user.email}</p>
                 <div className="flex items-center gap-4 flex-wrap">
-                  <span className={`text-sm font-medium ${level.color}`}>{level.icon} {level.label} Trader</span>
-                  {profile.user.location && <span className="text-gray-400 text-xs">📍 {profile.user.location}</span>}
-                  {profile.user.trading_since && <span className="text-gray-400 text-xs">📅 Trading since {profile.user.trading_since}</span>}
-                  <span className="text-gray-500 text-xs">Member since {formatDate(profile.user.created_at)}</span>
+                  <span className={`text-sm font-medium ${level.color}`}>
+                    {level.icon} {level.label} Trader
+                  </span>
+                  {profile.user.location && (
+                    <span className="text-gray-400 text-xs">📍 {profile.user.location}</span>
+                  )}
+                  {profile.user.trading_since && (
+                    <span className="text-gray-400 text-xs">
+                      📅 Trading since {profile.user.trading_since}
+                    </span>
+                  )}
+                  <span className="text-gray-500 text-xs">
+                    Member since {formatDate(profile.user.created_at)}
+                  </span>
                 </div>
-                {profile.user.bio && <p className="text-gray-300 text-sm mt-2 max-w-md">{profile.user.bio}</p>}
+                {profile.user.bio && (
+                  <p className="text-gray-300 text-sm mt-2 max-w-md">{profile.user.bio}</p>
+                )}
                 {/* Avatar error shown near the avatar area */}
                 {avatarError && (
-                  <p className="text-red-400 text-xs mt-1">{avatarError}
-                    <button onClick={() => setAvatarError('')} className="ml-2 underline">Dismiss</button>
+                  <p className="text-red-400 text-xs mt-1">
+                    {avatarError}
+                    <button onClick={() => setAvatarError('')} className="ml-2 underline">
+                      Dismiss
+                    </button>
                   </p>
                 )}
               </div>
             </div>
 
             <button
-              onClick={() => editing ? handleCancelEdit() : setEditing(true)}
+              onClick={() => (editing ? handleCancelEdit() : setEditing(true))}
               className={`px-4 py-2.5 rounded-xl text-sm font-medium transition-colors min-h-[44px] ${
                 editing
                   ? 'bg-gray-700 text-gray-300 hover:bg-gray-600'
@@ -399,21 +458,31 @@ function ProfilePage() {
           <div className="grid grid-cols-2 sm:grid-cols-4 gap-4 mt-6">
             <div className="bg-white bg-opacity-5 rounded-xl p-3 text-center border border-white border-opacity-10">
               <p className="text-2xl font-bold text-white">{profile.stats.totalTrades}</p>
-              <p className="text-[10px] font-semibold uppercase tracking-widest text-gray-400 mt-1">Total Trades</p>
+              <p className="text-[10px] font-semibold uppercase tracking-widest text-gray-400 mt-1">
+                Total Trades
+              </p>
             </div>
             <div className="bg-white bg-opacity-5 rounded-xl p-3 text-center border border-white border-opacity-10">
-              <p className={`text-2xl font-bold ${profile.stats.winRate >= 50 ? 'text-green-400' : 'text-red-400'}`}>
+              <p
+                className={`text-2xl font-bold ${profile.stats.winRate >= 50 ? 'text-green-400' : 'text-red-400'}`}
+              >
                 {profile.stats.winRate}%
               </p>
-              <p className="text-[10px] font-semibold uppercase tracking-widest text-gray-400 mt-1">Win Rate</p>
+              <p className="text-[10px] font-semibold uppercase tracking-widest text-gray-400 mt-1">
+                Win Rate
+              </p>
             </div>
             <div className="bg-white bg-opacity-5 rounded-xl p-3 text-center border border-white border-opacity-10">
               <p className="text-2xl font-bold text-blue-400">🔥 {profile.discipline.streak}</p>
-              <p className="text-[10px] font-semibold uppercase tracking-widest text-gray-400 mt-1">Day Streak</p>
+              <p className="text-[10px] font-semibold uppercase tracking-widest text-gray-400 mt-1">
+                Day Streak
+              </p>
             </div>
             <div className="bg-white bg-opacity-5 rounded-xl p-3 text-center border border-white border-opacity-10">
               <p className="text-2xl font-bold text-purple-400">{profile.research.totalPosts}</p>
-              <p className="text-[10px] font-semibold uppercase tracking-widest text-gray-400 mt-1">Research Posts</p>
+              <p className="text-[10px] font-semibold uppercase tracking-widest text-gray-400 mt-1">
+                Research Posts
+              </p>
             </div>
           </div>
         </div>
@@ -422,12 +491,19 @@ function ProfilePage() {
       {/* ── Edit Panel ── */}
       {editing && (
         <div className="bg-white dark:bg-gray-800 rounded-2xl p-6 mb-6 shadow-sm border border-gray-100 dark:border-gray-700">
-          <h2 className="text-base font-semibold text-gray-900 dark:text-white mb-4">Edit Profile</h2>
+          <h2 className="text-base font-semibold text-gray-900 dark:text-white mb-4">
+            Edit Profile
+          </h2>
 
           {saveError && (
             <div className="bg-red-50 dark:bg-red-900/30 text-red-600 dark:text-red-300 px-4 py-3 rounded-xl text-sm mb-4 flex items-center justify-between">
               <span>{saveError}</span>
-              <button onClick={() => setSaveError('')} className="text-red-400 hover:text-red-600 ml-2">✕</button>
+              <button
+                onClick={() => setSaveError('')}
+                className="text-red-400 hover:text-red-600 ml-2"
+              >
+                ✕
+              </button>
             </div>
           )}
 
@@ -439,7 +515,10 @@ function ProfilePage() {
               <input
                 type="text"
                 value={form.name}
-                onChange={e => { setForm({ ...form, name: e.target.value }); setFormErrors(p => ({ ...p, name: '' })) }}
+                onChange={(e) => {
+                  setForm({ ...form, name: e.target.value })
+                  setFormErrors((p) => ({ ...p, name: '' }))
+                }}
                 maxLength={100}
                 className={`w-full border rounded-xl px-3 py-2 text-sm focus:outline-none dark:bg-gray-700 dark:text-white ${
                   formErrors.name
@@ -450,21 +529,25 @@ function ProfilePage() {
               {formErrors.name && <p className="text-red-400 text-xs mt-1">{formErrors.name}</p>}
             </div>
             <div>
-              <label className="block text-xs text-gray-500 dark:text-gray-400 mb-1">Location</label>
+              <label className="block text-xs text-gray-500 dark:text-gray-400 mb-1">
+                Location
+              </label>
               <input
                 type="text"
                 value={form.location}
-                onChange={e => setForm({ ...form, location: e.target.value })}
+                onChange={(e) => setForm({ ...form, location: e.target.value })}
                 placeholder="e.g. Kathmandu, Nepal"
                 className="w-full border border-gray-200 dark:border-gray-600 dark:bg-gray-700 dark:text-white rounded-xl px-3 py-2 text-sm focus:outline-none focus:border-blue-500"
               />
             </div>
             <div>
-              <label className="block text-xs text-gray-500 dark:text-gray-400 mb-1">Trading Since</label>
+              <label className="block text-xs text-gray-500 dark:text-gray-400 mb-1">
+                Trading Since
+              </label>
               <input
                 type="text"
                 value={form.trading_since}
-                onChange={e => setForm({ ...form, trading_since: e.target.value })}
+                onChange={(e) => setForm({ ...form, trading_since: e.target.value })}
                 placeholder="e.g. 2020"
                 className="w-full border border-gray-200 dark:border-gray-600 dark:bg-gray-700 dark:text-white rounded-xl px-3 py-2 text-sm focus:outline-none focus:border-blue-500"
               />
@@ -472,14 +555,19 @@ function ProfilePage() {
             <div>
               <label className="block text-xs text-gray-500 dark:text-gray-400 mb-1 flex items-center justify-between">
                 <span>Bio</span>
-                <span className={`text-xs ${form.bio.length > 450 ? 'text-red-400' : 'text-gray-400'}`}>
+                <span
+                  className={`text-xs ${form.bio.length > 450 ? 'text-red-400' : 'text-gray-400'}`}
+                >
                   {form.bio.length}/500
                 </span>
               </label>
               {/* textarea for multi-line bio — input was wrong here */}
               <textarea
                 value={form.bio}
-                onChange={e => { setForm({ ...form, bio: e.target.value }); setFormErrors(p => ({ ...p, bio: '' })) }}
+                onChange={(e) => {
+                  setForm({ ...form, bio: e.target.value })
+                  setFormErrors((p) => ({ ...p, bio: '' }))
+                }}
                 placeholder="Short bio about your trading style"
                 rows={3}
                 maxLength={500}
@@ -512,11 +600,18 @@ function ProfilePage() {
 
           {showPasswordForm && (
             <div className="mt-4 pt-4 border-t border-gray-100 dark:border-gray-700">
-              <h3 className="text-sm font-semibold text-gray-900 dark:text-white mb-3">Change Password</h3>
+              <h3 className="text-sm font-semibold text-gray-900 dark:text-white mb-3">
+                Change Password
+              </h3>
               {passwordError && (
                 <div className="bg-red-50 dark:bg-red-900/30 text-red-600 dark:text-red-300 px-3 py-2 rounded-xl text-sm mb-3 flex items-center justify-between">
                   <span>{passwordError}</span>
-                  <button onClick={() => setPasswordError('')} className="ml-2 text-red-400 hover:text-red-600">✕</button>
+                  <button
+                    onClick={() => setPasswordError('')}
+                    className="ml-2 text-red-400 hover:text-red-600"
+                  >
+                    ✕
+                  </button>
                 </div>
               )}
               {passwordSuccess && (
@@ -527,36 +622,48 @@ function ProfilePage() {
               <form onSubmit={handleChangePassword} autoComplete="off">
                 <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 mb-4">
                   <div>
-                    <label className="block text-xs text-gray-500 dark:text-gray-400 mb-1">Current Password</label>
+                    <label className="block text-xs text-gray-500 dark:text-gray-400 mb-1">
+                      Current Password
+                    </label>
                     <input
                       type="password"
                       autoComplete="current-password"
                       value={passwordForm.currentPassword}
-                      onChange={e => setPasswordForm({ ...passwordForm, currentPassword: e.target.value })}
+                      onChange={(e) =>
+                        setPasswordForm({ ...passwordForm, currentPassword: e.target.value })
+                      }
                       placeholder="••••••••"
                       className="w-full border border-gray-200 dark:border-gray-600 dark:bg-gray-700 dark:text-white rounded-xl px-3 py-2 text-sm focus:outline-none focus:border-blue-500"
                       required
                     />
                   </div>
                   <div>
-                    <label className="block text-xs text-gray-500 dark:text-gray-400 mb-1">New Password</label>
+                    <label className="block text-xs text-gray-500 dark:text-gray-400 mb-1">
+                      New Password
+                    </label>
                     <input
                       type="password"
                       autoComplete="new-password"
                       value={passwordForm.newPassword}
-                      onChange={e => setPasswordForm({ ...passwordForm, newPassword: e.target.value })}
+                      onChange={(e) =>
+                        setPasswordForm({ ...passwordForm, newPassword: e.target.value })
+                      }
                       placeholder="••••••••"
                       className="w-full border border-gray-200 dark:border-gray-600 dark:bg-gray-700 dark:text-white rounded-xl px-3 py-2 text-sm focus:outline-none focus:border-blue-500"
                       required
                     />
                   </div>
                   <div>
-                    <label className="block text-xs text-gray-500 dark:text-gray-400 mb-1">Confirm New Password</label>
+                    <label className="block text-xs text-gray-500 dark:text-gray-400 mb-1">
+                      Confirm New Password
+                    </label>
                     <input
                       type="password"
                       autoComplete="new-password"
                       value={passwordForm.confirmPassword}
-                      onChange={e => setPasswordForm({ ...passwordForm, confirmPassword: e.target.value })}
+                      onChange={(e) =>
+                        setPasswordForm({ ...passwordForm, confirmPassword: e.target.value })
+                      }
                       placeholder="••••••••"
                       className="w-full border border-gray-200 dark:border-gray-600 dark:bg-gray-700 dark:text-white rounded-xl px-3 py-2 text-sm focus:outline-none focus:border-blue-500"
                       required
@@ -581,32 +688,52 @@ function ProfilePage() {
         <div className="bg-white dark:bg-gray-800 rounded-2xl p-5 shadow-sm border border-red-200 dark:border-red-900/50 mb-6">
           <div className="flex items-center justify-between">
             <div>
-              <h3 className="text-sm font-semibold text-red-600 dark:text-red-400">Delete Account</h3>
-              <p className="text-xs text-gray-500 dark:text-gray-400 mt-0.5">Permanently removes all your data. This cannot be undone.</p>
+              <h3 className="text-sm font-semibold text-red-600 dark:text-red-400">
+                Delete Account
+              </h3>
+              <p className="text-xs text-gray-500 dark:text-gray-400 mt-0.5">
+                Permanently removes all your data. This cannot be undone.
+              </p>
             </div>
             <button
               type="button"
-              onClick={() => { setShowDeleteForm(!showDeleteForm); setDeleteError(''); setDeletePassword('') }}
+              onClick={() => {
+                setShowDeleteForm(!showDeleteForm)
+                setDeleteError('')
+                setDeletePassword('')
+              }}
               className="text-xs font-semibold text-red-500 hover:text-red-700 dark:hover:text-red-300 transition-colors px-3 py-1.5 rounded-lg border border-red-200 dark:border-red-800 hover:bg-red-50 dark:hover:bg-red-900/20"
             >
               {showDeleteForm ? 'Cancel' : 'Delete Account'}
             </button>
           </div>
           {showDeleteForm && (
-            <form onSubmit={handleDeleteAccount} className="mt-4 pt-4 border-t border-red-100 dark:border-red-900/40">
+            <form
+              onSubmit={handleDeleteAccount}
+              className="mt-4 pt-4 border-t border-red-100 dark:border-red-900/40"
+            >
               {deleteError && (
                 <div className="bg-red-50 dark:bg-red-900/30 text-red-600 dark:text-red-300 px-3 py-2 rounded-xl text-sm mb-3 flex items-center justify-between">
                   <span>{deleteError}</span>
-                  <button type="button" onClick={() => setDeleteError('')} className="ml-2 text-red-400 hover:text-red-600">✕</button>
+                  <button
+                    type="button"
+                    onClick={() => setDeleteError('')}
+                    className="ml-2 text-red-400 hover:text-red-600"
+                  >
+                    ✕
+                  </button>
                 </div>
               )}
-              <p className="text-xs text-gray-500 dark:text-gray-400 mb-3">Enter your password to confirm deletion of all trades, journals, research, and settings.</p>
+              <p className="text-xs text-gray-500 dark:text-gray-400 mb-3">
+                Enter your password to confirm deletion of all trades, journals, research, and
+                settings.
+              </p>
               <div className="flex items-center gap-3">
                 <input
                   type="password"
                   autoComplete="current-password"
                   value={deletePassword}
-                  onChange={e => setDeletePassword(e.target.value)}
+                  onChange={(e) => setDeletePassword(e.target.value)}
                   placeholder="Your password"
                   className="flex-1 border border-red-200 dark:border-red-800 dark:bg-gray-700 dark:text-white rounded-xl px-3 py-2 text-sm focus:outline-none focus:border-red-500"
                   required
@@ -626,7 +753,7 @@ function ProfilePage() {
 
       {/* ── Tabs ── */}
       <div className="flex gap-2 mb-6">
-        {['overview', 'trading', 'discipline', 'research'].map(tab => (
+        {['overview', 'trading', 'discipline', 'research'].map((tab) => (
           <button
             key={tab}
             onClick={() => setActiveTab(tab)}
@@ -655,15 +782,21 @@ function ProfilePage() {
             <div className="space-y-3">
               <div className="flex justify-between">
                 <span className="text-xs text-gray-500 dark:text-gray-400">Total Trades</span>
-                <span className="text-sm font-bold text-gray-900 dark:text-white">{profile.stats.totalTrades}</span>
+                <span className="text-sm font-bold text-gray-900 dark:text-white">
+                  {profile.stats.totalTrades}
+                </span>
               </div>
               <div className="flex justify-between">
                 <span className="text-xs text-gray-500 dark:text-gray-400">Closed Trades</span>
-                <span className="text-sm font-bold text-gray-900 dark:text-white">{profile.stats.closedTrades}</span>
+                <span className="text-sm font-bold text-gray-900 dark:text-white">
+                  {profile.stats.closedTrades}
+                </span>
               </div>
               <div className="flex justify-between">
                 <span className="text-xs text-gray-500 dark:text-gray-400">Win Rate</span>
-                <span className={`text-sm font-bold ${profile.stats.winRate >= 50 ? 'text-green-500' : 'text-red-400'}`}>
+                <span
+                  className={`text-sm font-bold ${profile.stats.winRate >= 50 ? 'text-green-500' : 'text-red-400'}`}
+                >
                   {profile.stats.winRate}%
                 </span>
               </div>
@@ -673,19 +806,25 @@ function ProfilePage() {
               </div>
               <div className="flex justify-between">
                 <span className="text-xs text-gray-500 dark:text-gray-400">Realized P&L</span>
-                <span className={`text-sm font-bold ${profile.stats.totalRealizedPnl >= 0 ? 'text-green-500' : 'text-red-400'}`}>
-                  {profile.stats.totalRealizedPnl >= 0 ? '+' : ''}Rs.{Math.abs(profile.stats.totalRealizedPnl).toLocaleString()}
+                <span
+                  className={`text-sm font-bold ${profile.stats.totalRealizedPnl >= 0 ? 'text-green-500' : 'text-red-400'}`}
+                >
+                  {profile.stats.totalRealizedPnl >= 0 ? '+' : ''}Rs.
+                  {Math.abs(profile.stats.totalRealizedPnl).toLocaleString()}
                 </span>
               </div>
               <div className="flex justify-between">
                 <span className="text-xs text-gray-500 dark:text-gray-400">Open Positions</span>
-                <span className="text-sm font-bold text-gray-900 dark:text-white">{profile.stats.openPositions}</span>
+                <span className="text-sm font-bold text-gray-900 dark:text-white">
+                  {profile.stats.openPositions}
+                </span>
               </div>
               {profile.stats.bestTrade && (
                 <div className="flex justify-between">
                   <span className="text-xs text-gray-500 dark:text-gray-400">Best Trade</span>
                   <span className="text-sm font-bold text-green-500">
-                    {profile.stats.bestTrade.symbol} +Rs.{profile.stats.bestTrade.pnl.toLocaleString()}
+                    {profile.stats.bestTrade.symbol} +Rs.
+                    {profile.stats.bestTrade.pnl.toLocaleString()}
                   </span>
                 </div>
               )}
@@ -701,27 +840,45 @@ function ProfilePage() {
                 <svg className="w-20 h-20 transform -rotate-90" viewBox="0 0 80 80">
                   <circle cx="40" cy="40" r="30" fill="none" stroke="#f3f4f6" strokeWidth="8" />
                   <circle
-                    cx="40" cy="40" r="30" fill="none"
-                    stroke={profile.discipline.monthlyScore >= 80 ? '#22c55e' : profile.discipline.monthlyScore >= 50 ? '#3b82f6' : '#f87171'}
-                    strokeWidth="8" strokeLinecap="round"
+                    cx="40"
+                    cy="40"
+                    r="30"
+                    fill="none"
+                    stroke={
+                      profile.discipline.monthlyScore >= 80
+                        ? '#22c55e'
+                        : profile.discipline.monthlyScore >= 50
+                          ? '#3b82f6'
+                          : '#f87171'
+                    }
+                    strokeWidth="8"
+                    strokeLinecap="round"
                     strokeDasharray={2 * Math.PI * 30}
-                    strokeDashoffset={2 * Math.PI * 30 * (1 - profile.discipline.monthlyScore / 100)}
+                    strokeDashoffset={
+                      2 * Math.PI * 30 * (1 - profile.discipline.monthlyScore / 100)
+                    }
                     className="transition-all duration-700"
                   />
                 </svg>
                 <div className="absolute inset-0 flex items-center justify-center">
-                  <span className="text-lg font-bold text-gray-900 dark:text-white">{profile.discipline.monthlyScore}%</span>
+                  <span className="text-lg font-bold text-gray-900 dark:text-white">
+                    {profile.discipline.monthlyScore}%
+                  </span>
                 </div>
               </div>
             </div>
             <div className="space-y-2">
               <div className="flex justify-between">
                 <span className="text-xs text-gray-500 dark:text-gray-400">Current Streak</span>
-                <span className="text-sm font-bold text-orange-400">🔥 {profile.discipline.streak} days</span>
+                <span className="text-sm font-bold text-orange-400">
+                  🔥 {profile.discipline.streak} days
+                </span>
               </div>
               <div className="flex justify-between">
                 <span className="text-xs text-gray-500 dark:text-gray-400">Days Tracked</span>
-                <span className="text-sm font-bold text-gray-900 dark:text-white">{profile.discipline.totalDaysTracked}</span>
+                <span className="text-sm font-bold text-gray-900 dark:text-white">
+                  {profile.discipline.totalDaysTracked}
+                </span>
               </div>
             </div>
           </div>
@@ -733,15 +890,21 @@ function ProfilePage() {
             <div className="space-y-3 mb-4">
               <div className="flex justify-between">
                 <span className="text-xs text-gray-500 dark:text-gray-400">Posts Published</span>
-                <span className="text-sm font-bold text-gray-900 dark:text-white">{profile.research.totalPosts}</span>
+                <span className="text-sm font-bold text-gray-900 dark:text-white">
+                  {profile.research.totalPosts}
+                </span>
               </div>
               <div className="flex justify-between">
                 <span className="text-xs text-gray-500 dark:text-gray-400">Verified Posts</span>
-                <span className="text-sm font-bold text-blue-500">{profile.research.verifiedPosts}</span>
+                <span className="text-sm font-bold text-blue-500">
+                  {profile.research.verifiedPosts}
+                </span>
               </div>
               <div className="flex justify-between">
                 <span className="text-xs text-gray-500 dark:text-gray-400">Eligibility</span>
-                <span className={`text-sm font-bold ${profile.isEligible ? 'text-green-500' : 'text-red-400'}`}>
+                <span
+                  className={`text-sm font-bold ${profile.isEligible ? 'text-green-500' : 'text-red-400'}`}
+                >
                   {profile.isEligible ? '✓ Eligible' : '✗ Not Yet'}
                 </span>
               </div>
@@ -749,7 +912,7 @@ function ProfilePage() {
             {profile.research.recentPosts.length > 0 && (
               <div>
                 <p className="text-xs text-gray-400 mb-2">Recent Posts</p>
-                {profile.research.recentPosts.map(post => (
+                {profile.research.recentPosts.map((post) => (
                   <div
                     key={post.id}
                     onClick={() => navigate(`/research/${post.id}`)}
@@ -769,11 +932,31 @@ function ProfilePage() {
       {activeTab === 'trading' && (
         <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
           <StatCard label="Total Trades" value={profile.stats.totalTrades} />
-          <StatCard label="Closed Trades" value={profile.stats.closedTrades} color="text-blue-400" />
-          <StatCard label="Open Positions" value={profile.stats.openPositions} color="text-green-400" />
-          <StatCard label="Win Rate" value={`${profile.stats.winRate}%`} color={profile.stats.winRate >= 50 ? 'text-green-500' : 'text-red-400'} />
-          <StatCard label="Avg Risk/Reward" value={`1:${profile.stats.avgRR}`} color="text-blue-500" />
-          <StatCard label="Profitable Trades" value={profile.stats.profitableTrades} color="text-green-500" />
+          <StatCard
+            label="Closed Trades"
+            value={profile.stats.closedTrades}
+            color="text-blue-400"
+          />
+          <StatCard
+            label="Open Positions"
+            value={profile.stats.openPositions}
+            color="text-green-400"
+          />
+          <StatCard
+            label="Win Rate"
+            value={`${profile.stats.winRate}%`}
+            color={profile.stats.winRate >= 50 ? 'text-green-500' : 'text-red-400'}
+          />
+          <StatCard
+            label="Avg Risk/Reward"
+            value={`1:${profile.stats.avgRR}`}
+            color="text-blue-500"
+          />
+          <StatCard
+            label="Profitable Trades"
+            value={profile.stats.profitableTrades}
+            color="text-green-500"
+          />
           <StatCard
             label="Realized P&L"
             value={`${profile.stats.totalRealizedPnl >= 0 ? '+' : ''}Rs.${Math.abs(profile.stats.totalRealizedPnl).toLocaleString()}`}
@@ -781,19 +964,26 @@ function ProfilePage() {
           />
           <StatCard
             label="Capital at Risk"
-            value={profile.stats.totalInvested > 0 ? `Rs.${Math.round(profile.stats.totalInvested / 1000)}K` : '—'}
+            value={
+              profile.stats.totalInvested > 0
+                ? `Rs.${Math.round(profile.stats.totalInvested / 1000)}K`
+                : '—'
+            }
             color="text-purple-400"
           />
-          <div className={`col-span-4 rounded-xl p-4 text-center ${
-            profile.isEligible
-              ? 'bg-green-50 dark:bg-green-900/30 border border-green-200 dark:border-green-700'
-              : 'bg-yellow-50 dark:bg-yellow-900/30 border border-yellow-200 dark:border-yellow-700'
-          }`}>
-            <p className={`text-sm font-semibold ${profile.isEligible ? 'text-green-700 dark:text-green-300' : 'text-yellow-700 dark:text-yellow-300'}`}>
+          <div
+            className={`col-span-4 rounded-xl p-4 text-center ${
+              profile.isEligible
+                ? 'bg-green-50 dark:bg-green-900/30 border border-green-200 dark:border-green-700'
+                : 'bg-yellow-50 dark:bg-yellow-900/30 border border-yellow-200 dark:border-yellow-700'
+            }`}
+          >
+            <p
+              className={`text-sm font-semibold ${profile.isEligible ? 'text-green-700 dark:text-green-300' : 'text-yellow-700 dark:text-yellow-300'}`}
+            >
               {profile.isEligible
                 ? '🎉 You are eligible to post research! Your trading metrics meet all requirements.'
-                : `⏳ Keep trading! You need 14+ trades (${profile.stats.totalTrades}/14), 5+ profitable (${profile.stats.profitableTrades}/5), 33%+ win rate (${profile.stats.winRate}%), and 1:3+ avg RR (1:${profile.stats.avgRR}).`
-              }
+                : `⏳ Keep trading! You need 14+ trades (${profile.stats.totalTrades}/14), 5+ profitable (${profile.stats.profitableTrades}/5), 33%+ win rate (${profile.stats.winRate}%), and 1:3+ avg RR (1:${profile.stats.avgRR}).`}
             </p>
           </div>
         </div>
@@ -802,28 +992,52 @@ function ProfilePage() {
       {/* ── Discipline Tab ── */}
       {activeTab === 'discipline' && (
         <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
-          <StatCard label="Today's Score" value={`${profile.discipline.todayScore}%`} color={profile.discipline.todayScore >= 80 ? 'text-green-500' : profile.discipline.todayScore >= 50 ? 'text-blue-500' : 'text-red-400'} />
-          <StatCard label="Monthly Average" value={`${profile.discipline.monthlyScore}%`} color="text-blue-500" />
-          <StatCard label="Current Streak" value={`🔥 ${profile.discipline.streak}`} color="text-orange-400" sub="consecutive days ≥70%" />
+          <StatCard
+            label="Today's Score"
+            value={`${profile.discipline.todayScore}%`}
+            color={
+              profile.discipline.todayScore >= 80
+                ? 'text-green-500'
+                : profile.discipline.todayScore >= 50
+                  ? 'text-blue-500'
+                  : 'text-red-400'
+            }
+          />
+          <StatCard
+            label="Monthly Average"
+            value={`${profile.discipline.monthlyScore}%`}
+            color="text-blue-500"
+          />
+          <StatCard
+            label="Current Streak"
+            value={`🔥 ${profile.discipline.streak}`}
+            color="text-orange-400"
+            sub="consecutive days ≥70%"
+          />
           <StatCard label="Total Days Tracked" value={profile.discipline.totalDaysTracked} />
           <div className="col-span-1 sm:col-span-2 bg-white dark:bg-gray-800 rounded-xl p-5 shadow-sm border border-gray-100 dark:border-gray-700">
-            <h3 className="text-sm font-semibold text-gray-900 dark:text-white mb-3">Discipline Impact</h3>
-            <p className={`text-sm font-medium p-3 rounded-lg ${
-              profile.discipline.todayScore >= 80
-                ? 'bg-green-50 dark:bg-green-900/30 text-green-700 dark:text-green-300'
-                : profile.discipline.todayScore <= 40
-                ? 'bg-red-50 dark:bg-red-900/30 text-red-600 dark:text-red-300'
-                : 'bg-blue-50 dark:bg-blue-900/30 text-blue-600 dark:text-blue-300'
-            }`}>
+            <h3 className="text-sm font-semibold text-gray-900 dark:text-white mb-3">
+              Discipline Impact
+            </h3>
+            <p
+              className={`text-sm font-medium p-3 rounded-lg ${
+                profile.discipline.todayScore >= 80
+                  ? 'bg-green-50 dark:bg-green-900/30 text-green-700 dark:text-green-300'
+                  : profile.discipline.todayScore <= 40
+                    ? 'bg-red-50 dark:bg-red-900/30 text-red-600 dark:text-red-300'
+                    : 'bg-blue-50 dark:bg-blue-900/30 text-blue-600 dark:text-blue-300'
+              }`}
+            >
               {profile.discipline.todayScore >= 80
                 ? '💎 Strong discipline — you are aligned.'
                 : profile.discipline.todayScore <= 40
-                ? '⚠️ Low discipline day — trade smaller position.'
-                : '📈 Good progress — stay focused.'
-              }
+                  ? '⚠️ Low discipline day — trade smaller position.'
+                  : '📈 Good progress — stay focused.'}
             </p>
             {profile.discipline.totalDaysTracked === 0 && (
-              <p className="text-xs text-gray-400 mt-3">Complete your daily tasks on the Home page to start tracking discipline.</p>
+              <p className="text-xs text-gray-400 mt-3">
+                Complete your daily tasks on the Home page to start tracking discipline.
+              </p>
             )}
           </div>
         </div>
@@ -832,14 +1046,28 @@ function ProfilePage() {
       {/* ── Research Tab ── */}
       {activeTab === 'research' && (
         <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
-          <StatCard label="Posts Published" value={profile.research.totalPosts} color="text-blue-500" />
-          <StatCard label="Verified Posts" value={profile.research.verifiedPosts} color="text-green-500" />
-          <StatCard label="Research Status" value={profile.isEligible ? '✓ Eligible' : '✗ Not Yet'} color={profile.isEligible ? 'text-green-500' : 'text-red-400'} />
+          <StatCard
+            label="Posts Published"
+            value={profile.research.totalPosts}
+            color="text-blue-500"
+          />
+          <StatCard
+            label="Verified Posts"
+            value={profile.research.verifiedPosts}
+            color="text-green-500"
+          />
+          <StatCard
+            label="Research Status"
+            value={profile.isEligible ? '✓ Eligible' : '✗ Not Yet'}
+            color={profile.isEligible ? 'text-green-500' : 'text-red-400'}
+          />
           {profile.research.recentPosts.length > 0 ? (
             <div className="col-span-1 sm:col-span-3 bg-white dark:bg-gray-800 rounded-xl p-5 shadow-sm border border-gray-100 dark:border-gray-700">
-              <h3 className="text-sm font-semibold text-gray-900 dark:text-white mb-3">Recent Research Posts</h3>
+              <h3 className="text-sm font-semibold text-gray-900 dark:text-white mb-3">
+                Recent Research Posts
+              </h3>
               <div className="space-y-2">
-                {profile.research.recentPosts.map(post => (
+                {profile.research.recentPosts.map((post) => (
                   <div
                     key={post.id}
                     onClick={() => navigate(`/research/${post.id}`)}
@@ -871,7 +1099,6 @@ function ProfilePage() {
           )}
         </div>
       )}
-
     </div>
   )
 }

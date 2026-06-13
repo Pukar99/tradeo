@@ -9,6 +9,7 @@
 import { createContext, useContext, useState, useCallback, useEffect, useRef, useMemo } from 'react'
 import { useLocation } from 'react-router-dom'
 import { getPositions } from '../utils/globalCache'
+import { useAuth } from './AuthContext'
 
 const ScreenContext = createContext(null)
 
@@ -16,37 +17,59 @@ const ScreenContext = createContext(null)
 // 1. PROVIDER
 // =============================================================================
 
-export function ScreenProvider({ children, initialSymbol, initialIndexId, initialIsIndex, initialTimeframe, onSymbolChange, disableMovers, disablePositions, disableNavState }) {
-  const [selectedSymbol,      setSelectedSymbol]      = useState(initialSymbol  || 'NEPSE')
+export function ScreenProvider({
+  children,
+  initialSymbol,
+  initialIndexId,
+  initialIsIndex,
+  initialTimeframe,
+  onSymbolChange,
+  disableMovers,
+  disablePositions,
+  disableNavState,
+}) {
+  const [selectedSymbol, setSelectedSymbol] = useState(initialSymbol || 'NEPSE')
   const [selectedCompanyName, setSelectedCompanyName] = useState(null)
-  const [selectedIndexId,     setSelectedIndexId]     = useState(initialIndexId ?? 12)
-  const [selectedIsIndex,     setSelectedIsIndex]     = useState(initialIsIndex ?? true)
-  const [chartType,       setChartType]       = useState('candlestick')
-  const [timeframe,       setTimeframe]       = useState(initialTimeframe || 'ALL')
-  const [activeIndicators,setActiveIndicators]= useState([])
+  const [selectedIndexId, setSelectedIndexId] = useState(initialIndexId ?? 12)
+  const [selectedIsIndex, setSelectedIsIndex] = useState(initialIsIndex ?? true)
+  const [chartType, setChartType] = useState('candlestick')
+  const [timeframe, setTimeframe] = useState(initialTimeframe || 'ALL')
+  const [activeIndicators, setActiveIndicators] = useState([])
 
   // Hover / click-lock state — drives the candle movers overlay
-  const [hoveredDate,   setHoveredDate]   = useState(null)
-  const [pinnedDate,    setPinnedDate]    = useState(null)  // null = not pinned
-  const [hoveredMovers, setHoveredMovers] = useState(null)  // { gainers, losers }
-  const [pinnedMovers,  setPinnedMovers]  = useState(null)
+  const [hoveredDate, setHoveredDate] = useState(null)
+  const [pinnedDate, setPinnedDate] = useState(null) // null = not pinned
+  const [hoveredMovers, setHoveredMovers] = useState(null) // { gainers, losers }
+  const [pinnedMovers, setPinnedMovers] = useState(null)
 
   // Shared positions — fetched once, consumed by LeftPanel + any future ScreenPage component.
   // Raw position_view rows — each consumer does its own field mapping.
-  const [sharedPositions,    setSharedPositions]    = useState([])
-  const [positionsLoading,   setPositionsLoading]   = useState(true)
-  const positionsFetchedRef  = useRef(false)
+  const { user } = useAuth()
+  const [sharedPositions, setSharedPositions] = useState([])
+  // Guests have no positions — start resolved (not loading) so the panel renders
+  // its empty/guest state instead of a perpetual spinner.
+  const [positionsLoading, setPositionsLoading] = useState(!!user)
+  const positionsFetchedRef = useRef(false)
 
   const refreshPositions = useCallback(() => {
     setPositionsLoading(true)
     getPositions()
-      .then(r => { setSharedPositions(r.data || []); positionsFetchedRef.current = true })
+      .then((r) => {
+        setSharedPositions(r.data || [])
+        positionsFetchedRef.current = true
+      })
       .catch(() => {})
       .finally(() => setPositionsLoading(false))
   }, [])
 
   // Fetch once on mount — skipped when disablePositions=true (e.g. MultiChart panels)
-  useEffect(() => { if (!disablePositions) refreshPositions() }, [refreshPositions, disablePositions])
+  // and skipped for guests: /api/tradelog/positions is auth-gated, so a guest fetch
+  // 401s and the global interceptor would force a "session expired" redirect, hiding
+  // the page's own in-place AuthWall. No user → no positions to fetch.
+  useEffect(() => {
+    if (disablePositions || !user) return
+    refreshPositions()
+  }, [refreshPositions, disablePositions, user])
 
   // Active positions array — supports multiple entries for same symbol
   // Each: { id, entry_price, sl, tp, position, quantity }
@@ -96,8 +119,8 @@ export function ScreenProvider({ children, initialSymbol, initialIndexId, initia
   }, []) // eslint-disable-line react-hooks/exhaustive-deps
 
   const toggleIndicator = useCallback((name) => {
-    setActiveIndicators(prev =>
-      prev.includes(name) ? prev.filter(i => i !== name) : [...prev, name]
+    setActiveIndicators((prev) =>
+      prev.includes(name) ? prev.filter((i) => i !== name) : [...prev, name]
     )
   }, [])
 
@@ -112,7 +135,7 @@ export function ScreenProvider({ children, initialSymbol, initialIndexId, initia
 
   // Called by StockChart on candle click — toggles pin
   const onPin = useCallback((date, movers) => {
-    setPinnedDate(prev => {
+    setPinnedDate((prev) => {
       const next = prev === date ? null : date
       setPinnedMovers(next === null ? null : movers)
       setClickedMovers(next === null ? null : { date, movers })
@@ -127,39 +150,70 @@ export function ScreenProvider({ children, initialSymbol, initialIndexId, initia
   }, [])
 
   // Active date/movers = pinned takes priority over hovered
-  const activeDate   = pinnedDate   ?? hoveredDate
+  const activeDate = pinnedDate ?? hoveredDate
   const activeMovers = pinnedMovers ?? hoveredMovers
 
-  const ctxValue = useMemo(() => ({
-    selectedSymbol, selectedCompanyName, selectedIndexId,
-    chartType,       setChartType,
-    timeframe,       setTimeframe,
-    activeIndicators, toggleIndicator,
-    selectSymbol,    isIndex,
-    hoveredDate, pinnedDate, activeDate,
-    hoveredMovers, pinnedMovers, activeMovers,
-    clickedMovers,
-    onHover, onPin, clearPin,
-    disableMovers,
-    activePositions,
-    activePosition: activePositions?.[0] ?? null,
-    sharedPositions, positionsLoading, refreshPositions,
-  }), [
-    selectedSymbol, selectedCompanyName, selectedIndexId,
-    chartType, timeframe, activeIndicators,
-    hoveredDate, pinnedDate, activeDate,
-    hoveredMovers, pinnedMovers, activeMovers,
-    clickedMovers, disableMovers,
-    activePositions, sharedPositions, positionsLoading,
-    setChartType, setTimeframe, toggleIndicator,
-    selectSymbol, isIndex, onHover, onPin, clearPin, refreshPositions,
-  ])
-
-  return (
-    <ScreenContext.Provider value={ctxValue}>
-      {children}
-    </ScreenContext.Provider>
+  const ctxValue = useMemo(
+    () => ({
+      selectedSymbol,
+      selectedCompanyName,
+      selectedIndexId,
+      chartType,
+      setChartType,
+      timeframe,
+      setTimeframe,
+      activeIndicators,
+      toggleIndicator,
+      selectSymbol,
+      isIndex,
+      hoveredDate,
+      pinnedDate,
+      activeDate,
+      hoveredMovers,
+      pinnedMovers,
+      activeMovers,
+      clickedMovers,
+      onHover,
+      onPin,
+      clearPin,
+      disableMovers,
+      activePositions,
+      activePosition: activePositions?.[0] ?? null,
+      sharedPositions,
+      positionsLoading,
+      refreshPositions,
+    }),
+    [
+      selectedSymbol,
+      selectedCompanyName,
+      selectedIndexId,
+      chartType,
+      timeframe,
+      activeIndicators,
+      hoveredDate,
+      pinnedDate,
+      activeDate,
+      hoveredMovers,
+      pinnedMovers,
+      activeMovers,
+      clickedMovers,
+      disableMovers,
+      activePositions,
+      sharedPositions,
+      positionsLoading,
+      setChartType,
+      setTimeframe,
+      toggleIndicator,
+      selectSymbol,
+      isIndex,
+      onHover,
+      onPin,
+      clearPin,
+      refreshPositions,
+    ]
   )
+
+  return <ScreenContext.Provider value={ctxValue}>{children}</ScreenContext.Provider>
 }
 
 // =============================================================================

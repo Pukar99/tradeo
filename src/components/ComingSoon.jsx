@@ -11,8 +11,15 @@ export default function ComingSoon({ label, desc, compact = false }) {
         <div className="relative w-10 h-10">
           <div className="absolute inset-0 rounded-full bg-blue-400/20 animate-pulse-ring" />
           <div className="w-10 h-10 rounded-full bg-gray-100 dark:bg-gray-800 flex items-center justify-center relative z-10">
-            <svg className="w-5 h-5 text-gray-400" viewBox="0 0 24 24" fill="none"
-              stroke="currentColor" strokeWidth={1.8} strokeLinecap="round" strokeLinejoin="round">
+            <svg
+              className="w-5 h-5 text-gray-400"
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke="currentColor"
+              strokeWidth={1.8}
+              strokeLinecap="round"
+              strokeLinejoin="round"
+            >
               <circle cx="12" cy="12" r="10" />
               <path d="M12 8v4l3 3" />
             </svg>
@@ -29,7 +36,12 @@ export default function ComingSoon({ label, desc, compact = false }) {
       <div className="relative w-14 h-14">
         <div className="absolute inset-0 rounded-2xl bg-blue-400/15 animate-pulse-ring" />
         <div className="w-14 h-14 rounded-2xl bg-gray-100 dark:bg-gray-800 flex items-center justify-center relative z-10">
-          <svg className="w-7 h-7 text-gray-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+          <svg
+            className="w-7 h-7 text-gray-400"
+            fill="none"
+            viewBox="0 0 24 24"
+            stroke="currentColor"
+          >
             <circle cx="12" cy="12" r="10" />
             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M12 8v4l3 3" />
           </svg>

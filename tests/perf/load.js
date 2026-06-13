@@ -15,7 +15,7 @@
  * With options: k6 run --env SCENARIO=trade_crud tests/perf/load.js
  */
 
-import http    from 'k6/http'
+import http from 'k6/http'
 import { check, sleep, group } from 'k6'
 import { Counter, Rate, Trend } from 'k6/metrics'
 import { uuidv4 } from 'https://jslib.k6.io/k6-utils/1.4.0/index.js'
@@ -28,78 +28,80 @@ const SCENARIO = __ENV.SCENARIO || 'all'
 // ── Custom metrics ─────────────────────────────────────────────────────────────
 
 const tradeCreateErrors = new Counter('trade_create_errors')
-const tradeCreateTime   = new Trend('trade_create_duration')
-const loginSuccess      = new Rate('login_success_rate')
-const p99Threshold      = new Trend('p99_response_time')
+const tradeCreateTime = new Trend('trade_create_duration')
+const loginSuccess = new Rate('login_success_rate')
+const p99Threshold = new Trend('p99_response_time')
 
 // ── k6 options ─────────────────────────────────────────────────────────────────
 
 export const options = {
   scenarios: {
     auth_flow: {
-      executor:    'constant-vus',
-      vus:          5,
-      duration:    '30s',
-      exec:        'authFlow',
-      tags:        { scenario: 'auth' },
+      executor: 'constant-vus',
+      vus: 5,
+      duration: '30s',
+      exec: 'authFlow',
+      tags: { scenario: 'auth' },
     },
     trade_crud: {
-      executor:    'ramping-vus',
-      startVUs:     5,
+      executor: 'ramping-vus',
+      startVUs: 5,
       stages: [
         { duration: '30s', target: 30 },
-        { duration: '1m',  target: 50 },
-        { duration: '30s', target: 0  },
+        { duration: '1m', target: 50 },
+        { duration: '30s', target: 0 },
       ],
-      exec:        'tradeCrud',
-      tags:        { scenario: 'trade' },
+      exec: 'tradeCrud',
+      tags: { scenario: 'trade' },
     },
     concurrent_burst: {
-      executor:    'ramping-arrival-rate',
-      startRate:    10,
-      timeUnit:    '1s',
+      executor: 'ramping-arrival-rate',
+      startRate: 10,
+      timeUnit: '1s',
       preAllocatedVUs: 50,
-      maxVUs:       150,
+      maxVUs: 150,
       stages: [
         { duration: '10s', target: 100 },
         { duration: '20s', target: 100 },
-        { duration: '10s', target: 0   },
+        { duration: '10s', target: 0 },
       ],
-      exec:        'burstTradeCreate',
-      tags:        { scenario: 'burst' },
+      exec: 'burstTradeCreate',
+      tags: { scenario: 'burst' },
     },
     dashboard_load: {
-      executor:    'constant-vus',
-      vus:          20,
-      duration:    '3m',
-      exec:        'dashboardLoad',
-      tags:        { scenario: 'dashboard' },
+      executor: 'constant-vus',
+      vus: 20,
+      duration: '3m',
+      exec: 'dashboardLoad',
+      tags: { scenario: 'dashboard' },
     },
   },
   thresholds: {
     // 95% of requests < 500ms
-    http_req_duration:      ['p(95)<500', 'p(99)<1000'],
+    http_req_duration: ['p(95)<500', 'p(99)<1000'],
     // Login must succeed > 95% of the time
-    login_success_rate:     ['rate>0.95'],
+    login_success_rate: ['rate>0.95'],
     // Trade create errors < 1%
-    trade_create_errors:    ['count<5'],
+    trade_create_errors: ['count<5'],
     // No 5xx errors
-    'http_req_failed':      ['rate<0.01'],
+    http_req_failed: ['rate<0.01'],
   },
 }
 
 // ── Shared auth helper ─────────────────────────────────────────────────────────
 
 function getAuthToken(email, password) {
-  const loginRes = http.post(
-    `${API_BASE}/api/auth/login`,
-    JSON.stringify({ email, password }),
-    { headers: { 'Content-Type': 'application/json' } }
-  )
+  const loginRes = http.post(`${API_BASE}/api/auth/login`, JSON.stringify({ email, password }), {
+    headers: { 'Content-Type': 'application/json' },
+  })
   const success = check(loginRes, {
     'login status 200': (r) => r.status === 200,
-    'token present':    (r) => {
-      try { return !!JSON.parse(r.body).token } catch { return false }
+    'token present': (r) => {
+      try {
+        return !!JSON.parse(r.body).token
+      } catch {
+        return false
+      }
     },
   })
   loginSuccess.add(success)
@@ -108,15 +110,15 @@ function getAuthToken(email, password) {
 }
 
 function authHeaders(token) {
-  return { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` }
+  return { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` }
 }
 
 // ── Scenario: Auth Flow ────────────────────────────────────────────────────────
 
 export function authFlow() {
-  const uid   = uuidv4().slice(0, 8)
+  const uid = uuidv4().slice(0, 8)
   const email = `perf_${uid}@loadtest.com`
-  const pass  = 'loadtest123'
+  const pass = 'loadtest123'
 
   group('signup', () => {
     const res = http.post(
@@ -126,7 +128,7 @@ export function authFlow() {
     )
     check(res, {
       'signup 201': (r) => r.status === 201,
-      'no error':   (r) => !JSON.parse(r.body || '{}').error,
+      'no error': (r) => !JSON.parse(r.body || '{}').error,
     })
   })
 
@@ -143,9 +145,9 @@ export function authFlow() {
 
 export function tradeCrud() {
   // Each VU creates its own account
-  const uid   = `${__VU}_${__ITER}`
+  const uid = `${__VU}_${__ITER}`
   const email = `trade_vu${uid}@loadtest.com`
-  const pass  = 'loadtest123'
+  const pass = 'loadtest123'
 
   // Signup (only once per VU — first iteration)
   if (__ITER === 0) {
@@ -157,20 +159,23 @@ export function tradeCrud() {
   }
 
   const token = getAuthToken(email, pass)
-  if (!token) { sleep(1); return }
+  if (!token) {
+    sleep(1)
+    return
+  }
 
   const headers = authHeaders(token)
   let tradeId
 
   group('create_trade', () => {
     const start = Date.now()
-    const res   = http.post(
+    const res = http.post(
       `${API_BASE}/api/tradelog`,
       JSON.stringify({
-        date:        '2025-04-01',
-        symbol:      `VU${__VU}`,
-        position:    'LONG',
-        quantity:    100,
+        date: '2025-04-01',
+        symbol: `VU${__VU}`,
+        position: 'LONG',
+        quantity: 100,
         entry_price: 500,
       }),
       { headers }
@@ -181,11 +186,18 @@ export function tradeCrud() {
 
     const ok = check(res, {
       'trade created 201': (r) => r.status === 201,
-      'has trade id':      (r) => {
-        try { return !!JSON.parse(r.body).id } catch { return false }
+      'has trade id': (r) => {
+        try {
+          return !!JSON.parse(r.body).id
+        } catch {
+          return false
+        }
       },
     })
-    if (!ok) { tradeCreateErrors.add(1); return }
+    if (!ok) {
+      tradeCreateErrors.add(1)
+      return
+    }
     tradeId = JSON.parse(res.body).id
   })
 
@@ -208,8 +220,12 @@ export function tradeCrud() {
     )
     check(res, {
       'trade closed 200': (r) => r.status === 200,
-      'status CLOSED':    (r) => {
-        try { return JSON.parse(r.body).status === 'CLOSED' } catch { return false }
+      'status CLOSED': (r) => {
+        try {
+          return JSON.parse(r.body).status === 'CLOSED'
+        } catch {
+          return false
+        }
       },
     })
   })
@@ -227,9 +243,9 @@ export function tradeCrud() {
 // ── Scenario: Concurrent Burst ─────────────────────────────────────────────────
 
 export function burstTradeCreate() {
-  const uid   = `${__VU}_${__ITER}_${Date.now()}`
+  const uid = `${__VU}_${__ITER}_${Date.now()}`
   const email = `burst_${uid.slice(-8)}@loadtest.com`
-  const pass  = 'loadtest123'
+  const pass = 'loadtest123'
 
   // Signup + immediate trade create
   const signup = http.post(
@@ -246,10 +262,10 @@ export function burstTradeCreate() {
   const res = http.post(
     `${API_BASE}/api/tradelog`,
     JSON.stringify({
-      date:        '2025-04-01',
-      symbol:      'BURST',
-      position:    'LONG',
-      quantity:    10,
+      date: '2025-04-01',
+      symbol: 'BURST',
+      position: 'LONG',
+      quantity: 10,
       entry_price: 100,
     }),
     { headers: authHeaders(token) }
@@ -257,8 +273,12 @@ export function burstTradeCreate() {
 
   check(res, {
     'burst create 201': (r) => r.status === 201,
-    'unique id':        (r) => {
-      try { return !!JSON.parse(r.body).id } catch { return false }
+    'unique id': (r) => {
+      try {
+        return !!JSON.parse(r.body).id
+      } catch {
+        return false
+      }
     },
   })
   if (res.status !== 201) tradeCreateErrors.add(1)
@@ -267,9 +287,9 @@ export function burstTradeCreate() {
 // ── Scenario: Dashboard Load ───────────────────────────────────────────────────
 
 export function dashboardLoad() {
-  const uid   = `dash_${__VU}`
+  const uid = `dash_${__VU}`
   const email = `${uid}@loadtest.com`
-  const pass  = 'loadtest123'
+  const pass = 'loadtest123'
 
   // Signup once per VU
   if (__ITER === 0) {
@@ -281,21 +301,24 @@ export function dashboardLoad() {
   }
 
   const token = getAuthToken(email, pass)
-  if (!token) { sleep(2); return }
+  if (!token) {
+    sleep(2)
+    return
+  }
 
   const headers = authHeaders(token)
 
   group('dashboard_requests', () => {
     // Typical dashboard makes several parallel requests
     const [trades, dash, portfolio] = http.batch([
-      ['GET', `${API_BASE}/api/tradelog`,   null, { headers }],
-      ['GET', `${API_BASE}/api/dashboard`,  null, { headers }],
-      ['GET', `${API_BASE}/api/portfolio`,  null, { headers }],
+      ['GET', `${API_BASE}/api/tradelog`, null, { headers }],
+      ['GET', `${API_BASE}/api/dashboard`, null, { headers }],
+      ['GET', `${API_BASE}/api/portfolio`, null, { headers }],
     ])
 
-    check(trades,    { 'tradelog 200':   (r) => r.status === 200 })
-    check(dash,      { 'dashboard 200':  (r) => r.status === 200 || r.status === 404 })
-    check(portfolio, { 'portfolio 200':  (r) => r.status === 200 })
+    check(trades, { 'tradelog 200': (r) => r.status === 200 })
+    check(dash, { 'dashboard 200': (r) => r.status === 200 || r.status === 404 })
+    check(portfolio, { 'portfolio 200': (r) => r.status === 200 })
   })
 
   sleep(2)

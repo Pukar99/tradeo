@@ -4,7 +4,9 @@
 import { useState, useEffect } from 'react'
 import { isMarketOpenNow } from '../../utils/nepseCalendar'
 
-export default function MarketStatusBadge({ latestDate }) {
+// compact — show only the status dot (no label / "Data as of" text). Used in the
+// cramped mobile Screen toolbar where horizontal space is scarce.
+export default function MarketStatusBadge({ latestDate, compact = false }) {
   const [isOpen, setIsOpen] = useState(() => isMarketOpenNow())
 
   // Re-evaluate every minute so the badge flips at open/close without a reload
@@ -13,11 +15,20 @@ export default function MarketStatusBadge({ latestDate }) {
     return () => clearInterval(id)
   }, [])
 
+  const dot = (
+    <span
+      className={`w-1.5 h-1.5 rounded-full ${isOpen ? 'bg-emerald-400 animate-pulse' : 'bg-gray-500'}`}
+      title={isOpen ? 'Market Open' : 'Market Closed'}
+    />
+  )
+
+  if (compact) return <span className="flex items-center">{dot}</span>
+
   return (
     <div className="flex items-center gap-2 text-[10px] text-gray-400">
       {latestDate && <span>Data as of {latestDate}</span>}
       <span className="flex items-center gap-1">
-        <span className={`w-1.5 h-1.5 rounded-full ${isOpen ? 'bg-emerald-400 animate-pulse' : 'bg-gray-500'}`} />
+        {dot}
         <span className={isOpen ? 'text-emerald-400' : 'text-gray-500'}>
           {isOpen ? 'Market Open' : 'Market Closed'}
         </span>

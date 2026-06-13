@@ -6,26 +6,33 @@ import { LABEL, fmtPct } from './helpers'
 // Memoized: parent re-renders on every heatmap-cell click but the left-panel
 // props (data, wAvg, wWinRate, selectedIndexId, setSelectedIndexId) are all
 // stable references unless the underlying data changes.
-const LeftInsightPanel = memo(function LeftInsightPanel({ data, wAvg, wWinRate, selectedIndexId, setSelectedIndexId }) {
-
-  const validAvg  = wAvg.filter(v => v != null)
-  const bestMi    = validAvg.length ? wAvg.indexOf(Math.max(...validAvg)) : -1
-  const worstMi   = validAvg.length ? wAvg.indexOf(Math.min(...validAvg)) : -1
+const LeftInsightPanel = memo(function LeftInsightPanel({
+  data,
+  wAvg,
+  wWinRate,
+  selectedIndexId,
+  setSelectedIndexId,
+}) {
+  const validAvg = wAvg.filter((v) => v != null)
+  const bestMi = validAvg.length ? wAvg.indexOf(Math.max(...validAvg)) : -1
+  const worstMi = validAvg.length ? wAvg.indexOf(Math.min(...validAvg)) : -1
 
   return (
     <div className="flex flex-col h-full overflow-y-auto overflow-x-hidden bg-white dark:bg-gray-900">
-
       {/* Index selector — pill list */}
       <div className="shrink-0 px-3 pt-3 pb-2 border-b border-gray-100 dark:border-gray-800">
         <div className={`${LABEL} mb-1.5`}>Index</div>
         <div className="flex flex-wrap gap-1">
-          {INDEX_OPTIONS.map(opt => (
-            <button key={opt.id} onClick={() => setSelectedIndexId(opt.id)}
+          {INDEX_OPTIONS.map((opt) => (
+            <button
+              key={opt.id}
+              onClick={() => setSelectedIndexId(opt.id)}
               className={`px-1.5 py-0.5 rounded text-[10px] font-bold transition-colors min-w-[40px] text-center ${
                 selectedIndexId === opt.id
                   ? 'bg-blue-600 text-white'
                   : 'bg-gray-100 dark:bg-gray-800 text-gray-500 dark:text-gray-400 hover:bg-gray-200 dark:hover:bg-gray-700'
-              }`}>
+              }`}
+            >
               {opt.short}
             </button>
           ))}
@@ -62,11 +69,16 @@ const LeftInsightPanel = memo(function LeftInsightPanel({ data, wAvg, wWinRate, 
             <div>
               <div className={`${LABEL} mb-1.5`}>Top Years</div>
               {(data.best_years || []).slice(0, 10).map((y, i) => (
-                <div key={y.year} className={`flex items-center justify-between mb-0.5 px-1 py-0.5 rounded ${
-                  i % 2 === 1 ? 'bg-gray-50 dark:bg-gray-800/60' : ''
-                }`}>
+                <div
+                  key={y.year}
+                  className={`flex items-center justify-between mb-0.5 px-1 py-0.5 rounded ${
+                    i % 2 === 1 ? 'bg-gray-50 dark:bg-gray-800/60' : ''
+                  }`}
+                >
                   <span className="flex items-center gap-1 min-w-0">
-                    <span className="text-[10px] text-gray-500 dark:text-gray-500">{i+1}. {y.year}</span>
+                    <span className="text-[10px] text-gray-500 dark:text-gray-500">
+                      {i + 1}. {y.year}
+                    </span>
                     {y.label && (
                       <span className="text-[8px] font-black px-0.5 rounded bg-emerald-100 text-emerald-600 dark:bg-emerald-900/40 dark:text-emerald-400">
                         {y.label}
@@ -80,11 +92,16 @@ const LeftInsightPanel = memo(function LeftInsightPanel({ data, wAvg, wWinRate, 
             <div>
               <div className={`${LABEL} mb-1.5`}>Bottom</div>
               {(data.worst_years || []).slice(0, 10).map((y, i) => (
-                <div key={y.year} className={`flex items-center justify-between mb-0.5 px-1 py-0.5 rounded ${
-                  i % 2 === 1 ? 'bg-gray-50 dark:bg-gray-800/60' : ''
-                }`}>
+                <div
+                  key={y.year}
+                  className={`flex items-center justify-between mb-0.5 px-1 py-0.5 rounded ${
+                    i % 2 === 1 ? 'bg-gray-50 dark:bg-gray-800/60' : ''
+                  }`}
+                >
                   <span className="flex items-center gap-1 min-w-0">
-                    <span className="text-[10px] text-gray-500 dark:text-gray-500">{i+1}. {y.year}</span>
+                    <span className="text-[10px] text-gray-500 dark:text-gray-500">
+                      {i + 1}. {y.year}
+                    </span>
                     {y.label && (
                       <span className="text-[8px] font-black px-0.5 rounded bg-red-100 text-red-500 dark:bg-red-900/40 dark:text-red-400">
                         {y.label}

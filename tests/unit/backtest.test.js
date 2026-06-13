@@ -13,39 +13,39 @@ import { describe, test, expect } from 'vitest'
 // ── Inline mirrors of nepse utility functions ─────────────────────────────────
 
 function calcBrokerFee(amount) {
-  if (amount <= 50000)    return parseFloat((amount * 0.0036).toFixed(2))
-  if (amount <= 500000)   return parseFloat((amount * 0.0033).toFixed(2))
-  if (amount <= 2000000)  return parseFloat((amount * 0.0031).toFixed(2))
+  if (amount <= 50000) return parseFloat((amount * 0.0036).toFixed(2))
+  if (amount <= 500000) return parseFloat((amount * 0.0033).toFixed(2))
+  if (amount <= 2000000) return parseFloat((amount * 0.0031).toFixed(2))
   if (amount <= 10000000) return parseFloat((amount * 0.0027).toFixed(2))
   return parseFloat((amount * 0.0024).toFixed(2))
 }
 
 function checkCircuitLimit(entryPrice, currentPrice, position) {
   const changePct = ((currentPrice - entryPrice) / entryPrice) * 100
-  if (position === 'LONG'  && changePct >= 10) return { breached: true, type: 'UPPER_CIRCUIT', changePct }
-  if (position === 'SHORT' && changePct <= -10) return { breached: true, type: 'LOWER_CIRCUIT', changePct }
+  if (position === 'LONG' && changePct >= 10)
+    return { breached: true, type: 'UPPER_CIRCUIT', changePct }
+  if (position === 'SHORT' && changePct <= -10)
+    return { breached: true, type: 'LOWER_CIRCUIT', changePct }
   return { breached: false, changePct }
 }
 
 function calcSessionPnl(orders) {
-  return orders
-    .filter(o => o.status === 'CLOSED')
-    .reduce((s, o) => s + (o.realized_pnl || 0), 0)
+  return orders.filter((o) => o.status === 'CLOSED').reduce((s, o) => s + (o.realized_pnl || 0), 0)
 }
 
 function calcSessionWinRate(orders) {
-  const closed = orders.filter(o => o.status === 'CLOSED')
+  const closed = orders.filter((o) => o.status === 'CLOSED')
   if (!closed.length) return 0
-  const wins = closed.filter(o => (o.realized_pnl || 0) > 0).length
+  const wins = closed.filter((o) => (o.realized_pnl || 0) > 0).length
   return Math.round((wins / closed.length) * 100)
 }
 
 function calcSharpeRatio(returns, riskFreeRate = 0) {
   if (returns.length < 2) return 0
-  const excess  = returns.map(r => r - riskFreeRate)
-  const mu      = excess.reduce((s, r) => s + r, 0) / excess.length
+  const excess = returns.map((r) => r - riskFreeRate)
+  const mu = excess.reduce((s, r) => s + r, 0) / excess.length
   const variance = excess.reduce((s, r) => s + (r - mu) ** 2, 0) / (excess.length - 1)
-  const sd       = Math.sqrt(variance)
+  const sd = Math.sqrt(variance)
   return sd === 0 ? 0 : mu / sd
 }
 
@@ -63,7 +63,7 @@ function calcMaxDrawdown(equityCurve) {
 
 function calcPositionSize(availableCapital, price, quantity) {
   const cost = price * quantity
-  const fee  = calcBrokerFee(cost)
+  const fee = calcBrokerFee(cost)
   return cost + fee
 }
 
@@ -72,20 +72,19 @@ function calcRemainingCapital(availableCapital, orderCost) {
 }
 
 function calcPnlAtExit(position, entryPrice, exitPrice, quantity, entryFee, exitFee) {
-  const gross = position === 'LONG'
-    ? (exitPrice - entryPrice) * quantity
-    : (entryPrice - exitPrice) * quantity
+  const gross =
+    position === 'LONG' ? (exitPrice - entryPrice) * quantity : (entryPrice - exitPrice) * quantity
   return gross - entryFee - exitFee
 }
 
 // ── Broker fee ────────────────────────────────────────────────────────────────
 describe('calcBrokerFee', () => {
-  test('≤50k: 0.36%',  () => expect(calcBrokerFee(50000)).toBe(180))
+  test('≤50k: 0.36%', () => expect(calcBrokerFee(50000)).toBe(180))
   test('≤500k: 0.33%', () => expect(calcBrokerFee(100000)).toBe(330))
-  test('≤2M: 0.31%',   () => expect(calcBrokerFee(1000000)).toBe(3100))
-  test('≤10M: 0.27%',  () => expect(calcBrokerFee(5000000)).toBe(13500))
-  test('>10M: 0.24%',  () => expect(calcBrokerFee(20000000)).toBe(48000))
-  test('fee > 0',       () => expect(calcBrokerFee(1000)).toBeGreaterThan(0))
+  test('≤2M: 0.31%', () => expect(calcBrokerFee(1000000)).toBe(3100))
+  test('≤10M: 0.27%', () => expect(calcBrokerFee(5000000)).toBe(13500))
+  test('>10M: 0.24%', () => expect(calcBrokerFee(20000000)).toBe(48000))
+  test('fee > 0', () => expect(calcBrokerFee(1000)).toBeGreaterThan(0))
   test('scales with amount', () =>
     expect(calcBrokerFee(200000)).toBeGreaterThan(calcBrokerFee(50000)))
 })
@@ -122,44 +121,50 @@ describe('calcSessionPnl', () => {
   const orders = [
     { status: 'CLOSED', realized_pnl: 5000 },
     { status: 'CLOSED', realized_pnl: -2000 },
-    { status: 'OPEN',   realized_pnl: 0 },
+    { status: 'OPEN', realized_pnl: 0 },
   ]
   test('sums closed order P&L only', () => expect(calcSessionPnl(orders)).toBe(3000))
-  test('excludes OPEN orders',        () => {
+  test('excludes OPEN orders', () => {
     const onlyOpen = [{ status: 'OPEN', realized_pnl: 9999 }]
     expect(calcSessionPnl(onlyOpen)).toBe(0)
   })
-  test('empty orders → 0',            () => expect(calcSessionPnl([])).toBe(0))
-  test('all winning → positive',       () => {
-    expect(calcSessionPnl([
-      { status: 'CLOSED', realized_pnl: 1000 },
-      { status: 'CLOSED', realized_pnl: 2000 },
-    ])).toBe(3000)
+  test('empty orders → 0', () => expect(calcSessionPnl([])).toBe(0))
+  test('all winning → positive', () => {
+    expect(
+      calcSessionPnl([
+        { status: 'CLOSED', realized_pnl: 1000 },
+        { status: 'CLOSED', realized_pnl: 2000 },
+      ])
+    ).toBe(3000)
   })
 })
 
 // ── Session win rate ──────────────────────────────────────────────────────────
 describe('calcSessionWinRate', () => {
   test('2 wins 1 loss = 67%', () => {
-    expect(calcSessionWinRate([
-      { status: 'CLOSED', realized_pnl: 1000 },
-      { status: 'CLOSED', realized_pnl: -500 },
-      { status: 'CLOSED', realized_pnl: 200 },
-    ])).toBe(67)
+    expect(
+      calcSessionWinRate([
+        { status: 'CLOSED', realized_pnl: 1000 },
+        { status: 'CLOSED', realized_pnl: -500 },
+        { status: 'CLOSED', realized_pnl: 200 },
+      ])
+    ).toBe(67)
   })
-  test('all wins = 100%',   () => {
-    expect(calcSessionWinRate([
-      { status: 'CLOSED', realized_pnl: 100 },
-      { status: 'CLOSED', realized_pnl: 200 },
-    ])).toBe(100)
+  test('all wins = 100%', () => {
+    expect(
+      calcSessionWinRate([
+        { status: 'CLOSED', realized_pnl: 100 },
+        { status: 'CLOSED', realized_pnl: 200 },
+      ])
+    ).toBe(100)
   })
-  test('all losses = 0%',   () => {
+  test('all losses = 0%', () => {
     expect(calcSessionWinRate([{ status: 'CLOSED', realized_pnl: -100 }])).toBe(0)
   })
-  test('no closed → 0',     () => {
+  test('no closed → 0', () => {
     expect(calcSessionWinRate([{ status: 'OPEN', realized_pnl: 0 }])).toBe(0)
   })
-  test('breakeven = 0%',    () => {
+  test('breakeven = 0%', () => {
     expect(calcSessionWinRate([{ status: 'CLOSED', realized_pnl: 0 }])).toBe(0)
   })
 })
@@ -223,8 +228,7 @@ describe('calcRemainingCapital', () => {
     expect(calcRemainingCapital(100000, 50000)).toBe(50000))
   test('goes negative if order exceeds capital', () =>
     expect(calcRemainingCapital(50000, 60000)).toBe(-10000))
-  test('zero cost → unchanged', () =>
-    expect(calcRemainingCapital(100000, 0)).toBe(100000))
+  test('zero cost → unchanged', () => expect(calcRemainingCapital(100000, 0)).toBe(100000))
 })
 
 // ── P&L at exit (net of fees) ─────────────────────────────────────────────────

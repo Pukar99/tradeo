@@ -12,4 +12,3 @@ describe('app version', () => {
     expect(import.meta.env.VITE_APP_VERSION).toBe(process.env.npm_package_version)
   })
 })
-

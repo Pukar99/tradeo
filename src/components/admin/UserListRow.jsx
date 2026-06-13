@@ -8,12 +8,23 @@ import { patchUserForceLogout } from '@api/admin'
 import toast from 'react-hot-toast'
 
 function getInitials(name = '') {
-  return name.split(' ').map(w => w[0]).join('').toUpperCase().slice(0, 2) || '?'
+  return (
+    name
+      .split(' ')
+      .map((w) => w[0])
+      .join('')
+      .toUpperCase()
+      .slice(0, 2) || '?'
+  )
 }
 
 const AVATAR_COLORS = [
-  'bg-blue-500', 'bg-purple-500', 'bg-green-500',
-  'bg-amber-500', 'bg-red-500',   'bg-pink-500',
+  'bg-blue-500',
+  'bg-purple-500',
+  'bg-green-500',
+  'bg-amber-500',
+  'bg-red-500',
+  'bg-pink-500',
 ]
 
 function avatarColor(id) {
@@ -21,18 +32,20 @@ function avatarColor(id) {
 }
 
 export default function UserListRow({ user: initialUser, onRefresh, dropUp = false }) {
-  const [user,         setUser]         = useState(initialUser)
-  const [menuOpen,     setMenuOpen]     = useState(false)
+  const [user, setUser] = useState(initialUser)
+  const [menuOpen, setMenuOpen] = useState(false)
   const [activeAction, setActiveAction] = useState(null) // 'tier' | 'suspend' | 'force-logout'
   const [forceLoading, setForceLoading] = useState(false)
   const menuRef = useRef(null)
 
   // Sync local user when parent list re-fetches
-  useEffect(() => { setUser(initialUser) }, [initialUser])
+  useEffect(() => {
+    setUser(initialUser)
+  }, [initialUser])
 
   // Close dropdown on outside click
   useEffect(() => {
-    const handler = e => {
+    const handler = (e) => {
       if (menuRef.current && !menuRef.current.contains(e.target)) setMenuOpen(false)
     }
     document.addEventListener('mousedown', handler)
@@ -40,15 +53,21 @@ export default function UserListRow({ user: initialUser, onRefresh, dropUp = fal
   }, [])
 
   const joined = user.created_at
-    ? new Date(user.created_at).toLocaleDateString('en-US', { year: 'numeric', month: 'short', day: 'numeric' })
+    ? new Date(user.created_at).toLocaleDateString('en-US', {
+        year: 'numeric',
+        month: 'short',
+        day: 'numeric',
+      })
     : '—'
 
   function selectAction(action) {
     setMenuOpen(false)
-    setActiveAction(prev => prev === action ? null : action)
+    setActiveAction((prev) => (prev === action ? null : action))
   }
 
-  function closeAction() { setActiveAction(null) }
+  function closeAction() {
+    setActiveAction(null)
+  }
 
   function handleSuccess(updated) {
     setUser(updated)
@@ -75,13 +94,17 @@ export default function UserListRow({ user: initialUser, onRefresh, dropUp = fal
       {/* Main row */}
       <div className="flex items-center gap-3 px-4 py-3 hover:bg-gray-50 dark:hover:bg-gray-800/50 transition-colors">
         {/* Initials avatar */}
-        <div className={`w-8 h-8 rounded-lg flex items-center justify-center flex-shrink-0 ${avatarColor(user.id)}`}>
+        <div
+          className={`w-8 h-8 rounded-lg flex items-center justify-center flex-shrink-0 ${avatarColor(user.id)}`}
+        >
           <span className="text-white text-xs font-bold">{getInitials(user.name)}</span>
         </div>
 
         {/* Name + email */}
         <div className="flex-1 min-w-0">
-          <p className="text-sm font-semibold text-gray-900 dark:text-white truncate">{user.name}</p>
+          <p className="text-sm font-semibold text-gray-900 dark:text-white truncate">
+            {user.name}
+          </p>
           <p className="text-xs text-gray-500 dark:text-gray-400 truncate">{user.email}</p>
         </div>
 
@@ -103,21 +126,23 @@ export default function UserListRow({ user: initialUser, onRefresh, dropUp = fal
         {/* ⋮ actions menu */}
         <div className="relative flex-shrink-0" ref={menuRef}>
           <button
-            onClick={() => setMenuOpen(prev => !prev)}
+            onClick={() => setMenuOpen((prev) => !prev)}
             className="w-7 h-7 flex items-center justify-center rounded-lg text-gray-400 dark:text-gray-500 hover:text-gray-600 dark:hover:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors"
             aria-label="User actions"
           >
             <svg className="w-4 h-4" fill="currentColor" viewBox="0 0 24 24">
-              <circle cx="12" cy="5"  r="1.5" />
+              <circle cx="12" cy="5" r="1.5" />
               <circle cx="12" cy="12" r="1.5" />
               <circle cx="12" cy="19" r="1.5" />
             </svg>
           </button>
 
           {menuOpen && (
-            <div className={`absolute right-0 w-40 bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-700 rounded-xl shadow-lg overflow-hidden z-50 ${
-              dropUp ? 'bottom-full mb-1' : 'top-full mt-1'
-            }`}>
+            <div
+              className={`absolute right-0 w-40 bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-700 rounded-xl shadow-lg overflow-hidden z-50 ${
+                dropUp ? 'bottom-full mb-1' : 'top-full mt-1'
+              }`}
+            >
               <button
                 onClick={() => selectAction('tier')}
                 className="w-full text-left px-3 py-2.5 text-xs text-gray-600 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-800 transition-colors"

@@ -9,7 +9,6 @@
 
 import { useEffect, useRef } from 'react'
 
-
 // =============================================================================
 // 1. EVENTS
 // =============================================================================
@@ -26,19 +25,31 @@ export function dispatchDebrief({ symbol, debrief }) {
   window.dispatchEvent(new CustomEvent(DEBRIEF_EVENT, { detail: { symbol, debrief } }))
 }
 
-
 // =============================================================================
 // 2. REFRESH MAP
 // =============================================================================
 
 // Maps data domain → chat action names that should trigger a re-fetch of that domain.
 export const REFRESH_MAP = {
-  trades:   ['ADD_TRADE', 'CLOSE_TRADE', 'UPDATE_SL_TP', 'CONFIRM_DELETE', 'PARTIAL_CLOSE', 'SELECT_TRADE', 'UNDO'],
-  watchlist: ['ADD_WATCHLIST', 'REMOVE_WATCHLIST', 'UPDATE_WATCHLIST', 'BULK_ADD_WATCHLIST', 'UNDO'],
-  goals:    ['ADD_GOAL', 'UPDATE_GOAL', 'DELETE_GOAL', 'UNDO'],
-  journal:  ['ADD_JOURNAL', 'UNDO'],
+  trades: [
+    'ADD_TRADE',
+    'CLOSE_TRADE',
+    'UPDATE_SL_TP',
+    'CONFIRM_DELETE',
+    'PARTIAL_CLOSE',
+    'SELECT_TRADE',
+    'UNDO',
+  ],
+  watchlist: [
+    'ADD_WATCHLIST',
+    'REMOVE_WATCHLIST',
+    'UPDATE_WATCHLIST',
+    'BULK_ADD_WATCHLIST',
+    'UNDO',
+  ],
+  goals: ['ADD_GOAL', 'UPDATE_GOAL', 'DELETE_GOAL', 'UNDO'],
+  journal: ['ADD_JOURNAL', 'UNDO'],
 }
-
 
 // =============================================================================
 // 3. HOOK
@@ -54,7 +65,7 @@ export function useChatRefresh(domains, callback) {
 
   const domainsKey = domains.slice().sort().join(',')
   useEffect(() => {
-    const relevant = new Set(domains.flatMap(d => REFRESH_MAP[d] || []))
+    const relevant = new Set(domains.flatMap((d) => REFRESH_MAP[d] || []))
     const handler = (e) => {
       if (relevant.has(e.detail?.action)) callbackRef.current()
     }

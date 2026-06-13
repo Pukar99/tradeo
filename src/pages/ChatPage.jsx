@@ -12,9 +12,7 @@ function ChatPage() {
       <div className="min-h-screen bg-gray-100 dark:bg-gray-900 flex items-center justify-center">
         <div className="bg-white dark:bg-gray-800 rounded-2xl p-8 text-center max-w-md shadow-sm">
           <span className="text-4xl mb-4 block">🤖</span>
-          <h2 className="text-xl font-bold text-gray-900 dark:text-white mb-2">
-            Tradeo AI
-          </h2>
+          <h2 className="text-xl font-bold text-gray-900 dark:text-white mb-2">Tradeo AI</h2>
           <p className="text-gray-500 dark:text-gray-400 text-sm mb-6">
             Login to chat with your AI trading assistant
           </p>
@@ -33,11 +31,12 @@ function ChatPage() {
     <div className="min-h-screen bg-gray-100 dark:bg-gray-900">
       {/* 56px/80px = approximate navbar height (mobile/desktop) — update if Navbar height changes */}
       <div className="max-w-6xl mx-auto px-3 sm:px-4 py-4 sm:py-6 flex gap-4 h-[calc(100dvh-56px)] sm:h-[calc(100dvh-80px)]">
-
         {/* Left — Trader Profile sidebar (desktop only) */}
         <div className="hidden lg:flex flex-col w-64 xl:w-72 flex-shrink-0 gap-4 overflow-y-auto pb-2">
           <div>
-            <h2 className="text-[13px] font-bold text-gray-900 dark:text-white mb-0.5">AI Trading Assistant</h2>
+            <h2 className="text-[13px] font-bold text-gray-900 dark:text-white mb-0.5">
+              AI Trading Assistant
+            </h2>
             <p className="text-[10px] text-gray-400">Powered by Groq · NEPSE-aware</p>
           </div>
           <TraderProfile />
@@ -47,14 +46,17 @@ function ChatPage() {
         <div className="flex-1 flex flex-col min-w-0">
           {/* Mobile/tablet header (hidden on lg) */}
           <div className="lg:hidden mb-3">
-            <h1 className="text-[15px] font-bold text-gray-900 dark:text-white">AI Trading Assistant</h1>
-            <p className="text-[10px] text-gray-400 mt-0.5">Powered by Groq · Knows your portfolio & NEPSE data</p>
+            <h1 className="text-[15px] font-bold text-gray-900 dark:text-white">
+              AI Trading Assistant
+            </h1>
+            <p className="text-[10px] text-gray-400 mt-0.5">
+              Powered by Groq · Knows your portfolio & NEPSE data
+            </p>
           </div>
           <div className="flex-1 bg-white dark:bg-gray-800 rounded-2xl shadow-sm overflow-hidden flex flex-col min-h-0">
             <AIChat isFullPage={true} />
           </div>
         </div>
-
       </div>
     </div>
   )

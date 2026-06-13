@@ -9,13 +9,22 @@ import TradeGalleryView from './TradeGalleryView'
 import EmptyState from './EmptyState'
 import { filterPositions } from './tradeConstants'
 
-export default function TradeActionsTab({ positions, ltpMap, view, filter, search, addModal, setAddModal, onRefresh }) {
-  const [closeTarget,   setCloseTarget]  = useState(null)
-  const [partialTarget, setPartialTarget]= useState(null)
-  const [addTarget,     setAddTarget]    = useState(null)
-  const [confirmDel,    setConfirmDel]   = useState(null)
-  const [deleting,      setDeleting]     = useState(false)
-  const [deleteErr,     setDeleteErr]    = useState(null)
+export default function TradeActionsTab({
+  positions,
+  ltpMap,
+  view,
+  filter,
+  search,
+  addModal,
+  setAddModal,
+  onRefresh,
+}) {
+  const [closeTarget, setCloseTarget] = useState(null)
+  const [partialTarget, setPartialTarget] = useState(null)
+  const [addTarget, setAddTarget] = useState(null)
+  const [confirmDel, setConfirmDel] = useState(null)
+  const [deleting, setDeleting] = useState(false)
+  const [deleteErr, setDeleteErr] = useState(null)
   const [refreshTick, setRefreshTick] = useState(0)
 
   const displayed = useMemo(
@@ -28,7 +37,7 @@ export default function TradeActionsTab({ positions, ltpMap, view, filter, searc
     setAddTarget(null)
     setCloseTarget(null)
     setPartialTarget(null)
-    setRefreshTick(prev => prev + 1)
+    setRefreshTick((prev) => prev + 1)
     onRefresh()
   }, [onRefresh, setAddModal])
 
@@ -44,10 +53,12 @@ export default function TradeActionsTab({ positions, ltpMap, view, filter, searc
         confirmDel.refreshHistory?.()
       }
       setConfirmDel(null)
-      setRefreshTick(prev => prev + 1)
+      setRefreshTick((prev) => prev + 1)
       onRefresh()
     } catch (err) {
-      setDeleteErr(err.response?.data?.message || err.response?.data?.error || err.message || 'Delete failed')
+      setDeleteErr(
+        err.response?.data?.message || err.response?.data?.error || err.message || 'Delete failed'
+      )
     } finally {
       setDeleting(false)
     }
@@ -61,52 +72,58 @@ export default function TradeActionsTab({ positions, ltpMap, view, filter, searc
     <EmptyState
       title={`No ${filter === 'open' ? 'open ' : ''}positions`}
       subtitle={filter === 'open' ? 'Switch to All above to see closed trades' : undefined}
-      action={filter !== 'open' ? (
-        <button onClick={() => setAddModal(true)} className="text-[11px] text-gray-400 underline hover:text-blue-500 transition-colors">
-          Add your first trade →
-        </button>
-      ) : undefined}
+      action={
+        filter !== 'open' ? (
+          <button
+            onClick={() => setAddModal(true)}
+            className="text-[11px] text-gray-400 underline hover:text-blue-500 transition-colors"
+          >
+            Add your first trade →
+          </button>
+        ) : undefined
+      }
     />
   )
 
   return (
     <div className="space-y-2">
-
       {/* gallery view */}
-      {view === 'gallery' && (
-        displayed.length === 0 ? emptyState : (
+      {view === 'gallery' &&
+        (displayed.length === 0 ? (
+          emptyState
+        ) : (
           <TradeGalleryView
             positions={displayed}
             ltpMap={ltpMap}
-            onAdd={p => setAddTarget(p)}
-            onPartialExit={p => setPartialTarget(p)}
-            onClose={p => setCloseTarget(p)}
-            onDelete={p => setConfirmDel({ type: 'trade', target: p })}
+            onAdd={(p) => setAddTarget(p)}
+            onPartialExit={(p) => setPartialTarget(p)}
+            onClose={(p) => setCloseTarget(p)}
+            onDelete={(p) => setConfirmDel({ type: 'trade', target: p })}
           />
-        )
-      )}
+        ))}
 
       {/* database view */}
-      {view === 'database' && (
-        displayed.length === 0 ? emptyState : (
+      {view === 'database' &&
+        (displayed.length === 0 ? (
+          emptyState
+        ) : (
           <div className="space-y-2">
-            {displayed.map(pos => (
+            {displayed.map((pos) => (
               <PositionRow
                 key={pos.trade_id}
                 position={pos}
                 ltp={ltpMap?.[pos.symbol]}
-                onAdd={p => setAddTarget(p)}
-                onPartialExit={p => setPartialTarget(p)}
-                onClose={p => setCloseTarget(p)}
-                onDelete={p => setConfirmDel({ type: 'trade', target: p })}
+                onAdd={(p) => setAddTarget(p)}
+                onPartialExit={(p) => setPartialTarget(p)}
+                onClose={(p) => setCloseTarget(p)}
+                onDelete={(p) => setConfirmDel({ type: 'trade', target: p })}
                 onDeleteAction={handleDeleteAction}
                 onRefresh={onRefresh}
                 refreshTick={refreshTick}
               />
             ))}
           </div>
-        )
-      )}
+        ))}
 
       {/* delete confirm */}
       {confirmDel && (
@@ -122,12 +139,20 @@ export default function TradeActionsTab({ positions, ltpMap, view, filter, searc
             </p>
             {deleteErr && <p className="text-[11px] text-red-500 mb-3">{deleteErr}</p>}
             <div className="flex gap-2">
-              <button onClick={() => { setConfirmDel(null); setDeleteErr(null) }}
-                className="flex-1 py-2 rounded-xl border border-gray-200 dark:border-gray-700 text-[12px] font-semibold text-gray-500 hover:bg-gray-50 dark:hover:bg-gray-800 transition-colors">
+              <button
+                onClick={() => {
+                  setConfirmDel(null)
+                  setDeleteErr(null)
+                }}
+                className="flex-1 py-2 rounded-xl border border-gray-200 dark:border-gray-700 text-[12px] font-semibold text-gray-500 hover:bg-gray-50 dark:hover:bg-gray-800 transition-colors"
+              >
                 Cancel
               </button>
-              <button onClick={handleConfirmDelete} disabled={deleting}
-                className="flex-1 py-2 rounded-xl bg-red-600 hover:bg-red-500 text-white text-[12px] font-bold disabled:opacity-50 transition-colors">
+              <button
+                onClick={handleConfirmDelete}
+                disabled={deleting}
+                className="flex-1 py-2 rounded-xl bg-red-600 hover:bg-red-500 text-white text-[12px] font-bold disabled:opacity-50 transition-colors"
+              >
                 {deleting ? 'Deleting…' : 'Delete'}
               </button>
             </div>
@@ -136,17 +161,27 @@ export default function TradeActionsTab({ positions, ltpMap, view, filter, searc
       )}
 
       {/* modals */}
-      {addModal && (
-        <AddTradeModal onClose={() => setAddModal(false)} onSaved={handleSaved} />
-      )}
+      {addModal && <AddTradeModal onClose={() => setAddModal(false)} onSaved={handleSaved} />}
       {addTarget && (
-        <AddTradeModal existingPosition={addTarget} onClose={() => setAddTarget(null)} onSaved={handleSaved} />
+        <AddTradeModal
+          existingPosition={addTarget}
+          onClose={() => setAddTarget(null)}
+          onSaved={handleSaved}
+        />
       )}
       {closeTarget && (
-        <ClosePositionModal position={closeTarget} onClose={() => setCloseTarget(null)} onSaved={handleSaved} />
+        <ClosePositionModal
+          position={closeTarget}
+          onClose={() => setCloseTarget(null)}
+          onSaved={handleSaved}
+        />
       )}
       {partialTarget && (
-        <PartialExitModal position={partialTarget} onClose={() => setPartialTarget(null)} onSaved={handleSaved} />
+        <PartialExitModal
+          position={partialTarget}
+          onClose={() => setPartialTarget(null)}
+          onSaved={handleSaved}
+        />
       )}
     </div>
   )

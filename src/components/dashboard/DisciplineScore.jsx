@@ -6,11 +6,11 @@ import { getDiscipline } from '../../utils/globalCache'
 
 const GRADE = (s) => {
   if (s >= 85) return { letter: 'A+', color: 'text-emerald-500', ring: '#10b981' }
-  if (s >= 70) return { letter: 'A',  color: 'text-green-500',   ring: '#22c55e' }
-  if (s >= 55) return { letter: 'B',  color: 'text-blue-500',    ring: '#3b82f6' }
-  if (s >= 40) return { letter: 'C',  color: 'text-yellow-500',  ring: '#eab308' }
-  if (s >= 25) return { letter: 'D',  color: 'text-orange-500',  ring: '#f97316' }
-  return               { letter: 'F',  color: 'text-red-400',     ring: '#f87171' }
+  if (s >= 70) return { letter: 'A', color: 'text-green-500', ring: '#22c55e' }
+  if (s >= 55) return { letter: 'B', color: 'text-blue-500', ring: '#3b82f6' }
+  if (s >= 40) return { letter: 'C', color: 'text-yellow-500', ring: '#eab308' }
+  if (s >= 25) return { letter: 'D', color: 'text-orange-500', ring: '#f97316' }
+  return { letter: 'F', color: 'text-red-400', ring: '#f87171' }
 }
 
 const BAR_COLOR = (s) => {
@@ -29,12 +29,27 @@ function Ring({ score, size = 88 }) {
   return (
     <div className="relative flex-shrink-0" style={{ width: size, height: size }}>
       <svg width={size} height={size} viewBox="0 0 88 88" className="-rotate-90">
-        <circle cx="44" cy="44" r={r} fill="none" stroke="currentColor"
-          className="text-gray-100 dark:text-gray-800" strokeWidth="7" />
-        <circle cx="44" cy="44" r={r} fill="none"
-          stroke={grade.ring} strokeWidth="7" strokeLinecap="round"
-          strokeDasharray={circ} strokeDashoffset={offset}
-          style={{ transition: 'stroke-dashoffset 0.9s ease' }} />
+        <circle
+          cx="44"
+          cy="44"
+          r={r}
+          fill="none"
+          stroke="currentColor"
+          className="text-gray-100 dark:text-gray-800"
+          strokeWidth="7"
+        />
+        <circle
+          cx="44"
+          cy="44"
+          r={r}
+          fill="none"
+          stroke={grade.ring}
+          strokeWidth="7"
+          strokeLinecap="round"
+          strokeDasharray={circ}
+          strokeDashoffset={offset}
+          style={{ transition: 'stroke-dashoffset 0.9s ease' }}
+        />
       </svg>
       <div className="absolute inset-0 flex flex-col items-center justify-center">
         <span className={`text-lg font-bold leading-none ${grade.color}`}>{score}</span>
@@ -52,10 +67,13 @@ function DimBar({ label, score, extra, noData }) {
           <span className="text-[10px] text-gray-500 dark:text-gray-400 leading-none">{label}</span>
           {extra && <span className="text-[9px] text-gray-400 dark:text-gray-600">({extra})</span>}
         </div>
-        {noData
-          ? <span className="text-[9px] text-gray-400 dark:text-gray-600 italic">No data</span>
-          : <span className="text-[10px] font-semibold text-gray-700 dark:text-gray-200 tabular-nums">{score}%</span>
-        }
+        {noData ? (
+          <span className="text-[9px] text-gray-400 dark:text-gray-600 italic">No data</span>
+        ) : (
+          <span className="text-[10px] font-semibold text-gray-700 dark:text-gray-200 tabular-nums">
+            {score}%
+          </span>
+        )}
       </div>
       <div className="h-1 bg-gray-100 dark:bg-gray-700 rounded-full overflow-hidden">
         <div
@@ -76,51 +94,62 @@ function DisciplineScore({ initData }) {
     setLoading(true)
     setError(null)
     getDiscipline()
-      .then(res => setData(res.data))
-      .catch(err => setError(err?.message || 'Failed to load'))
+      .then((res) => setData(res.data))
+      .catch((err) => setError(err?.message || 'Failed to load'))
       .finally(() => setLoading(false))
   }
 
   useEffect(() => {
-    if (initData) { setData(initData); setLoading(false); return }
+    if (initData) {
+      setData(initData)
+      setLoading(false)
+      return
+    }
     load()
   }, [initData]) // re-sync when parent passes fresh data
 
-  if (error) return (
-    <div className="bg-white/70 dark:bg-gray-900/60 backdrop-blur-md rounded-2xl border border-white/60 dark:border-white/10 shadow-sm p-4 flex flex-col items-center justify-center gap-3 h-full">
-      <p className="text-[11px] text-red-400">{error}</p>
-      <button
-        onClick={load}
-        className="text-[11px] px-3 py-1 rounded-lg bg-gray-100 dark:bg-gray-800 text-gray-600 dark:text-gray-300 hover:bg-gray-200 dark:hover:bg-gray-700 transition-colors"
-      >
-        Retry
-      </button>
-    </div>
-  )
+  if (error)
+    return (
+      <div className="bg-white/70 dark:bg-gray-900/60 backdrop-blur-md rounded-2xl border border-white/60 dark:border-white/10 shadow-sm p-4 flex flex-col items-center justify-center gap-3 h-full">
+        <p className="text-[11px] text-red-400">{error}</p>
+        <button
+          onClick={load}
+          className="text-[11px] px-3 py-1 rounded-lg bg-gray-100 dark:bg-gray-800 text-gray-600 dark:text-gray-300 hover:bg-gray-200 dark:hover:bg-gray-700 transition-colors"
+        >
+          Retry
+        </button>
+      </div>
+    )
 
-  if (loading) return (
-    <div className="bg-white/70 dark:bg-gray-900/60 backdrop-blur-md rounded-2xl border border-white/60 dark:border-white/10 shadow-sm p-4 space-y-3 animate-pulse h-full">
-      <div className="h-3 bg-gray-100 dark:bg-gray-800 rounded w-1/2" />
-      <div className="flex gap-4">
-        <div className="w-20 h-20 rounded-full bg-gray-100 dark:bg-gray-800 flex-shrink-0" />
-        <div className="flex-1 space-y-2 pt-1">
-          {[1,2,3].map(i => <div key={i} className="h-2 bg-gray-100 dark:bg-gray-800 rounded" />)}
+  if (loading)
+    return (
+      <div className="bg-white/70 dark:bg-gray-900/60 backdrop-blur-md rounded-2xl border border-white/60 dark:border-white/10 shadow-sm p-4 space-y-3 animate-pulse h-full">
+        <div className="h-3 bg-gray-100 dark:bg-gray-800 rounded w-1/2" />
+        <div className="flex gap-4">
+          <div className="w-20 h-20 rounded-full bg-gray-100 dark:bg-gray-800 flex-shrink-0" />
+          <div className="flex-1 space-y-2 pt-1">
+            {[1, 2, 3].map((i) => (
+              <div key={i} className="h-2 bg-gray-100 dark:bg-gray-800 rounded" />
+            ))}
+          </div>
         </div>
       </div>
-    </div>
-  )
+    )
 
   const score = data?.finalScore ?? data?.monthlyScore ?? 0
   const bd = data?.breakdown || {}
   const dims = [
-    { key: 'taskCompletion',    extra: null,                                                                 noData: false },
-    { key: 'journalConsistency',extra: null,                                                                 noData: false },
-    { key: 'winRate',           extra: bd.winRate?.raw != null ? `${bd.winRate.raw}% WR` : null,           noData: bd.winRate?.raw == null && bd.winRate?.score === 0 },
+    { key: 'taskCompletion', extra: null, noData: false },
+    { key: 'journalConsistency', extra: null, noData: false },
+    {
+      key: 'winRate',
+      extra: bd.winRate?.raw != null ? `${bd.winRate.raw}% WR` : null,
+      noData: bd.winRate?.raw == null && bd.winRate?.score === 0,
+    },
   ]
 
   return (
     <div className="hp-card bg-white/70 dark:bg-gray-900/60 backdrop-blur-md rounded-2xl border border-white/60 dark:border-white/10 shadow-sm p-4 pb-3 flex flex-col gap-3 h-full min-h-0 overflow-y-auto">
-
       {/* Header */}
       <div className="flex items-center justify-between">
         <h3 className="text-[11px] font-semibold uppercase tracking-widest text-gray-400 dark:text-gray-500">
@@ -138,7 +167,9 @@ function DisciplineScore({ initData }) {
         <div className="flex flex-col items-center gap-1">
           <Ring score={score} />
           <span className="text-[10px] text-gray-400 text-center leading-tight">
-            composite<br/>score
+            composite
+            <br />
+            score
           </span>
         </div>
 
@@ -147,13 +178,7 @@ function DisciplineScore({ initData }) {
             const dim = bd[key]
             if (!dim) return null
             return (
-              <DimBar
-                key={key}
-                label={dim.label}
-                score={dim.score}
-                extra={extra}
-                noData={noData}
-              />
+              <DimBar key={key} label={dim.label} score={dim.score} extra={extra} noData={noData} />
             )
           })}
         </div>
@@ -162,11 +187,14 @@ function DisciplineScore({ initData }) {
       {/* Streak bonus chip */}
       {data?.streakBonus > 0 && (
         <div className="flex items-center justify-between px-2.5 py-1.5 bg-orange-50 dark:bg-orange-900/20 rounded-xl mt-auto">
-          <span className="text-[10px] text-orange-500 dark:text-orange-400 font-medium">Streak bonus</span>
-          <span className="text-[10px] text-orange-500 dark:text-orange-400 font-semibold">+{data.streakBonus} pts</span>
+          <span className="text-[10px] text-orange-500 dark:text-orange-400 font-medium">
+            Streak bonus
+          </span>
+          <span className="text-[10px] text-orange-500 dark:text-orange-400 font-semibold">
+            +{data.streakBonus} pts
+          </span>
         </div>
       )}
-
     </div>
   )
 }

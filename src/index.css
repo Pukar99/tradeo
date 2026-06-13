@@ -3,11 +3,25 @@
 @tailwind utilities;
 
 /* ── Hide Google Translate toolbar / banner ──────────────────────────────── */
-.goog-te-banner-frame.skiptranslate { display: none !important; }
-.goog-te-menu-value span { display: none; }
-body { top: 0 !important; position: static !important; }
-#goog-gt-tt, .goog-te-balloon-frame, .goog-tooltip { display: none !important; }
-.goog-text-highlight { background: none !important; box-shadow: none !important; }
+.goog-te-banner-frame.skiptranslate {
+  display: none !important;
+}
+.goog-te-menu-value span {
+  display: none;
+}
+body {
+  top: 0 !important;
+  position: static !important;
+}
+#goog-gt-tt,
+.goog-te-balloon-frame,
+.goog-tooltip {
+  display: none !important;
+}
+.goog-text-highlight {
+  background: none !important;
+  box-shadow: none !important;
+}
 
 /* ── Global font size: 110% = 17.6px base — matches the "looks right at 110% zoom" point ── */
 html {
@@ -22,7 +36,7 @@ html {
 .dark .bn-container {
   background-color: #111827 !important;
 }
-.dark [class*="bn-"] {
+.dark [class*='bn-'] {
   --bn-colors-editor-background: #111827 !important;
   --bn-colors-editor-text: #f3f4f6 !important;
   --bn-colors-menu-background: #1f2937 !important;
@@ -62,7 +76,7 @@ html {
 
 /* Core glass surface */
 .glass {
-  background:    rgba(255, 255, 255, 0.72);
+  background: rgba(255, 255, 255, 0.72);
   backdrop-filter: blur(20px) saturate(180%);
   -webkit-backdrop-filter: blur(20px) saturate(180%);
   border: 1px solid rgba(255, 255, 255, 0.55);
@@ -72,104 +86,106 @@ html {
     inset 0 -1px 0 rgba(0, 0, 0, 0.04);
 }
 .dark .glass {
-  background:    rgba(15, 23, 42, 0.70);
+  background: rgba(15, 23, 42, 0.7);
   border: 1px solid rgba(255, 255, 255, 0.08);
   box-shadow:
-    0 8px 32px rgba(0, 0, 0, 0.40),
+    0 8px 32px rgba(0, 0, 0, 0.4),
     inset 0 1px 0 rgba(255, 255, 255, 0.07),
-    inset 0 -1px 0 rgba(0, 0, 0, 0.20);
+    inset 0 -1px 0 rgba(0, 0, 0, 0.2);
 }
 
 /* Stronger glass for floating panels (chatbot, modals) */
 .glass-panel {
-  background:    rgba(255, 255, 255, 0.82);
+  background: rgba(255, 255, 255, 0.82);
   backdrop-filter: blur(28px) saturate(200%);
   -webkit-backdrop-filter: blur(28px) saturate(200%);
   border: 1px solid rgba(255, 255, 255, 0.65);
   box-shadow:
     0 20px 60px rgba(0, 0, 0, 0.12),
-    0 4px 16px  rgba(0, 0, 0, 0.06),
+    0 4px 16px rgba(0, 0, 0, 0.06),
     inset 0 1.5px 0 rgba(255, 255, 255, 0.95),
     inset 0 -1px 0 rgba(0, 0, 0, 0.05);
 }
 .dark .glass-panel {
-  background:    rgba(10, 15, 30, 0.78);
-  border: 1px solid rgba(255, 255, 255, 0.10);
+  background: rgba(10, 15, 30, 0.78);
+  border: 1px solid rgba(255, 255, 255, 0.1);
   box-shadow:
     0 20px 60px rgba(0, 0, 0, 0.55),
-    0 4px 16px  rgba(0, 0, 0, 0.30),
+    0 4px 16px rgba(0, 0, 0, 0.3),
     inset 0 1.5px 0 rgba(255, 255, 255, 0.09),
-    inset 0 -1px 0 rgba(0, 0, 0, 0.30);
+    inset 0 -1px 0 rgba(0, 0, 0, 0.3);
 }
 
 /* Light glass for navbar / sticky bars */
 .glass-bar {
-  background:    rgba(255, 255, 255, 0.80);
+  background: rgba(255, 255, 255, 0.8);
   backdrop-filter: blur(16px) saturate(160%);
   -webkit-backdrop-filter: blur(16px) saturate(160%);
   border-bottom: 1px solid rgba(0, 0, 0, 0.07);
   box-shadow:
     0 1px 12px rgba(0, 0, 0, 0.06),
-    inset 0 1px 0 rgba(255, 255, 255, 0.80);
+    inset 0 1px 0 rgba(255, 255, 255, 0.8);
 }
 .dark .glass-bar {
-  background:    rgba(10, 15, 30, 0.82);
+  background: rgba(10, 15, 30, 0.82);
   border-bottom: 1px solid rgba(255, 255, 255, 0.07);
   box-shadow:
-    0 1px 12px rgba(0, 0, 0, 0.40),
+    0 1px 12px rgba(0, 0, 0, 0.4),
     inset 0 1px 0 rgba(255, 255, 255, 0.05);
 }
 
 /* Subtle glass for cards / inner surfaces */
 .glass-card {
-  background:    rgba(255, 255, 255, 0.60);
+  background: rgba(255, 255, 255, 0.6);
   backdrop-filter: blur(12px) saturate(150%);
   -webkit-backdrop-filter: blur(12px) saturate(150%);
-  border: 1px solid rgba(255, 255, 255, 0.50);
+  border: 1px solid rgba(255, 255, 255, 0.5);
   box-shadow:
     0 4px 16px rgba(0, 0, 0, 0.06),
-    inset 0 1px 0 rgba(255, 255, 255, 0.80);
+    inset 0 1px 0 rgba(255, 255, 255, 0.8);
 }
 .dark .glass-card {
-  background:    rgba(30, 41, 59, 0.55);
+  background: rgba(30, 41, 59, 0.55);
   border: 1px solid rgba(255, 255, 255, 0.06);
   box-shadow:
-    0 4px 16px rgba(0, 0, 0, 0.30),
+    0 4px 16px rgba(0, 0, 0, 0.3),
     inset 0 1px 0 rgba(255, 255, 255, 0.05);
 }
 
 /* FAB / pill buttons */
 .glass-fab {
-  background:    rgba(255, 255, 255, 0.85);
+  background: rgba(255, 255, 255, 0.85);
   backdrop-filter: blur(20px) saturate(180%);
   -webkit-backdrop-filter: blur(20px) saturate(180%);
-  border: 1px solid rgba(255, 255, 255, 0.70);
+  border: 1px solid rgba(255, 255, 255, 0.7);
   box-shadow:
     0 8px 24px rgba(0, 0, 0, 0.12),
-    0 2px 6px  rgba(0, 0, 0, 0.06),
+    0 2px 6px rgba(0, 0, 0, 0.06),
     inset 0 1.5px 0 rgba(255, 255, 255, 1),
     inset 0 -1px 0 rgba(0, 0, 0, 0.06);
 }
 .dark .glass-fab {
-  background:    rgba(15, 23, 42, 0.80);
+  background: rgba(15, 23, 42, 0.8);
   border: 1px solid rgba(255, 255, 255, 0.12);
   box-shadow:
-    0 8px 24px rgba(0, 0, 0, 0.50),
-    0 2px 6px  rgba(0, 0, 0, 0.25),
-    inset 0 1.5px 0 rgba(255, 255, 255, 0.10),
-    inset 0 -1px 0 rgba(0, 0, 0, 0.30);
+    0 8px 24px rgba(0, 0, 0, 0.5),
+    0 2px 6px rgba(0, 0, 0, 0.25),
+    inset 0 1.5px 0 rgba(255, 255, 255, 0.1),
+    inset 0 -1px 0 rgba(0, 0, 0, 0.3);
 }
 
 /* Liquid shimmer highlight on hover */
-.glass-fab:hover, .glass:hover {
+.glass-fab:hover,
+.glass:hover {
   box-shadow:
     0 12px 40px rgba(0, 0, 0, 0.14),
     inset 0 1.5px 0 rgba(255, 255, 255, 1),
     inset 0 -1px 0 rgba(0, 0, 0, 0.05);
 }
-.dark .glass-fab:hover, .dark .glass:hover {
+.dark .glass-fab:hover,
+.dark .glass:hover {
   box-shadow:
-    0 12px 40px rgba(0, 0, 0, 0.60),
+    0 12px 40px rgba(0, 0, 0, 0.6),
     inset 0 1.5px 0 rgba(255, 255, 255, 0.13),
     inset 0 -1px 0 rgba(0, 0, 0, 0.35);
 }
@@ -190,7 +206,7 @@ html {
    ─────────────────────────────────────────────────────────────────────────── */
 
 /* Modal backdrops — light tinted blur */
-.fixed.inset-0[style*="rgba(0,0,0"] > div:not([class*="absolute"]):first-child,
+.fixed.inset-0[style*='rgba(0,0,0'] > div:not([class*='absolute']):first-child,
 .fixed.inset-0 > .absolute.inset-0 {
   backdrop-filter: blur(4px);
   -webkit-backdrop-filter: blur(4px);
@@ -201,33 +217,35 @@ html {
 .fixed.inset-0 > .relative.dark\:bg-gray-900,
 .fixed.inset-0 > div > .relative.bg-white,
 .fixed.inset-0 > div > .relative.dark\:bg-gray-900 {
-  background:    rgba(255, 255, 255, 0.88) !important;
+  background: rgba(255, 255, 255, 0.88) !important;
   backdrop-filter: blur(24px) saturate(180%) !important;
   -webkit-backdrop-filter: blur(24px) saturate(180%) !important;
-  border: 1px solid rgba(255, 255, 255, 0.60) !important;
+  border: 1px solid rgba(255, 255, 255, 0.6) !important;
   box-shadow:
     0 24px 64px rgba(0, 0, 0, 0.14),
-    0 4px 16px  rgba(0, 0, 0, 0.07),
+    0 4px 16px rgba(0, 0, 0, 0.07),
     inset 0 1.5px 0 rgba(255, 255, 255, 0.95) !important;
 }
 .dark .fixed.inset-0 > .relative,
 .dark .fixed.inset-0 > div > .relative {
-  background:    rgba(10, 15, 30, 0.82) !important;
+  background: rgba(10, 15, 30, 0.82) !important;
   border: 1px solid rgba(255, 255, 255, 0.09) !important;
   box-shadow:
     0 24px 64px rgba(0, 0, 0, 0.55),
-    0 4px 16px  rgba(0, 0, 0, 0.28),
+    0 4px 16px rgba(0, 0, 0, 0.28),
     inset 0 1.5px 0 rgba(255, 255, 255, 0.08) !important;
 }
 
 /* bg-white rounded-xl shadow-2xl pattern (backtest modals, simpler) */
 .fixed.inset-0 > div > .bg-white.rounded-xl,
 .fixed.inset-0 > .bg-white.rounded-xl {
-  background:    rgba(255, 255, 255, 0.88) !important;
+  background: rgba(255, 255, 255, 0.88) !important;
   backdrop-filter: blur(24px) saturate(180%) !important;
   -webkit-backdrop-filter: blur(24px) saturate(180%) !important;
-  border: 1px solid rgba(255, 255, 255, 0.60) !important;
-  box-shadow: 0 20px 60px rgba(0, 0, 0, 0.14), inset 0 1px 0 rgba(255,255,255,0.9) !important;
+  border: 1px solid rgba(255, 255, 255, 0.6) !important;
+  box-shadow:
+    0 20px 60px rgba(0, 0, 0, 0.14),
+    inset 0 1px 0 rgba(255, 255, 255, 0.9) !important;
 }
 .dark .fixed.inset-0 > div > .bg-white.rounded-xl,
 .dark .fixed.inset-0 > .bg-white.rounded-xl {
@@ -237,8 +255,14 @@ html {
 
 /* ── Smooth fade-in for cards / messages ─────────────────────────────────── */
 @keyframes fadeSlideUp {
-  from { opacity: 0; transform: translateY(6px); }
-  to   { opacity: 1; transform: translateY(0); }
+  from {
+    opacity: 0;
+    transform: translateY(6px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
 }
 .animate-fade-up {
   animation: fadeSlideUp 0.22s ease-out both;
@@ -246,8 +270,14 @@ html {
 
 /* ── Subtle scale-in for action cards ───────────────────────────────────── */
 @keyframes scaleIn {
-  from { opacity: 0; transform: scale(0.97); }
-  to   { opacity: 1; transform: scale(1); }
+  from {
+    opacity: 0;
+    transform: scale(0.97);
+  }
+  to {
+    opacity: 1;
+    transform: scale(1);
+  }
 }
 .animate-scale-in {
   animation: scaleIn 0.18s ease-out both;
@@ -255,8 +285,15 @@ html {
 
 /* ── Gentle pulse for loading dots (override bounce for smoother feel) ───── */
 @keyframes softBounce {
-  0%, 100% { transform: translateY(0);    opacity: 0.5; }
-  50%       { transform: translateY(-4px); opacity: 1;   }
+  0%,
+  100% {
+    transform: translateY(0);
+    opacity: 0.5;
+  }
+  50% {
+    transform: translateY(-4px);
+    opacity: 1;
+  }
 }
 .animate-soft-bounce {
   animation: softBounce 1s ease-in-out infinite;
@@ -264,8 +301,14 @@ html {
 
 /* ── Tab content fade-in (Screen / SMC / PA tab switches) ───────────────────*/
 @keyframes tabIn {
-  from { opacity: 0; transform: translateY(4px); }
-  to   { opacity: 1; transform: translateY(0); }
+  from {
+    opacity: 0;
+    transform: translateY(4px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
 }
 .animate-tab-in {
   animation: tabIn 0.18s ease-out both;
@@ -297,7 +340,7 @@ html {
   content: '';
   position: absolute;
   inset: 0;
-  background: linear-gradient(135deg, rgba(255,255,255,0.12) 0%, transparent 60%);
+  background: linear-gradient(135deg, rgba(255, 255, 255, 0.12) 0%, transparent 60%);
   opacity: 0;
   pointer-events: none;
   z-index: 1;
@@ -312,7 +355,9 @@ html {
 .hp-stat::after {
   content: '';
   position: absolute;
-  bottom: 0; left: 0; right: 0;
+  bottom: 0;
+  left: 0;
+  right: 0;
   height: 2px;
   background: linear-gradient(90deg, #3b82f6, #22c55e);
   transform: scaleX(0);
@@ -326,7 +371,9 @@ html {
 .hp-watch-item::before {
   content: '';
   position: absolute;
-  left: 0; top: 20%; bottom: 20%;
+  left: 0;
+  top: 20%;
+  bottom: 20%;
   width: 2px;
   background: #3b82f6;
   border-radius: 0 2px 2px 0;
@@ -340,7 +387,9 @@ html {
 
 @media (hover: hover) and (pointer: fine) {
   .hp-card {
-    transition: transform 220ms ease-out, box-shadow 220ms ease-out;
+    transition:
+      transform 220ms ease-out,
+      box-shadow 220ms ease-out;
   }
   .hp-card::before {
     transition: opacity 220ms ease-out;
@@ -348,20 +397,25 @@ html {
   .hp-card:hover {
     transform: translateY(-3px);
     box-shadow:
-      0 16px 40px rgba(0, 0, 0, 0.10),
-      0 4px 12px  rgba(0, 0, 0, 0.06),
+      0 16px 40px rgba(0, 0, 0, 0.1),
+      0 4px 12px rgba(0, 0, 0, 0.06),
       inset 0 1px 0 rgba(255, 255, 255, 0.85);
   }
-  .hp-card:hover::before { opacity: 1; }
+  .hp-card:hover::before {
+    opacity: 1;
+  }
   .dark .hp-card:hover {
     box-shadow:
-      0 16px 40px rgba(0, 0, 0, 0.50),
-      0 4px 12px  rgba(0, 0, 0, 0.30),
-      inset 0 1px 0 rgba(255, 255, 255, 0.10);
+      0 16px 40px rgba(0, 0, 0, 0.5),
+      0 4px 12px rgba(0, 0, 0, 0.3),
+      inset 0 1px 0 rgba(255, 255, 255, 0.1);
   }
 
   .hp-stat {
-    transition: transform 200ms ease-out, box-shadow 200ms ease-out, border-color 200ms ease-out;
+    transition:
+      transform 200ms ease-out,
+      box-shadow 200ms ease-out,
+      border-color 200ms ease-out;
   }
   .hp-stat::after {
     transition: transform 260ms cubic-bezier(0.22, 1, 0.36, 1);
@@ -370,43 +424,116 @@ html {
     transform: translateY(-2px);
     box-shadow:
       0 8px 24px rgba(59, 130, 246, 0.12),
-      0 2px 8px  rgba(0, 0, 0, 0.06),
+      0 2px 8px rgba(0, 0, 0, 0.06),
       inset 0 1px 0 rgba(255, 255, 255, 0.85);
   }
-  .hp-stat:hover::after { transform: scaleX(1); }
+  .hp-stat:hover::after {
+    transform: scaleX(1);
+  }
   .dark .hp-stat:hover {
     box-shadow:
-      0 8px 24px rgba(59, 130, 246, 0.20),
-      0 2px 8px  rgba(0, 0, 0, 0.35),
+      0 8px 24px rgba(59, 130, 246, 0.2),
+      0 2px 8px rgba(0, 0, 0, 0.35),
       inset 0 1px 0 rgba(255, 255, 255, 0.08);
   }
 
   .hp-watch-item {
-    transition: background 180ms ease-out, padding-left 180ms ease-out;
+    transition:
+      background 180ms ease-out,
+      padding-left 180ms ease-out;
   }
   .hp-watch-item::before {
     transition: transform 200ms cubic-bezier(0.22, 1, 0.36, 1);
   }
   .hp-watch-item:hover {
-    background: rgba(255,255,255,0.45) !important;
+    background: rgba(255, 255, 255, 0.45) !important;
     padding-left: 14px;
   }
-  .hp-watch-item:hover::before { transform: scaleY(1); }
-  .dark .hp-watch-item:hover { background: rgba(255,255,255,0.06) !important; }
+  .hp-watch-item:hover::before {
+    transform: scaleY(1);
+  }
+  .dark .hp-watch-item:hover {
+    background: rgba(255, 255, 255, 0.06) !important;
+  }
 
   .hp-alert-row {
-    transition: background 160ms ease-out, transform 160ms ease-out;
+    transition:
+      background 160ms ease-out,
+      transform 160ms ease-out;
   }
-  .hp-alert-row:hover { transform: translateX(2px); }
+  .hp-alert-row:hover {
+    transform: translateX(2px);
+  }
 }
 
 @keyframes drawdownShake {
-  0%, 100% { transform: translateX(0); }
-  20%       { transform: translateX(-2px); }
-  40%       { transform: translateX(2px); }
-  60%       { transform: translateX(-1px); }
-  80%       { transform: translateX(1px); }
+  0%,
+  100% {
+    transform: translateX(0);
+  }
+  20% {
+    transform: translateX(-2px);
+  }
+  40% {
+    transform: translateX(2px);
+  }
+  60% {
+    transform: translateX(-1px);
+  }
+  80% {
+    transform: translateX(1px);
+  }
 }
 .hp-drawdown {
   animation: drawdownShake 0.5s ease-out 0.6s both;
+}
+
+/* ── Auth (Login / Signup) mobile polish ────────────────────────────────────
+   Inputs flagged .auth-input render at the page's chosen visual size on desktop
+   but jump to ≥16px at phone widths so iOS Safari never auto-zooms on focus
+   (any focused input < 16px triggers an irreversible page zoom). Tailwind keeps
+   the visual text-sm look; this only overrides the computed font-size on phones.
+   ─────────────────────────────────────────────────────────────────────────── */
+@media (max-width: 767px) {
+  .auth-input {
+    font-size: 16px;
+  }
+}
+
+/* Error shake for a field that fails validation on submit (transform-only) */
+@keyframes authShake {
+  0%,
+  100% {
+    transform: translateX(0);
+  }
+  20% {
+    transform: translateX(-5px);
+  }
+  40% {
+    transform: translateX(5px);
+  }
+  60% {
+    transform: translateX(-3px);
+  }
+  80% {
+    transform: translateX(3px);
+  }
+}
+.animate-auth-shake {
+  animation: authShake 0.3s ease-in-out both;
+}
+
+/* ── Global reduced-motion: respect the OS "reduce motion" setting ───────────
+   Collapses every animation/transition app-wide to a 1ms no-op so motion-
+   sensitive users get instant state changes instead of movement. Applies to
+   the auth flow and everywhere else. ────────────────────────────────────────*/
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.001ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.001ms !important;
+    scroll-behavior: auto !important;
+  }
 }

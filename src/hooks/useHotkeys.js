@@ -6,14 +6,16 @@ import { useEffect, useRef } from 'react'
 // uses a ref internally so keyMap updates are picked up without re-subscribing.
 export function useHotkeys(keyMap) {
   const keyMapRef = useRef(keyMap)
-  useEffect(() => { keyMapRef.current = keyMap })
+  useEffect(() => {
+    keyMapRef.current = keyMap
+  })
 
   useEffect(() => {
     const handler = (e) => {
       const tag = e.target.tagName
       if (tag === 'INPUT' || tag === 'TEXTAREA' || e.target.isContentEditable) return
 
-      const key   = e.key.toLowerCase()
+      const key = e.key.toLowerCase()
       const combo = `${e.ctrlKey ? 'ctrl+' : ''}${e.shiftKey ? 'shift+' : ''}${e.altKey ? 'alt+' : ''}${key}`
 
       const action = keyMapRef.current[combo] || keyMapRef.current[key]

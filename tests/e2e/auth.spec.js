@@ -15,10 +15,10 @@ const { test, expect } = require('@playwright/test')
 const BASE_URL = process.env.BASE_URL || 'http://localhost:5173'
 
 // Unique email per run to avoid conflicts
-const timestamp  = Date.now()
+const timestamp = Date.now()
 const TEST_EMAIL = `e2e_${timestamp}@test.com`
-const TEST_PASS  = 'password123'
-const TEST_NAME  = 'E2E Tester'
+const TEST_PASS = 'password123'
+const TEST_NAME = 'E2E Tester'
 
 test.describe('Signup Flow', () => {
   test('new user can sign up and lands on dashboard', async ({ page }) => {
@@ -27,7 +27,9 @@ test.describe('Signup Flow', () => {
     await page.fill('[name="name"], input[placeholder*="name" i]', TEST_NAME)
     await page.fill('[name="email"], input[type="email"]', TEST_EMAIL)
     await page.fill('[name="password"], input[type="password"]', TEST_PASS)
-    await page.click('button[type="submit"], button:has-text("Sign up"), button:has-text("Register")')
+    await page.click(
+      'button[type="submit"], button:has-text("Sign up"), button:has-text("Register")'
+    )
 
     // Should land on dashboard or trader page
     await expect(page).toHaveURL(/\/(dashboard|trader|home|app)/, { timeout: 10000 })
@@ -40,9 +42,13 @@ test.describe('Signup Flow', () => {
     await page.fill('[name="name"], input[placeholder*="name" i]', TEST_NAME)
     await page.fill('[name="email"], input[type="email"]', TEST_EMAIL)
     await page.fill('[name="password"], input[type="password"]', TEST_PASS)
-    await page.click('button[type="submit"], button:has-text("Sign up"), button:has-text("Register")')
+    await page.click(
+      'button[type="submit"], button:has-text("Sign up"), button:has-text("Register")'
+    )
 
-    await expect(page.locator('text=/already registered|already exists|duplicate/i')).toBeVisible({ timeout: 8000 })
+    await expect(page.locator('text=/already registered|already exists|duplicate/i')).toBeVisible({
+      timeout: 8000,
+    })
   })
 
   test('signup with invalid email format shows error', async ({ page }) => {
@@ -51,7 +57,9 @@ test.describe('Signup Flow', () => {
     await page.fill('[name="name"], input[placeholder*="name" i]', TEST_NAME)
     await page.fill('[name="email"], input[type="email"]', 'not-an-email')
     await page.fill('[name="password"], input[type="password"]', TEST_PASS)
-    await page.click('button[type="submit"], button:has-text("Sign up"), button:has-text("Register")')
+    await page.click(
+      'button[type="submit"], button:has-text("Sign up"), button:has-text("Register")'
+    )
 
     // Either HTML5 validation or server error
     const isInvalid = await page.evaluate(() => {
@@ -69,7 +77,9 @@ test.describe('Signup Flow', () => {
     await page.fill('[name="name"], input[placeholder*="name" i]', TEST_NAME)
     await page.fill('[name="email"], input[type="email"]', `short_pw_${timestamp}@test.com`)
     await page.fill('[name="password"], input[type="password"]', '123')
-    await page.click('button[type="submit"], button:has-text("Sign up"), button:has-text("Register")')
+    await page.click(
+      'button[type="submit"], button:has-text("Sign up"), button:has-text("Register")'
+    )
 
     await expect(page.locator('text=/password|6 char|too short/i')).toBeVisible({ timeout: 5000 })
   })
@@ -79,13 +89,15 @@ test.describe('Login Flow', () => {
   test.beforeAll(async ({ browser }) => {
     // Pre-create account via API so login tests have a known user
     const context = await browser.newContext()
-    const page    = await context.newPage()
+    const page = await context.newPage()
     await page.goto(`${BASE_URL}/signup`)
     // Attempt signup (may already exist from Signup Flow tests)
     await page.fill('[name="name"], input[placeholder*="name" i]', TEST_NAME)
     await page.fill('[name="email"], input[type="email"]', TEST_EMAIL)
     await page.fill('[name="password"], input[type="password"]', TEST_PASS)
-    await page.click('button[type="submit"], button:has-text("Sign up"), button:has-text("Register")')
+    await page.click(
+      'button[type="submit"], button:has-text("Sign up"), button:has-text("Register")'
+    )
     await page.waitForTimeout(2000)
     await context.close()
   })
@@ -153,15 +165,22 @@ test.describe('Session Persistence', () => {
     await expect(page).toHaveURL(/\/(dashboard|trader|home|app)/, { timeout: 10000 })
 
     // Find and click logout
-    const logoutBtn = page.locator('button:has-text("Logout"), button:has-text("Log out"), [aria-label*="logout" i]')
-    if (await logoutBtn.count() === 0) {
+    const logoutBtn = page.locator(
+      'button:has-text("Logout"), button:has-text("Log out"), [aria-label*="logout" i]'
+    )
+    if ((await logoutBtn.count()) === 0) {
       // May be inside a dropdown/menu
-      await page.click('[aria-label*="user" i], [aria-label*="account" i], button:has-text("Profile")').catch(() => {})
+      await page
+        .click('[aria-label*="user" i], [aria-label*="account" i], button:has-text("Profile")')
+        .catch(() => {})
     }
-    await logoutBtn.first().click({ timeout: 5000 }).catch(() => {
-      // Fallback: clear storage manually
-      return page.evaluate(() => localStorage.clear())
-    })
+    await logoutBtn
+      .first()
+      .click({ timeout: 5000 })
+      .catch(() => {
+        // Fallback: clear storage manually
+        return page.evaluate(() => localStorage.clear())
+      })
 
     await page.goto(`${BASE_URL}/trader`)
     await expect(page).toHaveURL(/\/(login|auth|signin)/, { timeout: 8000 })
