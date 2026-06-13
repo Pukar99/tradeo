@@ -33,16 +33,21 @@ function FloatingChat() {
   const { user } = useAuth()
   const location = useLocation()
 
-  // Position of the FAB (bottom-right by default, stored as distance from top-left)
+  // Default bottom-right anchor for the current viewport.
+  const defaultPos = () => ({
+    x: window.innerWidth - BUTTON_SIZE - EDGE_PAD,
+    y: window.innerHeight - BUTTON_SIZE - EDGE_PAD,
+  })
+
+  // Position of the FAB (stored as distance from top-left). A saved position is
+  // only used if it's a valid pair of finite numbers; it is clamped to the
+  // current viewport below so a stale off-screen value can't hide the button.
   const [pos, setPos] = useState(() => {
     try {
-      const saved = sessionStorage.getItem('floatingChat_pos')
-      if (saved) return JSON.parse(saved)
+      const saved = JSON.parse(sessionStorage.getItem('floatingChat_pos'))
+      if (saved && Number.isFinite(saved.x) && Number.isFinite(saved.y)) return saved
     } catch {}
-    return {
-      x: window.innerWidth - BUTTON_SIZE - EDGE_PAD,
-      y: window.innerHeight - BUTTON_SIZE - EDGE_PAD,
-    }
+    return defaultPos()
   })
 
   const dragging = useRef(false)
@@ -50,16 +55,21 @@ function FloatingChat() {
   const hasMoved = useRef(false)
   const fabRef = useRef(null)
 
-  // Keep in bounds when window resizes
+  // Clamp into the viewport on mount AND on resize. The mount clamp is the fix
+  // for "the chat bubble disappeared": a position saved on a larger/rotated
+  // screen (or a different device) could be off-screen for the current viewport,
+  // and the resize handler alone never ran on load — so the FAB rendered outside
+  // the visible area and looked gone.
   useEffect(() => {
-    const onResize = () => {
+    const reclamp = () => {
       setPos((p) => ({
         x: clamp(p.x, EDGE_PAD, window.innerWidth - BUTTON_SIZE - EDGE_PAD),
         y: clamp(p.y, EDGE_PAD, window.innerHeight - BUTTON_SIZE - EDGE_PAD),
       }))
     }
-    window.addEventListener('resize', onResize)
-    return () => window.removeEventListener('resize', onResize)
+    reclamp() // run once on mount
+    window.addEventListener('resize', reclamp)
+    return () => window.removeEventListener('resize', reclamp)
   }, [])
 
   const onMouseDown = useCallback(
