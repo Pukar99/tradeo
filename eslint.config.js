@@ -47,6 +47,11 @@ export default [
       'react-hooks/gating': 'off',
       'react-refresh/only-export-components': ['warn', { allowConstantExport: true }],
       'react/jsx-no-target-blank': 'off',
+      // Security: block dangerouslySetInnerHTML — the app currently has ZERO uses,
+      // and rendering model/user content as raw HTML is the main DOM-XSS vector.
+      // If a real need ever arises, sanitize with DOMPurify and disable per-line
+      // with an explanatory comment.
+      'react/no-danger': 'error',
       // project does not use PropTypes
       'react/prop-types': 'off',
       // apostrophes in UI text are intentional
