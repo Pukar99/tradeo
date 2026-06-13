@@ -239,7 +239,7 @@ function SummaryTab({ summary, selectSymbol }) {
               : 'bg-red-50/60 dark:bg-red-950/30 border-red-200 dark:border-red-800'
           }`}>
             <div className="flex items-center justify-between mb-1">
-              <span className="text-[10px] font-bold uppercase tracking-widest text-gray-500">NEPSE Index</span>
+              <span className="text-[10px] font-semibold uppercase tracking-widest text-gray-500">NEPSE Index</span>
               <span className={`text-[10px] font-bold ${isPos ? 'text-emerald-600' : 'text-red-500'}`}>
                 {isPos ? '▲' : '▼'} {Math.abs(nepse.per_change ?? 0).toFixed(2)}%
               </span>
@@ -277,7 +277,7 @@ function SummaryTab({ summary, selectSymbol }) {
         const decPct  = breadth.total > 0 ? (breadth.declining  / breadth.total) * 100 : 0
         return (
           <div className="rounded-xl px-2.5 py-2 border border-gray-100 dark:border-gray-800 bg-gray-50/40 dark:bg-gray-800/20">
-            <p className="text-[10px] font-bold uppercase tracking-widest text-gray-400 mb-2">Market Breadth</p>
+            <p className="text-[10px] font-semibold uppercase tracking-widest text-gray-400 mb-2">Market Breadth</p>
             <div className="grid grid-cols-3 gap-1 mb-2">
               {[
                 [breadth.advancing, 'Up',   'text-emerald-500'],
@@ -308,7 +308,7 @@ function SummaryTab({ summary, selectSymbol }) {
       {/* Sectors */}
       {sectors?.length > 0 && (
         <div className="rounded-xl border border-gray-100 dark:border-gray-800 overflow-hidden">
-          <p className="text-[10px] font-bold uppercase tracking-widest text-gray-400 px-2.5 pt-2 pb-1">Sectors</p>
+          <p className="text-[10px] font-semibold uppercase tracking-widest text-gray-400 px-2.5 pt-2 pb-1">Sectors</p>
           <table className="w-full">
             <tbody>
               {sectors.map((s) => {

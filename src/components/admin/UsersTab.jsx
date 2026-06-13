@@ -91,18 +91,26 @@ export default function UsersTab() {
         <div className="hidden sm:block w-20 text-[10px] font-semibold text-gray-400 dark:text-gray-500 uppercase tracking-wide flex-shrink-0">Tier</div>
         <div className="hidden md:block w-24 text-[10px] font-semibold text-gray-400 dark:text-gray-500 uppercase tracking-wide flex-shrink-0">Status</div>
         <div className="hidden lg:block w-32 text-[10px] font-semibold text-gray-400 dark:text-gray-500 uppercase tracking-wide flex-shrink-0">Joined</div>
+        <div className="w-7 flex-shrink-0" />
       </div>
 
       {/* Rows */}
-      <div className="divide-y divide-gray-100 dark:divide-gray-800/60">
+      <div className="divide-y divide-gray-100 dark:divide-gray-800/60 min-h-[420px]">
         {loading ? (
           Array.from({ length: 8 }).map((_, i) => <SkeletonRow key={i} />)
         ) : users.length === 0 ? (
-          <div className="flex items-center justify-center py-16 text-sm text-gray-400 dark:text-gray-500">
+          <div className="min-h-[420px] flex items-center justify-center text-sm text-gray-400 dark:text-gray-500">
             No users found
           </div>
         ) : (
-          users.map(u => <UserListRow key={u.id} user={u} onRefresh={fetchUsers} />)
+          users.map((u, i) => (
+            <UserListRow
+              key={u.id}
+              user={u}
+              onRefresh={fetchUsers}
+              dropUp={users.length > 3 && i >= users.length - 2}
+            />
+          ))
         )}
       </div>
 

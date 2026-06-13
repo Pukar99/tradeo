@@ -273,7 +273,7 @@ function NEPSEChart({ fixed = false }) {
       <div className="hp-card bg-white/70 dark:bg-gray-900/60 backdrop-blur-md rounded-2xl border border-white/60 dark:border-white/10 shadow-sm overflow-hidden">
         {/* Mobile toggle — D / W pill, hidden on desktop */}
         <div className="flex items-center justify-between px-3 pt-2 pb-0 lg:hidden">
-          <span className="text-[10px] font-bold uppercase tracking-widest text-gray-400">NEPSE</span>
+          <span className="text-[10px] font-semibold uppercase tracking-widest text-gray-400">NEPSE</span>
           <div className="flex items-center bg-gray-100 dark:bg-gray-800 rounded-lg p-0.5">
             {[{ id: 'daily', label: 'Daily' }, { id: 'weekly', label: 'Weekly' }].map(t => (
               <button key={t.id} onClick={() => handleMobileTabSwitch(t.id)}

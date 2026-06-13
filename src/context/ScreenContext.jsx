@@ -55,7 +55,9 @@ export function ScreenProvider({ children, initialSymbol, initialIndexId, initia
 
   const location = useLocation()
 
-  const isIndex = () => selectedIsIndex
+  // Memoized — a plain arrow here is recreated every render and, being a useMemo
+  // dep of ctxValue below, would defeat the context memoization entirely
+  const isIndex = useCallback(() => selectedIsIndex, [selectedIsIndex])
 
   const selectSymbol = useCallback((sym, indexId = null, positions = null, companyName = null) => {
     setSelectedSymbol(sym)

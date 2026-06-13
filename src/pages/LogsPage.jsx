@@ -1,14 +1,14 @@
-// === LogsPage.jsx — logs page: Trades / Market / Audit / Stats tabs, shared toolbar, position fetch, chat refresh ===
+// === LogsPage.jsx — logs page: Trades / Market / Stats tabs, shared toolbar, position fetch, chat refresh ===
 import { useState, useEffect, useCallback, useMemo, lazy, Suspense, useRef } from 'react'
 import { useSearchParams } from 'react-router-dom'
 import { getMarketJournals, autoCreateMarketJournal } from '../api'
 import { today } from '../utils/format'
 import { getBatchPrices, getPositions, clearEligibilityCache, clearPositionsCache } from '../utils/globalCache'
 import { useChatRefresh } from '../utils/chatEvents'
+import { PERF_RANGES } from '../components/logs/tradeConstants'
 
-import TradeActionsTab  from '../components/logs/TradeActionsTab'
-import StatsTab, { STAT_RANGES } from '../components/logs/StatsTab'
-import AuditTab         from '../components/logs/AuditTab'
+import TradeActionsTab from '../components/logs/TradeActionsTab'
+import AuditTab        from '../components/logs/AuditTab'
 const MarketJournalTab = lazy(() => import('../components/logs/MarketJournalTab'))
 
 function TabSpinner() {
@@ -22,29 +22,39 @@ function TabSpinner() {
 const TABS = [
   { key: 'trades', label: 'Trades' },
   { key: 'market', label: 'Market' },
-  { key: 'audit',  label: 'Audit'  },
-  { key: 'stats',  label: 'Stats'  },
+  { key: 'audit',  label: 'Stats'  },
 ]
+
+// Legacy deep links: the old Stats tab merged into the audit tab (now labeled "Stats")
+function resolveTabParam(t) {
+  if (t === 'stats') return 'audit'
+  return TABS.some(tab => tab.key === t) ? t : null
+}
 
 export default function LogsPage() {
   const [positions,  setPositions]  = useState([])
   const [ltpMap,     setLtpMap]     = useState({})
   const [loading,    setLoading]    = useState(true)
-  const [searchParams] = useSearchParams()
-  const [activeTab,  setActiveTab]  = useState(() => {
-    const t = searchParams.get('tab')
-    return TABS.some(tab => tab.key === t) ? t : 'trades'
-  })
-  // Sync tab if searchParams changes while component is already mounted
+  const [searchParams, setSearchParams] = useSearchParams()
+  const [activeTab,  setActiveTab]  = useState(() => resolveTabParam(searchParams.get('tab')) || 'trades')
+  // Sync tab if searchParams changes while component is already mounted (back/forward nav)
   const prevTabParam = useRef(searchParams.get('tab'))
   useEffect(() => {
     const t = searchParams.get('tab')
     if (t !== prevTabParam.current) {
       prevTabParam.current = t
-      if (TABS.some(tab => tab.key === t)) setActiveTab(t)
+      const resolved = resolveTabParam(t)
+      if (resolved) setActiveTab(resolved)
     }
   }, [searchParams])
   const [error,      setError]      = useState(null)
+
+  // Tab click — keep the URL in sync so refresh/share restores the right tab
+  const handleTabChange = useCallback((key) => {
+    setActiveTab(key)
+    prevTabParam.current = key
+    setSearchParams(key === 'trades' ? {} : { tab: key }, { replace: true })
+  }, [setSearchParams])
 
   // Shared log view — persists across Trades + Market tabs
   const [view,   setView]   = useState('database')
@@ -52,10 +62,7 @@ export default function LogsPage() {
   const [search, setSearch] = useState('')
   const [addModal, setAddModal] = useState(false)
 
-  // Stats tab range filter
-  const [statsRange, setStatsRange] = useState('1M')
-
-  // Audit tab filters
+  // Stats tab filters
   const [auditRange,      setAuditRange]      = useState('1M')
   const [auditSymbol,     setAuditSymbol]     = useState('all')
   const [auditSymbols,    setAuditSymbols]    = useState([])
@@ -95,21 +102,12 @@ export default function LogsPage() {
 
   const fetchMarketJournals = useCallback(async () => {
     try {
+      // Auto-create/refresh today's entry, then load all entries.
+      // (No historical backfill: the backend always writes the latest trading
+      // date, so per-date backfill calls are no-ops that only burn rate limit.)
       await autoCreateMarketJournal(today())
       const journalsRes = await getMarketJournals()
-      const all = journalsRes.data || []
-      setMarketJournals(all)
-
-      // Backfill news for recent entries that have none — once per session only
-      if (!sessionStorage.getItem('mj_backfilled')) {
-        sessionStorage.setItem('mj_backfilled', '1')
-        const missing = all.filter(e => !e.news).slice(0, 5)
-        if (missing.length > 0) {
-          await Promise.all(missing.map(e => autoCreateMarketJournal(e.date).catch(() => {})))
-          const refreshed = await getMarketJournals()
-          setMarketJournals(refreshed.data || [])
-        }
-      }
+      setMarketJournals(journalsRes.data || [])
     } catch (err) {
       console.error('[fetchMarketJournals]', err?.message)
     }
@@ -123,13 +121,16 @@ export default function LogsPage() {
       fetchMarketJournals()
     }
   }, [activeTab, marketJournalLoaded, fetchMarketJournals])
-  useChatRefresh(['trades'], fetchData)
 
   const handleRefresh = useCallback(() => {
     clearEligibilityCache()
     clearPositionsCache()
     fetchData()
   }, [fetchData])
+
+  // Chat-driven trade writes must invalidate the positions cache before
+  // re-fetching — fetchData alone would serve the 30s-cached pre-write list.
+  useChatRefresh(['trades'], handleRefresh)
 
   const handleMarketJournalSaved = useCallback((updated) => {
     setMarketJournals(prev => prev.map(e => e.date === updated.date ? updated : e))
@@ -190,7 +191,7 @@ export default function LogsPage() {
         <div className="flex items-center gap-0.5 bg-gray-100 dark:bg-gray-800 rounded-lg p-0.5 shrink-0">
           {TABS.map(tab => (
             <button key={tab.key}
-              onClick={() => setActiveTab(tab.key)}
+              onClick={() => handleTabChange(tab.key)}
               className={`px-2 py-0.5 rounded-md text-[10px] font-semibold transition-all whitespace-nowrap ${
                 activeTab === tab.key
                   ? 'bg-white dark:bg-gray-700 text-gray-900 dark:text-white shadow-sm'
@@ -207,17 +208,11 @@ export default function LogsPage() {
         {/* Middle slot — scrolls horizontally on narrow viewports */}
         <div className="flex-1 min-w-0 flex items-center gap-1.5 overflow-x-auto overscroll-x-contain [scrollbar-width:thin] [&::-webkit-scrollbar]:h-1 [&::-webkit-scrollbar-thumb]:bg-gray-300 dark:[&::-webkit-scrollbar-thumb]:bg-gray-700 [&::-webkit-scrollbar-thumb]:rounded-full">
 
-          {/* Audit: range chips + symbol select + share trigger */}
+          {/* Stats: range chips + symbol select */}
           {activeTab === 'audit' && (
             <>
               <div className="flex items-center gap-0.5 bg-gray-100 dark:bg-gray-800 rounded-md p-0.5 shrink-0">
-                {[
-                  { key: '1M', label: 'This Month' },
-                  { key: '3M', label: '3M' },
-                  { key: '6M', label: '6M' },
-                  { key: '1Y', label: '1Y' },
-                  { key: 'all', label: 'All Time' },
-                ].map(r => (
+                {PERF_RANGES.map(r => (
                   <button key={r.key}
                     onClick={() => setAuditRange(r.key)}
                     className={`px-1.5 py-0.5 rounded text-[10px] font-semibold transition-colors whitespace-nowrap ${
@@ -245,23 +240,6 @@ export default function LogsPage() {
             </>
           )}
 
-          {/* Stats: range filter chips */}
-          {activeTab === 'stats' && (
-            <div className="flex items-center gap-0.5 bg-gray-100 dark:bg-gray-800 rounded-md p-0.5 shrink-0">
-              {STAT_RANGES.map(r => (
-                <button key={r.key}
-                  onClick={() => setStatsRange(r.key)}
-                  className={`px-1.5 py-0.5 rounded text-[10px] font-semibold transition-colors whitespace-nowrap ${
-                    statsRange === r.key
-                      ? 'bg-white dark:bg-gray-700 text-gray-900 dark:text-white shadow-sm'
-                      : 'text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-300'
-                  }`}>
-                  {r.label}
-                </button>
-              ))}
-            </div>
-          )}
-
           {/* Trades + Market: view toggle */}
           {(activeTab === 'trades' || activeTab === 'market') && (
             <>
@@ -269,7 +247,6 @@ export default function LogsPage() {
                 {[
                   { key: 'database', label: 'Database' },
                   { key: 'gallery',  label: 'Gallery'  },
-                  { key: 'calendar', label: 'Calendar' },
                 ].map(v => (
                   <button key={v.key}
                     onClick={() => setView(v.key)}
@@ -284,7 +261,7 @@ export default function LogsPage() {
               </div>
 
               {/* Trades only: open/all filter + symbol search */}
-              {activeTab === 'trades' && (view === 'database' || view === 'gallery') && (
+              {activeTab === 'trades' && (
                 <>
                   <div className="w-px h-3.5 bg-gray-200 dark:bg-gray-700 shrink-0" />
 
@@ -323,7 +300,7 @@ export default function LogsPage() {
           )}
         </div>
 
-        {/* Audit: Share My Stats button — right side of toolbar */}
+        {/* Stats: Share My Stats button — right side of toolbar */}
         {activeTab === 'audit' && (
           <button
             onClick={() => setAuditShareOpen(true)}
@@ -388,9 +365,6 @@ export default function LogsPage() {
               shareOpen={auditShareOpen}
               onShareClose={() => setAuditShareOpen(false)}
             />
-          )}
-          {activeTab === 'stats' && (
-            <StatsTab positions={positions} loading={loading} range={statsRange} />
           )}
         </div>
       </div>

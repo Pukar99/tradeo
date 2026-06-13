@@ -135,6 +135,14 @@ function FloatingChat() {
     setIsOpen(o => !o)
   }, [])
 
+  // Escape closes the panel — same convention as every other overlay in the app
+  useEffect(() => {
+    if (!isOpen) return
+    const onKey = (e) => { if (e.key === 'Escape') setIsOpen(false) }
+    window.addEventListener('keydown', onKey)
+    return () => window.removeEventListener('keydown', onKey)
+  }, [isOpen])
+
   if (location.pathname === '/chat') return null
   if (!user) return null
 

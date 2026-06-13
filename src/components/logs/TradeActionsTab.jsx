@@ -1,12 +1,13 @@
-// === TradeActionsTab.jsx — trade actions tab: database/gallery/calendar views, add/close/partial/delete modals ===
+// === TradeActionsTab.jsx — trade actions tab: database/gallery views, add/close/partial/delete modals ===
 import { useState, useCallback, useMemo } from 'react'
 import { deleteTradeAction, deleteEntireTrade } from '../../api'
 import PositionRow from './PositionRow'
 import AddTradeModal from './AddTradeModal'
 import ClosePositionModal from './ClosePositionModal'
 import PartialExitModal from './PartialExitModal'
-import TradeCalendarView from './TradeCalendarView'
 import TradeGalleryView from './TradeGalleryView'
+import EmptyState from './EmptyState'
+import { filterPositions } from './tradeConstants'
 
 export default function TradeActionsTab({ positions, ltpMap, view, filter, search, addModal, setAddModal, onRefresh }) {
   const [closeTarget,   setCloseTarget]  = useState(null)
@@ -17,15 +18,10 @@ export default function TradeActionsTab({ positions, ltpMap, view, filter, searc
   const [deleteErr,     setDeleteErr]    = useState(null)
   const [refreshTick, setRefreshTick] = useState(0)
 
-  const displayed = useMemo(() => {
-    let list = positions || []
-    if (filter === 'open') list = list.filter(p => p.status !== 'CLOSED')
-    if (search.trim()) {
-      const q = search.trim().toUpperCase()
-      list = list.filter(p => p.symbol.includes(q))
-    }
-    return list
-  }, [positions, filter, search])
+  const displayed = useMemo(
+    () => filterPositions(positions, filter, search),
+    [positions, filter, search]
+  )
 
   const handleSaved = useCallback(() => {
     setAddModal(false)
@@ -61,42 +57,38 @@ export default function TradeActionsTab({ positions, ltpMap, view, filter, searc
     setConfirmDel({ type: 'action', target: action, refreshHistory })
   }, [])
 
+  const emptyState = (
+    <EmptyState
+      title={`No ${filter === 'open' ? 'open ' : ''}positions`}
+      subtitle={filter === 'open' ? 'Switch to All above to see closed trades' : undefined}
+      action={filter !== 'open' ? (
+        <button onClick={() => setAddModal(true)} className="text-[11px] text-gray-400 underline hover:text-blue-500 transition-colors">
+          Add your first trade →
+        </button>
+      ) : undefined}
+    />
+  )
+
   return (
     <div className="space-y-2">
 
-      {/* calendar view */}
-      {view === 'calendar' && <TradeCalendarView />}
-
       {/* gallery view */}
       {view === 'gallery' && (
-        <TradeGalleryView
-          positions={positions}
-          ltpMap={ltpMap}
-          filter={filter}
-          search={search}
-          onAdd={p => setAddTarget(p)}
-          onPartialExit={p => setPartialTarget(p)}
-          onClose={p => setCloseTarget(p)}
-          onDelete={p => setConfirmDel({ type: 'trade', target: p })}
-          onOpenAddModal={() => setAddModal(true)}
-        />
+        displayed.length === 0 ? emptyState : (
+          <TradeGalleryView
+            positions={displayed}
+            ltpMap={ltpMap}
+            onAdd={p => setAddTarget(p)}
+            onPartialExit={p => setPartialTarget(p)}
+            onClose={p => setCloseTarget(p)}
+            onDelete={p => setConfirmDel({ type: 'trade', target: p })}
+          />
+        )
       )}
 
       {/* database view */}
       {view === 'database' && (
-        displayed.length === 0 ? (
-          <div className="text-center py-20 text-gray-400 dark:text-gray-500">
-            <p className="text-[13px] font-semibold mb-1">
-              No {filter === 'open' ? 'open ' : ''}positions
-            </p>
-            <p className="text-[11px]">
-              {filter === 'open'
-                ? <span className="text-gray-400">Switch to All above to see closed trades</span>
-                : <button onClick={() => setAddModal(true)} className="underline hover:text-blue-500 transition-colors">Add your first trade →</button>
-              }
-            </p>
-          </div>
-        ) : (
+        displayed.length === 0 ? emptyState : (
           <div className="space-y-2">
             {displayed.map(pos => (
               <PositionRow

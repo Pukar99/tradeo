@@ -217,7 +217,7 @@ export default function BacktestActivePanel({
 
         {/* Total Equity Banner */}
         <div className={`rounded-lg px-2.5 py-2 border ${totalEquityPct >= 0 ? 'border-green-200 dark:border-green-900 bg-green-50 dark:bg-green-900/10' : 'border-red-200 dark:border-red-900 bg-red-50 dark:bg-red-900/10'}`}>
-          <div className="text-[10px] font-bold text-gray-400 uppercase tracking-wider mb-0.5">Session Equity</div>
+          <div className="text-[10px] font-semibold text-gray-400 uppercase tracking-widest mb-0.5">Session Equity</div>
           <div className={`text-[14px] font-bold ${totalEquityPct >= 0 ? 'text-green-600' : 'text-red-500'}`}>
             Rs.{fmt(totalEquity)}
           </div>
@@ -228,7 +228,7 @@ export default function BacktestActivePanel({
 
         {/* Capital breakdown */}
         <div className="rounded-lg border border-gray-100 dark:border-gray-800 p-2 bg-gray-50 dark:bg-gray-900">
-          <div className="text-[10px] font-bold text-gray-400 uppercase tracking-wider mb-1">Capital</div>
+          <div className="text-[10px] font-semibold text-gray-400 uppercase tracking-widest mb-1">Capital</div>
           <div className="grid grid-cols-2 gap-x-3 gap-y-0.5 text-gray-600 dark:text-gray-400">
             <span>Available</span>
             <span className="text-right font-semibold text-blue-600">Rs.{fmt(availCap)}</span>
@@ -243,7 +243,7 @@ export default function BacktestActivePanel({
 
         {/* Open positions */}
         <div>
-          <div className="text-[10px] font-bold text-gray-400 uppercase tracking-wider mb-1">
+          <div className="text-[10px] font-semibold text-gray-400 uppercase tracking-widest mb-1">
             Open Positions {openPositions.length > 0 && `(${openPositions.length})`}
           </div>
           {openPositions.length === 0

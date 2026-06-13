@@ -74,7 +74,7 @@ function AnnouncementRow({ item, onToggle, onDelete }) {
             item.is_active ? 'bg-green-500' : 'bg-gray-200 dark:bg-gray-700'
           } disabled:opacity-50`}
         >
-          <span className={`absolute top-0.5 w-4 h-4 bg-white rounded-full shadow transition-transform ${
+          <span className={`absolute left-0 top-0.5 w-4 h-4 bg-white rounded-full shadow transition-transform ${
             item.is_active ? 'translate-x-4' : 'translate-x-0.5'
           }`} />
         </button>
@@ -263,11 +263,11 @@ export default function BroadcastTab() {
       </div>
 
       {/* Rows */}
-      <div className="divide-y divide-gray-100 dark:divide-gray-800/60">
+      <div className="divide-y divide-gray-100 dark:divide-gray-800/60 min-h-[420px]">
         {loading ? (
           Array.from({ length: 4 }).map((_, i) => <SkeletonRow key={i} />)
         ) : items.length === 0 ? (
-          <div className="flex items-center justify-center py-12 text-sm text-gray-400 dark:text-gray-500">
+          <div className="min-h-[420px] flex items-center justify-center text-sm text-gray-400 dark:text-gray-500">
             No announcements yet
           </div>
         ) : (

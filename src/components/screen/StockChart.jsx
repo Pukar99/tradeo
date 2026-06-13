@@ -5,6 +5,7 @@ import { useTheme } from '../../context/ThemeContext'
 import { useScreen } from '../../context/ScreenContext'
 import { getIndexChart, getStockChart, triggerBackfill } from '../../api'
 import { getMarketSymbols, getTradeHistory, getTopMovers } from '../../utils/globalCache'
+import { nptNow, expectedLatestTradingDate } from '../../utils/nepseCalendar'
 import { useScreenToolbarSlot } from '../../pages/ScreenPage'
 
 // ── useFixedDropdown ──────────────────────────────────────────────────────────
@@ -585,7 +586,7 @@ function ChartIndicatorDropdown({ activeTool, setActiveTool, onClearDrawings, dr
 
           {/* Indicators section */}
           <div className="px-3 pt-3 pb-2.5">
-            <p className="text-[10px] font-bold text-gray-400 dark:text-gray-500 uppercase tracking-widest mb-2">
+            <p className="text-[10px] font-semibold text-gray-400 dark:text-gray-500 uppercase tracking-widest mb-2">
               Indicators
             </p>
             <div className="flex flex-wrap gap-1">
@@ -610,7 +611,7 @@ function ChartIndicatorDropdown({ activeTool, setActiveTool, onClearDrawings, dr
 
           {/* Drawing tools section */}
           <div className="px-3 pt-2.5 pb-3">
-            <p className="text-[10px] font-bold text-gray-400 dark:text-gray-500 uppercase tracking-widest mb-2">
+            <p className="text-[10px] font-semibold text-gray-400 dark:text-gray-500 uppercase tracking-widest mb-2">
               Drawing Tools
             </p>
             <div className="flex flex-wrap gap-1">
@@ -851,59 +852,6 @@ function PositionBadge({ positions, latestClose }) {
   )
 }
 
-// ── Movers Overlay ─────────────────────────────────────────────────────────────
-
-function MoversOverlay({ movers, date, pinned, onClear }) {
-  if (!movers || (!movers.gainers?.length && !movers.losers?.length)) return null
-  // eslint-disable-next-line react-hooks/rules-of-hooks
-  const { selectSymbol } = useScreen()
-
-  return (
-    <div translate="no" className={`absolute top-14 right-2 z-20 w-52 rounded-2xl border shadow-lg backdrop-blur-sm text-[10px] overflow-hidden
-      ${pinned
-        ? 'bg-white dark:bg-gray-900/95 border-blue-200 dark:border-blue-700 ring-1 ring-blue-400/30'
-        : 'bg-white/95 dark:bg-gray-900/90 border-gray-200 dark:border-white/[0.10]'
-      }`}>
-      <div className="flex items-center justify-between px-3 py-1.5 border-b border-gray-100 dark:border-gray-800">
-        <span className="text-[10px] font-semibold text-gray-400 uppercase tracking-widest">{date}</span>
-        {pinned ? (
-          <button onClick={onClear} className="text-[10px] text-blue-400 hover:text-blue-600 font-semibold flex items-center gap-0.5">
-            <span>📌</span> Pinned
-          </button>
-        ) : (
-          <span className="text-[10px] text-gray-300 dark:text-gray-600">Click to pin</span>
-        )}
-      </div>
-      <div className="grid grid-cols-2 divide-x divide-gray-100 dark:divide-gray-800">
-        <div className="px-2 py-2">
-          <p className="text-[10px] font-semibold text-emerald-500 uppercase tracking-widest mb-1">Gainers</p>
-          {(movers.gainers || []).slice(0, 5).map((s, i) => (
-            <div key={i}
-              onClick={() => selectSymbol(s.s)}
-              className="flex justify-between items-center py-0.5 cursor-pointer hover:bg-gray-50 dark:hover:bg-gray-800/50 rounded px-0.5 transition-colors"
-            >
-              <span className="font-semibold text-gray-700 dark:text-gray-200">{s.s}</span>
-              <span className="text-emerald-500 font-semibold">+{s.p}%</span>
-            </div>
-          ))}
-        </div>
-        <div className="px-2 py-2">
-          <p className="text-[10px] font-semibold text-red-400 uppercase tracking-widest mb-1">Losers</p>
-          {(movers.losers || []).slice(0, 5).map((s, i) => (
-            <div key={i}
-              onClick={() => selectSymbol(s.s)}
-              className="flex justify-between items-center py-0.5 cursor-pointer hover:bg-gray-50 dark:hover:bg-gray-800/50 rounded px-0.5 transition-colors"
-            >
-              <span className="font-semibold text-gray-700 dark:text-gray-200">{s.s}</span>
-              <span className="text-red-400 font-semibold">{s.p}%</span>
-            </div>
-          ))}
-        </div>
-      </div>
-    </div>
-  )
-}
-
 // ── OHLC Tooltip ──────────────────────────────────────────────────────────────
 
 function OHLCTooltip({ bar, change }) {
@@ -946,7 +894,7 @@ function OHLCTooltip({ bar, change }) {
 
 function ChartSkeleton() {
   return (
-    <div className="w-full h-full flex flex-col gap-2 p-4 animate-pulse" style={{ background: 'var(--chart-bg, #fafafa)' }}>
+    <div className="w-full h-full flex flex-col gap-2 p-4 animate-pulse bg-white dark:bg-gray-900">
       <div className="flex gap-1 items-end h-full">
         {Array.from({ length: 40 }).map((_, i) => (
           <div key={i} className="flex-1 bg-gray-200 dark:bg-gray-800/80 rounded-sm"
@@ -980,7 +928,7 @@ export default function StockChart({ hideToolbar = false, onChartReady, smcData 
   const { isDark } = useTheme()
   const {
     selectedSymbol, selectedIndexId, chartType, timeframe,
-    activeIndicators: _activeIndicators, isIndex, onHover, onPin, pinnedDate, clearPin,
+    activeIndicators: _activeIndicators, isIndex, onHover, onPin, pinnedDate,
     activePositions, disableMovers,
   } = useScreen() || {}
   const activeIndicators = Array.isArray(_activeIndicators) ? _activeIndicators : []
@@ -1028,7 +976,7 @@ export default function StockChart({ hideToolbar = false, onChartReady, smcData 
       drawingsRef.current = []
     }
     setDrawVersion(v => v + 1) // repaint canvas with restored drawings
-  }, [drawKey]) // eslint-disable-line react-hooks/exhaustive-deps
+  }, [drawKey])
 
   const canvasRef           = useRef(null)
   const priceSeriesRef      = useRef(null)  // set after chart build — needed for coordinate conversion
@@ -1228,6 +1176,26 @@ export default function StockChart({ hideToolbar = false, onChartReady, smcData 
       } catch (_) {}
     }
 
+    // Trend structure line — zigzag through the confirmed swing points
+    if (paToggles.showTrend && paData.swings?.length >= 2) {
+      try {
+        const pts = []
+        paData.swings.forEach(sw => {
+          if (!sw.date || sw.price == null) return
+          const pt = { time: sw.date, value: parseFloat(sw.price) }
+          // setData requires strictly ascending unique times — a candle can be both
+          // peak and trough, so collapse same-date swings to the last one
+          if (pts.length && pts[pts.length - 1].time === pt.time) pts[pts.length - 1] = pt
+          else pts.push(pt)
+        })
+        if (pts.length >= 2) {
+          const s = chart.addLineSeries({ color: '#22c55e66', lineWidth: 1, lineStyle: 0, priceLineVisible: false, lastValueVisible: false, crosshairMarkerVisible: false })
+          s.setData(pts)
+          paSeriesRef.current.push(s)
+        }
+      } catch (_) {}
+    }
+
     // S/R horizontal lines
     if (paToggles.showSR && paData.support_resistance?.length) {
       paData.support_resistance.forEach(z => {
@@ -1280,14 +1248,19 @@ export default function StockChart({ hideToolbar = false, onChartReady, smcData 
       }
       try {
         const existing = priceSeriesRef.current.markers() || []
-        const ptMarkers = paData.patterns.slice(-20).map(pt => ({
-          time:     pt.date,
-          position: pt.direction === 'bull' ? 'belowBar' : 'aboveBar',
-          color:    pt.direction === 'bull' ? '#f59e0b' : '#d97706',
-          shape:    pt.direction === 'bull' ? 'arrowUp' : 'arrowDown',
-          text:     ABBREV[pt.type] ?? pt.type.slice(0, 3).toUpperCase(),
-          size:     1,
-        }))
+        // Neutral patterns (doji, inside bar) get a gray circle — no directional arrow
+        const ptMarkers = paData.patterns.slice(-20).map(pt => {
+          const isBull = pt.direction === 'bull'
+          const isBear = pt.direction === 'bear'
+          return {
+            time:     pt.date,
+            position: isBear ? 'aboveBar' : 'belowBar',
+            color:    isBull ? '#f59e0b' : isBear ? '#d97706' : '#9ca3af',
+            shape:    isBull ? 'arrowUp' : isBear ? 'arrowDown' : 'circle',
+            text:     ABBREV[pt.type] ?? pt.type.slice(0, 3).toUpperCase(),
+            size:     1,
+          }
+        })
         const ptTypes = new Set(Object.values(ABBREV))
         const merged = [...existing.filter(m => !ptTypes.has(m.text)), ...ptMarkers]
           .sort((a, b) => a.time < b.time ? -1 : a.time > b.time ? 1 : 0)
@@ -1314,7 +1287,7 @@ export default function StockChart({ hideToolbar = false, onChartReady, smcData 
       : `${selectedSymbol}:${timeframe}`
     _chartCache.delete(cacheKey)
     setRefreshTick(t => t + 1)
-  }, [isIndex, selectedIndexId, selectedSymbol, timeframe]) // eslint-disable-line react-hooks/exhaustive-deps
+  }, [isIndex, selectedIndexId, selectedSymbol, timeframe])
 
   // Always-fresh ref so drawing onContextMenu can call it without stale closure
   const handleRefreshRef = useRef(handleRefresh)
@@ -1353,10 +1326,14 @@ export default function StockChart({ hideToolbar = false, onChartReady, smcData 
   )
 
   const C = {
-    bg:     isDark ? '#0c152936' : '#fafafa',
+    // Surface colors match the app theme (design.md: bg-white / dark:bg-gray-900)
+    // so the chart blends with the page instead of sitting as a different slab.
+    // bg must match the theme-update effect below — a different value here means the
+    // chart background visibly shifts the first time the user toggles dark/light.
+    bg:     isDark ? '#111827' : '#ffffff',
     grid:   'transparent',
     text:   isDark ? '#6b7280' : '#9ca3af',
-    border: isDark ? '#111827' : '#f3f4f6',
+    border: isDark ? '#1f2937' : '#f3f4f6',
     up:     '#10b981',
     down:   '#ef4444',
     ma:     '#3b82f6',
@@ -1411,31 +1388,18 @@ export default function StockChart({ hideToolbar = false, onChartReady, smcData 
       setLoading(false)
       onChartDataReady?.(data)
 
-      // Gap detection: if latest candle is older than expected, trigger backfill
+      // Gap detection: if latest candle is older than expected, trigger backfill.
+      // Calendar logic lives in utils/nepseCalendar.js — fixed 2025-04-13 weekend-rule
+      // cutoff (the old inline version reset the cutoff every year, breaking Jan–Apr).
       if (data.length > 0) {
         const latestCandle = data[data.length - 1].time // 'YYYY-MM-DD'
-        const nowNPT = new Date(Date.now() + (5 * 60 + 45) * 60 * 1000)
-        const hNPT = nowNPT.getUTCHours()
-        const mNPT = nowNPT.getUTCMinutes()
-        const afterClose = hNPT > 15 || (hNPT === 15 && mNPT >= 10)
+        const now = nptNow()
+        const afterClose = now.getUTCHours() > 15 || (now.getUTCHours() === 15 && now.getUTCMinutes() >= 10)
         if (!afterClose) return
 
-        const expected = (() => {
-          const d = new Date(nowNPT)
-          for (let i = 0; i < 7; i++) {
-            const s = d.toISOString().slice(0, 10)
-            const dow = d.getUTCDay()
-            // NEPSE switched to Sun–Thu (Sat+Sun off) starting Nepali year 2082 (≈ mid-April 2025).
-            // Use April 13 of each Gregorian year as the conservative cutoff for the new weekend rule.
-            const year = parseInt(s.slice(0, 4))
-            const nepaliNewYearApprox = `${year}-04-13`
-            const isWeekend = s >= nepaliNewYearApprox ? (dow === 0 || dow === 6) : (dow === 5 || dow === 6)
-            if (!isWeekend) return s
-            d.setUTCDate(d.getUTCDate() - 1)
-          }
-        })()
+        const expected = expectedLatestTradingDate()
 
-        if (latestCandle < expected) {
+        if (expected && latestCandle < expected) {
           try {
             const wasIndex = isIndex()
             const bf = await triggerBackfill(expected)
@@ -1479,8 +1443,7 @@ export default function StockChart({ hideToolbar = false, onChartReady, smcData 
       if (cancelled || !mainRef.current) return
 
       const base = {
-        layout:         { background: { color: C.bg }, textColor: C.text, fontSize: 11 },
-        attributionLogo: false,
+        layout:         { background: { color: C.bg }, textColor: C.text, fontSize: 11, attributionLogo: false },
         grid:           { vertLines: { color: C.grid }, horzLines: { color: C.grid } },
         crosshair: {
           mode:     CrosshairMode.Normal,
@@ -1846,9 +1809,9 @@ export default function StockChart({ hideToolbar = false, onChartReady, smcData 
 
   // Apply theme color changes without rebuilding the chart — avoids full rebuild on dark/light toggle
   useEffect(() => {
-    const bg   = isDark ? '#0d1117' : '#fafafa'
+    const bg   = isDark ? '#111827' : '#ffffff'
     const text = isDark ? '#6b7280' : '#9ca3af'
-    const border = isDark ? '#111827' : '#f3f4f6'
+    const border = isDark ? '#1f2937' : '#f3f4f6'
     Object.values(chartsRef.current).forEach(c => {
       try {
         c.applyOptions({
@@ -1904,7 +1867,7 @@ export default function StockChart({ hideToolbar = false, onChartReady, smcData 
       try { chart.timeScale().unsubscribeVisibleTimeRangeChange(scheduleRepaint) } catch (_) {}
       ro.disconnect()
     }
-  }, [chartBuiltVer, isDark, activeTool, drawVersion]) // eslint-disable-line react-hooks/exhaustive-deps
+  }, [chartBuiltVer, isDark, activeTool, drawVersion])
 
   // Drawing mouse handlers — re-registers whenever chartBuiltVer changes (new chart instance)
   const activeToolRef = useRef(activeTool)
@@ -2106,7 +2069,7 @@ export default function StockChart({ hideToolbar = false, onChartReady, smcData 
       </svg>
       <p className="text-[12px] text-gray-400">{error}</p>
       <button
-        onClick={() => { setError(null); setLoading(true) }}
+        onClick={handleRefresh}
         className="text-[10px] text-blue-500 hover:underline"
       >Retry</button>
     </div>
@@ -2170,12 +2133,12 @@ export default function StockChart({ hideToolbar = false, onChartReady, smcData 
       document.body
     )}
 
-    <div className="flex flex-col w-full h-full overflow-hidden" style={{ background: isDark ? '#0d1117' : '#fafafa' }}>
+    <div className="flex flex-col w-full h-full overflow-hidden bg-white dark:bg-gray-900">
 
       {/* ── Overlays (absolute inside the chart area below) ── */}
 
       {/* ── Chart area ── */}
-      {/* Position badge rendered outside loading gate so it's visible during chart load */}
+      {/* Position badge — hidden while loading; needs latestClose for P&L */}
       {!loading && <PositionBadge positions={activePositions} latestClose={latestClose} />}
 
       {loading ? (
@@ -2233,31 +2196,31 @@ export default function StockChart({ hideToolbar = false, onChartReady, smcData 
           </div>
 
           {showRSI && (
-            <div className="w-full shrink-0 flex flex-col" style={{ height: `${subPanePct}%`, borderTop: isDark ? '1px solid #1c2333' : '1px solid #f3f4f6' }}>
+            <div className="w-full shrink-0 flex flex-col" style={{ height: `${subPanePct}%`, borderTop: isDark ? '1px solid #1f2937' : '1px solid #f3f4f6' }}>
               <SubPaneLabel title="RSI" sub="14" color="#a78bfa"
                 legend={[{ color: '#ef444480', label: '70 OB' }, { color: '#10b98180', label: '30 OS' }]} />
               <div ref={rsiRef} className="w-full flex-1 min-h-0 relative">
-                {!chartsRef.current.rsi && <div className="absolute inset-0 animate-pulse" style={{ background: isDark ? '#0d1117' : '#fafafa' }} />}
+                {!chartsRef.current.rsi && <div className="absolute inset-0 animate-pulse bg-white dark:bg-gray-900" />}
               </div>
             </div>
           )}
 
           {showMACD && (
-            <div className="w-full shrink-0 flex flex-col" style={{ height: `${subPanePct}%`, borderTop: isDark ? '1px solid #1c2333' : '1px solid #f3f4f6' }}>
+            <div className="w-full shrink-0 flex flex-col" style={{ height: `${subPanePct}%`, borderTop: isDark ? '1px solid #1f2937' : '1px solid #f3f4f6' }}>
               <SubPaneLabel title="MACD" sub="12 / 26 / 9" color="#60a5fa"
                 legend={[{ color: '#60a5fa', label: 'MACD' }, { color: '#f59e0b', label: 'Signal' }]} />
               <div ref={macdRef} className="w-full flex-1 min-h-0 relative">
-                {!chartsRef.current.macd && <div className="absolute inset-0 animate-pulse" style={{ background: isDark ? '#0d1117' : '#fafafa' }} />}
+                {!chartsRef.current.macd && <div className="absolute inset-0 animate-pulse bg-white dark:bg-gray-900" />}
               </div>
             </div>
           )}
 
           {showATR && (
-            <div className="w-full shrink-0 flex flex-col" style={{ height: `${subPanePct}%`, borderTop: isDark ? '1px solid #1c2333' : '1px solid #f3f4f6' }}>
+            <div className="w-full shrink-0 flex flex-col" style={{ height: `${subPanePct}%`, borderTop: isDark ? '1px solid #1f2937' : '1px solid #f3f4f6' }}>
               <SubPaneLabel title="ATR" sub="14" color="#f59e0b"
                 legend={[{ color: '#f59e0b', label: 'ATR' }]} />
               <div ref={atrRef} className="w-full flex-1 min-h-0 relative">
-                {!chartsRef.current.atr && <div className="absolute inset-0 animate-pulse" style={{ background: isDark ? '#0d1117' : '#fafafa' }} />}
+                {!chartsRef.current.atr && <div className="absolute inset-0 animate-pulse bg-white dark:bg-gray-900" />}
               </div>
             </div>
           )}

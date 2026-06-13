@@ -319,8 +319,16 @@ export default function MultiChartPage() {
   const [activePanel, setActivePanel] = useState(0)
 
   const [panels, setPanels] = useState(() => {
+    // saveState persists only the active panels (1–4 entries, FIX MC09) — accept any
+    // valid length and pad the rest with defaults. Requiring exactly MAX_PANELS here
+    // silently discarded saved state for 2/3-panel layouts.
     const s = loadState()?.panels
-    if (Array.isArray(s) && s.length === MAX_PANELS) return s
+    if (Array.isArray(s) && s.length > 0 && s.length <= MAX_PANELS) {
+      return [
+        ...s.map(p => ({ ...DEFAULT_PANEL, ...p })),
+        ...Array(MAX_PANELS - s.length).fill(null).map(() => ({ ...DEFAULT_PANEL })),
+      ]
+    }
     return Array(MAX_PANELS).fill(null).map(() => ({ ...DEFAULT_PANEL }))
   })
 
@@ -516,6 +524,17 @@ export default function MultiChartPage() {
   // Stable no-op — mobile panel must not write to chartRefs/seriesRefs
   const noopChartReady = useCallback(() => {}, [])
 
+  // Mount only ONE of the mobile/desktop subtrees. With CSS-only hiding both were
+  // always mounted: desktop built a 5th hidden panel-0 chart, and mobile built all
+  // 2–4 desktop charts behind display:none (up to 5 chart instances for 1 visible).
+  const [isMobile, setIsMobile] = useState(() => window.matchMedia('(max-width: 767px)').matches)
+  useEffect(() => {
+    const mq = window.matchMedia('(max-width: 767px)')
+    const fn = e => setIsMobile(e.matches)
+    mq.addEventListener('change', fn)
+    return () => mq.removeEventListener('change', fn)
+  }, [])
+
   return (
     <div className="flex-1 overflow-hidden min-h-0 flex flex-col">
 
@@ -525,51 +544,51 @@ export default function MultiChartPage() {
         syncCross={syncCross} setSyncCross={setSyncCross}
       />
 
-      {/* Mobile: single panel — uses a no-op onChartReady so it never writes to
-          chartRefs/seriesRefs (those are for the desktop grid only). Without this,
-          the mobile panel's cleanup call zeroes out chartRefs[0], breaking crosshair
-          sync for panel 0 on desktop. */}
-      <div className="md:hidden flex-1 flex flex-col min-h-0">
-        <ChartPanelWrapper
-          panelIdx={0}
-          panelState={panels[0]}
-          isActive={true}
-          onActivate={() => {}}
-          onExternalSymbolChange={handleExternalSymbolChange}
-          onExternalTimeframeChange={handleExternalTimeframeChange}
-          onChartReady={noopChartReady}
-          onSelectSymbolReady={handleSelectSymbolReady}
-          onSetTimeframeReady={handleSetTimeframeReady}
-          allSymbols={allSymbols}
-        />
-        <p className="shrink-0 text-center text-[10px] text-gray-400 py-1 border-t border-gray-100 dark:border-gray-800">
-          MultiChart shows all panels on wider screens
-        </p>
-      </div>
-
-      {/* Desktop grid — FIX MC02: ChartPanelWrapper is memo'd, stable parent handlers
-          passed as props. No inline arrows in the map → SyncBridge re-fires only when
-          actually needed (symbol/timeframe change), not every render. */}
-      <div className="hidden md:flex flex-col flex-1 min-h-0">
-        <div style={gridStyle}>
-          {Array.from({ length: panelCount }).map((_, idx) => (
-            <div key={idx} style={panelStyle(idx)} className={panelBorderClass(idx)}>
-              <ChartPanelWrapper
-                panelIdx={idx}
-                panelState={panels[idx]}
-                isActive={activePanel === idx}
-                onActivate={setActivePanel}
-                onExternalSymbolChange={handleExternalSymbolChange}
-                onExternalTimeframeChange={handleExternalTimeframeChange}
-                onChartReady={handleChartReady}
-                onSelectSymbolReady={handleSelectSymbolReady}
-                onSetTimeframeReady={handleSetTimeframeReady}
-                allSymbols={allSymbols}
-              />
-            </div>
-          ))}
+      {isMobile ? (
+        /* Mobile: single panel — uses a no-op onChartReady so it never writes to
+           chartRefs/seriesRefs (those are for the desktop grid only). */
+        <div className="flex-1 flex flex-col min-h-0">
+          <ChartPanelWrapper
+            panelIdx={0}
+            panelState={panels[0]}
+            isActive={true}
+            onActivate={() => {}}
+            onExternalSymbolChange={handleExternalSymbolChange}
+            onExternalTimeframeChange={handleExternalTimeframeChange}
+            onChartReady={noopChartReady}
+            onSelectSymbolReady={handleSelectSymbolReady}
+            onSetTimeframeReady={handleSetTimeframeReady}
+            allSymbols={allSymbols}
+          />
+          <p className="shrink-0 text-center text-[10px] text-gray-400 py-1 border-t border-gray-100 dark:border-gray-800">
+            MultiChart shows all panels on wider screens
+          </p>
         </div>
-      </div>
+      ) : (
+        /* Desktop grid — FIX MC02: ChartPanelWrapper is memo'd, stable parent handlers
+           passed as props. No inline arrows in the map → SyncBridge re-fires only when
+           actually needed (symbol/timeframe change), not every render. */
+        <div className="flex flex-col flex-1 min-h-0">
+          <div style={gridStyle}>
+            {Array.from({ length: panelCount }).map((_, idx) => (
+              <div key={idx} style={panelStyle(idx)} className={panelBorderClass(idx)}>
+                <ChartPanelWrapper
+                  panelIdx={idx}
+                  panelState={panels[idx]}
+                  isActive={activePanel === idx}
+                  onActivate={setActivePanel}
+                  onExternalSymbolChange={handleExternalSymbolChange}
+                  onExternalTimeframeChange={handleExternalTimeframeChange}
+                  onChartReady={handleChartReady}
+                  onSelectSymbolReady={handleSelectSymbolReady}
+                  onSetTimeframeReady={handleSetTimeframeReady}
+                  allSymbols={allSymbols}
+                />
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
     </div>
   )
 }

@@ -562,7 +562,7 @@ function Watchlist() {
 
       {/* ── Header row: label + tabs + add button ── */}
       <div className="flex items-center gap-2 px-3 py-2.5 border-b border-gray-100 dark:border-gray-800">
-        <p className="text-[10px] font-bold uppercase tracking-widest text-gray-400 shrink-0">Watchlist</p>
+        <p className="text-[10px] font-semibold uppercase tracking-widest text-gray-400 shrink-0">Watchlist</p>
 
         <div className="flex-1" />
 

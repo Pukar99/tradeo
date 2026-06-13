@@ -6,14 +6,18 @@ import { useTheme } from '../../context/ThemeContext'
 import { getPerformance } from '../../api'
 import { isCanceled } from '../../utils/format'
 import { getMarketSymbols, registerCacheCleaner } from '../../utils/globalCache'
-import { useToolbarSlot } from '../../pages/DataLabPage'
+import { useToolbarSlot, safeSessionGet, safeSessionSet } from '../../pages/DataLabPage'
+import { CARD, LABEL, STITLE, SVAL, Skeleton, fmtPct } from './shared'
 
 // ── Cache — capped at 20 entries (LRU eviction) ───────────────────────────────
-const CACHE_VER  = 'v3'
+const CACHE_VER  = 'v4'  // v4: NEPSE history held once in _nepseCache, not per key
 const PERF_TTL   = 60 * 60_000
 const fresh      = ts => ts && Date.now() - ts < PERF_TTL
 const _cache     = {}
 const _cacheKeys = []  // insertion-order list for LRU eviction
+// NEPSE candles are identical for every symbol/threshold — one shared copy
+// instead of 20 duplicates, and the basis for skip_nepse requests.
+let _nepseCache  = null  // { data, ts }
 
 function cacheSet(key, value) {
   if (_cache[key]) {
@@ -31,6 +35,7 @@ function cacheSet(key, value) {
 export function clearPerformanceCache() {
   for (const k of Object.keys(_cache)) delete _cache[k]
   _cacheKeys.length = 0
+  _nepseCache = null
 }
 // Module-load side effect: hook into the global logout flow.
 // PerformanceChart is lazy-loaded so this only runs once the user opens DataLab.
@@ -48,10 +53,6 @@ async function loadLC() { return import('lightweight-charts') }
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
 function pct(a, b)      { return (!a || !b) ? null : ((b - a) / a) * 100 }
-function fmtPct(n, dec = 1) {
-  if (n == null || isNaN(n)) return '—'
-  return `${n >= 0 ? '+' : ''}${n.toFixed(dec)}%`
-}
 function fmtDays(from, to) {
   const d = Math.round((new Date(to) - new Date(from)) / 86400000)
   return d >= 365 ? `${(d / 365).toFixed(1)}y` : `${d}d`
@@ -90,22 +91,8 @@ function nameSwings(raw) {
   return named.slice().reverse()
 }
 
-// ── Shared design tokens ──────────────────────────────────────────────────────
-const CARD   = 'bg-white dark:bg-gray-900 rounded-2xl border border-gray-100 dark:border-gray-800'
-const LABEL  = 'text-[10px] font-semibold uppercase tracking-widest text-gray-400'
-const STITLE = 'text-[11px] font-semibold text-gray-700 dark:text-gray-200'
-const SVAL   = 'text-[13px] font-bold tabular-nums'
-
-// ── Skeleton ─────────────────────────────────────────────────────────────────
-function Skeleton() {
-  return (
-    <div className="space-y-2 px-4 py-6">
-      <div className="h-3 w-full bg-gray-100 dark:bg-gray-800 rounded animate-pulse" />
-      <div className="h-3 w-3/4 bg-gray-100 dark:bg-gray-800 rounded animate-pulse" />
-      <div className="h-3 w-1/2 bg-gray-100 dark:bg-gray-800 rounded animate-pulse" />
-    </div>
-  )
-}
+// Design tokens, Skeleton and fmtPct come from ./shared (single source for all
+// three DataLab tabs).
 
 // ── Symbol Search ─────────────────────────────────────────────────────────────
 function SymbolSearch({ value, onChange }) {
@@ -270,7 +257,6 @@ function SymbolSearch({ value, onChange }) {
 
 // ── Inline candlestick chart — exposes chart instance via ref for cursor sync ──
 const MiniCandle = forwardRef(function MiniCandle({ data, height = 360 }, fwdRef) {
-  const fillParent = false // always use explicit height; CycleDetail uses a wrapper
   const { isDark } = useTheme()
   const domRef  = useRef(null)
   const chartR  = useRef(null)
@@ -301,8 +287,7 @@ const MiniCandle = forwardRef(function MiniCandle({ data, height = 360 }, fwdRef
 
       const chart = createChart(domRef.current, {
         width: w, height,
-        attributionLogo: false,
-        layout:    { background: { color: bg }, textColor: tx, fontSize: 10 },
+        layout:    { background: { color: bg }, textColor: tx, fontSize: 10, attributionLogo: false },
         grid:      { vertLines: { color: 'transparent' }, horzLines: { color: 'transparent' } },
         crosshair: {
           mode: 1,
@@ -509,13 +494,11 @@ function CycleItem({ swing, precomp, symbol, isActive, onClick, index }) {
 
 // ── Right panel — side-by-side charts for selected cycle ─────────────────────
 function CycleDetail({ swing, precomp, nepse, stock, symbol }) {
-  // Always call hooks — use precomp values when available (avoids redundant slice+stats)
-  const _nepseSlice = useMemo(() => slice(nepse, swing.from, swing.to), [nepse, swing.from, swing.to])
-  const _stockSlice = useMemo(() => stock ? slice(stock, swing.from, swing.to) : [], [stock, swing.from, swing.to])
-  const _st         = useMemo(() => stats(_nepseSlice, _stockSlice), [_nepseSlice, _stockSlice])
-  const nepseSlice  = precomp?.ns ?? _nepseSlice
-  const stockSlice  = precomp?.ss ?? _stockSlice
-  const st          = precomp?.st ?? _st
+  // Use precomp values when available — fall back to computing inside the memo
+  // so the redundant slice+stats work is skipped entirely when precomp exists.
+  const nepseSlice = useMemo(() => precomp?.ns ?? slice(nepse, swing.from, swing.to), [precomp, nepse, swing.from, swing.to])
+  const stockSlice = useMemo(() => precomp?.ss ?? (stock ? slice(stock, swing.from, swing.to) : []), [precomp, stock, swing.from, swing.to])
+  const st         = useMemo(() => precomp?.st ?? stats(nepseSlice, stockSlice), [precomp, nepseSlice, stockSlice])
   const isBull     = swing.type === 'bull'
 
   const nepseRef   = useRef(null)
@@ -726,11 +709,11 @@ function cycleChip(cycle) {
 }
 
 // ─── Cycle row: dual mini-bar for NEPSE vs stock returns inside one cycle ─────
-function CycleRow({ cycle, nRet, sRet, symbol, max, isActive, isStart, onClick }) {
+function CycleRow({ cycle, nRet, sRet, symbol, max, isActive, isStart, partial, onClick }) {
   const isBull = cycle.type === 'bull'
 
   const barFor = (v) => {
-    if (v == null) return { w: 0, color: '#9ca3af' }
+    if (v == null) return { w: 0, color: '#9ca3af', left: 50 }
     const w = Math.min(Math.abs(v) / max * 50, 50)
     const color = v >= 0 ? '#10b981' : '#ef4444'
     return { w, color, left: v >= 0 ? 50 : 50 - w }
@@ -768,7 +751,7 @@ function CycleRow({ cycle, nRet, sRet, symbol, max, isActive, isStart, onClick }
         <div className="flex-1 min-w-0 space-y-0.5">
           {/* NEPSE row */}
           <div className="flex items-center gap-1.5">
-            <span className="w-6 shrink-0 text-[10px] font-bold uppercase tracking-wider text-blue-400">NEP</span>
+            <span className="w-6 shrink-0 text-[10px] font-bold uppercase tracking-widest text-blue-400">NEP</span>
             <div className="relative flex-1 h-2 bg-gray-100 dark:bg-gray-800 rounded-sm overflow-hidden">
               <div className="absolute inset-y-0 left-1/2 w-px bg-gray-300 dark:bg-gray-600" />
               <div className="absolute top-0 h-full rounded-sm"
@@ -781,7 +764,11 @@ function CycleRow({ cycle, nRet, sRet, symbol, max, isActive, isStart, onClick }
           {/* Stock row */}
           {symbol && (
             <div className="flex items-center gap-1.5">
-              <span className="w-6 shrink-0 text-[10px] font-bold uppercase tracking-wider text-amber-500 truncate">{symbol.slice(0, 4)}</span>
+              <span className="w-6 shrink-0 text-[10px] font-bold uppercase tracking-widest text-amber-500 truncate">{symbol.slice(0, 4)}</span>
+              {partial && (
+                <span className="shrink-0 text-[9px] text-amber-500 leading-none"
+                  title="Partial data — stock was not listed for the full cycle; excluded from win rate and alpha">◐</span>
+              )}
               <div className="relative flex-1 h-2 bg-gray-100 dark:bg-gray-800 rounded-sm overflow-hidden">
                 <div className="absolute inset-y-0 left-1/2 w-px bg-gray-300 dark:bg-gray-600" />
                 <div className="absolute top-0 h-full rounded-sm"
@@ -798,7 +785,7 @@ function CycleRow({ cycle, nRet, sRet, symbol, max, isActive, isStart, onClick }
   )
 }
 
-function CompareRightPanel({ symbol, swings, allStats, statsById, expanded, setExpanded, winRateInfo, bulls, bears }) {
+function CompareRightPanel({ symbol, swings, allStats, expanded, setExpanded, winRateInfo, bulls, bears }) {
   // Investment amount for ladder (default Rs.100 to match user's reference)
   const [amount, setAmount] = useState(100)
   // Start cycle id (chronological). null = oldest cycle.
@@ -825,13 +812,15 @@ function CompareRightPanel({ symbol, swings, allStats, statsById, expanded, setE
     </div>
   )
 
-  // Aggregate stats
-  const wins = valid.filter(x => x.st.alpha > 0).length
-  const losses = valid.length - wins
-  const avgAlpha = valid.reduce((s, x) => s + (x.st.alpha || 0), 0) / valid.length
-  const totalAlpha = valid.reduce((s, x) => s + (x.st.alpha || 0), 0)
-  const bestCycle  = valid.reduce((b, x) => (x.st.alpha > (b?.st.alpha ?? -Infinity) ? x : b), null)
-  const worstCycle = valid.reduce((b, x) => (x.st.alpha < (b?.st.alpha ?? +Infinity) ? x : b), null)
+  // Aggregate stats — win/loss counts live in winRateInfo (shown in the card header).
+  // Partial-coverage cycles (stock listed mid-cycle) are excluded; if EVERY cycle
+  // is partial (newly listed stock) fall back to all valid so the card isn't empty.
+  const aggBase    = valid.filter(x => !x.partial)
+  const agg        = aggBase.length ? aggBase : valid
+  const avgAlpha   = agg.reduce((s, x) => s + (x.st.alpha || 0), 0) / agg.length
+  const totalAlpha = agg.reduce((s, x) => s + (x.st.alpha || 0), 0)
+  const bestCycle  = agg.reduce((b, x) => (x.st.alpha > (b?.st.alpha ?? -Infinity) ? x : b), null)
+  const worstCycle = agg.reduce((b, x) => (x.st.alpha < (b?.st.alpha ?? +Infinity) ? x : b), null)
 
   // Bar scaling: max of both NEPSE and stock returns in absolute terms
   const maxAbs = Math.max(
@@ -854,12 +843,12 @@ function CompareRightPanel({ symbol, swings, allStats, statsById, expanded, setE
     ladder.push({ id: x.id, cycle: swings.find(s => s.id === x.id), nRet, sRet, nBal, sBal })
   }
   const lastRow = ladder[ladder.length - 1]
-  const finalNepsePct = lastRow ? ((lastRow.nBal - amount) / amount) * 100 : 0
-  const finalStockPct = lastRow ? ((lastRow.sBal - amount) / amount) * 100 : 0
+  // amount can be 0 mid-typing — guard the division so the footer never shows NaN%
+  const finalNepsePct = lastRow && amount > 0 ? ((lastRow.nBal - amount) / amount) * 100 : 0
+  const finalStockPct = lastRow && amount > 0 ? ((lastRow.sBal - amount) / amount) * 100 : 0
   const finalAlphaPct = finalStockPct - finalNepsePct
 
   const fmtRs = v => v == null ? '—' : `Rs.${v >= 1000 ? Math.round(v).toLocaleString() : v.toFixed(1)}`
-  const getCycleName = (id) => swings.find(s => s.id === id)?.name || `Cycle #${id}`
 
   return (
     <div className="space-y-3">
@@ -875,14 +864,6 @@ function CompareRightPanel({ symbol, swings, allStats, statsById, expanded, setE
           )}
         </div>
         <div className="grid grid-cols-2 gap-2 mt-2">
-          <div>
-            <p className={`${LABEL} mb-0.5`}>Wins</p>
-            <p className="text-[13px] font-bold tabular-nums text-emerald-500">{wins}</p>
-          </div>
-          <div>
-            <p className={`${LABEL} mb-0.5`}>Losses</p>
-            <p className="text-[13px] font-bold tabular-nums text-red-500">{losses}</p>
-          </div>
           <div>
             <p className={`${LABEL} mb-0.5`}>Avg α</p>
             <p className={`text-[13px] font-bold tabular-nums ${avgAlpha >= 0 ? 'text-emerald-500' : 'text-red-500'}`}>
@@ -923,6 +904,7 @@ function CompareRightPanel({ symbol, swings, allStats, statsById, expanded, setE
               sRet={x.st.sRet}
               symbol={symbol}
               max={maxAbs}
+              partial={x.partial}
               isActive={expanded === x.id}
               isStart={startCycleId === x.id}
               onClick={() => setExpanded(prev => prev === x.id ? null : x.id)}
@@ -961,12 +943,12 @@ function CompareRightPanel({ symbol, swings, allStats, statsById, expanded, setE
 
         {/* Header row */}
         <div className="grid grid-cols-[40px_1fr_1fr] items-center gap-1 px-2 py-1.5 border-b border-gray-100 dark:border-gray-800 bg-gray-50/40 dark:bg-gray-800/20">
-          <span className="text-[10px] font-bold uppercase tracking-wider text-gray-400">Cycle</span>
+          <span className="text-[10px] font-semibold uppercase tracking-widest text-gray-400">Cycle</span>
           <div className="text-right">
-            <p className="text-[10px] font-bold uppercase tracking-wider text-blue-400">NEPSE</p>
+            <p className="text-[10px] font-bold uppercase tracking-widest text-blue-400">NEPSE</p>
           </div>
           <div className="text-right">
-            <p className="text-[10px] font-bold uppercase tracking-wider text-amber-500 truncate">{symbol}</p>
+            <p className="text-[10px] font-bold uppercase tracking-widest text-amber-500 truncate">{symbol}</p>
           </div>
         </div>
 
@@ -1013,7 +995,7 @@ function CompareRightPanel({ symbol, swings, allStats, statsById, expanded, setE
         {lastRow && (
           <div className="px-2 py-2 border-t border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-800/40">
             <div className="grid grid-cols-[40px_1fr_1fr] items-center gap-1">
-              <span className="text-[10px] font-bold uppercase tracking-wider text-gray-500">End</span>
+              <span className="text-[10px] font-semibold uppercase tracking-widest text-gray-500">End</span>
               <div className="text-right">
                 <p className={`text-[11px] font-black tabular-nums ${finalNepsePct >= 0 ? 'text-emerald-500' : 'text-red-500'}`}>
                   {finalNepsePct >= 0 ? '+' : ''}{finalNepsePct.toFixed(1)}%
@@ -1043,9 +1025,14 @@ function CompareRightPanel({ symbol, swings, allStats, statsById, expanded, setE
 
 // ── Main ──────────────────────────────────────────────────────────────────────
 export default function PerformanceChart() {
-  const [symbol,    setSymbol]    = useState('')
-  const [company,   setCompany]   = useState(null)
-  const [threshold, setThreshold] = useState(10)
+  // Controls survive refresh via sessionStorage (same pattern as the tab id)
+  const [symbol,    setSymbol]    = useState(() => safeSessionGet('tradeo_perf_symbol', ''))
+  const [threshold, setThreshold] = useState(() => {
+    const v = parseFloat(safeSessionGet('tradeo_perf_threshold', '10'))
+    return THRESHOLDS.includes(v) ? v : 10
+  })
+  useEffect(() => { safeSessionSet('tradeo_perf_symbol', symbol) }, [symbol])
+  useEffect(() => { safeSessionSet('tradeo_perf_threshold', String(threshold)) }, [threshold])
 
   const [nepse,       setNepse]       = useState([])
   const [swings,      setSwings]      = useState([])
@@ -1056,12 +1043,15 @@ export default function PerformanceChart() {
   const [cycleFilter, setCycleFilter] = useState('all')
 
   const lastSwingRef = useRef(null)
+  const reqIdRef     = useRef(0)
 
   const loadData = useCallback(() => {
-    const key = `${symbol || '_'}:${threshold}:${CACHE_VER}`
-    if (_cache[key] && fresh(_cache[key].ts)) {
+    const key        = `${symbol || '_'}:${threshold}:${CACHE_VER}`
+    const nepseFresh = _nepseCache && fresh(_nepseCache.ts)
+    if (_cache[key] && fresh(_cache[key].ts) && nepseFresh) {
       const named = nameSwings(_cache[key].swings || [])
-      setNepse(_cache[key].nepse || [])
+      setError('')
+      setNepse(_nepseCache.data || [])
       setSwings(named)
       setStock(_cache[key].stock || null)
       return
@@ -1069,22 +1059,28 @@ export default function PerformanceChart() {
 
     setLoading(true)
     setError('')
-    const params = symbol ? { symbol, threshold } : { threshold }
-    // No AbortController — the axios dedup interceptor already prevents
-    // duplicate requests in StrictMode. Aborting fights the dedup and breaks both.
+    // skip_nepse: the NEPSE array (~1400 candles) is identical for every
+    // symbol/threshold — only request it when the shared copy is stale.
+    const params = { threshold, ...(symbol ? { symbol } : {}), ...(nepseFresh ? { skip_nepse: 1 } : {}) }
+    // Key guard instead of AbortController: the axios dedup interceptor collapses
+    // duplicate in-flight requests (StrictMode), but it cannot cancel a DIFFERENT
+    // superseded request — without this guard a slow response for symbol A could
+    // overwrite state after the user already switched to symbol B.
+    const reqId = ++reqIdRef.current
     getPerformance(params)
       .then(r => {
-        const named = nameSwings(r.data.swings || [])
-        cacheSet(key, { nepse: r.data.nepse, swings: r.data.swings, stock: r.data.stock, ts: Date.now() })
-        setNepse(r.data.nepse  || [])
-        setSwings(named)
-        setStock(r.data.stock  || null)
+        if (reqId !== reqIdRef.current) return
+        if (r.data.nepse) _nepseCache = { data: r.data.nepse, ts: Date.now() }
+        cacheSet(key, { swings: r.data.swings, stock: r.data.stock, ts: Date.now() })
+        setNepse(_nepseCache?.data || [])
+        setSwings(nameSwings(r.data.swings || []))
+        setStock(r.data.stock || null)
       })
       .catch(err => {
-        if (isCanceled(err)) return
+        if (reqId !== reqIdRef.current || isCanceled(err)) return
         setError('Failed to load data')
       })
-      .finally(() => setLoading(false))
+      .finally(() => { if (reqId === reqIdRef.current) setLoading(false) })
   }, [symbol, threshold])
 
   useEffect(() => {
@@ -1096,7 +1092,11 @@ export default function PerformanceChart() {
   const allStats = useMemo(() => swings.map(sw => {
     const ns = slice(nepse, sw.from, sw.to)
     const ss = stock ? slice(stock, sw.from, sw.to) : []
-    return { id: sw.id, ns, ss, st: stats(ns, ss) }
+    // Stock listed mid-cycle: its return covers only part of the window, so
+    // comparing it against NEPSE's full-cycle return is apples-to-oranges.
+    // <80% trading-day coverage → flagged partial, excluded from win rate/alpha.
+    const partial = ss.length > 0 && ns.length > 0 && ss.length < ns.length * 0.8
+    return { id: sw.id, ns, ss, partial, st: stats(ns, ss) }
   }), [swings, nepse, stock])
 
   const statsById = useMemo(() => {
@@ -1119,7 +1119,8 @@ export default function PerformanceChart() {
   // Win rate with denominator (only cycles where stock data exists)
   const winRateInfo = useMemo(() => {
     if (!symbol || !allStats.length) return null
-    const withAlpha = allStats.filter(x => x.st.alpha != null)
+    // Partial-coverage cycles are excluded — their alpha is not comparable
+    const withAlpha = allStats.filter(x => x.st.alpha != null && !x.partial)
     if (!withAlpha.length) return null
     const wins = withAlpha.filter(x => x.st.alpha > 0).length
     return { wins, total: withAlpha.length, pct: Math.round(wins / withAlpha.length * 100) }
@@ -1128,7 +1129,7 @@ export default function PerformanceChart() {
   // Inject controls into the DataLab tab bar via portal
   const toolbar = useToolbarSlot(
     <div className="flex items-center gap-2 flex-nowrap whitespace-nowrap">
-      <SymbolSearch value={symbol} onChange={(sym, name) => { setSymbol(sym); setCompany(name); setExpanded(null) }} />
+      <SymbolSearch value={symbol} onChange={(sym) => { setSymbol(sym); setExpanded(null) }} />
 
       {symbol && (
         <div className="flex items-center gap-1 shrink-0 px-2 py-0.5 rounded-lg border border-gray-200 dark:border-gray-700 bg-amber-50 dark:bg-amber-900/20">
@@ -1175,6 +1176,8 @@ export default function PerformanceChart() {
             <span className="text-emerald-500 font-bold">{bulls.length}▲</span>
             {' '}
             <span className="text-red-400 font-bold">{bears.length}▼</span>
+            {/* This tab's data window starts at 2020 (Breakdown covers full history) */}
+            <span className="hidden sm:inline text-gray-300 dark:text-gray-600"> · since 2020</span>
           </span>
           {symbol && winRateInfo && (
             <div className={`flex items-center gap-1 shrink-0 px-2 py-0.5 rounded-full text-[10px] font-bold ${
@@ -1283,6 +1286,32 @@ export default function PerformanceChart() {
 
       {/* ── CENTER — chart area ── */}
       <div className="flex-1 min-w-0 overflow-hidden flex flex-col">
+
+        {/* Mobile cycle strip — the left rail is hidden below md and ↑↓ keys need
+            a keyboard, so phones get a horizontal chip strip to switch cycles */}
+        {swings.length > 0 && (
+          <div className="md:hidden shrink-0 flex items-center gap-1.5 px-3 pt-2 overflow-x-auto overscroll-x-contain [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
+            {filteredSwings.map(sw => {
+              const isBull   = sw.type === 'bull'
+              const isActive = expanded === sw.id
+              const ret      = statsById[sw.id]?.st?.nRet
+              return (
+                <button key={sw.id} onClick={() => setExpanded(sw.id)}
+                  className={`shrink-0 flex items-center gap-1 px-2 py-1 rounded-lg text-[10px] font-bold tabular-nums border transition-colors ${
+                    isActive
+                      ? isBull
+                        ? 'bg-emerald-50 dark:bg-emerald-900/20 border-emerald-300 dark:border-emerald-700 text-emerald-600 dark:text-emerald-400'
+                        : 'bg-red-50 dark:bg-red-900/20 border-red-300 dark:border-red-700 text-red-500'
+                      : 'bg-white dark:bg-gray-900 border-gray-200 dark:border-gray-700 text-gray-500 dark:text-gray-400'
+                  }`}>
+                  <span>{cycleChip(sw)}</span>
+                  <span>{fmtPct(ret)}</span>
+                </button>
+              )
+            })}
+          </div>
+        )}
+
         <div className="flex-1 min-h-0 p-3">
           {displaySwing ? (
             <CycleDetail swing={displaySwing} precomp={statsById[displaySwing.id]} nepse={nepse} stock={stock} symbol={symbol} />
@@ -1336,7 +1365,6 @@ export default function PerformanceChart() {
             symbol={symbol}
             swings={swings}
             allStats={allStats}
-            statsById={statsById}
             expanded={expanded}
             setExpanded={setExpanded}
             winRateInfo={winRateInfo}

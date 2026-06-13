@@ -2,16 +2,16 @@
 import { useState, useEffect } from 'react'
 import { useLanguage } from '../context/LanguageContext'
 import {
-  LineChart, Line, XAxis, YAxis, CartesianGrid,
+  LineChart, Line, XAxis, YAxis,
   Tooltip, ResponsiveContainer, PieChart, Pie,
   Cell, BarChart, Bar, Legend
 } from 'recharts'
-import { nepseCommission, sebonFee, dpCharge } from '../utils/format'
+import { nepseCommission, sebonFee, dpCharge, nepseCGTByTerm } from '../utils/format'
 
 const getBrokerCommission = nepseCommission
 const getSEBON = sebonFee
 const getDP = dpCharge
-const getCGT = (gain, isLongTerm) => gain > 0 ? gain * (isLongTerm ? 0.05 : 0.075) : 0
+const getCGT = nepseCGTByTerm // rates live in utils/format — single source
 
 const PIE_COLORS = ['#3b82f6', '#ef4444', '#f59e0b', '#22c55e', '#8b5cf6']
 
@@ -22,13 +22,13 @@ const TABS = [
 ]
 
 const INPUT = "bg-gray-50 dark:bg-gray-800 border border-gray-200 dark:border-gray-700 text-xs text-gray-800 dark:text-gray-100 focus:border-blue-400 rounded-xl px-3 py-2 w-full outline-none placeholder-gray-300 dark:placeholder-gray-600"
-const LABEL = "block text-[10px] font-semibold uppercase tracking-wider text-gray-400 mb-1"
+const LABEL = "block text-[10px] font-semibold uppercase tracking-widest text-gray-400 mb-1"
 
 // ─── Stat Mini Card ─────────────────────────────────────────
 function StatCard({ label, value, color = 'text-gray-800 dark:text-gray-100' }) {
   return (
     <div className="bg-gray-50 dark:bg-gray-800/60 rounded-xl p-3 text-center border border-gray-100 dark:border-gray-800">
-      <p className="text-[10px] font-semibold uppercase tracking-wider text-gray-400 mb-0.5">{label}</p>
+      <p className="text-[10px] font-semibold uppercase tracking-widest text-gray-400 mb-0.5">{label}</p>
       <p className={`text-[13px] font-bold ${color}`}>{value}</p>
     </div>
   )
@@ -50,9 +50,11 @@ function EmptyState({ text }) {
 
 // ─── NEPSE CALCULATOR ──────────────────────────────────────
 function NEPSECalculator() {
+  // Equity-only: commission slabs and CGT rates below are for ordinary shares.
+  // (A security-type selector existed but never changed the math — removed.)
   const [form, setForm] = useState({
     symbol: '', kitta: '', buyPrice: '', sellPrice: '',
-    buyDate: '', sellDate: '', bonusShares: '', cashDividend: '', securityType: 'equity',
+    buyDate: '', sellDate: '', bonusShares: '', cashDividend: '',
   })
   const [result, setResult] = useState(null)
   const [holdingPeriod, setHoldingPeriod] = useState(null)
@@ -117,8 +119,12 @@ function NEPSECalculator() {
       { name: 'Capital Gain Tax', value: Math.round(cgt) },
     ].filter(item => item.value > 0)
 
+    // holdingPeriod from the long/short buttons is a sentinel, not a real day
+    // count — only surface days when they came from actual dates
+    const hasDates = !!(form.buyDate && form.sellDate)
+
     setResult({
-      kitta, totalShares, buyPrice, sellPrice,
+      kitta, totalShares, buyPrice, sellPrice, bonusShares,
       adjustedCostPerShare: adjustedCostPerShare.toFixed(2),
       buyAmount, sellAmount,
       buyBroker, buySebon, buyDp, totalBuyCharges,
@@ -126,7 +132,7 @@ function NEPSECalculator() {
       totalSellCharges, totalCharges,
       grossProfit, netProfit, netProfitPct,
       cashDiv, breakEven: breakEven.toFixed(2),
-      isLongTerm, holdingPeriod,
+      isLongTerm, holdingPeriod: hasDates ? holdingPeriod : null,
       pieData: rawPieData,
     })
   }
@@ -138,17 +144,9 @@ function NEPSECalculator() {
         <p className="text-[11px] font-semibold uppercase tracking-widest text-gray-400">NEPSE Trade Details</p>
 
         <div className="grid grid-cols-2 gap-3">
-          <div>
-            <label className={LABEL}>Symbol</label>
+          <div className="col-span-2">
+            <label className={LABEL}>Symbol <span className="normal-case font-normal text-gray-300">equity / ordinary shares</span></label>
             <input type="text" value={form.symbol} onChange={e => update('symbol', e.target.value.toUpperCase())} placeholder="e.g. NTC" className={INPUT} />
-          </div>
-          <div>
-            <label className={LABEL}>Security Type</label>
-            <select value={form.securityType} onChange={e => update('securityType', e.target.value)} className={INPUT}>
-              <option value="equity">Equity (Shares)</option>
-              <option value="bond">Bond/Debenture</option>
-              <option value="mutual">Mutual Fund</option>
-            </select>
           </div>
           <div>
             <label className={LABEL}>Kitta (Units)</label>
@@ -173,7 +171,7 @@ function NEPSECalculator() {
         </div>
 
         <div className="border-t border-gray-100 dark:border-gray-800 pt-3 space-y-2">
-          <p className="text-[10px] font-semibold uppercase tracking-wider text-gray-400">Holding Period (CGT)</p>
+          <p className="text-[10px] font-semibold uppercase tracking-widest text-gray-400">Holding Period (CGT)</p>
           <div className="grid grid-cols-2 gap-3">
             <div>
               <label className={LABEL}>Buy Date <span className="normal-case font-normal text-gray-300">opt.</span></label>
@@ -191,7 +189,7 @@ function NEPSECalculator() {
                 ? 'bg-emerald-50 dark:bg-emerald-950 text-emerald-600 dark:text-emerald-400 border border-emerald-100 dark:border-emerald-900'
                 : 'bg-amber-50 dark:bg-amber-950 text-amber-600 dark:text-amber-400 border border-amber-100 dark:border-amber-900'
             }`}>
-              <span>{holdingPeriod} days</span>
+              <span>{form.buyDate && form.sellDate ? `${holdingPeriod} days` : 'Manual'}</span>
               <span>{holdingPeriod >= 365 ? 'Long-term · 5% CGT' : 'Short-term · 7.5% CGT'}</span>
             </div>
           )}
@@ -240,7 +238,7 @@ function NEPSECalculator() {
                   </p>
                 </div>
                 <div className="text-right">
-                  <p className="text-[10px] font-semibold uppercase tracking-wider text-gray-400">Break-even</p>
+                  <p className="text-[10px] font-semibold uppercase tracking-widest text-gray-400">Break-even</p>
                   <p className="text-base font-bold text-gray-800 dark:text-gray-100 mt-0.5">Rs.{result.breakEven}</p>
                   {result.bonusShares > 0 && (
                     <p className="text-[10px] text-blue-400">Adj. Rs.{result.adjustedCostPerShare}</p>
@@ -254,7 +252,7 @@ function NEPSECalculator() {
                   { label: 'Charges', value: `Rs.${Math.round(result.totalCharges).toLocaleString()}`, red: true },
                 ].map((s, i) => (
                   <div key={i} className="bg-white/60 dark:bg-gray-900/60 rounded-xl p-2 text-center border border-white/50 dark:border-gray-800/50">
-                    <p className="text-[10px] font-semibold text-gray-400 uppercase tracking-wider">{s.label}</p>
+                    <p className="text-[10px] font-semibold text-gray-400 uppercase tracking-widest">{s.label}</p>
                     <p className={`text-[11px] font-bold mt-0.5 ${s.red ? 'text-red-400' : 'text-gray-700 dark:text-gray-200'}`}>{s.value}</p>
                   </div>
                 ))}
@@ -443,7 +441,10 @@ function SIPCalculator() {
   const calculate = () => {
     setSipErr(null)
     const monthly = parseFloat(form.monthly) || 0
-    const annualReturnPct = parseFloat(form.annualReturn) ?? 12
+    // parseFloat('') is NaN, which ?? does not catch — explicit NaN check so a
+    // cleared field falls back to 12 while a typed 0 stays 0
+    const parsedReturn = parseFloat(form.annualReturn)
+    const annualReturnPct = Number.isNaN(parsedReturn) ? 12 : parsedReturn
     const years = Math.floor(parseFloat(form.years) || 10)
     const lump = parseFloat(form.initialLump) || 0
     if (!monthly) return
@@ -563,24 +564,20 @@ function RiskLabPage() {
         <p className="text-[11px] text-gray-400 mt-0.5">{t('risklab.subtitle')}</p>
       </div>
 
-      {/* Tabs */}
-      <div className="flex items-center gap-1 bg-gray-50 dark:bg-gray-800/60 rounded-2xl p-1 border border-gray-100 dark:border-gray-800">
+      {/* Tabs — compact pill token (design.md: page-level tabs are never large py-2 buttons) */}
+      <div className="inline-flex items-center gap-0.5 bg-gray-100 dark:bg-gray-800 rounded-lg p-0.5">
         {TABS.map(tab => (
           <button
             key={tab.id}
             onClick={() => setActiveTab(tab.id)}
-            className={`flex-1 flex flex-col items-center py-2 px-2 rounded-xl transition-all text-center ${
+            title={tab.desc}
+            className={`px-2 py-0.5 rounded-md text-[10px] font-semibold transition-all whitespace-nowrap ${
               activeTab === tab.id
-                ? 'bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-700 shadow-none'
-                : 'hover:bg-white/60 dark:hover:bg-gray-800'
+                ? 'bg-white dark:bg-gray-700 text-gray-900 dark:text-white shadow-sm'
+                : 'text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-300'
             }`}
           >
-            <span className={`text-[11px] font-semibold leading-tight ${activeTab === tab.id ? 'text-gray-800 dark:text-white' : 'text-gray-400'}`}>
-              {tab.label}
-            </span>
-            <span className={`text-[10px] mt-0.5 hidden sm:block ${activeTab === tab.id ? 'text-gray-400' : 'text-gray-300 dark:text-gray-600'}`}>
-              {tab.desc}
-            </span>
+            {tab.label}
           </button>
         ))}
       </div>

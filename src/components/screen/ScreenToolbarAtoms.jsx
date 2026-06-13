@@ -274,7 +274,7 @@ export function ToolbarConfigButton({ label = 'Config', children }) {
 
 // ── ToolbarConfigTitle ─────────────────────────────────────────────────────────
 export function ToolbarConfigTitle({ children }) {
-  return <p className="text-[10px] font-bold uppercase tracking-wide text-gray-400 dark:text-gray-500 mb-2">{children}</p>
+  return <p className="text-[10px] font-semibold uppercase tracking-wide text-gray-400 dark:text-gray-500 mb-2">{children}</p>
 }
 
 // ── ToolbarConfigSection ───────────────────────────────────────────────────────

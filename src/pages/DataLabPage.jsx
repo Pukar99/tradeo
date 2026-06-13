@@ -48,6 +48,7 @@ const TABS = [
       'Search a stock symbol or leave empty for NEPSE only',
       'Set swing threshold — higher = fewer, larger cycles',
       'Click any cycle in the left panel to view its chart',
+      'Use ↑ ↓ arrow keys to move between cycles',
       'Symbol beat NEPSE win rate shown when stock is selected',
     ],
   },
@@ -65,6 +66,7 @@ const TABS = [
     steps: [
       'Pick an index from the left panel (NEPSE, Banking, etc.)',
       'Click any heatmap cell to see that month\'s detail chart',
+      'Click a month name to profile it across all years',
       'Weighted Avg row shows the historically strongest months',
       'Use ← → arrow keys to navigate months in the detail view',
     ],
@@ -269,11 +271,12 @@ function TabContent({ activeTab }) {
 
 // Safe sessionStorage access — incognito / iframe / strict CSP throws SecurityError.
 // Wrap in try/catch so a single denial doesn't crash the whole DataLab tree.
-function safeSessionGet(key, fallback) {
+// Exported: the tab components persist their own controls (index, threshold, symbol).
+export function safeSessionGet(key, fallback) {
   try { return sessionStorage.getItem(key) ?? fallback }
   catch { return fallback }
 }
-function safeSessionSet(key, value) {
+export function safeSessionSet(key, value) {
   try { sessionStorage.setItem(key, value) }
   catch { /* fail silently — feature degrades to no persistence */ }
 }
@@ -296,7 +299,13 @@ export default function DataLabPage() {
     <ToolbarSlotCtx.Provider value={slotRef}>
       <div
         className="flex flex-col overflow-hidden bg-white dark:bg-gray-900"
-        style={{ height: '100dvh', paddingTop: navAutoHide && !navHidden ? 56 : 0 }}
+        style={{
+          height: '100dvh',
+          paddingTop: navAutoHide && !navHidden ? 56 : 0,
+          // Match the navbar's slide (duration-300 ease-in-out) so content
+          // reflows with it instead of jumping 56px in one frame
+          transition: 'padding-top 300ms ease-in-out',
+        }}
       >
 
         {/* ── Tab bar + inline toolbar ──
@@ -352,8 +361,11 @@ export default function DataLabPage() {
           <InfoButton tab={TABS.find(t => t.id === activeTab)} />
         </div>
 
-        {/* ── Content — mouse entering chart area triggers navbar hide ── */}
-        <div className="flex-1 overflow-hidden min-h-0" onMouseEnter={navHidden ? undefined : scheduleHide}>
+        {/* ── Content — mouse entering chart area triggers navbar hide ──
+            MUST be a flex container: Insight/Breakdown roots use `flex-1 min-h-0`,
+            which is inert in a block parent — the page then grows to content
+            height, the ancestor clips it, and every inner scroll panel dies. */}
+        <div className="flex-1 overflow-hidden min-h-0 flex flex-col" onMouseEnter={navHidden ? undefined : scheduleHide}>
           <TabContent activeTab={activeTab} />
         </div>
       </div>

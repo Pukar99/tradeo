@@ -1,24 +1,17 @@
 // === MarketStatusBadge.jsx — live NEPSE market open/closed status badge (NPT timezone) ===
+// Calendar + hours logic lives in utils/nepseCalendar.js (shared with StockChart backfill).
 
-// Shows live NPT market open/closed status
-// NEPSE open: 11:00 AM – 3:00 PM, Sun–Thu (NPT = UTC+5:45)
-
-function getMarketStatus() {
-  const now   = new Date()
-  const npt   = new Date(now.getTime() + (5 * 60 + 45) * 60 * 1000)
-  const day   = npt.getUTCDay()   // 0=Sun,1=Mon,...,5=Fri,6=Sat
-  const hour  = npt.getUTCHours()
-  const min   = npt.getUTCMinutes()
-  const mins  = hour * 60 + min
-
-  const isTradingDay = day !== 5 && day !== 6   // closed Fri + Sat
-  const isOpenTime   = mins >= 11 * 60 && mins < 15 * 60  // 11:00–15:00
-
-  return isTradingDay && isOpenTime
-}
+import { useState, useEffect } from 'react'
+import { isMarketOpenNow } from '../../utils/nepseCalendar'
 
 export default function MarketStatusBadge({ latestDate }) {
-  const isOpen = getMarketStatus()
+  const [isOpen, setIsOpen] = useState(() => isMarketOpenNow())
+
+  // Re-evaluate every minute so the badge flips at open/close without a reload
+  useEffect(() => {
+    const id = setInterval(() => setIsOpen(isMarketOpenNow()), 60_000)
+    return () => clearInterval(id)
+  }, [])
 
   return (
     <div className="flex items-center gap-2 text-[10px] text-gray-400">

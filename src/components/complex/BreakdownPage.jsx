@@ -6,28 +6,15 @@ import {
 } from '../../api'
 import { apiError, isCanceled } from '../../utils/format'
 import { INDEX_OPTIONS } from '../../utils/constants'
-import { useToolbarSlot } from '../../pages/DataLabPage'
+import { useToolbarSlot, safeSessionGet, safeSessionSet } from '../../pages/DataLabPage'
+// Design tokens, scrollbars and Skeleton come from the shared DataLab module
+import { CARD, LABEL, STITLE, SVAL, SCROLL_Y, SCROLL_X, Skeleton } from '../datalab/shared'
 
-// ─────────────────────────────────────────────────────────────────────────────
-// DESIGN TOKENS
-// ─────────────────────────────────────────────────────────────────────────────
-const CARD   = 'bg-white dark:bg-gray-900 rounded-2xl border border-gray-100 dark:border-gray-800'
-const LABEL  = 'text-[10px] font-semibold uppercase tracking-widest text-gray-400'
-const STITLE = 'text-[11px] font-semibold text-gray-700 dark:text-gray-200'
-const SVAL   = 'text-[13px] font-bold tabular-nums'
+// Sector display names arrive as 'Banking Sub-Index' / 'Finance Index' — strip the suffix
+const stripIndexName = (name = '') => name.replace(' Sub-Index', '').replace(' Index', '')
 
-// ─────────────────────────────────────────────────────────────────────────────
-// SKELETON (reserves space — pass minH to avoid layout shift)
-// ─────────────────────────────────────────────────────────────────────────────
-function Skeleton({ minH = 60 }) {
-  return (
-    <div className="space-y-2 px-4 py-4 animate-pulse" style={{ minHeight: minH }}>
-      <div className="h-3 w-full bg-gray-100 dark:bg-gray-800 rounded" />
-      <div className="h-3 w-3/4 bg-gray-100 dark:bg-gray-800 rounded" />
-      <div className="h-3 w-1/2 bg-gray-100 dark:bg-gray-800 rounded" />
-    </div>
-  )
-}
+// Mirror of the backend clamp — tiny thresholds explode the cycle count
+const clampThreshold = t => Math.min(50, Math.max(5, parseFloat(t) || 10))
 
 // ─────────────────────────────────────────────────────────────────────────────
 // COLOUR HELPERS
@@ -263,7 +250,7 @@ function PriceChart({ candles, startDate, endDate, type = 'bear', dark, label = 
               {type === 'bear' ? 'Drop' : 'Run'} day {hover - zoneStart + 1}
             </div>
           )}
-          {hover > zoneEnd && (
+          {type === 'bear' && hover > zoneEnd && (
             <div className="text-[10px] mt-0.5 text-emerald-500">Recovery day {hover - zoneEnd}</div>
           )}
         </div>
@@ -303,33 +290,36 @@ function MiniOverview({ candles, cycles, activeCycle, onCycleClick, dark }) {
     setHover(Math.max(0, Math.min(candles.length - 1, idx)))
   }, [candles, chartW])
 
+  // Band candle-indices are O(cycles × candles) to compute — memoized so hover
+  // re-renders (every mousemove) don't rescan ~7k candles per cycle.
+  const bands = useMemo(() => (cycles || []).map(cyc => {
+    const si = candles.findIndex(c => c.date >= cyc.start_date)
+    const ei = candles.findIndex(c => c.date >= cyc.end_date)
+    return { cyc, si, ei }
+  }).filter(b => b.si >= 0 && b.ei >= 0), [candles, cycles])
+
   const handleClick = useCallback((e) => {
     if (!svgRef.current || !candles?.length) return
     const rect = svgRef.current.getBoundingClientRect()
     const relX = (e.clientX - rect.left) * (VW / rect.width) - PAD.left
     const clamped = Math.max(0, Math.min(candles.length - 1, Math.round(relX / chartW * (candles.length - 1))))
-    const date = candles[clamped]?.date
-    if (!date) return
     // Direct hit
-    let hit = cycles.find(c => date >= c.start_date && date <= c.end_date)
-    if (hit) { onCycleClick(hit); return }
+    const hit = bands.find(b => clamped >= b.si && clamped <= b.ei)
+    if (hit) { onCycleClick(hit.cyc); return }
     // Grace fallback: tiny bands (< ~6px wide) are hard to land on. Pick the
     // nearest cycle whose midpoint is within a 1.5% candle-index radius of the click.
     const grace = Math.max(3, Math.round(candles.length * 0.015))
     let bestDist = Infinity, bestCycle = null
-    for (const c of cycles) {
-      const si = candles.findIndex(x => x.date >= c.start_date)
-      const ei = candles.findIndex(x => x.date >= c.end_date)
-      if (si < 0 || ei < 0) continue
-      const mid = (si + ei) / 2
+    for (const b of bands) {
+      const mid = (b.si + b.ei) / 2
       const dist = Math.abs(clamped - mid)
       if (dist <= grace && dist < bestDist) {
         bestDist = dist
-        bestCycle = c
+        bestCycle = b.cyc
       }
     }
     if (bestCycle) onCycleClick(bestCycle)
-  }, [candles, cycles, chartW, onCycleClick])
+  }, [candles, bands, chartW, onCycleClick])
 
   if (!candles?.length) return <div style={{ height: VH }} />
 
@@ -345,8 +335,7 @@ function MiniOverview({ candles, cycles, activeCycle, onCycleClick, dark }) {
   const linePath = candles.map((c, i) => `${i === 0 ? 'M' : 'L'} ${cx(i)} ${cy(+c.close)}`).join(' ')
 
   // Cursor: pointer when hovering inside a clickable cycle band, default otherwise
-  const hoverDate = hover != null ? candles[hover]?.date : null
-  const inBand = hoverDate ? cycles.some(c => hoverDate >= c.start_date && hoverDate <= c.end_date) : false
+  const inBand = hover != null && bands.some(b => hover >= b.si && hover <= b.ei)
 
   const yTicks = [0, 0.5, 1].map(f => ({ v: minV + f * span, y: cy(minV + f * span) }))
   const xLabels = [0, 0.25, 0.5, 0.75, 1].map(f => Math.round(f * (candles.length - 1)))
@@ -368,10 +357,7 @@ function MiniOverview({ candles, cycles, activeCycle, onCycleClick, dark }) {
           </g>
         ))}
 
-        {cycles.map((cyc, i) => {
-          const si = candles.findIndex(c => c.date >= cyc.start_date)
-          const ei = candles.findIndex(c => c.date >= cyc.end_date)
-          if (si < 0 || ei < 0) return null
+        {bands.map(({ cyc, si, ei }, i) => {
           const isActive = activeCycle?.start_date === cyc.start_date
           const base = cyc.type === 'bull' ? 'rgba(16,185,129,' : 'rgba(239,68,68,'
           const fill = `${base}${isActive ? '0.32' : '0.1'})`
@@ -487,7 +473,7 @@ function SectorCycleMatrix({ cycles, activeCycle, onCycleSelect, dark }) {
     // overscroll-x-contain stops the swipe from chaining to page scroll.
     // Thin styled scrollbar makes horizontal scroll affordance visible without dominating.
     // pb-1 reserves space inside the rounded card so the scrollbar isn't clipped.
-    <div className="overflow-x-auto overscroll-x-contain pb-1 [scrollbar-width:thin] [&::-webkit-scrollbar]:h-1.5 [&::-webkit-scrollbar-track]:bg-transparent [&::-webkit-scrollbar-thumb]:bg-gray-300 dark:[&::-webkit-scrollbar-thumb]:bg-gray-700 [&::-webkit-scrollbar-thumb]:rounded-full">
+    <div className={`overflow-x-auto overscroll-x-contain pb-1 ${SCROLL_X}`}>
       <table className="border-collapse text-[10px]">
         <thead>
           <tr>
@@ -501,8 +487,8 @@ function SectorCycleMatrix({ cycles, activeCycle, onCycleSelect, dark }) {
                 <th
                   key={ci}
                   onClick={() => onCycleSelect?.(c)}
-                  title={`${c.name || (isBull ? '▲' : '▼')} · ${c.start_date} → ${c.end_date} (${c.pct >= 0 ? '+' : ''}${c.pct?.toFixed(1)}%)`}
-                  className={`px-1.5 py-1 text-center text-[10px] font-bold tabular-nums cursor-pointer transition-colors min-w-[52px]
+                  title={`${c.name || (isBull ? '▲' : '▼')} · ${c.start_date} → ${c.end_date} (${c.pct >= 0 ? '+' : ''}${c.pct?.toFixed(1)}%) · click to load`}
+                  className={`px-1.5 py-1 text-center text-[10px] font-bold tabular-nums cursor-pointer transition-colors min-w-[52px] hover:underline decoration-dotted underline-offset-2
                     ${isActive
                       ? isBull
                         ? 'bg-emerald-100 dark:bg-emerald-900/40 text-emerald-700 dark:text-emerald-300'
@@ -523,7 +509,7 @@ function SectorCycleMatrix({ cycles, activeCycle, onCycleSelect, dark }) {
         <tbody>
           {data.sectors.map(s => {
             const total = totalReturn(s.returns)
-            const shortName = s.name.replace(' Sub-Index','').replace(' Index','')
+            const shortName = stripIndexName(s.name)
             const isNepse = s.index_id === 12
             return (
               <tr key={s.index_id} className="border-t border-gray-50 dark:border-gray-900">
@@ -617,7 +603,7 @@ function SectorMatrix({ rows, activeSectorName, onRowClick, cycleType, sortBy, s
               <div className="flex items-center gap-2" style={{ width: 150 }}>
                 <div className="w-1.5 h-1.5 rounded-full shrink-0" style={{ background: barColor }} />
                 <span className={`text-[11px] ${isNepse ? 'font-bold text-gray-900 dark:text-white' : 'font-medium text-gray-800 dark:text-gray-100'} truncate`}>
-                  {isNepse ? 'NEPSE' : s.index_name.replace(' Sub-Index','').replace(' Index','')}
+                  {isNepse ? 'NEPSE' : stripIndexName(s.index_name)}
                 </span>
               </div>
 
@@ -695,9 +681,10 @@ function StockList({ stocks, loading, onSelect, selected }) {
   const [sortBy,  setSortBy]  = useState('drop_pct')
   const [sortAsc, setSortAsc] = useState(true)
 
+  // New column starts descending — same convention as the sector matrix sort
   const toggleSort = col => {
     if (sortBy === col) setSortAsc(a => !a)
-    else { setSortBy(col); setSortAsc(true) }
+    else { setSortBy(col); setSortAsc(false) }
   }
 
   if (loading) return <Skeleton minH={140} />
@@ -805,7 +792,7 @@ function SectorIndexChart({ sector, cycle, dark }) {
   return loading
     ? <Skeleton minH={260} />
     : <PriceChart candles={candles} startDate={cycle.start_date} endDate={cycle.end_date}
-        type={cycle.type} dark={dark} label={sector.index_name.replace(' Sub-Index','').replace(' Index','')} height={260} />
+        type={cycle.type} dark={dark} label={stripIndexName(sector.index_name)} height={260} />
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -826,7 +813,7 @@ function ResilientTile({ sectors }) {
           <div className="flex flex-wrap gap-1.5">
             {recovered.map(s => (
               <span key={s.index_name} className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded bg-emerald-50 dark:bg-emerald-950/30 text-[10px] font-semibold text-emerald-600 dark:text-emerald-400">
-                {s.index_name.replace(' Sub-Index','').replace(' Index','')} · {s.recovery_days}d
+                {stripIndexName(s.index_name)} · {s.recovery_days}d
               </span>
             ))}
           </div>
@@ -838,7 +825,7 @@ function ResilientTile({ sectors }) {
           <div className="flex flex-wrap gap-1.5">
             {hardest.map(s => (
               <span key={s.index_name} className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded bg-red-50 dark:bg-red-950/30 text-[10px] font-semibold text-red-500 dark:text-red-400">
-                {s.index_name.replace(' Sub-Index','').replace(' Index','')} · {s.drop_pct?.toFixed(1)}%
+                {stripIndexName(s.index_name)} · {s.drop_pct?.toFixed(1)}%
               </span>
             ))}
           </div>
@@ -1016,9 +1003,15 @@ const IndexSelector = memo(function IndexSelector({ options, activeId, onSelect 
 export default function BreakdownPage() {
   const { isDark } = useTheme()
 
-  // Core state
-  const [indexId,     setIndexId]     = useState(12)
-  const [threshold,   setThreshold]   = useState(10)
+  // Core state — index + threshold survive refresh via sessionStorage
+  const [indexId,      setIndexId]      = useState(() => {
+    const v = parseInt(safeSessionGet('tradeo_breakdown_index', '12'))
+    return INDEX_OPTIONS.some(o => o.id === v) ? v : 12
+  })
+  const [threshold,    setThreshold]    = useState(() => clampThreshold(safeSessionGet('tradeo_breakdown_threshold', '10')))   // raw input value (string while typing)
+  const [ranThreshold, setRanThreshold] = useState(threshold)   // clamped value of the last Detect run
+  useEffect(() => { safeSessionSet('tradeo_breakdown_index', String(indexId)) }, [indexId])
+  useEffect(() => { safeSessionSet('tradeo_breakdown_threshold', String(ranThreshold)) }, [ranThreshold])
   const [cycles,      setCycles]      = useState([])
   const [allCandles,  setAllCandles]  = useState([])
   const [detecting,   setDetecting]   = useState(false)
@@ -1052,9 +1045,13 @@ export default function BreakdownPage() {
     if (detectCtrlRef.current) detectCtrlRef.current.abort()
     const ctrl = new AbortController()
     detectCtrlRef.current = ctrl
+    // Normalize whatever is in the input (string, empty, out of range) and
+    // reflect the clamped value back so the field shows what actually ran.
+    const t = clampThreshold(thresh)
+    setThreshold(t); setRanThreshold(t)
     setDetecting(true); setDetectError('')
     try {
-      const { data } = await getMarketCycles({ threshold: thresh, index_id: idxId }, { signal: ctrl.signal })
+      const { data } = await getMarketCycles({ threshold: t, index_id: idxId }, { signal: ctrl.signal })
       if (ctrl.signal.aborted) return
       // Inject canonical names: Bull 1, Bear 1, Bull 2... in chronological order.
       // Backend already sorts by start_date ascending.
@@ -1110,8 +1107,10 @@ export default function BreakdownPage() {
     setSelectedStock(null); setStockCandles(null); setStockError('')
     setAnalyzing(true)
     try {
+      // index_id: without it the backend defaults to NEPSE — summary stats then
+      // describe a different index than the cycles when Sensitive/sector is selected.
       const { data } = await runDropAnalysis(
-        { peak_date: cycle.start_date, trough_date: cycle.end_date },
+        { peak_date: cycle.start_date, trough_date: cycle.end_date, index_id: indexId },
         { signal: ctrl.signal }
       )
       if (ctrl.signal.aborted) return
@@ -1121,7 +1120,26 @@ export default function BreakdownPage() {
       setAnalyzeError(apiError(e, 'Failed to run analysis'))
     }
     if (!ctrl.signal.aborted) setAnalyzing(false)
+  }, [indexId])
+
+  // Deselect the active cycle — aborts in-flight work and restores the
+  // aggregate-stats right panel (previously unreachable after first selection).
+  const clearSelection = useCallback(() => {
+    analysisCtrlRef.current?.abort()
+    sectorStocksCtrlRef.current?.abort()
+    stockChartCtrlRef.current?.abort()
+    setActiveCycle(null); setAnalysis(null); setAnalyzeError(''); setAnalyzing(false)
+    setActiveSector(null); setSelectedStock(null); setStockCandles(null); setStockError('')
+    sectorStocksRef.current = {}
+    setSectorStocks({}); setSectorLoading({})
   }, [])
+
+  // Single entry point for cycle clicks (pills, overview bands, matrix columns):
+  // clicking the already-active cycle deselects it.
+  const selectCycle = useCallback((cycle) => {
+    if (activeCycle?.start_date === cycle.start_date) clearSelection()
+    else runAnalysis(cycle)
+  }, [activeCycle, runAnalysis, clearSelection])
 
   // Load sector stocks lazily (Rule 45 — abort last superseded sector fetch)
   const sectorStocksCtrlRef = useRef(null)
@@ -1142,7 +1160,14 @@ export default function BreakdownPage() {
       sectorStocksRef.current[indexName] = stocks
       setSectorStocks(prev => ({ ...prev, [indexName]: stocks }))
     } catch (e) {
-      if (ctrl.signal.aborted || isCanceled(e)) return
+      if (ctrl.signal.aborted || isCanceled(e)) {
+        // An aborted fetch must not poison the dedupe cache: clear the in-flight
+        // marker and the loading flag so a later click on this sector retries
+        // instead of showing a stuck skeleton forever.
+        delete sectorStocksRef.current[indexName]
+        setSectorLoading(prev => ({ ...prev, [indexName]: false }))
+        return
+      }
       sectorStocksRef.current[indexName] = []
       setSectorStocks(prev => ({ ...prev, [indexName]: [] }))
     }
@@ -1239,6 +1264,7 @@ export default function BreakdownPage() {
   ), [cycles, cycleFilter])
 
   const selectedIndexLabel = INDEX_OPTIONS.find(o => o.id === indexId)?.label || 'NEPSE'
+  const thresholdDirty = cycles.length > 0 && clampThreshold(threshold) !== ranThreshold
 
   const cycleCandles = useMemo(() => {
     if (!activeCycle || !allCandles.length) return []
@@ -1259,12 +1285,17 @@ export default function BreakdownPage() {
       <div className="flex items-center gap-1 shrink-0">
         <span className={`${LABEL} normal-case`}>Swing ≥</span>
         <input type="number" value={threshold} min={5} max={50} step={1}
-          onChange={e => setThreshold(parseFloat(e.target.value) || 10)}
+          onChange={e => setThreshold(e.target.value)}
           onKeyDown={e => { if (e.key === 'Enter') detectCycles(threshold, indexId) }}
           className="w-10 text-[10px] font-semibold text-center border border-gray-200 dark:border-gray-700 rounded px-1 py-0.5 dark:bg-gray-900 dark:text-gray-100 focus:outline-none focus:ring-1 focus:ring-gray-400" />
         <span className={`${LABEL} normal-case`}>%</span>
+        {/* Amber = input differs from the threshold the visible cycles were detected with */}
         <button onClick={() => detectCycles(threshold, indexId)} disabled={detecting}
-          className="px-2 py-0.5 rounded text-[10px] font-semibold bg-gray-900 dark:bg-gray-100 text-white dark:text-gray-900 hover:opacity-80 disabled:opacity-40 transition-opacity">
+          title={thresholdDirty ? 'Threshold changed — press Detect to re-run' : undefined}
+          className={`px-2 py-0.5 rounded text-[10px] font-semibold hover:opacity-80 disabled:opacity-40 transition-opacity ${
+            thresholdDirty
+              ? 'bg-amber-500 text-white'
+              : 'bg-gray-900 dark:bg-gray-100 text-white dark:text-gray-900'}`}>
           {detecting ? '…' : 'Detect'}
         </button>
       </div>
@@ -1317,11 +1348,11 @@ export default function BreakdownPage() {
 
           {detecting && <Skeleton minH={120} />}
 
-          <div className="flex-1 min-h-0 overflow-y-auto bg-white dark:bg-gray-950 [scrollbar-width:thin] [&::-webkit-scrollbar]:w-1.5 [&::-webkit-scrollbar-thumb]:bg-gray-300 dark:[&::-webkit-scrollbar-thumb]:bg-gray-700 [&::-webkit-scrollbar-thumb]:rounded-full">
-            {filteredCycles.map((c, i) => (
-              <CyclePill key={i} cycle={c}
+          <div className={`flex-1 min-h-0 overflow-y-auto bg-white dark:bg-gray-950 ${SCROLL_Y}`}>
+            {filteredCycles.map(c => (
+              <CyclePill key={`${c.type}-${c.start_date}`} cycle={c}
                 active={activeCycle?.start_date === c.start_date}
-                onClick={() => runAnalysis(c)} />
+                onClick={() => selectCycle(c)} />
             ))}
             {!detecting && filteredCycles.length === 0 && (
               <div className="flex items-center justify-center py-6 text-[10px] text-gray-400">
@@ -1350,7 +1381,7 @@ export default function BreakdownPage() {
               <div className="h-[160px] flex items-center justify-center text-[11px] text-gray-400">No price data available</div>
             ) : (
               <MiniOverview candles={allCandles} cycles={cycles}
-                activeCycle={activeCycle} onCycleClick={runAnalysis} dark={isDark} />
+                activeCycle={activeCycle} onCycleClick={selectCycle} dark={isDark} />
             )}
           </div>
 
@@ -1420,7 +1451,7 @@ export default function BreakdownPage() {
               {activeSector && activeSector.index_name !== 'NEPSE' && (
                 <div className={`${CARD} overflow-hidden`}>
                   <div className="flex items-center gap-2 px-3 py-1.5 border-b border-gray-100 dark:border-gray-800 bg-gray-50/60 dark:bg-gray-800/30">
-                    <span className={STITLE}>{activeSector.index_name.replace(' Sub-Index','').replace(' Index','')}</span>
+                    <span className={STITLE}>{stripIndexName(activeSector.index_name)}</span>
                     <button onClick={() => handleSectorClick(activeSector)}
                       className="text-gray-300 hover:text-gray-500 text-[14px] leading-none ml-auto">×</button>
                   </div>
@@ -1438,7 +1469,7 @@ export default function BreakdownPage() {
           <div className={`${CARD} overflow-hidden`}>
             <div className="flex items-center px-3 py-1.5 border-b border-gray-100 dark:border-gray-800">
               <span className={STITLE}>Sector × Cycle Returns</span>
-              <span className={`${LABEL} normal-case ml-2 hidden sm:inline`}>compounded % per bull/bear cycle</span>
+              <span className={`${LABEL} normal-case ml-2 hidden sm:inline`}>compounded % per cycle · click a column to load it</span>
               {activeCycle && (
                 <span className={`${LABEL} normal-case ml-auto`}>
                   Active: <span className={activeCycle.type === 'bull' ? 'text-emerald-500' : 'text-red-400'}>
@@ -1450,7 +1481,7 @@ export default function BreakdownPage() {
             <SectorCycleMatrix
               cycles={cycles}
               activeCycle={activeCycle}
-              onCycleSelect={runAnalysis}
+              onCycleSelect={selectCycle}
               dark={isDark}
             />
           </div>
@@ -1459,7 +1490,7 @@ export default function BreakdownPage() {
         {/* ── RIGHT PANEL (≥ md) ── */}
         <div className="hidden md:flex w-[360px] lg:w-[420px] shrink-0 border-l border-gray-100 dark:border-gray-800 flex-col min-h-0 bg-white dark:bg-gray-950">
           {!activeCycle ? (
-            <div className="flex-1 min-h-0 overflow-y-auto bg-white dark:bg-gray-950 p-3 [scrollbar-width:thin] [&::-webkit-scrollbar]:w-1.5 [&::-webkit-scrollbar-thumb]:bg-gray-300 dark:[&::-webkit-scrollbar-thumb]:bg-gray-700 [&::-webkit-scrollbar-thumb]:rounded-full">
+            <div className={`flex-1 min-h-0 overflow-y-auto bg-white dark:bg-gray-950 p-3 ${SCROLL_Y}`}>
               <AggregateStats bearCycles={bearCycles} bullCycles={bullCycles} />
             </div>
           ) : (
@@ -1480,6 +1511,8 @@ export default function BreakdownPage() {
                     ${activeCycle.type === 'bull' ? 'text-emerald-700 dark:text-emerald-300' : 'text-red-700 dark:text-red-300'}`}>
                     {activeCycle.pct >= 0 ? '+' : ''}{activeCycle.pct?.toFixed(1)}%
                   </span>
+                  <button onClick={clearSelection} aria-label="Deselect cycle"
+                    className="shrink-0 w-5 h-5 flex items-center justify-center rounded-full text-gray-400 hover:text-gray-600 dark:hover:text-gray-300 hover:bg-black/5 dark:hover:bg-white/10 text-[13px] leading-none">×</button>
                 </div>
                 <div className="text-[10px] text-gray-500 dark:text-gray-400 font-mono mb-1">
                   {activeCycle.start_date} → {activeCycle.end_date} · {activeCycle.duration_days}d
@@ -1520,7 +1553,7 @@ export default function BreakdownPage() {
                 </div>
               </div>
 
-              <div className="flex-1 min-h-0 overflow-y-auto bg-white dark:bg-gray-950 p-3 space-y-3 [scrollbar-width:thin] [&::-webkit-scrollbar]:w-1.5 [&::-webkit-scrollbar-thumb]:bg-gray-300 dark:[&::-webkit-scrollbar-thumb]:bg-gray-700 [&::-webkit-scrollbar-thumb]:rounded-full">
+              <div className={`flex-1 min-h-0 overflow-y-auto bg-white dark:bg-gray-950 p-3 space-y-3 ${SCROLL_Y}`}>
                 {/* Chart: cycle / sector / stock */}
                 <div className={`${CARD} p-2`}>
                   {selectedStock ? (
@@ -1581,7 +1614,7 @@ export default function BreakdownPage() {
                   <div className={`${CARD} overflow-hidden`}>
                     <div className="flex items-center gap-2 px-3 py-1.5 border-b border-gray-100 dark:border-gray-800 bg-gray-50/60 dark:bg-gray-800/30">
                       <span className={STITLE}>
-                        {activeSector.index_name.replace(' Sub-Index','').replace(' Index','')}
+                        {stripIndexName(activeSector.index_name)}
                       </span>
                       <span className="text-[10px] text-gray-400 ml-auto">click to chart</span>
                       <button onClick={() => handleSectorClick(activeSector)}
@@ -1639,10 +1672,10 @@ export default function BreakdownPage() {
               ))}
             </div>
             <div className="flex-1 overflow-y-auto min-h-0 bg-white dark:bg-gray-900">
-              {filteredCycles.map((c, i) => (
-                <CyclePill key={i} cycle={c}
+              {filteredCycles.map(c => (
+                <CyclePill key={`${c.type}-${c.start_date}`} cycle={c}
                   active={activeCycle?.start_date === c.start_date}
-                  onClick={() => { runAnalysis(c); setMobileCycles(false) }} />
+                  onClick={() => { selectCycle(c); setMobileCycles(false) }} />
               ))}
             </div>
           </div>

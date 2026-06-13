@@ -44,6 +44,12 @@ export function nepseCharges(amount) {
 
 // Capital Gains Tax on net gain after all transaction charges
 // Rates: 7.5% if held < 365 days, 5% if held >= 365 days
+// nepseCGTByTerm is the single source of the rates — date-based nepseCGT delegates to it.
+export function nepseCGTByTerm(netGain, isLongTerm) {
+  if (!netGain || netGain <= 0) return 0
+  return netGain * (isLongTerm ? 0.05 : 0.075)
+}
+
 export function nepseCGT(netGain, entryDateStr, exitDateStr) {
   if (!netGain || netGain <= 0) return 0
 
@@ -54,7 +60,7 @@ export function nepseCGT(netGain, entryDateStr, exitDateStr) {
   if (isNaN(entry.getTime()) || isNaN(exit.getTime())) return 0
 
   const days = Math.max(0, Math.floor((exit - entry) / 86400000))
-  return netGain * (days >= 365 ? 0.05 : 0.075)
+  return nepseCGTByTerm(netGain, days >= 365)
 }
 
 

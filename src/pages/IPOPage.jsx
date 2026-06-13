@@ -174,7 +174,7 @@ function AddAccountModal({ dpList, onClose, onAdded }) {
         bank_id: bankId, bank_name: bankName, bank_account_id: bankAccountId,
         account_branch_id: accountBranchId, account_number: accountNumber,
         account_type_id: accountTypeId, crn_number: crnNumber,
-        default_kitta: kitta,
+        default_kitta: parseInt(kitta) || 10,
         auto_apply: savePin,
         transaction_pin: savePin ? pin.trim() : undefined,
       })
@@ -216,6 +216,11 @@ function AddAccountModal({ dpList, onClose, onAdded }) {
                   <option value="">Select your broker / DP…</option>
                   {dpList.map(dp => <option key={dp.id} value={dp.id}>{dp.name}</option>)}
                 </select>
+                {dpList.length === 0 && (
+                  <p className="text-[10px] text-amber-600 dark:text-amber-400 mt-1">
+                    Broker list failed to load — check your connection, then close and reopen this dialog.
+                  </p>
+                )}
               </div>
               <div><FieldLabel>Meroshare Username</FieldLabel>
                 <input type="text" placeholder="Your Meroshare username" value={username} onChange={e => setUsername(e.target.value)} autoComplete="off" className={inputCls} />
@@ -278,7 +283,7 @@ function AddAccountModal({ dpList, onClose, onAdded }) {
                   <input type="text" placeholder="From passbook" value={crnNumber} onChange={e => setCrnNumber(e.target.value)} className={inputCls} />
                 </div>
                 <div><FieldLabel>Default Kitta</FieldLabel>
-                  <input type="number" min={10} step={10} value={kitta} onChange={e => setKitta(parseInt(e.target.value) || 10)} className={inputCls} />
+                  <input type="number" min={10} step={10} value={kitta} onChange={e => setKitta(e.target.value)} onBlur={() => setKitta(parseInt(kitta) || 10)} className={inputCls} />
                 </div>
               </div>
 
@@ -373,7 +378,7 @@ function EditAccountModal({ account, dpList, onClose, onUpdated }) {
     try {
       const payload = {
         label: label.trim(), dp_id: dpId, username: username.trim(),
-        crn_number: crnNumber, default_kitta: kitta,
+        crn_number: crnNumber, default_kitta: parseInt(kitta) || 10,
         auto_apply: savePin,
         transaction_pin: savePin && pin.trim() ? pin.trim() : undefined,
       }
@@ -484,7 +489,7 @@ function EditAccountModal({ account, dpList, onClose, onUpdated }) {
                   <input type="text" placeholder="From passbook" value={crnNumber} onChange={e => setCrnNumber(e.target.value)} className={inputCls} />
                 </div>
                 <div><FieldLabel>Default Kitta</FieldLabel>
-                  <input type="number" min={10} step={10} value={kitta} onChange={e => setKitta(parseInt(e.target.value) || 10)} className={inputCls} />
+                  <input type="number" min={10} step={10} value={kitta} onChange={e => setKitta(e.target.value)} onBlur={() => setKitta(parseInt(kitta) || 10)} className={inputCls} />
                 </div>
               </div>
 
@@ -544,7 +549,16 @@ function ApplyModal({ ipo, accounts, activeAccountId, onClose, onApplied }) {
   const hasBank         = !!(selectedAccount?.bank_id && selectedAccount?.account_number)
   const hasSavedPin     = !!selectedAccount?.auto_apply   // auto_apply = saved PIN present
   const alreadyApplied  = isApplied(ipo)
-  const amount          = sharePrice && kitta ? sharePrice * kitta : null
+
+  // Snap to min/max/multiple — applied on blur and at submit, never per keystroke
+  // (snapping onChange rewrote "1" of "150" to 10 mid-typing)
+  const snapKitta = (v) => {
+    const n = parseInt(v) || minKitta
+    const s = Math.round(n / multipleOf) * multipleOf
+    return Math.max(minKitta, maxKitta ? Math.min(s, maxKitta) : s)
+  }
+  const kittaNum = parseInt(kitta) || 0
+  const amount   = sharePrice && kittaNum ? sharePrice * kittaNum : null
   // 1-click: PIN saved and declaration accepted, no PIN input needed
   const canSubmit       = hasBank && declared && (hasSavedPin || pin.trim())
 
@@ -582,7 +596,7 @@ function ApplyModal({ ipo, accounts, activeAccountId, onClose, onApplied }) {
     setApplying(true); setError(null)
     try {
       const res = await applyMeroshareIPO({
-        account_id: accountId, company_share_id: ipo.companyShareId, applied_kitta: kitta,
+        account_id: accountId, company_share_id: ipo.companyShareId, applied_kitta: snapKitta(kitta),
         crn_number: crnNumber.trim(),
         // Only send pin if user typed one — backend uses stored PIN when omitted
         ...(pin.trim() ? { transaction_pin: pin.trim() } : {}),
@@ -668,11 +682,8 @@ function ApplyModal({ ipo, accounts, activeAccountId, onClose, onApplied }) {
             <div className="grid grid-cols-2 gap-3">
               <div><FieldLabel>Kitta</FieldLabel>
                 <input type="number" min={minKitta} max={maxKitta || undefined} step={multipleOf} value={kitta}
-                  onChange={e => {
-                    const v = parseInt(e.target.value) || minKitta
-                    const snapped = Math.round(v / multipleOf) * multipleOf
-                    setKitta(Math.max(minKitta, maxKitta ? Math.min(snapped, maxKitta) : snapped))
-                  }}
+                  onChange={e => setKitta(e.target.value)}
+                  onBlur={() => setKitta(snapKitta(kitta))}
                   className={inputCls + ' text-[14px] font-bold font-mono'} />
               </div>
               <div><FieldLabel>Amount (Rs.)</FieldLabel>
@@ -748,7 +759,7 @@ function BulkApplyModal({ ipo, accounts, inFlightRef, onClose, onApplied }) {
     if (inFlightRef) inFlightRef.current = true
     setApplying(true); setError(null)
     try {
-      const res = await applyMeroshareIPOBulk({ company_share_id: ipo.companyShareId, applied_kitta: kitta, transaction_pins: pins })
+      const res = await applyMeroshareIPOBulk({ company_share_id: ipo.companyShareId, applied_kitta: parseInt(kitta) || 10, transaction_pins: pins })
       const bulkResults = res.data.results || []
       setResults(bulkResults)
       // Pass only account IDs that actually succeeded — not all accounts
@@ -798,7 +809,7 @@ function BulkApplyModal({ ipo, accounts, inFlightRef, onClose, onApplied }) {
           <div className="overflow-y-auto flex-1 p-5 space-y-4">
             <div>
               <FieldLabel>Kitta per Account</FieldLabel>
-              <input type="number" min={10} step={10} value={kitta} onChange={e => setKitta(parseInt(e.target.value) || 10)} className={inputCls + ' text-[14px] font-bold font-mono'} />
+              <input type="number" min={10} step={10} value={kitta} onChange={e => setKitta(e.target.value)} onBlur={() => setKitta(parseInt(kitta) || 10)} className={inputCls + ' text-[14px] font-bold font-mono'} />
               <p className="text-[10px] text-gray-400 mt-1">Applied to all accounts. Default is the lowest among your accounts ({defaultKitta}).</p>
             </div>
 
@@ -852,17 +863,6 @@ function BulkApplyModal({ ipo, accounts, inFlightRef, onClose, onApplied }) {
           </div>
         )}
       </div>
-    </div>
-  )
-}
-
-// ── Stat Tile ─────────────────────────────────────────────────────────────────
-function StatTile({ label, value, accent }) {
-  const borders = { blue: 'border-l-blue-500', emerald: 'border-l-emerald-500', purple: 'border-l-purple-500' }
-  return (
-    <div className={`bg-white dark:bg-gray-900 rounded-xl border border-gray-100 dark:border-gray-800 border-l-2 ${borders[accent]} px-4 py-3 flex-1 min-w-0`}>
-      <p className="text-[10px] font-semibold text-gray-400 uppercase tracking-widest">{label}</p>
-      <p className="text-[18px] font-bold text-gray-900 dark:text-white font-mono mt-0.5 tabular-nums">{value}</p>
     </div>
   )
 }
@@ -1276,10 +1276,6 @@ function IPOPage({ isActive = true }) {
   const filteredIpos   = showAllTypes ? ipos : ipos.filter(isOrdinaryShare)
   const hiddenCount    = ipos.length - filteredIpos.length
 
-  // Stats
-  const appliedCount  = filteredIpos.filter(ipo => appliedMap[ipo.companyShareId]?.has(selectedAcc)).length
-  const holdingsCount = portfolio.length
-
   // Sorted portfolio
   const cycleSort = (col) => {
     if (sortCol !== col) { setSortCol(col); setSortDir('desc') }
@@ -1453,13 +1449,15 @@ function IPOPage({ isActive = true }) {
           )}
 
             {/* ── Open IPOs ── */}
-            {!loading && activeTab === 'ipos' && (
-              filteredIpos.length === 0 ? (
+            {!loading && activeTab === 'ipos' && (<>
+              {filteredIpos.length === 0 ? (
                 <div className="bg-white dark:bg-gray-900 rounded-2xl border border-gray-100 dark:border-gray-800 p-10 text-center">
                   <svg className="w-10 h-10 text-gray-200 dark:text-gray-700 mx-auto mb-3" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
                   </svg>
-                  <p className="text-[13px] font-semibold text-gray-400">No open IPOs at the moment</p>
+                  <p className="text-[13px] font-semibold text-gray-400">
+                    {hiddenCount > 0 ? 'No ordinary-share IPOs open right now' : 'No open IPOs at the moment'}
+                  </p>
                 </div>
               ) : (
                 <div className="space-y-3">
@@ -1586,8 +1584,21 @@ function IPOPage({ isActive = true }) {
                     )
                   })}
                 </div>
-              )
-            )}
+              )}
+
+              {/* Toggle for non-ordinary issues (mutual funds, debentures, rights)
+                  — without this the heuristic filter hides them with no escape hatch */}
+              {(hiddenCount > 0 || showAllTypes) && (
+                <button
+                  onClick={() => setShowAllTypes(v => !v)}
+                  className="w-full py-2 rounded-xl border border-dashed border-gray-200 dark:border-gray-700 text-[10px] font-semibold text-gray-400 hover:text-gray-600 dark:hover:text-gray-300 hover:border-gray-300 dark:hover:border-gray-600 transition-colors"
+                >
+                  {showAllTypes
+                    ? 'Hide mutual funds, debentures & other issue types'
+                    : `Show ${hiddenCount} hidden issue${hiddenCount !== 1 ? 's' : ''} (mutual funds, debentures, rights…)`}
+                </button>
+              )}
+            </>)}
 
             {/* ── Results ── */}
             {!loading && activeTab === 'results' && (
@@ -1776,9 +1787,10 @@ function IPOPage({ isActive = true }) {
           onClose={() => setApplyIPO(null)}
           onApplied={(csid, accId) => {
             handleApplied(csid, accId)
-            // Force fresh IPO fetch so Meroshare confirms the applied state
+            // Force fresh IPO fetch so Meroshare confirms the applied state.
+            // Do NOT close the modal here — it shows the result screen;
+            // the user dismisses it with Done (onClose).
             if (selectedAcc) loadData(selectedAcc, 'ipos', true)
-            setApplyIPO(null)
           }} />
       )}
       {bulkApplyIPO && (
@@ -1787,9 +1799,10 @@ function IPOPage({ isActive = true }) {
           onClose={() => setBulkApplyIPO(null)}
           onApplied={(csid, succeededIds) => {
             handleApplied(csid, succeededIds)
-            // Force fresh IPO fetch so applied state reflects Meroshare truth
+            // Force fresh IPO fetch so applied state reflects Meroshare truth.
+            // Keep the modal open — its per-account results screen is the only
+            // place bulk failures are reported; Done (onClose) dismisses it.
             if (selectedAcc) loadData(selectedAcc, 'ipos', true)
-            setBulkApplyIPO(null)
           }} />
       )}
     </div>

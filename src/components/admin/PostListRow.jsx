@@ -46,14 +46,21 @@ export default function PostListRow({ post: initialPost, onRefresh }) {
     <div>
       {/* Main row */}
       <div className="flex items-center gap-3 px-4 py-3 hover:bg-gray-50 dark:hover:bg-gray-800/50 transition-colors">
-        {/* Title + author */}
+        {/* Title + author (+ pinned badge — inline so columns stay aligned) */}
         <div className="flex-1 min-w-0">
           <p className="text-sm font-semibold text-gray-900 dark:text-white truncate">{post.title}</p>
-          <p className="text-xs text-gray-500 dark:text-gray-400 truncate">{post.author_name}</p>
+          <div className="flex items-center gap-1.5 min-w-0">
+            <p className="text-xs text-gray-500 dark:text-gray-400 truncate">{post.author_name}</p>
+            {post.is_pinned && (
+              <span className="flex-shrink-0 px-1.5 py-0.5 text-[10px] font-semibold rounded-full bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-400">
+                Pinned
+              </span>
+            )}
+          </div>
         </div>
 
         {/* Status badge */}
-        <div className="hidden sm:block flex-shrink-0">
+        <div className="hidden sm:block w-20 flex-shrink-0">
           <span className={`px-2 py-0.5 text-[10px] font-semibold rounded-full ${
             post.status === 'published'
               ? 'bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400'
@@ -62,15 +69,6 @@ export default function PostListRow({ post: initialPost, onRefresh }) {
             {post.status}
           </span>
         </div>
-
-        {/* Pinned badge */}
-        {post.is_pinned && (
-          <div className="hidden sm:block flex-shrink-0">
-            <span className="px-2 py-0.5 text-[10px] font-semibold rounded-full bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-400">
-              Pinned
-            </span>
-          </div>
-        )}
 
         {/* Comment count */}
         <div className="hidden md:flex items-center gap-1 w-16 flex-shrink-0">

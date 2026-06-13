@@ -26,6 +26,58 @@ const TradeoLogo = ({ size = 22 }) => (
   </svg>
 )
 
+// ── Lightweight markdown for assistant replies ───────────────────────────────
+// Groq replies use **bold**, `code`, bullets and numbered lists. Rendered as
+// React elements (never innerHTML) so model output can't inject markup.
+function renderInline(text) {
+  const parts = text.split(/(\*\*[^*]+\*\*|`[^`]+`)/g)
+  return parts.map((p, i) => {
+    if (p.startsWith('**') && p.endsWith('**'))
+      return <strong key={i} className="font-semibold">{p.slice(2, -2)}</strong>
+    if (p.startsWith('`') && p.endsWith('`'))
+      return <code key={i} className="px-1 rounded bg-black/5 dark:bg-white/10 font-mono text-[10px]">{p.slice(1, -1)}</code>
+    return p
+  })
+}
+
+function MarkdownLite({ text }) {
+  if (!text) return null
+  const blocks = []
+  let list = null // { ordered, items }
+  const flush = () => { if (list) { blocks.push(list); list = null } }
+  text.split('\n').forEach(line => {
+    const bullet  = line.match(/^\s*[-*•]\s+(.*)/)
+    const ordered = line.match(/^\s*\d+[.)]\s+(.*)/)
+    const heading = line.match(/^#{1,4}\s+(.*)/)
+    if (bullet) {
+      if (!list || list.ordered) { flush(); list = { ordered: false, items: [] } }
+      list.items.push(bullet[1])
+    } else if (ordered) {
+      if (!list || !list.ordered) { flush(); list = { ordered: true, items: [] } }
+      list.items.push(ordered[1])
+    } else {
+      flush()
+      if (heading) blocks.push({ heading: heading[1] })
+      else if (line.trim() !== '') blocks.push(line)
+    }
+  })
+  flush()
+  return (
+    <div className="space-y-1.5">
+      {blocks.map((b, i) => {
+        if (typeof b === 'string') return <p key={i} className="whitespace-pre-wrap">{renderInline(b)}</p>
+        if (b.heading) return <p key={i} className="font-semibold">{renderInline(b.heading)}</p>
+        const Tag = b.ordered ? 'ol' : 'ul'
+        return (
+          <Tag key={i} className={`${b.ordered ? 'list-decimal' : 'list-disc'} pl-4 space-y-0.5`}>
+            {b.items.map((it, j) => <li key={j}>{renderInline(it)}</li>)}
+          </Tag>
+        )
+      })}
+    </div>
+  )
+}
+
 // ── Action card metadata ─────────────────────────────────────────────────────
 const ACTION_META = {
   ADD_TRADE:          { icon: '📒', label: 'Trade Logged',            color: 'border-green-400 bg-green-50 dark:bg-green-900/30' },
@@ -380,6 +432,151 @@ function ShowJournalCard({ result }) {
               )}
             </div>
           ))}
+        </div>
+      )}
+    </div>
+  )
+}
+
+// ── Trade plan card — TRADE_PLAN returns a full technical plan ────────────────
+function PlanStat({ label, value, accent }) {
+  return (
+    <div className="bg-white dark:bg-gray-900 rounded-lg px-2 py-1.5">
+      <p className="text-[10px] text-gray-400">{label}</p>
+      <p className={`text-[11px] font-semibold ${accent || 'text-gray-800 dark:text-white'}`} translate="no">{value}</p>
+    </div>
+  )
+}
+
+function TradePlanCard({ plan }) {
+  if (!plan) return null
+  const trendCls = plan.trend === 'UPTREND'
+    ? 'bg-green-100 dark:bg-green-900/40 text-green-600 dark:text-green-400'
+    : plan.trend === 'DOWNTREND'
+      ? 'bg-red-100 dark:bg-red-900/40 text-red-500'
+      : 'bg-yellow-100 dark:bg-yellow-900/40 text-yellow-600 dark:text-yellow-400'
+  return (
+    <div className="border-l-2 border-blue-400 bg-blue-50 dark:bg-blue-900/20 rounded-xl px-3 py-2 mb-1.5 w-full">
+      <div className="flex items-center justify-between mb-2">
+        <div className="flex items-center gap-1.5">
+          <span className="text-sm">📐</span>
+          <span className="text-[11px] font-semibold text-gray-700 dark:text-gray-200" translate="no">
+            Trade Plan — {plan.symbol} · Rs.{plan.ltp?.toLocaleString()}
+          </span>
+        </div>
+        <span className={`text-[10px] font-semibold px-1.5 py-0.5 rounded-full ${trendCls}`}>{plan.trend}</span>
+      </div>
+
+      <div className="grid grid-cols-4 gap-1 mb-1.5">
+        <PlanStat label="RSI" value={plan.rsi} accent={plan.rsi >= 70 ? 'text-red-400' : plan.rsi <= 30 ? 'text-green-500' : undefined} />
+        <PlanStat label="ATR" value={plan.atr} />
+        <PlanStat label="EMA20" value={plan.ema20} />
+        <PlanStat label="EMA50" value={plan.ema50} />
+      </div>
+      <div className="grid grid-cols-2 gap-1 mb-1.5">
+        <PlanStat label="Support" value={`Rs.${plan.nearest_support?.toLocaleString()}`} accent="text-green-500" />
+        <PlanStat label="Resistance" value={`Rs.${plan.nearest_resistance?.toLocaleString()}`} accent="text-red-400" />
+      </div>
+
+      <div className="bg-white dark:bg-gray-900 rounded-lg px-2.5 py-2 mb-1.5 border border-blue-100 dark:border-blue-900/50">
+        <p className="text-[10px] font-semibold uppercase tracking-widest text-gray-400 dark:text-gray-500 mb-1">Suggested Setup</p>
+        <div className="space-y-0.5 text-[10px]" translate="no">
+          <div className="flex justify-between"><span className="text-gray-400">Entry</span><span className="font-semibold text-gray-800 dark:text-white">Rs.{plan.suggested_entry?.toLocaleString()}</span></div>
+          <div className="flex justify-between"><span className="text-gray-400">Stop Loss</span><span className="font-semibold text-red-500">Rs.{plan.suggested_sl?.toLocaleString()}</span></div>
+          <div className="flex justify-between"><span className="text-gray-400">Target 1</span><span className="font-semibold text-green-500">Rs.{plan.suggested_tp1?.toLocaleString()}</span></div>
+          <div className="flex justify-between"><span className="text-gray-400">Target 2</span><span className="font-semibold text-green-500">Rs.{plan.suggested_tp2?.toLocaleString()}</span></div>
+          <div className="flex justify-between border-t border-gray-100 dark:border-gray-800 pt-0.5 mt-0.5">
+            <span className="text-gray-400">R:R Ratio</span>
+            <span className={`font-semibold ${plan.rr_ratio >= 2 ? 'text-green-500' : plan.rr_ratio >= 1.5 ? 'text-yellow-500' : 'text-red-500'}`}>{plan.rr_ratio}:1</span>
+          </div>
+        </div>
+      </div>
+
+      {plan.ai_analysis && (
+        <div className="text-[10px] text-gray-600 dark:text-gray-300 leading-relaxed">
+          <MarkdownLite text={plan.ai_analysis} />
+        </div>
+      )}
+      <p className="text-[10px] text-gray-400 dark:text-gray-500 italic mt-1.5">Algorithmic suggestion — not financial advice.</p>
+    </div>
+  )
+}
+
+// ── Risk summary card — SHOW_RISK_SUMMARY: capital at risk across positions ───
+function RiskSummaryCard({ result }) {
+  if (!result?.positions) return null
+  const { positions, totalInvested, totalRisk, totalUnrealized, noSlCount } = result
+  return (
+    <div className="border-l-2 border-orange-400 bg-orange-50 dark:bg-orange-900/20 rounded-xl px-3 py-2 mb-1.5 w-full">
+      <div className="flex items-center gap-1.5 mb-2">
+        <span className="text-sm">⚠️</span>
+        <span className="text-[11px] font-semibold text-gray-700 dark:text-gray-200">Risk Summary ({positions.length} open)</span>
+      </div>
+      <div className="grid grid-cols-3 gap-1 mb-2">
+        <PlanStat label="Invested" value={`Rs.${Math.round(totalInvested).toLocaleString()}`} />
+        <PlanStat label="At Risk" value={`Rs.${Math.round(totalRisk).toLocaleString()}`} accent="text-red-500" />
+        <PlanStat label="Unrealized" value={`${totalUnrealized >= 0 ? '+' : ''}Rs.${Math.round(totalUnrealized).toLocaleString()}`} accent={totalUnrealized >= 0 ? 'text-green-500' : 'text-red-400'} />
+      </div>
+      {positions.length > 0 && (
+        <div className="space-y-1 mb-1.5">
+          {positions.map((p, i) => (
+            <div key={i} className="flex items-center justify-between bg-white dark:bg-gray-900 rounded-lg px-2 py-1.5 border border-gray-100 dark:border-gray-800 text-[10px]">
+              <div className="flex items-center gap-1.5">
+                <span className="font-semibold text-gray-800 dark:text-white" translate="no">{p.symbol}</span>
+                <span className="text-gray-400" translate="no">{p.qty}@{p.entry}</span>
+              </div>
+              {p.riskAmount != null ? (
+                <span className="font-semibold text-red-400" translate="no">−Rs.{Math.round(p.riskAmount).toLocaleString()} max</span>
+              ) : (
+                <span className="font-semibold px-1.5 py-0.5 rounded-full bg-red-100 dark:bg-red-900/40 text-red-500">no SL</span>
+              )}
+            </div>
+          ))}
+        </div>
+      )}
+      {noSlCount > 0 && (
+        <p className="text-[10px] text-red-500 font-medium">
+          {noSlCount} position{noSlCount > 1 ? 's' : ''} without a stop loss — capital fully exposed.
+        </p>
+      )}
+    </div>
+  )
+}
+
+// ── Weekly summary card — WEEKLY_SUMMARY: this week's performance ─────────────
+function WeeklySummaryCard({ result }) {
+  if (!result) return null
+  const { totalPnl, wins, losses, winRate, tradesOpened, tradesClosed, bestTrade, worstTrade, avgDiscipline } = result
+  return (
+    <div className="border-l-2 border-indigo-400 bg-indigo-50 dark:bg-indigo-900/20 rounded-xl px-3 py-2 mb-1.5 w-full">
+      <div className="flex items-center gap-1.5 mb-2">
+        <span className="text-sm">📅</span>
+        <span className="text-[11px] font-semibold text-gray-700 dark:text-gray-200">This Week's Performance</span>
+      </div>
+      <div className="grid grid-cols-3 gap-1 mb-2">
+        <PlanStat label="Net P&L" value={`${totalPnl >= 0 ? '+' : ''}Rs.${Math.round(totalPnl).toLocaleString()}`} accent={totalPnl >= 0 ? 'text-green-500' : 'text-red-400'} />
+        <PlanStat label="Win Rate" value={`${winRate}%`} accent={winRate >= 50 ? 'text-green-500' : 'text-red-400'} />
+        <PlanStat label="W / L" value={`${wins} / ${losses}`} />
+      </div>
+      <div className="space-y-0.5 text-[10px] mb-1.5" translate="no">
+        <div className="flex justify-between"><span className="text-gray-400">Opened / Closed</span><span className="text-gray-600 dark:text-gray-300">{tradesOpened} / {tradesClosed}</span></div>
+        {bestTrade && (
+          <div className="flex justify-between"><span className="text-gray-400">Best</span><span className="text-green-500 font-semibold">{bestTrade.symbol} +Rs.{bestTrade.pnl.toLocaleString()}</span></div>
+        )}
+        {worstTrade && worstTrade.pnl < 0 && (
+          <div className="flex justify-between"><span className="text-gray-400">Worst</span><span className="text-red-400 font-semibold">{worstTrade.symbol} −Rs.{Math.abs(worstTrade.pnl).toLocaleString()}</span></div>
+        )}
+      </div>
+      {avgDiscipline !== null && (
+        <div className="flex items-center gap-2">
+          <span className="text-[10px] text-gray-500 dark:text-gray-400">Discipline avg:</span>
+          <div className="flex-1 h-1.5 bg-gray-200 dark:bg-gray-700 rounded-full overflow-hidden">
+            <div
+              className={`h-full rounded-full ${avgDiscipline >= 70 ? 'bg-green-400' : avgDiscipline >= 40 ? 'bg-yellow-400' : 'bg-red-400'}`}
+              style={{ width: `${avgDiscipline}%` }}
+            />
+          </div>
+          <span className="text-[10px] font-semibold text-gray-600 dark:text-gray-300">{avgDiscipline}%</span>
         </div>
       )}
     </div>
@@ -789,14 +986,70 @@ const QUICK_CHIPS = [
 
 const PRESET_PROMPTS = [
   { icon: '📊', text: 'Show my open positions' },
-  { icon: '📈', text: "What's my win rate this month?" },
+  { icon: '📐', text: 'Trade plan for NABIL' },
+  { icon: '⚠️', text: 'Show my risk summary' },
+  { icon: '📅', text: 'How did I do this week?' },
   { icon: '🔥', text: 'Top gainers today on NEPSE' },
-  { icon: '⚠️', text: 'Any risk alerts on my trades?' },
   { icon: '🎯', text: 'Suggest SL for my open trades' },
-  { icon: '💼', text: 'Portfolio summary' },
   { icon: '🧮', text: 'Calculate broker fee for buying 100 kittas at Rs.500' },
   { icon: '📝', text: 'Draft a journal for my latest trade' },
 ]
+
+// ── Slash commands — type "/" in the input for the full capability list ───────
+// type: 'form'   → opens the matching QuickForm
+//       'send'   → sends a preset message to the agent immediately
+//       'insert' → inserts a stub into the input for the user to finish
+//       'new'    → clears the conversation
+const SLASH_COMMANDS = [
+  { cmd: 'buy',     icon: '📈', desc: 'Log a buy trade',             type: 'form',   arg: 'buy' },
+  { cmd: 'sell',    icon: '📉', desc: 'Close / sell a trade',        type: 'form',   arg: 'sell' },
+  { cmd: 'watch',   icon: '👁️', desc: 'Add a stock to watchlist',    type: 'form',   arg: 'watchlist' },
+  { cmd: 'sltp',    icon: '🎯', desc: 'Update stop loss / target',   type: 'form',   arg: 'sltp' },
+  { cmd: 'fee',     icon: '🧮', desc: 'NEPSE broker fee calculator', type: 'form',   arg: 'fee' },
+  { cmd: 'plan',    icon: '📐', desc: 'AI trade plan for a stock',   type: 'insert', arg: 'Trade plan for ' },
+  { cmd: 'price',   icon: '💹', desc: 'Live price of a stock',       type: 'insert', arg: 'Price of ' },
+  { cmd: 'brief',   icon: '☀️', desc: 'Morning trading brief',       type: 'send',   arg: 'Morning brief — show my trading summary for today' },
+  { cmd: 'risk',    icon: '⚠️', desc: 'Capital-at-risk summary',     type: 'send',   arg: 'Show my risk summary' },
+  { cmd: 'week',    icon: '📅', desc: "This week's performance",     type: 'send',   arg: 'How did I do this week?' },
+  { cmd: 'trades',  icon: '📋', desc: 'Show open trades',            type: 'send',   arg: 'Show my open trades' },
+  { cmd: 'goals',   icon: '🏆', desc: 'Show goals',                  type: 'send',   arg: 'Show my goals' },
+  { cmd: 'journal', icon: '📝', desc: 'Show journal entries',        type: 'send',   arg: 'Show my journal' },
+  { cmd: 'undo',    icon: '↩️', desc: 'Undo last action',            type: 'send',   arg: 'Undo my last action' },
+  { cmd: 'new',     icon: '🧹', desc: 'Start a new chat',            type: 'new' },
+]
+
+// ── Contextual follow-ups — suggested next steps after an action completes ────
+// Keyed by actionType; each returns [{ label, text }] sent as a normal message.
+const FOLLOW_UPS = {
+  ADD_TRADE: r => [
+    r.trade?.symbol && { label: '✏️ Draft journal', text: `Draft a journal for ${r.trade.symbol}` },
+    { label: '⚠️ Risk summary', text: 'Show my risk summary' },
+  ],
+  CLOSE_TRADE: r => [
+    r.trade?.symbol && { label: '✏️ Draft journal', text: `Draft a journal for ${r.trade.symbol}` },
+    { label: '📅 Week so far', text: 'How did I do this week?' },
+  ],
+  STOCK_PRICE: r => [
+    r.symbol && { label: '📐 Trade plan', text: `Trade plan for ${r.symbol}` },
+    r.symbol && { label: '👁️ Watch', text: `Add ${r.symbol} to watchlist` },
+  ],
+  TRADE_PLAN: r => [
+    r.plan?.symbol && { label: '👁️ Add to watchlist', text: `Add ${r.plan.symbol} to watchlist with price alert Rs.${r.plan.suggested_entry}` },
+  ],
+  SHOW_TRADES: () => [
+    { label: '⚠️ Risk summary', text: 'Show my risk summary' },
+  ],
+  SHOW_RISK_SUMMARY: r => [
+    r.noSlCount > 0 && { label: '🎯 Fix missing SLs', text: 'Suggest SL for my open trades' },
+    { label: '📋 Open trades', text: 'Show my open trades' },
+  ],
+  WEEKLY_SUMMARY: () => [
+    { label: '📋 Show trades', text: 'Show my trades' },
+  ],
+  MORNING_BRIEF: () => [
+    { label: '⚠️ Risk summary', text: 'Show my risk summary' },
+  ],
+}
 
 // ── Main AIChat component ────────────────────────────────────────────────────
 function AIChat({ isFullPage = false, onClose }) {
@@ -824,6 +1077,17 @@ function AIChat({ isFullPage = false, onClose }) {
   // Inline special cards waiting for user action
   const [journalDraft, setJournalDraft] = useState(null)   // { symbol, trade, ltp, pnl, suggestedContent }
   const [disciplineNudge, setDisciplineNudge] = useState(null) // score number
+
+  // Copy-to-clipboard feedback — which message id shows the "copied" check
+  const [copiedId, setCopiedId] = useState(null)
+  const copiedTimerRef = useRef(null)
+
+  // Smart auto-scroll: only follow new messages when the user is already near
+  // the bottom. Ref mirrors state so the scroll effect reads it without
+  // re-subscribing; guard in setAtBottom avoids re-render per scroll event.
+  const [atBottom, setAtBottom] = useState(true)
+  const atBottomRef = useRef(true)
+  const scrollBoxRef = useRef(null)
 
   // ── Chat session persistence ─────────────────────────────────────────────────
   const [currentSessionId, setCurrentSessionId] = useState(null)
@@ -935,8 +1199,29 @@ function AIChat({ isFullPage = false, onClose }) {
   }, [])
 
   useEffect(() => {
-    messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' })
+    if (atBottomRef.current) messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' })
   }, [messages, journalDraft])
+
+  const handleChatScroll = () => {
+    const el = scrollBoxRef.current
+    if (!el) return
+    const near = el.scrollHeight - el.scrollTop - el.clientHeight < 60
+    atBottomRef.current = near
+    setAtBottom(prev => (prev === near ? prev : near))
+  }
+
+  const scrollToBottom = () => {
+    atBottomRef.current = true
+    setAtBottom(true)
+    messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' })
+  }
+
+  const handleCopy = (msg) => {
+    navigator.clipboard.writeText(msg.content).catch(() => {})
+    setCopiedId(msg.id)
+    clearTimeout(copiedTimerRef.current)
+    copiedTimerRef.current = setTimeout(() => setCopiedId(null), 1500)
+  }
 
   // ── Voice helpers ──────────────────────────────────────────────────────────
   function stopVoiceRecording() {
@@ -1073,6 +1358,10 @@ function AIChat({ isFullPage = false, onClose }) {
     // P4-003: cap in-memory history at 100 messages to prevent memory bloat
     setMessages(prev => [...prev, userMessage].slice(-100))
     setInput('')
+    if (inputRef.current) inputRef.current.style.height = 'auto' // reset auto-grow
+    // Sending implies the user wants to follow the reply — re-enable auto-scroll
+    atBottomRef.current = true
+    setAtBottom(true)
     setLoading(true)
 
     try {
@@ -1192,7 +1481,8 @@ function AIChat({ isFullPage = false, onClose }) {
           ? 'Cannot reach the server — check your connection and try again.'
           : 'Something went wrong. Please try again.',
         time: new Date(),
-        isError: true
+        isError: true,
+        retryText: text, // lets the error bubble offer one-click resend
       }])
     } finally {
       setLoading(false)
@@ -1207,17 +1497,70 @@ function AIChat({ isFullPage = false, onClose }) {
     await handleSend(`Add journal note for ${symbol}: ${content}`)
   }
 
+  // Stop an in-flight response (SSE stream or pending request).
+  // The stream's AbortError path keeps whatever text already arrived.
+  const handleStop = () => {
+    abortCtrlRef.current?.abort()
+    setLoading(false)
+  }
+
   // Brief chip — send brief request immediately
   const handleBriefChip = () => {
     setActiveForm(null)
     handleSend('Morning brief — show my trading summary for today')
   }
 
+  // ── Slash-command palette ────────────────────────────────────────────────
+  // Open while the input is a single "/word" token; filter as the user types.
+  const slashQuery = input.startsWith('/') && !/[\s\n]/.test(input) ? input.slice(1).toLowerCase() : null
+  const slashMatches = slashQuery !== null ? SLASH_COMMANDS.filter(c => c.cmd.startsWith(slashQuery)) : []
+  const slashOpen = slashMatches.length > 0
+  const [slashIdx, setSlashIdx] = useState(0)
+  useEffect(() => { setSlashIdx(0) }, [slashQuery])
+
+  const runSlash = (c) => {
+    if (c.type === 'insert') {
+      setInput(c.arg)
+      inputRef.current?.focus()
+      return
+    }
+    setInput('')
+    if (inputRef.current) inputRef.current.style.height = 'auto'
+    if (c.type === 'form') setActiveForm(c.arg)
+    else if (c.type === 'send') handleSend(c.arg)
+    else if (c.type === 'new') handleNewChat()
+  }
+
   const handleKeyDown = (e) => {
+    // Palette navigation takes priority while open
+    if (slashOpen) {
+      if (e.key === 'ArrowDown') { e.preventDefault(); setSlashIdx(i => (i + 1) % slashMatches.length); return }
+      if (e.key === 'ArrowUp')   { e.preventDefault(); setSlashIdx(i => (i - 1 + slashMatches.length) % slashMatches.length); return }
+      if (e.key === 'Enter' || e.key === 'Tab') { e.preventDefault(); runSlash(slashMatches[slashIdx]); return }
+      if (e.key === 'Escape') { e.preventDefault(); setInput(''); return }
+    }
+    // ↑ on an empty input recalls the last sent message for editing
+    if (e.key === 'ArrowUp' && !input.trim()) {
+      const lastUser = [...messages].reverse().find(m => m.role === 'user')
+      if (lastUser) {
+        e.preventDefault()
+        setInput(lastUser.content)
+        requestAnimationFrame(autoGrowInput)
+      }
+      return
+    }
     if (e.key === 'Enter' && !e.shiftKey) {
       e.preventDefault()
       handleSend()
     }
+  }
+
+  // Grow the textarea with content (Shift+Enter newlines), capped at ~4 lines
+  const autoGrowInput = () => {
+    const el = inputRef.current
+    if (!el) return
+    el.style.height = 'auto'
+    el.style.height = Math.min(el.scrollHeight, 96) + 'px'
   }
 
   const formatTime = (date) => date ? new Date(date).toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' }) : ''
@@ -1291,18 +1634,27 @@ function AIChat({ isFullPage = false, onClose }) {
   }
 
   // Render a single message bubble + any special cards attached
-  const renderMessage = (msg, i) => {
+  const renderMessage = (msg, i, isLast = false) => {
+    // Follow-up chips — only under the most recent completed assistant message
+    const followUps = (isLast && msg.role === 'assistant' && !msg.streaming && !msg.isError
+      && msg.actionType && FOLLOW_UPS[msg.actionType])
+      ? (FOLLOW_UPS[msg.actionType](msg.actionResult || {}) || []).filter(Boolean)
+      : []
     const showBrokerFee      = msg.actionType === 'CALC_BROKER_FEE' && msg.actionResult?.fee
     const showMorningBrief   = msg.actionType === 'MORNING_BRIEF' && msg.actionResult?.brief
     const showDisambiguation = msg.actionType === 'NEEDS_DISAMBIGUATION' && msg.actionResult?.entries?.length
     const showShowTrades     = msg.actionType === 'SHOW_TRADES' && msg.actionResult?.trades
     const showShowGoals      = msg.actionType === 'SHOW_GOALS' && msg.actionResult?.goals
     const showShowJournal    = msg.actionType === 'SHOW_JOURNAL' && msg.actionResult?.entries
+    const showTradePlan      = msg.actionType === 'TRADE_PLAN' && msg.actionResult?.plan
+    const showRiskSummary    = msg.actionType === 'SHOW_RISK_SUMMARY' && msg.actionResult?.positions
+    const showWeekly         = msg.actionType === 'WEEKLY_SUMMARY' && msg.actionResult
     // TOGGLE_THEME: handled inline, no card needed
     // DELETE_TRADE: pending confirmation — no action card yet, text reply is the prompt
     // DRAFT_JOURNAL: shown as interactive JournalDraftCard (not inline here, added to messages area separately)
     const showStandardCard   = msg.actionType && msg.actionResult && !showBrokerFee && !showMorningBrief
       && !showDisambiguation && !showShowTrades && !showShowGoals && !showShowJournal
+      && !showTradePlan && !showRiskSummary && !showWeekly
       && !['DRAFT_JOURNAL', 'TOGGLE_THEME', 'DELETE_TRADE'].includes(msg.actionType)
 
     return (
@@ -1327,6 +1679,10 @@ function AIChat({ isFullPage = false, onClose }) {
           {showShowTrades && <ShowTradesCard result={msg.actionResult} />}
           {showShowGoals && <ShowGoalsCard result={msg.actionResult} />}
           {showShowJournal && <ShowJournalCard result={msg.actionResult} />}
+          {/* Analysis cards */}
+          {showTradePlan && <TradePlanCard plan={msg.actionResult.plan} />}
+          {showRiskSummary && <RiskSummaryCard result={msg.actionResult} />}
+          {showWeekly && <WeeklySummaryCard result={msg.actionResult} />}
           {/* Text bubble */}
           <div className={`px-3 py-2 rounded-2xl text-xs leading-relaxed ${
             msg.role === 'user'
@@ -1339,22 +1695,58 @@ function AIChat({ isFullPage = false, onClose }) {
               ? 'bg-white/55 dark:bg-white/8 border border-white/50 dark:border-white/12 text-gray-800 dark:text-gray-100 rounded-tl-sm shadow-sm backdrop-blur-sm'
               : 'bg-white dark:bg-gray-900 border border-gray-100 dark:border-gray-800 text-gray-800 dark:text-gray-200 rounded-tl-sm shadow-sm'
           }`}>
-            <p className="whitespace-pre-wrap">
-              {msg.content}
-              {msg.streaming && <span className="inline-block w-0.5 h-3 bg-green-500 ml-0.5 animate-pulse align-middle" />}
-            </p>
+            {msg.role === 'assistant' && !msg.isError ? (
+              <>
+                <MarkdownLite text={msg.content} />
+                {msg.streaming && <span className="inline-block w-0.5 h-3 bg-green-500 ml-0.5 animate-pulse align-middle" />}
+              </>
+            ) : (
+              <p className="whitespace-pre-wrap">{msg.content}</p>
+            )}
           </div>
+          {/* Retry — resend the message that failed */}
+          {msg.isError && msg.retryText && (
+            <button
+              onClick={() => handleSend(msg.retryText)}
+              className="mt-1 flex items-center gap-1 px-2 py-1 rounded-lg text-[10px] font-semibold text-red-500 border border-red-200 dark:border-red-800 hover:bg-red-50 dark:hover:bg-red-900/20 transition-colors"
+            >
+              <svg className="w-2.5 h-2.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}>
+                <path strokeLinecap="round" strokeLinejoin="round" d="M4 4v5h5M20 20v-5h-5M5.5 9A7.5 7.5 0 0119 7.5M18.5 15A7.5 7.5 0 015 16.5" />
+              </svg>
+              Retry
+            </button>
+          )}
+          {/* Suggested next steps */}
+          {followUps.length > 0 && !busy && (
+            <div className="flex flex-wrap gap-1.5 mt-1.5">
+              {followUps.map((f, j) => (
+                <button
+                  key={j}
+                  onClick={() => handleSend(f.text)}
+                  className="px-2.5 py-1 rounded-full border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-900 text-[10px] font-semibold text-gray-500 dark:text-gray-400 hover:border-green-400 hover:text-green-600 dark:hover:text-green-400 transition-colors animate-fade-up"
+                >
+                  {f.label}
+                </button>
+              ))}
+            </div>
+          )}
           <div className="flex items-center gap-2 mt-0.5 px-1">
             <span className="text-gray-400 text-[10px]">{formatTime(msg.time)}</span>
-            {msg.role === 'assistant' && msg.content && (
+            {msg.role === 'assistant' && msg.content && !msg.streaming && (
               <button
-                onClick={() => navigator.clipboard.writeText(msg.content)}
-                className="text-gray-300 dark:text-gray-600 hover:text-gray-500 dark:hover:text-gray-400 transition-colors"
-                title="Copy"
+                onClick={() => handleCopy(msg)}
+                className={`transition-colors ${copiedId === msg.id ? 'text-green-500' : 'text-gray-300 dark:text-gray-600 hover:text-gray-500 dark:hover:text-gray-400'}`}
+                title={copiedId === msg.id ? 'Copied!' : 'Copy'}
               >
-                <svg className="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z" />
-                </svg>
+                {copiedId === msg.id ? (
+                  <svg className="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}>
+                    <path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" />
+                  </svg>
+                ) : (
+                  <svg className="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z" />
+                  </svg>
+                )}
               </button>
             )}
           </div>
@@ -1374,6 +1766,8 @@ function AIChat({ isFullPage = false, onClose }) {
   }
 
   const isFloat = !isFullPage
+  const isStreaming = messages.some(m => m.streaming)
+  const busy = loading || isStreaming
 
   return (
     <div className={`flex flex-col h-full ${isFloat ? 'bg-transparent' : 'bg-white dark:bg-gray-950'}`}>
@@ -1436,7 +1830,7 @@ function AIChat({ isFullPage = false, onClose }) {
           isFloat ? 'bg-white/20 dark:bg-black/20 border-white/15 dark:border-white/6' : 'bg-gray-50 dark:bg-gray-900 border-gray-100 dark:border-gray-800'
         }`}>
           <div className="px-3 py-2">
-            <p className="text-[10px] font-semibold text-gray-400 uppercase tracking-wider mb-1.5">Recent Chats</p>
+            <p className="text-[10px] font-semibold text-gray-400 uppercase tracking-widest mb-1.5">Recent Chats</p>
             {sessionsLoading && <p className="text-[10px] text-gray-400 py-1">Loading...</p>}
             {!sessionsLoading && sessions.length === 0 && (
               <p className="text-[10px] text-gray-400 py-1">No saved sessions yet. Start chatting!</p>
@@ -1512,7 +1906,19 @@ function AIChat({ isFullPage = false, onClose }) {
       <div className="flex-1 relative overflow-hidden">
         <div className={`absolute top-0 left-0 right-0 h-6 bg-gradient-to-b ${isFloat ? 'from-white/0' : 'from-white/80 dark:from-gray-950/80'} to-transparent z-10 pointer-events-none`} />
         <div className={`absolute bottom-0 left-0 right-0 h-6 bg-gradient-to-t ${isFloat ? 'from-white/0' : 'from-white/80 dark:from-gray-950/80'} to-transparent z-10 pointer-events-none`} />
-        <div className="h-full overflow-y-auto no-scrollbar px-3 py-3 space-y-3">
+        {/* Scroll-to-bottom — appears when user has scrolled up */}
+        {!atBottom && messages.length > 0 && (
+          <button
+            onClick={scrollToBottom}
+            aria-label="Scroll to latest message"
+            className="absolute bottom-3 right-3 z-20 w-7 h-7 rounded-full bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 shadow-md flex items-center justify-center text-gray-500 dark:text-gray-300 hover:text-green-500 dark:hover:text-green-400 transition-colors animate-fade-up"
+          >
+            <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}>
+              <path strokeLinecap="round" strokeLinejoin="round" d="M19 14l-7 7m0 0l-7-7m7 7V3" />
+            </svg>
+          </button>
+        )}
+        <div ref={scrollBoxRef} onScroll={handleChatScroll} className="h-full overflow-y-auto no-scrollbar px-3 py-3 space-y-3">
 
           {/* Empty state */}
           {messages.length === 0 && !activeForm && (
@@ -1520,6 +1926,7 @@ function AIChat({ isFullPage = false, onClose }) {
               <TradeoLogo size={42} />
               <p className="text-gray-900 dark:text-white text-sm font-semibold mt-3 mb-1 drop-shadow-sm">{t('chat.greeting')}</p>
               <p className="text-gray-500 dark:text-gray-300 text-[11px] text-center max-w-[200px] leading-relaxed mb-4">{t('chat.greetingSub')}</p>
+              <p className="w-full text-[10px] font-semibold uppercase tracking-widest text-gray-400 dark:text-gray-500 mb-1.5">Try asking</p>
               <div className="w-full grid grid-cols-2 gap-1.5">
                 {(suggestions.length > 0
                   ? suggestions.slice(0, 8).map((s, i) => ({ icon: PRESET_PROMPTS[i]?.icon || '💬', text: s }))
@@ -1539,6 +1946,9 @@ function AIChat({ isFullPage = false, onClose }) {
                   </button>
                 ))}
               </div>
+              <p className="text-[10px] text-gray-400 dark:text-gray-500 mt-3">
+                Type <kbd className="px-1 py-px rounded border border-gray-200 dark:border-gray-700 font-sans text-[9px]">/</kbd> for quick commands
+              </p>
             </div>
           )}
 
@@ -1548,7 +1958,7 @@ function AIChat({ isFullPage = false, onClose }) {
           )}
 
           {/* Messages */}
-          {messages.map((msg, i) => renderMessage(msg, i))}
+          {messages.map((msg, i) => renderMessage(msg, i, i === messages.length - 1))}
 
           {/* Quick form after messages */}
           {activeForm && messages.length > 0 && (
@@ -1606,6 +2016,46 @@ function AIChat({ isFullPage = false, onClose }) {
           </button>
         ) : (
           <div className="flex flex-col gap-1">
+            {/* Slash-command palette */}
+            {slashOpen && (
+              <div className={`rounded-xl border overflow-hidden max-h-56 overflow-y-auto ${
+                isFloat
+                  ? 'bg-white/80 dark:bg-gray-900/90 border-white/50 dark:border-white/15 backdrop-blur-md'
+                  : 'bg-white dark:bg-gray-900 border-gray-200 dark:border-gray-700 shadow-lg'
+              }`}>
+                <p className="text-[10px] font-semibold uppercase tracking-widest text-gray-400 dark:text-gray-500 px-3 pt-2 pb-1">
+                  Commands · ↑↓ + Enter
+                </p>
+                {slashMatches.map((c, i) => (
+                  <button
+                    key={c.cmd}
+                    onMouseDown={e => e.preventDefault() /* keep textarea focus */}
+                    onClick={() => runSlash(c)}
+                    onMouseEnter={() => setSlashIdx(i)}
+                    className={`w-full flex items-center gap-2 px-3 py-1.5 text-left transition-colors ${
+                      i === slashIdx ? 'bg-green-50 dark:bg-green-900/20' : ''
+                    }`}
+                  >
+                    <span className="text-sm w-5 text-center">{c.icon}</span>
+                    <span className={`text-[11px] font-semibold ${i === slashIdx ? 'text-green-600 dark:text-green-400' : 'text-gray-700 dark:text-gray-200'}`}>/{c.cmd}</span>
+                    <span className="text-[10px] text-gray-400 truncate">{c.desc}</span>
+                  </button>
+                ))}
+              </div>
+            )}
+            {/* Undo chip — backend supports one-step UNDO; surface it after an
+                undoable write action instead of requiring the user to know to type "undo" */}
+            {!busy && ['ADD_TRADE', 'CLOSE_TRADE'].includes(lastAction?.action) && (
+              <button
+                onClick={() => handleSend('Undo my last action')}
+                className="self-start flex items-center gap-1 px-2.5 py-1 rounded-full border border-indigo-200 dark:border-indigo-800 text-[10px] font-semibold text-indigo-500 dark:text-indigo-400 hover:bg-indigo-50 dark:hover:bg-indigo-900/30 transition-colors animate-fade-up"
+              >
+                <svg className="w-2.5 h-2.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}>
+                  <path strokeLinecap="round" strokeLinejoin="round" d="M3 10h10a5 5 0 015 5v1m-15-6l4-4m-4 4l4 4" />
+                </svg>
+                Undo last action
+              </button>
+            )}
             {/* Voice status bar */}
             {voiceState === 'listening' && (
               <div className="flex items-center gap-2 px-3 py-1.5 rounded-lg bg-red-50 dark:bg-red-950/30 border border-red-200 dark:border-red-800">
@@ -1635,7 +2085,7 @@ function AIChat({ isFullPage = false, onClose }) {
               <textarea
                 ref={inputRef}
                 value={input}
-                onChange={e => setInput(e.target.value)}
+                onChange={e => { setInput(e.target.value); autoGrowInput() }}
                 onKeyDown={handleKeyDown}
                 placeholder={
                   voiceState === 'listening'   ? 'Listening… speak in Nepali or English'
@@ -1692,16 +2142,30 @@ function AIChat({ isFullPage = false, onClose }) {
                 )}
               </button>
 
-              {/* Send button */}
-              <button
-                onClick={() => handleSend()}
-                disabled={loading || !input.trim()}
-                className="bg-green-500 hover:bg-green-400 disabled:opacity-30 text-white w-8 h-8 rounded-xl flex items-center justify-center flex-shrink-0 transition-colors shadow-sm"
-              >
-                <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M12 19l9 2-9-18-9 18 9-2zm0 0v-8" />
-                </svg>
-              </button>
+              {/* Send / Stop button — swaps to stop while a reply is generating */}
+              {busy ? (
+                <button
+                  onClick={handleStop}
+                  title="Stop generating"
+                  aria-label="Stop generating"
+                  className="bg-gray-800 dark:bg-gray-200 hover:bg-gray-700 dark:hover:bg-white text-white dark:text-gray-900 w-8 h-8 rounded-xl flex items-center justify-center flex-shrink-0 transition-colors shadow-sm"
+                >
+                  <svg className="w-3 h-3" viewBox="0 0 24 24" fill="currentColor">
+                    <rect x="6" y="6" width="12" height="12" rx="2" />
+                  </svg>
+                </button>
+              ) : (
+                <button
+                  onClick={() => handleSend()}
+                  disabled={!input.trim()}
+                  title="Send (Enter)"
+                  className="bg-green-500 hover:bg-green-400 disabled:opacity-30 text-white w-8 h-8 rounded-xl flex items-center justify-center flex-shrink-0 transition-colors shadow-sm"
+                >
+                  <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M12 19l9 2-9-18-9 18 9-2zm0 0v-8" />
+                  </svg>
+                </button>
+              )}
             </div>
           </div>
         )}

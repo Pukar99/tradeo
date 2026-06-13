@@ -1,0 +1,5 @@
+User-agent: *
+Allow: /
+
+# Authenticated app sections have no crawlable server-rendered content,
+# but we don't disallow them — they simply return the SPA shell to crawlers.

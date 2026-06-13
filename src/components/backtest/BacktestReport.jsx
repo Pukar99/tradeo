@@ -13,7 +13,7 @@ function StatCard({ label, value, sub, color, hint }) {
   return (
     <div className="bg-white dark:bg-gray-900 rounded-xl border border-gray-100 dark:border-gray-800 p-3 flex flex-col gap-0.5">
       <div className="flex items-center gap-1">
-        <div className="text-[10px] text-gray-400 uppercase tracking-wider font-semibold">{label}</div>
+        <div className="text-[10px] text-gray-400 uppercase tracking-widest font-semibold">{label}</div>
         {hint && (
           <div className="relative group">
             <span className="text-[10px] text-gray-300 dark:text-gray-600 cursor-default">ⓘ</span>
@@ -225,7 +225,7 @@ export default function BacktestReport({ sessionId, onClose }) {
       {/* Equity curve */}
       {equityData.length > 1 && (
         <div className="bg-white dark:bg-gray-900 rounded-xl border border-gray-100 dark:border-gray-800 p-3 mb-4">
-          <div className="text-[10px] font-bold text-gray-400 uppercase tracking-wider mb-2">Equity Curve</div>
+          <div className="text-[10px] font-semibold text-gray-400 uppercase tracking-widest mb-2">Equity Curve</div>
           <ResponsiveContainer width="100%" height={120}>
             <AreaChart data={equityData} margin={{ top: 4, right: 4, bottom: 0, left: 0 }}>
               <defs>
@@ -280,7 +280,7 @@ export default function BacktestReport({ sessionId, onClose }) {
 
       {/* Trade log */}
       <div className="bg-white dark:bg-gray-900 rounded-xl border border-gray-100 dark:border-gray-800 p-3 mb-4">
-        <div className="text-[10px] font-bold text-gray-400 uppercase tracking-wider mb-2">
+        <div className="text-[10px] font-semibold text-gray-400 uppercase tracking-widest mb-2">
           Trade Log ({report.trades?.length || 0} trades)
         </div>
         {report.trades?.length === 0 ? (
@@ -335,7 +335,7 @@ export default function BacktestReport({ sessionId, onClose }) {
       {/* Behavior log */}
       {report.behavior_log?.length > 0 && (
         <div className="bg-white dark:bg-gray-900 rounded-xl border border-orange-200 dark:border-orange-900 p-3 mb-4">
-          <div className="text-[10px] font-bold text-orange-500 uppercase tracking-wider mb-2">
+          <div className="text-[10px] font-semibold text-orange-500 uppercase tracking-widest mb-2">
             Behavior Log ({report.behavior_log.length} events)
           </div>
           <div className="flex flex-col gap-1.5">

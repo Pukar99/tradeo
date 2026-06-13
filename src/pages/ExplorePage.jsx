@@ -121,12 +121,13 @@ export default function ExplorePage() {
   const { user }        = useAuth()
 
   // Default to risklab for unauthenticated users if they land on a locked tab
+  // (the bare /explore fallback follows the same rule — ipo is auth-locked)
   const resolveTab = (t) => {
     if (VALID_IDS.has(t)) {
       if (!user && AUTH_REQUIRED_IDS.has(t)) return 'risklab'
       return t
     }
-    return 'ipo'
+    return user ? 'ipo' : 'risklab'
   }
   const [activeTab, setActiveTab] = useState(() => resolveTab(urlTab))
 
@@ -139,7 +140,9 @@ export default function ExplorePage() {
   function handleTab(id) {
     if (id === activeTab) return
     setActiveTab(id)
-    navigate(`/explore/${id}`, { replace: true })
+    // Push (not replace) — each tab is a distinct URL, so back/forward should
+    // move between tabs as the sync effect above expects.
+    navigate(`/explore/${id}`)
   }
 
   const isLocked = (id) => !user && AUTH_REQUIRED_IDS.has(id)

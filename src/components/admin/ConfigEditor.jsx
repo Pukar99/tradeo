@@ -44,7 +44,7 @@ function ConfigRow({ row, onSaved }) {
           />
           <button
             onClick={() => setEditing(false)}
-            className="text-xs text-gray-400 hover:text-gray-600 dark:hover:text-gray-200 transition-colors"
+            className="px-3 py-1.5 text-xs text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-200 transition-colors"
           >
             Cancel
           </button>

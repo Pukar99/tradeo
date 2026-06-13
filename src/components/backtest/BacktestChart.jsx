@@ -157,6 +157,7 @@ export default function BacktestChart({ candles, cursorIndex, positions }) {
         layout: {
           background: { color: 'transparent' },
           textColor:  dark ? '#9ca3af' : '#374151',
+          attributionLogo: false,
         },
         grid: {
           vertLines: { color: 'transparent' },
@@ -169,7 +170,6 @@ export default function BacktestChart({ candles, cursorIndex, positions }) {
           timeVisible:  true,
           rightOffset:  3,
         },
-        attributionLogo: false,
       })
 
       const candleSer = chart.addCandlestickSeries({

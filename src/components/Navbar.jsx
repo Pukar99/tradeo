@@ -271,7 +271,7 @@ function Navbar({ autoHide = false, hidden = false, onMouseEnter, onMouseLeave }
         <button
           onClick={toggleTheme}
           className="w-11 h-11 rounded-lg flex items-center justify-center text-gray-500 dark:text-gray-400 hover:text-gray-900 dark:hover:text-white hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors"
-          title={isDark ? 'Switch to Light' : 'Switch to Dark'}
+          title={`${isDark ? 'Switch to Light' : 'Switch to Dark'} (Alt+D)`}
           aria-label={isDark ? 'Switch to light mode' : 'Switch to dark mode'}
         >
           {isDark ? (
@@ -342,7 +342,7 @@ function Navbar({ autoHide = false, hidden = false, onMouseEnter, onMouseLeave }
                           )}
                           <div className="flex-1 min-w-0" style={n.read ? { paddingLeft: '14px' } : {}}>
                             <p className="text-xs font-semibold text-gray-900 dark:text-white truncate">{n.title}</p>
-                            <p className="text-[10px] text-gray-500 dark:text-gray-400 mt-0.5 line-clamp-2">{n.body}</p>
+                            <p className="text-[10px] text-gray-500 dark:text-gray-400 mt-0.5">{n.body}</p>
                             <p className="text-[10px] text-gray-400 dark:text-gray-500 mt-1">
                               {new Date(n.created_at).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}
                             </p>
@@ -404,11 +404,11 @@ function Navbar({ autoHide = false, hidden = false, onMouseEnter, onMouseLeave }
                 </div>
                 <div className="p-1">
                   {[
-                    { to: '/', icon: '🏠', label: t('nav.dashboard') },
+                    { to: '/', icon: '🏠', label: t('nav.dashboard'), kbd: 'Alt+H' },
                     { to: '/profile', icon: '👤', label: t('nav.profile') },
-                    { to: '/chat', icon: '🤖', label: t('nav.aiChat') },
-                    { to: '/logs', icon: '📈', label: t('nav.tradeLog') },
-                    { to: '/portfolio', icon: '💼', label: t('nav.portfolio') },
+                    { to: '/chat', icon: '🤖', label: t('nav.aiChat'), kbd: 'Alt+C' },
+                    { to: '/logs', icon: '📈', label: t('nav.tradeLog'), kbd: 'Alt+L' },
+                    { to: '/portfolio', icon: '💼', label: t('nav.portfolio'), kbd: 'Alt+P' },
                   ].map(item => (
                     <Link
                       key={item.to}
@@ -417,6 +417,9 @@ function Navbar({ autoHide = false, hidden = false, onMouseEnter, onMouseLeave }
                       className="flex items-center gap-2 px-3 py-2 text-sm text-gray-600 dark:text-gray-300 hover:text-gray-900 dark:hover:text-white hover:bg-gray-50 dark:hover:bg-gray-800 rounded-lg transition-colors"
                     >
                       <span>{item.icon}</span> {item.label}
+                      {item.kbd && (
+                        <kbd className="ml-auto text-[9px] font-sans text-gray-300 dark:text-gray-600">{item.kbd}</kbd>
+                      )}
                     </Link>
                   ))}
                 </div>

@@ -20,7 +20,7 @@ function avatarColor(id) {
   return AVATAR_COLORS[id % AVATAR_COLORS.length]
 }
 
-export default function UserListRow({ user: initialUser, onRefresh }) {
+export default function UserListRow({ user: initialUser, onRefresh, dropUp = false }) {
   const [user,         setUser]         = useState(initialUser)
   const [menuOpen,     setMenuOpen]     = useState(false)
   const [activeAction, setActiveAction] = useState(null) // 'tier' | 'suspend' | 'force-logout'
@@ -115,7 +115,9 @@ export default function UserListRow({ user: initialUser, onRefresh }) {
           </button>
 
           {menuOpen && (
-            <div className="absolute right-0 top-full mt-1 w-40 bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-700 rounded-xl shadow-lg overflow-hidden z-50">
+            <div className={`absolute right-0 w-40 bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-700 rounded-xl shadow-lg overflow-hidden z-50 ${
+              dropUp ? 'bottom-full mb-1' : 'top-full mt-1'
+            }`}>
               <button
                 onClick={() => selectAction('tier')}
                 className="w-full text-left px-3 py-2.5 text-xs text-gray-600 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-800 transition-colors"

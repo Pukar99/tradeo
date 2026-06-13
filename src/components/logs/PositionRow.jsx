@@ -1,4 +1,4 @@
-// === PositionRow.jsx — expandable position card: stats, SL/TP/RR, action history expand, context menu ===
+// === PositionRow.jsx — expandable position card: stats, SL/TP/RR, action history expand, action menu ===
 
 import { useState, useEffect, useCallback, useRef } from 'react'
 import { getTradeHistory } from '../../utils/globalCache'
@@ -6,22 +6,11 @@ import { useContextMenu } from '../ContextMenu'
 import ActionHistory from './ActionHistory'
 import EditActionModal from './EditActionModal'
 import { fmt } from '../../utils/format'
-
-const DIRECTION_CFG = {
-  LONG:  { label: '↑ Long',  bg: 'bg-emerald-500', pill: 'bg-emerald-100 text-emerald-700 dark:bg-emerald-500/10 dark:text-emerald-400 border border-emerald-200 dark:border-emerald-500/20' },
-  SHORT: { label: '↓ Short', bg: 'bg-red-500',     pill: 'bg-red-100 text-red-700 dark:bg-red-500/10 dark:text-red-400 border border-red-200 dark:border-red-500/20' },
-}
-
-const STATUS_CFG = {
-  OPEN:    { label: 'Open',    dot: 'bg-blue-500',   pill: 'bg-blue-100 text-blue-700 dark:bg-blue-500/10 dark:text-blue-400 border border-blue-200 dark:border-blue-500/20' },
-  PARTIAL: { label: 'Partial', dot: 'bg-amber-500',  pill: 'bg-amber-100 text-amber-700 dark:bg-amber-500/10 dark:text-amber-400 border border-amber-200 dark:border-amber-500/20' },
-  CLOSED:  { label: 'Closed',  dot: 'bg-gray-400',   pill: 'bg-gray-100 text-gray-600 dark:bg-gray-500/10 dark:text-gray-400 border border-gray-200 dark:border-gray-600/20' },
-}
+import { DIRECTION_CFG, STATUS_CFG, computePositionMetrics } from './tradeConstants'
 
 export default function PositionRow({ position, ltp, onAdd, onPartialExit, onClose, onDelete, onDeleteAction, onRefresh, refreshTick }) {
   const [expanded,   setExpanded]   = useState(false)
   const [actions,    setActions]    = useState(null)
-  const [fetched,    setFetched]    = useState(false)
   const fetchedRef = useRef(false)
   const [loading,    setLoading]    = useState(false)
   const [error,      setError]      = useState(null)
@@ -29,43 +18,23 @@ export default function PositionRow({ position, ltp, onAdd, onPartialExit, onClo
 
   const { onContextMenu, ContextMenuPortal } = useContextMenu()
 
-  const wacc      = parseFloat(position.wacc) || 0
-  const totalQty  = parseFloat(position.total_qty) || 0
-  const ltpNum    = ltp ? parseFloat(ltp) : null
-  const isClosed  = position.status === 'CLOSED'
-  const direction = position.direction?.toUpperCase() === 'LONG' ? 'LONG' : 'SHORT'
+  const {
+    wacc, totalQty, ltpNum, isClosed, direction,
+    pnlValue, hasPnl, slPct, tpPct, rr,
+  } = computePositionMetrics(position, ltp)
+
   const dirCfg    = DIRECTION_CFG[direction]
   const statusCfg = STATUS_CFG[position.status] || STATUS_CFG.CLOSED
-
-  const unrealPnl = ltpNum != null && !isClosed
-    ? (direction === 'LONG' ? (ltpNum - wacc) * totalQty : (wacc - ltpNum) * totalQty)
-    : null
-
-  const pnlValue   = isClosed ? parseFloat(position.total_realized_pnl) : unrealPnl
-  const pnlLabel   = isClosed ? 'P&L' : 'Unreal'
-  const hasPnl     = pnlValue != null && !isNaN(pnlValue)
-  const pnlPos     = hasPnl && pnlValue >= 0
-
-  // SL/TP distance from WACC
-  const slPct = position.sl && wacc > 0
-    ? Math.abs((parseFloat(position.sl) - wacc) / wacc * 100).toFixed(1)
-    : null
-  const tpPct = position.tp && wacc > 0
-    ? Math.abs((parseFloat(position.tp) - wacc) / wacc * 100).toFixed(1)
-    : null
-
-  // R:R
-  const rr = position.sl && position.tp && wacc > 0
-    ? (Math.abs(parseFloat(position.tp) - wacc) / Math.abs(parseFloat(position.sl) - wacc)).toFixed(1)
-    : null
+  const pnlLabel  = isClosed ? 'P&L' : 'Unreal'
+  const pnlPos    = hasPnl && pnlValue >= 0
 
   const loadHistory = useCallback(async (force = false) => {
     if (!force && fetchedRef.current) return
     setLoading(true)
+    setError(null)
     try {
       const res = await getTradeHistory(position.trade_id)
       setActions(res.data)
-      setFetched(true)
       fetchedRef.current = true
     } catch {
       setError('Failed to load history')
@@ -75,27 +44,27 @@ export default function PositionRow({ position, ltp, onAdd, onPartialExit, onClo
   }, [position.trade_id])
 
   useEffect(() => {
-    if (expanded && !fetched) loadHistory()
-  }, [expanded, fetched, loadHistory])
+    if (expanded) loadHistory()
+  }, [expanded, loadHistory])
 
   // When parent triggers a refresh (trade saved/closed/exited), clear the
   // cached actions so the next expand (or immediate if already open) re-fetches.
+  const isFirstTick = useRef(true)
   useEffect(() => {
-    if (refreshTick === undefined) return
+    if (isFirstTick.current) { isFirstTick.current = false; return }
     setActions(null)
-    setFetched(false)
     fetchedRef.current = false
     if (expanded) loadHistory(true)
   }, [refreshTick]) // eslint-disable-line react-hooks/exhaustive-deps
 
   const menuItems = isClosed
-    ? [{ label: 'Delete Trade', icon: '🗑', action: () => onDelete(position) }]
+    ? [{ label: 'Delete Trade', icon: '🗑', danger: true, action: () => onDelete(position) }]
     : [
         { label: 'Add to Position', icon: '＋', action: () => onAdd(position) },
         { label: 'Partial Exit',    icon: '↗', action: () => onPartialExit(position) },
         { label: 'Close Position',  icon: '✓', action: () => onClose(position) },
         { separator: true },
-        { label: 'Delete Trade',    icon: '🗑', action: () => onDelete(position) },
+        { label: 'Delete Trade',    icon: '🗑', danger: true, action: () => onDelete(position) },
       ]
 
   const handleEditSaved = useCallback((updatedAction) => {
@@ -122,7 +91,7 @@ export default function PositionRow({ position, ltp, onAdd, onPartialExit, onClo
       }`}>
 
         {/* ── direction accent bar ── */}
-        <div className={`h-0.5 w-full ${dirCfg.bg} opacity-60`} />
+        <div className={`h-0.5 w-full ${dirCfg.accent} opacity-60`} />
 
         {/* ── main card row ── */}
         <div
@@ -141,7 +110,7 @@ export default function PositionRow({ position, ltp, onAdd, onPartialExit, onClo
                 {dirCfg.label}
               </span>
               <span className={`flex items-center gap-1 text-[10px] font-semibold px-1.5 py-0.5 rounded-md ${statusCfg.pill}`}>
-                <span className={`w-1.5 h-1.5 rounded-full ${statusCfg.dot} ${position.status !== 'CLOSED' ? 'animate-pulse' : ''}`} />
+                <span className={`w-1.5 h-1.5 rounded-full ${statusCfg.dot} ${statusCfg.pulse ? 'animate-pulse' : ''}`} />
                 {statusCfg.label}
               </span>
             </div>
@@ -219,6 +188,15 @@ export default function PositionRow({ position, ltp, onAdd, onPartialExit, onClo
             )}
           </div>
 
+          {/* action menu — visible button so actions work without right-click (touch) */}
+          <button
+            onClick={e => { e.stopPropagation(); onContextMenu(menuItems)(e) }}
+            aria-label={`Actions for ${position.symbol}`}
+            className="shrink-0 w-7 h-7 flex items-center justify-center rounded-lg text-gray-400 hover:text-gray-600 dark:hover:text-gray-200 hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors text-[14px] leading-none"
+          >
+            ⋯
+          </button>
+
         </div>
 
         {/* ── expanded action history ── */}
@@ -230,11 +208,10 @@ export default function PositionRow({ position, ltp, onAdd, onPartialExit, onClo
                 Loading history…
               </div>
             )}
-            {error && <div className="px-6 py-4 text-xs text-red-500">{error}</div>}
+            {error && !loading && <div className="px-6 py-4 text-xs text-red-500">{error}</div>}
             {!loading && !error && actions !== null && (
               <ActionHistory
                 actions={actions}
-                direction={direction}
                 onEdit={a => setEditTarget(a)}
                 onDelete={a => onDeleteAction(a, () => loadHistory(true))}
               />

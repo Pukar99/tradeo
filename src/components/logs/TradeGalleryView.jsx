@@ -1,12 +1,14 @@
 // === TradeGalleryView.jsx — trade gallery: candlestick thumbnail cards, hover actions, lazy chart loading ===
+// Receives positions already filtered by the parent (TradeActionsTab) — no re-filtering here.
 
-import { useState, useMemo, useEffect, useRef, useCallback } from 'react'
+import { useState, useEffect, useRef } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { useTheme } from '../../context/ThemeContext'
 import { getStockChart } from '../../api'
 import { getTradeHistory } from '../../utils/globalCache'
 import { useContextMenu } from '../ContextMenu'
 import { fmt, today } from '../../utils/format'
+import { DIRECTION_CFG, STATUS_CFG, computePositionMetrics } from './tradeConstants'
 
 // ── Module-level chart data cache ─────────────────────────────────────────────
 const _cache = new Map()
@@ -116,7 +118,7 @@ function CandleThumbnail({ symbol, actions, wacc, ltp, isClosed, onCardHoverChan
       if (cancelled || !containerRef.current) return
 
       if (chartRef.current) {
-        try { chartRef.current.remove() } catch (_) {}
+        try { chartRef.current.remove() } catch { /* chart already disposed */ }
         chartRef.current = null
       }
 
@@ -127,7 +129,7 @@ function CandleThumbnail({ symbol, actions, wacc, ltp, isClosed, onCardHoverChan
       const chart = createChart(containerRef.current, {
         width:  containerRef.current.clientWidth  || 300,
         height: containerRef.current.clientHeight || 160,
-        layout: { background: { color: bg }, textColor: 'transparent' },
+        layout: { background: { color: bg }, textColor: 'transparent', attributionLogo: false },
         grid:   { vertLines: { color: 'transparent' }, horzLines: { color: 'transparent' } },
         rightPriceScale: { visible: false },
         leftPriceScale:  { visible: false },
@@ -249,7 +251,7 @@ function CandleThumbnail({ symbol, actions, wacc, ltp, isClosed, onCardHoverChan
           return
         }
 
-        const date    = typeof param.time === 'string' ? param.time : param.time
+        const date    = param.time
         const actMap  = buildActionMap(actionsRef.current || [])
         const matched = actMap[date]
 
@@ -259,9 +261,8 @@ function CandleThumbnail({ symbol, actions, wacc, ltp, isClosed, onCardHoverChan
         }
 
         // Position tooltip near the crosshair point
-        const rect = containerRef.current.getBoundingClientRect()
-        const cx   = param.point?.x ?? 0
-        const cy   = param.point?.y ?? 0
+        const cx = param.point?.x ?? 0
+        const cy = param.point?.y ?? 0
 
         const lines = matched.map(a => {
           const verb  = ACTION_VERB[a.action_type] || a.action_type
@@ -312,7 +313,7 @@ function CandleThumbnail({ symbol, actions, wacc, ltp, isClosed, onCardHoverChan
       cancelled = true
       if (roRef.current) { roRef.current.disconnect(); roRef.current = null }
       if (chartRef.current) {
-        try { chartRef.current.remove() } catch (_) {}
+        try { chartRef.current.remove() } catch { /* chart already disposed */ }
         chartRef.current = null
       }
     }
@@ -320,12 +321,10 @@ function CandleThumbnail({ symbol, actions, wacc, ltp, isClosed, onCardHoverChan
 
   return (
     <div
-      className="relative w-full h-full tv-thumb"
+      className="relative w-full h-full"
       onMouseEnter={() => onCardHoverChange?.(true)}
       onMouseLeave={() => { onCardHoverChange?.(false); setTooltip(null) }}
     >
-      <style>{`.tv-thumb a[href*="tradingview"]{display:none!important;}`}</style>
-
       <div ref={containerRef} className="w-full h-full" />
 
       {/* action tooltip — shown when crosshair lands on a trade action date */}
@@ -348,19 +347,6 @@ function CandleThumbnail({ symbol, actions, wacc, ltp, isClosed, onCardHoverChan
       )}
     </div>
   )
-}
-
-// ── Direction / Status config ─────────────────────────────────────────────────
-
-const DIR_CFG = {
-  LONG:  { label: '↑ Long',  pill: 'bg-emerald-100 text-emerald-700 dark:bg-emerald-500/10 dark:text-emerald-400 border border-emerald-200 dark:border-emerald-500/20', bar: 'bg-emerald-500' },
-  SHORT: { label: '↓ Short', pill: 'bg-red-100 text-red-700 dark:bg-red-500/10 dark:text-red-400 border border-red-200 dark:border-red-500/20',                         bar: 'bg-red-500'     },
-}
-
-const STATUS_CFG = {
-  OPEN:    { label: 'Open',    dot: 'bg-blue-500',  pill: 'bg-blue-100 text-blue-700 dark:bg-blue-500/10 dark:text-blue-400 border border-blue-200 dark:border-blue-500/20',     pulse: true  },
-  PARTIAL: { label: 'Partial', dot: 'bg-amber-500', pill: 'bg-amber-100 text-amber-700 dark:bg-amber-500/10 dark:text-amber-400 border border-amber-200 dark:border-amber-500/20', pulse: true  },
-  CLOSED:  { label: 'Closed',  dot: 'bg-gray-400',  pill: 'bg-gray-100 text-gray-600 dark:bg-gray-500/10 dark:text-gray-400 border border-gray-200 dark:border-gray-600/20',      pulse: false },
 }
 
 // ── Hover action bar shown over the chart thumbnail ───────────────────────────
@@ -416,28 +402,15 @@ function GalleryCard({ position, ltp, onAdd, onPartialExit, onClose, onDelete })
     return () => obs.disconnect()
   }, [])
 
-  const wacc     = parseFloat(position.wacc) || 0
-  const totalQty = parseFloat(position.total_qty) || 0
-  const ltpNum   = ltp ? parseFloat(ltp) : null
-  const isClosed = position.status === 'CLOSED'
-  const direction = position.direction?.toUpperCase() === 'LONG' ? 'LONG' : 'SHORT'
-  const dirCfg    = DIR_CFG[direction]
+  const {
+    wacc, totalQty, ltpNum, isClosed, direction,
+    pnlValue, hasPnl, slPct, tpPct, rr,
+  } = computePositionMetrics(position, ltp)
+
+  const dirCfg    = DIRECTION_CFG[direction]
   const statusCfg = STATUS_CFG[position.status] || STATUS_CFG.CLOSED
-
-  const unrealPnl = ltpNum != null && !isClosed
-    ? (direction === 'LONG' ? (ltpNum - wacc) * totalQty : (wacc - ltpNum) * totalQty)
-    : null
-  const pnlValue = isClosed ? parseFloat(position.total_realized_pnl) : unrealPnl
-  const pnlLabel = isClosed ? 'Realized P&L' : 'Unreal P&L'
-  const hasPnl   = pnlValue != null && !isNaN(pnlValue)
-  const pnlPos   = hasPnl && pnlValue >= 0
-
-  const slPct = position.sl && wacc > 0
-    ? Math.abs((parseFloat(position.sl) - wacc) / wacc * 100).toFixed(1) : null
-  const tpPct = position.tp && wacc > 0
-    ? Math.abs((parseFloat(position.tp) - wacc) / wacc * 100).toFixed(1) : null
-  const rr = position.sl && position.tp && wacc > 0
-    ? (Math.abs(parseFloat(position.tp) - wacc) / Math.abs(parseFloat(position.sl) - wacc)).toFixed(1) : null
+  const pnlLabel  = isClosed ? 'Realized P&L' : 'Unreal P&L'
+  const pnlPos    = hasPnl && pnlValue >= 0
 
   // Fetch action history only once the card is visible in the viewport
   useEffect(() => {
@@ -462,13 +435,13 @@ function GalleryCard({ position, ltp, onAdd, onPartialExit, onClose, onDelete })
   }
 
   const menuItems = isClosed
-    ? [{ label: 'Delete Trade', icon: '🗑', action: () => onDelete(position) }]
+    ? [{ label: 'Delete Trade', icon: '🗑', danger: true, action: () => onDelete(position) }]
     : [
         { label: 'Add to Position', icon: '＋', action: () => onAdd(position) },
         { label: 'Partial Exit',    icon: '↗', action: () => onPartialExit(position) },
         { label: 'Close Position',  icon: '✓', action: () => onClose(position) },
         { separator: true },
-        { label: 'Delete Trade',    icon: '🗑', action: () => onDelete(position) },
+        { label: 'Delete Trade',    icon: '🗑', danger: true, action: () => onDelete(position) },
       ]
 
   return (
@@ -482,7 +455,7 @@ function GalleryCard({ position, ltp, onAdd, onPartialExit, onClose, onDelete })
         onContextMenu={onContextMenu(menuItems)}
       >
         {/* direction accent bar */}
-        <div className={`h-0.5 w-full ${dirCfg.bar} opacity-60`} />
+        <div className={`h-0.5 w-full ${dirCfg.accent} opacity-60`} />
 
         {/* ── candlestick thumbnail ── */}
         <div className="relative w-full bg-white dark:bg-gray-950 overflow-hidden" style={{ height: 160 }}>
@@ -529,7 +502,7 @@ function GalleryCard({ position, ltp, onAdd, onPartialExit, onClose, onDelete })
         {/* ── card body ── */}
         <div className="flex flex-col gap-3 p-4 flex-1">
 
-          {/* symbol + badges */}
+          {/* symbol + badges + action menu */}
           <div className="flex items-start justify-between gap-2">
             <div>
               <div className="flex items-center gap-2 mb-0.5">
@@ -542,10 +515,20 @@ function GalleryCard({ position, ltp, onAdd, onPartialExit, onClose, onDelete })
                 {position.opened_at?.slice(0, 10)}
               </div>
             </div>
-            <span className={`flex items-center gap-1 text-[10px] font-semibold px-2 py-1 rounded-lg shrink-0 ${statusCfg.pill}`}>
-              <span className={`w-1.5 h-1.5 rounded-full ${statusCfg.dot} ${statusCfg.pulse ? 'animate-pulse' : ''}`} />
-              {statusCfg.label}
-            </span>
+            <div className="flex items-center gap-1 shrink-0">
+              <span className={`flex items-center gap-1 text-[10px] font-semibold px-2 py-1 rounded-lg ${statusCfg.pill}`}>
+                <span className={`w-1.5 h-1.5 rounded-full ${statusCfg.dot} ${statusCfg.pulse ? 'animate-pulse' : ''}`} />
+                {statusCfg.label}
+              </span>
+              {/* action menu — visible button so actions work without right-click (touch) */}
+              <button
+                onClick={onContextMenu(menuItems)}
+                aria-label={`Actions for ${position.symbol}`}
+                className="w-6 h-6 flex items-center justify-center rounded-lg text-gray-400 hover:text-gray-600 dark:hover:text-gray-200 hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors text-[14px] leading-none"
+              >
+                ⋯
+              </button>
+            </div>
           </div>
 
           {/* stat grid */}
@@ -566,7 +549,7 @@ function GalleryCard({ position, ltp, onAdd, onPartialExit, onClose, onDelete })
 
           {/* P&L pill */}
           {hasPnl && (
-            <div className={`flex items-center justify-between px-3 py-2 rounded-xl ${
+            <div className={`flex items-center justify-between px-3 py-2 rounded-xl mt-auto ${
               pnlPos ? 'bg-emerald-50 dark:bg-emerald-500/10' : 'bg-red-50 dark:bg-red-500/10'
             }`}>
               <span className="text-[10px] uppercase tracking-wide font-semibold text-gray-400 dark:text-gray-500">{pnlLabel}</span>
@@ -575,11 +558,6 @@ function GalleryCard({ position, ltp, onAdd, onPartialExit, onClose, onDelete })
               </span>
             </div>
           )}
-
-          {/* right-click hint */}
-          <p className="text-[10px] text-gray-300 dark:text-gray-700 text-center mt-auto pt-1 select-none">
-            Right-click for actions
-          </p>
         </div>
       </div>
     </>
@@ -599,34 +577,10 @@ function StatBox({ label, value, mono, color }) {
 
 // ── Gallery container ─────────────────────────────────────────────────────────
 
-export default function TradeGalleryView({ positions = [], ltpMap = {}, filter, search, onAdd, onPartialExit, onClose, onDelete, onOpenAddModal }) {
-  const displayed = useMemo(() => {
-    let list = positions
-    if (filter === 'open') list = list.filter(p => p.status !== 'CLOSED')
-    if (search.trim()) {
-      const q = search.trim().toUpperCase()
-      list = list.filter(p => p.symbol.includes(q))
-    }
-    return list
-  }, [positions, filter, search])
-
-  if (displayed.length === 0) {
-    return (
-      <div className="text-center py-20 text-gray-400 dark:text-gray-500">
-        <p className="text-[13px] font-semibold mb-1">No {filter === 'open' ? 'open ' : ''}positions</p>
-        <p className="text-[11px]">
-          {filter === 'open'
-            ? <span>Switch to All above to see closed trades</span>
-            : <button onClick={onOpenAddModal} className="underline hover:text-blue-500 transition-colors">Add your first trade →</button>
-          }
-        </p>
-      </div>
-    )
-  }
-
+export default function TradeGalleryView({ positions = [], ltpMap = {}, onAdd, onPartialExit, onClose, onDelete }) {
   return (
     <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
-      {displayed.map(pos => (
+      {positions.map(pos => (
         <GalleryCard
           key={pos.trade_id}
           position={pos}

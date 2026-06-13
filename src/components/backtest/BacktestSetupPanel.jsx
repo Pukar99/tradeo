@@ -75,7 +75,7 @@ export default function BacktestSetupPanel({ onSessionStarted }) {
 
   return (
     <div className="flex flex-col gap-3 p-3 h-full overflow-y-auto">
-      <div className="text-[10px] font-bold text-gray-500 dark:text-gray-400 uppercase tracking-widest">
+      <div className="text-[10px] font-semibold text-gray-400 dark:text-gray-500 uppercase tracking-widest">
         Backtest Setup
       </div>
 
@@ -88,7 +88,7 @@ export default function BacktestSetupPanel({ onSessionStarted }) {
 
       {/* Script */}
       <div className="relative" ref={dropdownRef}>
-        <label className="text-[10px] font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wider">Script</label>
+        <label className="text-[10px] font-semibold text-gray-400 dark:text-gray-500 uppercase tracking-widest">Script</label>
         <div
           className="mt-0.5 flex items-center gap-1 px-2 py-1.5 rounded-md border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 cursor-pointer text-[11px]"
           onClick={() => setShowSymbolList(v => !v)}
@@ -130,7 +130,7 @@ export default function BacktestSetupPanel({ onSessionStarted }) {
 
       {/* Start Date */}
       <div>
-        <label className="text-[10px] font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wider">Start Date</label>
+        <label className="text-[10px] font-semibold text-gray-400 dark:text-gray-500 uppercase tracking-widest">Start Date</label>
         <input
           type="date"
           value={startDate}
@@ -148,7 +148,7 @@ export default function BacktestSetupPanel({ onSessionStarted }) {
 
       {/* Initial Capital */}
       <div>
-        <label className="text-[10px] font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wider">Capital (NPR)</label>
+        <label className="text-[10px] font-semibold text-gray-400 dark:text-gray-500 uppercase tracking-widest">Capital (NPR)</label>
         <input
           type="number"
           value={capital}
@@ -162,7 +162,7 @@ export default function BacktestSetupPanel({ onSessionStarted }) {
 
       {/* Strategy Name */}
       <div>
-        <label className="text-[10px] font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wider">Strategy Name</label>
+        <label className="text-[10px] font-semibold text-gray-400 dark:text-gray-500 uppercase tracking-widest">Strategy Name</label>
         <input
           type="text"
           value={strategyName}
@@ -175,7 +175,7 @@ export default function BacktestSetupPanel({ onSessionStarted }) {
 
       {/* Run Mode */}
       <div>
-        <label className="text-[10px] font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wider">Run Mode</label>
+        <label className="text-[10px] font-semibold text-gray-400 dark:text-gray-500 uppercase tracking-widest">Run Mode</label>
         <div className="mt-0.5 flex gap-2">
           {['PLAY', 'MANUAL'].map(m => (
             <button
@@ -196,7 +196,7 @@ export default function BacktestSetupPanel({ onSessionStarted }) {
       {/* Play Speed — only if PLAY */}
       {runMode === 'PLAY' && (
         <div>
-          <label className="text-[10px] font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wider">Play Speed</label>
+          <label className="text-[10px] font-semibold text-gray-400 dark:text-gray-500 uppercase tracking-widest">Play Speed</label>
           <div className="mt-0.5 flex gap-1 flex-wrap">
             {SPEEDS.map(s => (
               <button
@@ -217,7 +217,7 @@ export default function BacktestSetupPanel({ onSessionStarted }) {
 
       {/* SL Validation Mode */}
       <div>
-        <label className="text-[10px] font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wider">
+        <label className="text-[10px] font-semibold text-gray-400 dark:text-gray-500 uppercase tracking-widest">
           SL Validation
         </label>
         <div className="mt-0.5 flex gap-2">

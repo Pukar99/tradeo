@@ -13,7 +13,7 @@ const SCOPE_COLORS = {
   beta:    'bg-purple-100 text-purple-700 dark:bg-purple-900/30 dark:text-purple-400',
 }
 
-function FlagRow({ flag, onToggle, onScopeChange }) {
+function FlagRow({ flag, onToggle, onScopeChange, dropUp = false }) {
   const [scopeOpen,   setScopeOpen]   = useState(false)
   const [toggling,    setToggling]    = useState(false)
   const [scopeSaving, setScopeSaving] = useState(false)
@@ -54,7 +54,7 @@ function FlagRow({ flag, onToggle, onScopeChange }) {
       </div>
 
       {/* Scope dropdown */}
-      <div className="hidden sm:block relative flex-shrink-0">
+      <div className="hidden sm:block relative w-20 flex-shrink-0">
         <button
           onClick={() => setScopeOpen(p => !p)}
           disabled={scopeSaving}
@@ -63,7 +63,9 @@ function FlagRow({ flag, onToggle, onScopeChange }) {
           {scopeSaving ? '…' : flag.scope}
         </button>
         {scopeOpen && (
-          <div className="absolute right-0 top-full mt-1 w-28 bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-700 rounded-xl shadow-lg overflow-hidden z-50">
+          <div className={`absolute right-0 w-28 bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-700 rounded-xl shadow-lg overflow-hidden z-50 ${
+            dropUp ? 'bottom-full mb-1' : 'top-full mt-1'
+          }`}>
             {SCOPES.map(s => (
               <button
                 key={s}
@@ -95,7 +97,7 @@ function FlagRow({ flag, onToggle, onScopeChange }) {
           flag.enabled ? 'bg-green-500' : 'bg-gray-200 dark:bg-gray-700'
         } disabled:opacity-50`}
       >
-        <span className={`absolute top-0.5 w-4 h-4 bg-white rounded-full shadow transition-transform ${
+        <span className={`absolute left-0 top-0.5 w-4 h-4 bg-white rounded-full shadow transition-transform ${
           flag.enabled ? 'translate-x-4' : 'translate-x-0.5'
         }`} />
       </button>
@@ -182,16 +184,22 @@ export default function FeatureFlagsTab() {
       </div>
 
       {/* Rows */}
-      <div className="divide-y divide-gray-100 dark:divide-gray-800/60">
+      <div className="divide-y divide-gray-100 dark:divide-gray-800/60 min-h-[420px]">
         {loading ? (
           Array.from({ length: 8 }).map((_, i) => <SkeletonRow key={i} />)
         ) : flags.length === 0 ? (
-          <div className="flex items-center justify-center py-12 text-sm text-gray-400 dark:text-gray-500">
+          <div className="min-h-[420px] flex items-center justify-center text-sm text-gray-400 dark:text-gray-500">
             No flags yet
           </div>
         ) : (
-          flags.map(f => (
-            <FlagRow key={f.name} flag={f} onToggle={handleToggle} onScopeChange={handleScopeChange} />
+          flags.map((f, i) => (
+            <FlagRow
+              key={f.name}
+              flag={f}
+              onToggle={handleToggle}
+              onScopeChange={handleScopeChange}
+              dropUp={flags.length > 3 && i >= flags.length - 2}
+            />
           ))
         )}
       </div>

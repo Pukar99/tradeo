@@ -1,8 +1,9 @@
-// === MarketJournalTab.jsx — market journal gallery/database/calendar views with NEPSE candlestick thumbnails ===
+// === MarketJournalTab.jsx — market journal gallery/database views with NEPSE candlestick thumbnails ===
 import { useState, useMemo, useEffect, useRef } from 'react'
 import { useTheme } from '../../context/ThemeContext'
 import { getIndexChart } from '../../api'
 import MarketJournalModal from './MarketJournalModal'
+import EmptyState from './EmptyState'
 import { safeUrl } from '../../utils/format'
 
 // ── Module-level chart cache (shared across all cards, 5-min TTL) ─────────────
@@ -29,24 +30,12 @@ const fmtVol = (v) => {
   return `Rs.${Math.round(n).toLocaleString()}`
 }
 
-// ── Empty state ───────────────────────────────────────────────────────────────
-function Empty() {
-  return (
-    <div className="flex flex-col items-center justify-center py-16 text-center">
-      <div className="w-12 h-12 rounded-2xl bg-gray-100 dark:bg-gray-800 flex items-center justify-center mb-3 text-2xl">📰</div>
-      <p className="text-[13px] font-semibold text-gray-600 dark:text-gray-300">No market journal entries yet</p>
-      <p className="text-[11px] text-gray-400 mt-1 max-w-xs">
-        Entries are auto-created when you open the Logs page. Come back after a trading day.
-      </p>
-    </div>
-  )
-}
-
-// ── NEPSE candlestick thumbnail — last 15 bars ending at entry.date ──────────
-function NepseThumbnail({ entryDate, onHoverChange, onOHLC }) {
+// ── NEPSE candlestick thumbnail — 30 bars ending at entry.date, right half empty ──
+function NepseThumbnail({ entryDate, onOHLC }) {
   const { isDark }   = useTheme()
   const containerRef = useRef(null)
   const chartRef     = useRef(null)
+  const roRef        = useRef(null)
   const [loading, setLoading] = useState(true)
   const [error,   setError]   = useState(false)
 
@@ -59,13 +48,14 @@ function NepseThumbnail({ entryDate, onHoverChange, onOHLC }) {
       if (cancelled || !containerRef.current) return
 
       if (chartRef.current) {
-        try { chartRef.current.remove() } catch (_) {}
+        try { chartRef.current.remove() } catch { /* chart already disposed */ }
         chartRef.current = null
       }
 
-      // Take 29 bars ending at entryDate — entry bar is the rightmost real bar.
-      // Then set rightOffset=15 so the timescale shows 15 empty bars to the right,
-      // making the entry bar appear centered in the 30-bar visible window.
+      // Take 30 bars ending at entryDate — the entry bar is the rightmost real
+      // bar. The visible logical range is widened by 15 blank bars on the right
+      // so the entry bar sits ~2/3 across and the OHLC overlay floats over the
+      // empty area. (fitContent() must not be used — it would discard the gap.)
       const dates  = allRows.map(r => r.date?.slice(0, 10) || r.time)
       const idx    = entryDate ? dates.lastIndexOf(entryDate) : dates.length - 1
       const center = idx >= 0 ? idx : dates.length - 1
@@ -95,7 +85,7 @@ function NepseThumbnail({ entryDate, onHoverChange, onOHLC }) {
         grid:   { vertLines: { color: 'transparent' }, horzLines: { color: 'transparent' } },
         rightPriceScale: { visible: false },
         leftPriceScale:  { visible: false },
-        timeScale:       { visible: false, borderColor: 'transparent', rightOffset: 15 },
+        timeScale:       { visible: false, borderColor: 'transparent' },
         crosshair:       { mode: 0 },
         handleScroll:    false,
         handleScale:     false,
@@ -119,17 +109,16 @@ function NepseThumbnail({ entryDate, onHoverChange, onOHLC }) {
       })).filter(d => d.time && !isNaN(d.open))
 
       series.setData(candleData)
-      chart.timeScale().fitContent()
+      chart.timeScale().setVisibleLogicalRange({ from: -0.5, to: candleData.length - 0.5 + 15 })
 
-      const ro = new ResizeObserver(() => {
+      roRef.current = new ResizeObserver(() => {
         if (!containerRef.current || !chart) return
         chart.applyOptions({
           width:  containerRef.current.clientWidth,
           height: containerRef.current.clientHeight,
         })
       })
-      ro.observe(containerRef.current)
-      chart._ro = ro
+      roRef.current.observe(containerRef.current)
     }
 
     async function fetchAndBuild() {
@@ -155,22 +144,16 @@ function NepseThumbnail({ entryDate, onHoverChange, onOHLC }) {
 
     return () => {
       cancelled = true
+      if (roRef.current) { roRef.current.disconnect(); roRef.current = null }
       if (chartRef.current) {
-        try {
-          if (chartRef.current._ro) chartRef.current._ro.disconnect()
-          chartRef.current.remove()
-        } catch (_) {}
+        try { chartRef.current.remove() } catch { /* chart already disposed */ }
         chartRef.current = null
       }
     }
   }, [isDark, entryDate]) // eslint-disable-line react-hooks/exhaustive-deps
 
   return (
-    <div
-      className="relative w-full h-full"
-      onMouseEnter={() => onHoverChange?.(true)}
-      onMouseLeave={() => onHoverChange?.(false)}
-    >
+    <div className="relative w-full h-full">
       <div ref={containerRef} className="w-full h-full" />
 
       {loading && (
@@ -189,8 +172,7 @@ function NepseThumbnail({ entryDate, onHoverChange, onOHLC }) {
 
 // ── Gallery card ──────────────────────────────────────────────────────────────
 function GalleryCard({ entry, onOpen }) {
-  const [hovered, setHovered] = useState(false)
-  const [ohlc,    setOhlc]    = useState(null)
+  const [ohlc, setOhlc] = useState(null)
 
   const change   = entry.nepse_change_pct != null ? parseFloat(entry.nepse_change_pct) : null
   const close    = entry.nepse_close      != null ? parseFloat(entry.nepse_close)      : null
@@ -204,8 +186,7 @@ function GalleryCard({ entry, onOpen }) {
   const advPct = Math.round((adv / total) * 100)
   const decPct = Math.round((dec / total) * 100)
 
-  const filledFields = [entry.pre_market, entry.during_market, entry.post_market, entry.market_surprise]
-  const filledCount  = filledFields.filter(v => v?.trim()).length
+  const filledFields  = [entry.pre_market, entry.during_market, entry.post_market, entry.market_surprise]
   const journalLabels = ['Pre', 'During', 'Post', 'Surprise']
 
   const dateObj = new Date(entry.date + 'T00:00:00')
@@ -253,11 +234,9 @@ function GalleryCard({ entry, onOpen }) {
 
       {/* ── chart — full width, OHLC overlay top-right in the empty half ── */}
       <div className="relative w-full bg-white dark:bg-gray-950 overflow-hidden" style={{ height: 150 }}>
-        <style>{`.mj-thumb a[href*="tradingview"]{display:none!important;}`}</style>
-        <div className="absolute inset-0 mj-thumb">
+        <div className="absolute inset-0">
           <NepseThumbnail
             entryDate={entry.date}
-            onHoverChange={setHovered}
             onOHLC={setOhlc}
           />
         </div>
@@ -380,19 +359,6 @@ function GalleryCard({ entry, onOpen }) {
           </p>
         </div>
       </div>
-    </div>
-  )
-}
-
-// ── Calendar coming soon ───────────────────────────────────────────────────────
-function CalendarComingSoon() {
-  return (
-    <div className="flex flex-col items-center justify-center py-20 text-center">
-      <div className="w-14 h-14 rounded-2xl bg-gray-100 dark:bg-gray-800 flex items-center justify-center mb-4 text-3xl">🗓</div>
-      <p className="text-[14px] font-semibold text-gray-700 dark:text-gray-200">Market Calendar</p>
-      <p className="text-[11px] text-gray-400 mt-1.5 max-w-xs leading-relaxed">
-        A heatmap calendar view of daily NEPSE performance and your journal entries — coming soon.
-      </p>
     </div>
   )
 }
@@ -657,13 +623,15 @@ export default function MarketJournalTab({ view = 'database', marketJournals, on
   const handleClose = () => setOpenEntry(null)
   const handleSaved = (updated) => { onMarketJournalSaved(updated); setOpenEntry(null) }
 
-  if (view === 'calendar') return <CalendarComingSoon />
-
   return (
     <div className="space-y-4">
 
-      {!marketJournals?.length ? (
-        <Empty />
+      {!entries.length ? (
+        <EmptyState
+          icon="📰"
+          title="No market journal entries yet"
+          subtitle="Entries are auto-created when you open the Logs page. Come back after a trading day."
+        />
       ) : view === 'gallery' ? (
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
           {entries.map(entry => (

@@ -888,7 +888,7 @@ function CenterDashboard({ navigate, initData, onRefresh, onDataReady }) {
                     </span>
                   )}
                 </div>
-                <p className="text-[9px] font-bold uppercase tracking-widest text-gray-400 mt-0.5">Edit alert levels</p>
+                <p className="text-[9px] font-semibold uppercase tracking-widest text-gray-400 mt-0.5">Edit alert levels</p>
               </div>
               <button onClick={() => setWatchEditItem(null)}
                 className="w-6 h-6 flex items-center justify-center rounded-full hover:bg-gray-100 dark:hover:bg-gray-800 text-gray-400 hover:text-gray-600 dark:hover:text-gray-300 transition-colors text-base leading-none shrink-0 ml-2">×</button>
@@ -897,7 +897,7 @@ function CenterDashboard({ navigate, initData, onRefresh, onDataReady }) {
 
               {/* ── Price Alert ── */}
               <div>
-                <p className="text-[9px] font-bold uppercase tracking-widest text-gray-400 mb-1">Price Alert</p>
+                <p className="text-[9px] font-semibold uppercase tracking-widest text-gray-400 mb-1">Price Alert</p>
                 {pctChips && (
                   <div className="flex gap-1 mb-1.5 flex-wrap">
                     {pctChips.map(c => (
@@ -925,7 +925,7 @@ function CenterDashboard({ navigate, initData, onRefresh, onDataReady }) {
 
               {/* ── Target Date ── */}
               <div>
-                <p className="text-[9px] font-bold uppercase tracking-widest text-gray-400 mb-1">Target Date</p>
+                <p className="text-[9px] font-semibold uppercase tracking-widest text-gray-400 mb-1">Target Date</p>
                 <div className="flex gap-1 mb-1.5">
                   {dateChips.map(c => (
                     <button key={c.label} type="button"
@@ -948,14 +948,14 @@ function CenterDashboard({ navigate, initData, onRefresh, onDataReady }) {
               {/* ── Watch Range ── */}
               <div className="grid grid-cols-2 gap-2">
                 <div>
-                  <p className="text-[9px] font-bold uppercase tracking-widest text-gray-400 mb-1">Watch Low</p>
+                  <p className="text-[9px] font-semibold uppercase tracking-widest text-gray-400 mb-1">Watch Low</p>
                   <input type="number" min="0" step="0.01" value={watchEditForm.watch_low} autoComplete="off"
                     onChange={e => setWatchEditForm(f => ({ ...f, watch_low: e.target.value }))}
                     placeholder="0.00"
                     className="w-full bg-gray-50 dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg px-2.5 py-1.5 text-[11px] text-gray-800 dark:text-gray-100 placeholder-gray-300 dark:placeholder-gray-600 outline-none focus:border-red-300 dark:focus:border-red-500/50 focus:ring-1 focus:ring-red-200/50 transition-all" />
                 </div>
                 <div>
-                  <p className="text-[9px] font-bold uppercase tracking-widest text-gray-400 mb-1">Watch High</p>
+                  <p className="text-[9px] font-semibold uppercase tracking-widest text-gray-400 mb-1">Watch High</p>
                   <input type="number" min="0" step="0.01" value={watchEditForm.watch_high} autoComplete="off"
                     onChange={e => setWatchEditForm(f => ({ ...f, watch_high: e.target.value }))}
                     placeholder="0.00"
@@ -965,7 +965,7 @@ function CenterDashboard({ navigate, initData, onRefresh, onDataReady }) {
 
               {/* ── Notes ── */}
               <div>
-                <p className="text-[9px] font-bold uppercase tracking-widest text-gray-400 mb-1">Notes</p>
+                <p className="text-[9px] font-semibold uppercase tracking-widest text-gray-400 mb-1">Notes</p>
                 <input type="text" value={watchEditForm.notes} maxLength={300} autoComplete="off"
                   onChange={e => setWatchEditForm(f => ({ ...f, notes: e.target.value }))}
                   placeholder="Setup reason, catalyst…"
@@ -1088,7 +1088,7 @@ function CenterDashboard({ navigate, initData, onRefresh, onDataReady }) {
 
               {/* ── Price Alert ── */}
               <div>
-                <p className="text-[9px] font-bold uppercase tracking-widest text-gray-400 mb-1">Price Alert</p>
+                <p className="text-[9px] font-semibold uppercase tracking-widest text-gray-400 mb-1">Price Alert</p>
                 {pctChips && (
                   <div className="flex gap-1 mb-1.5 flex-wrap">
                     {pctChips.map(c => (
@@ -1116,7 +1116,7 @@ function CenterDashboard({ navigate, initData, onRefresh, onDataReady }) {
 
               {/* ── Target Date ── */}
               <div>
-                <p className="text-[9px] font-bold uppercase tracking-widest text-gray-400 mb-1">Target Date</p>
+                <p className="text-[9px] font-semibold uppercase tracking-widest text-gray-400 mb-1">Target Date</p>
                 <div className="flex gap-1 mb-1.5">
                   {dateChips.map(c => (
                     <button key={c.label} type="button"
@@ -1139,14 +1139,14 @@ function CenterDashboard({ navigate, initData, onRefresh, onDataReady }) {
               {/* ── Watch Range ── */}
               <div className="grid grid-cols-2 gap-2">
                 <div>
-                  <p className="text-[9px] font-bold uppercase tracking-widest text-gray-400 mb-1">Watch Low</p>
+                  <p className="text-[9px] font-semibold uppercase tracking-widest text-gray-400 mb-1">Watch Low</p>
                   <input type="number" min="0" step="0.01" value={watchForm.watch_low}
                     onChange={e => setWatchForm(f => ({ ...f, watch_low: e.target.value }))}
                     placeholder="0.00" autoComplete="off"
                     className="w-full bg-gray-50 dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg px-2.5 py-1.5 text-[11px] text-gray-800 dark:text-gray-100 placeholder-gray-300 dark:placeholder-gray-600 outline-none focus:border-red-300 dark:focus:border-red-500/50 focus:ring-1 focus:ring-red-200/50 transition-all" />
                 </div>
                 <div>
-                  <p className="text-[9px] font-bold uppercase tracking-widest text-gray-400 mb-1">Watch High</p>
+                  <p className="text-[9px] font-semibold uppercase tracking-widest text-gray-400 mb-1">Watch High</p>
                   <input type="number" min="0" step="0.01" value={watchForm.watch_high}
                     onChange={e => setWatchForm(f => ({ ...f, watch_high: e.target.value }))}
                     placeholder="0.00" autoComplete="off"
@@ -1156,7 +1156,7 @@ function CenterDashboard({ navigate, initData, onRefresh, onDataReady }) {
 
               {/* ── Notes + quick tags ── */}
               <div>
-                <p className="text-[9px] font-bold uppercase tracking-widest text-gray-400 mb-1">Notes</p>
+                <p className="text-[9px] font-semibold uppercase tracking-widest text-gray-400 mb-1">Notes</p>
                 <div className="flex gap-1 flex-wrap mb-1.5">
                   {noteTags.map(tag => (
                     <button key={tag} type="button"
@@ -1456,7 +1456,7 @@ function LoggedInHome() {
           {/* Top toggle: Daily Routine ↔ Discipline Score */}
           <div className="flex flex-col gap-2">
             <div className="flex items-center justify-between px-1">
-              <p className="text-[10px] font-bold uppercase tracking-widest text-gray-400">
+              <p className="text-[10px] font-semibold uppercase tracking-widest text-gray-400">
                 {mobileTopTab === 'tasks' ? 'Daily Routine' : 'Discipline Score'}
               </p>
               <div className="flex items-center bg-gray-100 dark:bg-gray-800 rounded-lg p-0.5">
@@ -1485,7 +1485,7 @@ function LoggedInHome() {
           {/* Bottom toggle: Goals ↔ Alerts */}
           <div className="flex flex-col gap-2">
             <div className="flex items-center justify-between px-1">
-              <p className="text-[10px] font-bold uppercase tracking-widest text-gray-400">
+              <p className="text-[10px] font-semibold uppercase tracking-widest text-gray-400">
                 {mobileBottomTab === 'goals' ? 'Monthly Goals' : 'Alerts'}
               </p>
               <div className="flex items-center bg-gray-100 dark:bg-gray-800 rounded-lg p-0.5">

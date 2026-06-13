@@ -94,13 +94,15 @@ export default function ScraperPanel() {
                 <p className="text-[10px] text-red-600 dark:text-red-400 font-medium break-all">{status.lastError}</p>
               </div>
             )}
-            <button
-              onClick={handleRun}
-              disabled={running || status?.running}
-              className="w-full mt-1 px-3 py-2 text-xs font-semibold bg-green-600 hover:bg-green-700 text-white rounded-lg disabled:opacity-40 transition-colors"
-            >
-              {status?.running ? 'Running…' : 'Run Now'}
-            </button>
+            <div className="flex justify-end pt-1">
+              <button
+                onClick={handleRun}
+                disabled={running || status?.running}
+                className="px-3 py-1.5 text-xs font-semibold bg-green-600 hover:bg-green-700 text-white rounded-lg disabled:opacity-40 transition-colors"
+              >
+                {status?.running ? 'Running…' : 'Run Now'}
+              </button>
+            </div>
           </>
         )}
       </div>

@@ -79,7 +79,7 @@ export default function AuditLogTab() {
     <div className="flex flex-col gap-0">
       {/* Filters */}
       <div className="flex flex-col gap-2 px-4 py-3 border-b border-gray-200 dark:border-gray-800">
-        <div className="flex items-center gap-2">
+        <div className="flex flex-wrap items-center gap-2">
           <input
             type="text"
             inputMode="numeric"
@@ -132,11 +132,11 @@ export default function AuditLogTab() {
       </div>
 
       {/* Rows */}
-      <div className="divide-y divide-gray-100 dark:divide-gray-800/60">
+      <div className="divide-y divide-gray-100 dark:divide-gray-800/60 min-h-[420px]">
         {loading ? (
           Array.from({ length: 10 }).map((_, i) => <SkeletonRow key={i} />)
         ) : logs.length === 0 ? (
-          <div className="flex items-center justify-center py-16 text-sm text-gray-400 dark:text-gray-500">
+          <div className="min-h-[420px] flex items-center justify-center text-sm text-gray-400 dark:text-gray-500">
             No audit log entries found
           </div>
         ) : (

@@ -1,16 +1,22 @@
-// === AuditTab.jsx — trade audit tab: KPI grid, equity curve, tax/fees estimates, share modal (PNG + PDF) ===
+// === AuditTab.jsx — merged performance tab: KPI grid, setup breakdown, streaks,
+// equity curve, tax/fees estimates, script audit, share modal (PNG + PDF) ===
 import { useState, useEffect, useCallback, useMemo, useRef, useId } from 'react'
 import { useAuth } from '../../context/AuthContext'
 import { getTradeActions } from '../../utils/globalCache'
 import TraderCard from './TraderCard'
-import { nepseCharges, nepseCGT, fmtRs as fmtAbs, fmtRsSigned as fmtPnl, today } from '../../utils/format'
+import EmptyState from './EmptyState'
+import { rangeToFromTo } from './tradeConstants'
+import { nepseCharges, nepseCGT, fmtRs as fmtAbs, fmtRsSigned as fmtPnl } from '../../utils/format'
+
+const EXIT_TYPES = ['Close Position', 'Partial Exit']
+const LABEL = 'text-[10px] uppercase tracking-widest font-semibold text-gray-400'
 
 // ── KPI card ──────────────────────────────────────────────────────────────────
 function KpiCard({ label, value, valueClass = 'text-gray-900 dark:text-white', sub, icon }) {
   return (
     <div className="bg-white dark:bg-gray-900 rounded-xl border border-gray-100 dark:border-gray-800 px-4 py-3.5 flex flex-col gap-0.5">
       <div className="flex items-center justify-between mb-1">
-        <p className="text-[10px] uppercase tracking-widest font-semibold text-gray-400">{label}</p>
+        <p className={LABEL}>{label}</p>
         {icon && <span className="text-[13px]">{icon}</span>}
       </div>
       <p className={`text-[15px] font-black tracking-tight tabular-nums leading-tight ${valueClass}`}>{value}</p>
@@ -19,25 +25,44 @@ function KpiCard({ label, value, valueClass = 'text-gray-900 dark:text-white', s
   )
 }
 
+// ── Hidden-iframe print (replaces popup + document.write — popup-blocker safe) ─
+function printHtml(html) {
+  document.getElementById('tradeo-pdf-frame')?.remove()
+  const iframe = document.createElement('iframe')
+  iframe.id = 'tradeo-pdf-frame'
+  iframe.style.cssText = 'position:fixed;right:0;bottom:0;width:0;height:0;border:0;'
+  iframe.srcdoc = html
+  iframe.onload = () => {
+    iframe.contentWindow.focus()
+    iframe.contentWindow.print()
+  }
+  document.body.appendChild(iframe)
+}
+
 // ── Share modal ───────────────────────────────────────────────────────────────
-function ShareModal({ onClose, kpis, trades, dateLabel, user }) {
+function ShareModal({ onClose, kpis, trades, entryDateMap, dateLabel, user }) {
   const cardRef    = useRef(null)
   const [gen, setGen]    = useState(false)
   const [pdfGen, setPdfGen] = useState(false)
   const [err, setErr]    = useState(null)
 
+  const captureCard = async () => {
+    if (!cardRef.current) return null
+    const html2canvas = (await import('html2canvas')).default
+    const canvas = await html2canvas(cardRef.current, {
+      backgroundColor: '#0f172a',
+      scale: 2,
+      useCORS: true,
+      logging: false,
+    })
+    return canvas.toDataURL('image/png')
+  }
+
   const handleDownloadCard = async () => {
-    if (!cardRef.current) return
     setGen(true); setErr(null)
     try {
-      const html2canvas = (await import('html2canvas')).default
-      const canvas = await html2canvas(cardRef.current, {
-        backgroundColor: '#0f172a',
-        scale: 2,
-        useCORS: true,
-        logging: false,
-      })
-      const url = canvas.toDataURL('image/png')
+      const url = await captureCard()
+      if (!url) return
       const a   = document.createElement('a')
       a.href     = url
       a.download = `tradeo-card-${new Date().toISOString().slice(0, 10)}.png`
@@ -52,34 +77,19 @@ function ShareModal({ onClose, kpis, trades, dateLabel, user }) {
   const handleDownloadPDF = async () => {
     setPdfGen(true); setErr(null)
     try {
-      // Capture card as image first
-      const html2canvas = (await import('html2canvas')).default
       let cardDataUrl = null
-      if (cardRef.current) {
-        const canvas = await html2canvas(cardRef.current, {
-          backgroundColor: '#0f172a',
-          scale: 2,
-          useCORS: true,
-          logging: false,
-        })
-        cardDataUrl = canvas.toDataURL('image/png')
-      }
-
-      // Build PDF via browser print window (no jsPDF dep needed)
-      const fmt = (n, isFx) =>
-        isFx
-          ? `$${Math.abs(n).toFixed(2)}`
-          : `Rs.${Math.abs(Math.round(n)).toLocaleString()}`
+      try { cardDataUrl = await captureCard() } catch { /* card image is optional */ }
 
       const tradeRows = trades.map(t => {
-        const entryDate = t.date || ''
-        const exitDate  = (t.date || '').slice(0, 10)
+        const entryDate = entryDateMap[t.trade_id] || t.date || ''
+        const exitDate  = t.date || ''
         const days      = entryDate && exitDate
           ? Math.max(0, Math.floor((new Date(exitDate) - new Date(entryDate)) / 86400000))
           : 0
         const pnl = parseFloat(t.realized_pnl) || 0
         return `<tr style="border-bottom:1px solid #e5e7eb">
           <td>${entryDate}</td>
+          <td>${exitDate}</td>
           <td style="font-weight:700">${t.symbol}</td>
           <td style="color:${t.position === 'LONG' ? '#059669' : '#dc2626'}">${t.position}</td>
           <td>${parseFloat(t.quantity) || 0}</td>
@@ -122,24 +132,16 @@ ${cardDataUrl ? `<img src="${cardDataUrl}" class="card-img" alt="Trader Card"/>`
   <div class="kpi"><div class="kpi-label">Est. CGT</div><div class="kpi-value pur">Rs.${Math.round(kpis.cgt).toLocaleString()}</div></div>
 </div>
 <table>
-  <thead><tr><th>Entry Date</th><th>Symbol</th><th>Dir</th><th>Qty</th><th>Entry</th><th>Exit</th><th>P&L</th><th>Hold</th></tr></thead>
+  <thead><tr><th>Entry Date</th><th>Exit Date</th><th>Symbol</th><th>Dir</th><th>Qty</th><th>Entry</th><th>Exit</th><th>P&L</th><th>Hold</th></tr></thead>
   <tbody>${tradeRows}</tbody>
 </table>
-<p class="note">Nepal CGT: Short-term (&lt;365d) 7.5%, Long-term (≥365d) 5%. Broker fees: SEBON-regulated tiers (0.36%–0.24%). This is an estimate — consult a tax advisor for official filing.</p>
+<p class="note">Nepal CGT: Short-term (&lt;365d) 7.5%, Long-term (≥365d) 5%, applied to gains net of fees. Broker fees: SEBON-regulated tiers (0.36%–0.24%). This is an estimate — consult a tax advisor for official filing.</p>
 </body></html>`
 
-      const win = window.open('', '_blank')
-      if (!win) {
-        setErr('Popup blocked. Allow popups for this site to download the PDF.')
-        setPdfGen(false)
-        return
-      }
-      win.document.write(html)
-      win.document.close()
-      win.focus()
-      setTimeout(() => { win.print(); setPdfGen(false) }, 400)
+      printHtml(html)
     } catch {
       setErr('Failed to generate PDF. Please try again.')
+    } finally {
       setPdfGen(false)
     }
   }
@@ -173,9 +175,9 @@ ${cardDataUrl ? `<img src="${cardDataUrl}" class="card-img" alt="Trader Card"/>`
         <div className="p-5 space-y-5">
           {/* Card preview */}
           <div>
-            <p className="text-[10px] uppercase tracking-widest font-semibold text-gray-400 mb-3">Trader Card Preview</p>
+            <p className={`${LABEL} mb-3`}>Trader Card Preview</p>
             <div className="flex justify-center">
-              <TraderCard ref={cardRef} kpis={kpis} trades={trades} dateLabel={dateLabel} user={user} />
+              <TraderCard ref={cardRef} kpis={kpis} dateLabel={dateLabel} user={user} />
             </div>
           </div>
 
@@ -214,16 +216,6 @@ ${cardDataUrl ? `<img src="${cardDataUrl}" class="card-img" alt="Trader Card"/>`
   )
 }
 
-// ── Range → from/to ──────────────────────────────────────────────────────────
-function rangeToFromTo(range) {
-  const todayStr = today()
-  if (range === '1M') return { from: todayStr.slice(0, 7) + '-01', to: todayStr }
-  if (range === '3M') { const d = new Date(); d.setMonth(d.getMonth() - 3); return { from: d.toISOString().slice(0, 10), to: todayStr } }
-  if (range === '6M') { const d = new Date(); d.setMonth(d.getMonth() - 6); return { from: d.toISOString().slice(0, 10), to: todayStr } }
-  if (range === '1Y') return { from: `${new Date().getFullYear()}-01-01`, to: todayStr }
-  return { from: null, to: todayStr }
-}
-
 // ── Main AuditTab ─────────────────────────────────────────────────────────────
 export default function AuditTab({ range = '1M', symbol = 'all', onSymbolsLoaded, shareOpen = false, onShareClose }) {
   const { user }   = useAuth()
@@ -232,7 +224,6 @@ export default function AuditTab({ range = '1M', symbol = 'all', onSymbolsLoaded
 
   const [trades,    setTrades]    = useState([])
   const [loading,   setLoading]   = useState(true)
-  const [showShare, setShowShare] = useState(false)
 
   const fetchTrades = useCallback(async () => {
     try {
@@ -250,17 +241,12 @@ export default function AuditTab({ range = '1M', symbol = 'all', onSymbolsLoaded
   // Derive from/to from range prop — recalculates whenever range changes
   const { from: appliedFrom, to: appliedTo } = useMemo(() => rangeToFromTo(range), [range])
 
-  // Sync share modal open state with parent toolbar button
-  useEffect(() => {
-    if (shareOpen) setShowShare(true)
-  }, [shareOpen])
-
   // Expose unique symbols to parent so it can populate the select
   useEffect(() => {
-    if (!onSymbolsLoaded || !trades.length) return
+    if (!onSymbolsLoaded) return
     const syms = [...new Set(
       trades
-        .filter(t => t.action_type === 'Close Position' || t.action_type === 'Partial Exit')
+        .filter(t => EXIT_TYPES.includes(t.action_type))
         .map(t => t.symbol)
     )].sort()
     onSymbolsLoaded(syms)
@@ -277,28 +263,46 @@ export default function AuditTab({ range = '1M', symbol = 'all', onSymbolsLoaded
   }, [trades, appliedFrom, appliedTo, symbol])
 
   // Only action rows that actually realised P&L — not open-position rows that happen to have PARTIAL status
-  const closed = rangedTrades.filter(t => t.action_type === 'Close Position' || t.action_type === 'Partial Exit')
+  const closed = useMemo(
+    () => rangedTrades.filter(t => EXIT_TYPES.includes(t.action_type)),
+    [rangedTrades]
+  )
 
-  // Entry date map: trade_id → date from the New Position action row
-  const entryDateMap = useMemo(() => {
+  // Entry metadata per trade_id from the New Position action row:
+  // date for hold-days/CGT, sl/tp for planned R:R, setup_type for the breakdown.
+  const entryMap = useMemo(() => {
     const map = {}
-    trades.forEach(t => { if (t.action_type === 'New Position') map[t.trade_id] = t.date })
+    trades.forEach(t => {
+      if (t.action_type === 'New Position') {
+        map[t.trade_id] = { date: t.date, sl: t.sl, tp: t.tp, setup_type: t.setup_type, entry_price: t.entry_price }
+      }
+    })
     return map
   }, [trades])
+
+  const entryDateMap = useMemo(() => {
+    const map = {}
+    for (const [id, e] of Object.entries(entryMap)) map[id] = e.date
+    return map
+  }, [entryMap])
 
   // ── KPI calculations (all client-side from loaded trades array) ────────────
   const kpis = useMemo(() => {
     const totalTrades = new Set(rangedTrades.map(t => t.trade_id)).size
-    const winners     = closed.filter(t => (parseFloat(t.realized_pnl) || 0) > 0)
-    const losers      = closed.filter(t => (parseFloat(t.realized_pnl) || 0) < 0)
+    const pnlOf       = t => parseFloat(t.realized_pnl) || 0
+    const winners     = closed.filter(t => pnlOf(t) > 0)
+    const losers      = closed.filter(t => pnlOf(t) < 0)
     const winRate     = closed.length > 0 ? (winners.length / closed.length) * 100 : null
 
-    const grossProfit = winners.reduce((s, t) => s + (parseFloat(t.realized_pnl) || 0), 0)
-    const grossLoss   = Math.abs(losers.reduce((s, t) => s + (parseFloat(t.realized_pnl) || 0), 0))
+    const grossProfit = winners.reduce((s, t) => s + pnlOf(t), 0)
+    const grossLoss   = Math.abs(losers.reduce((s, t) => s + pnlOf(t), 0))
     const netPnl      = grossProfit - grossLoss
     const profitFactor = grossLoss > 0 ? grossProfit / grossLoss : grossProfit > 0 ? Infinity : null
+    const avgWin      = winners.length ? grossProfit / winners.length : null
+    const avgLoss     = losers.length  ? grossLoss   / losers.length  : null
 
-    // Broker fees — NEPSE only (entry value × tier rate, each side)
+    // Broker fees + CGT — NEPSE only. CGT applies to gains net of transaction
+    // charges (per format.js fee schedule), per exit action.
     let brokerFees = 0
     let cgt        = 0
     let totalTradedValue = 0
@@ -307,44 +311,40 @@ export default function AuditTab({ range = '1M', symbol = 'all', onSymbolsLoaded
       const entry = parseFloat(t.entry_price) || 0
       const qty   = parseFloat(t.quantity) || 0
       const exitP = parseFloat(t.exit_price) || 0
-      const pnl   = parseFloat(t.realized_pnl) || 0
+      const pnl   = pnlOf(t)
 
       const entryVal = entry * qty
       const exitVal  = exitP * qty
-      brokerFees   += nepseCharges(entryVal) + nepseCharges(exitVal)
+      const charges  = nepseCharges(entryVal) + nepseCharges(exitVal)
+      brokerFees   += charges
       totalTradedValue += entryVal
-      // CGT: t.date = exit date (action date), entryDateMap = entry date from New Position row
+
+      // t.date = exit date (action date); entryDateMap = entry date from New Position row
       const entryDate = entryDateMap[t.trade_id] || t.date
-      if (pnl > 0 && entryDate && t.date) {
-        cgt += nepseCGT(pnl, entryDate, t.date)
+      const taxable   = pnl - charges
+      if (taxable > 0 && entryDate && t.date) {
+        cgt += nepseCGT(taxable, entryDate, t.date)
       }
     }
 
     const netAfterTaxFees = netPnl - brokerFees - cgt
 
-    // Avg R:R from trades with SL + TP
-    const rrTrades = closed.filter(t => t.sl && t.tp)
-    const avgRR    = rrTrades.length > 0
-      ? rrTrades.reduce((s, t) => {
-          const e    = parseFloat(t.entry_price)
-          const risk = Math.abs(e - parseFloat(t.sl))
-          const rew  = Math.abs(parseFloat(t.tp) - e)
-          return s + (risk > 0 ? rew / risk : 0)
-        }, 0) / rrTrades.length
-      : null
-
-    // Max drawdown from equity curve — sort by action date (the canonical date column in v2.2)
-    const sortedClosed = [...closed].sort((a, b) => (a.date || '') < (b.date || '') ? -1 : 1)
-    let equity = 0, peak = 0, maxDDPct = 0
+    // Max drawdown — absolute Rs peak-to-trough on the cumulative curve.
+    // (A % of peak is undefined when equity starts negative.)
+    const sortedClosed = [...closed].sort((a, b) => {
+      if ((a.date || '') !== (b.date || '')) return (a.date || '') < (b.date || '') ? -1 : 1
+      return (a.created_at || '') < (b.created_at || '') ? -1 : 1
+    })
+    let equity = 0, peak = 0, maxDD = 0
     for (const t of sortedClosed) {
-      equity += parseFloat(t.realized_pnl) || 0
+      equity += pnlOf(t)
       if (equity > peak) peak = equity
-      const dd = peak > 0 ? ((peak - equity) / peak) * 100 : 0
-      if (dd > maxDDPct) maxDDPct = dd
+      const dd = peak - equity
+      if (dd > maxDD) maxDD = dd
     }
 
     // Best / worst — closed already contains only Close Position + Partial Exit rows
-    const sortedByPnl  = [...closed].sort((a, b) => (parseFloat(b.realized_pnl) || 0) - (parseFloat(a.realized_pnl) || 0))
+    const sortedByPnl  = [...closed].sort((a, b) => pnlOf(b) - pnlOf(a))
     const bestTrade    = sortedByPnl[0] || null
     const worstTrade   = sortedByPnl[sortedByPnl.length - 1] || null
 
@@ -357,24 +357,47 @@ export default function AuditTab({ range = '1M', symbol = 'all', onSymbolsLoaded
         }, 0) / closedWithDates.length
       : null
 
-    // Daily win streak (current) — group by exit action date
+    // Daily win streak (current) — group exits by date, count consecutive green days
     const byDate = {}
     for (const t of closed) {
       const d = t.date || ''
       if (!d) continue
-      byDate[d] = (byDate[d] || 0) + (parseFloat(t.realized_pnl) || 0)
+      byDate[d] = (byDate[d] || 0) + pnlOf(t)
     }
     const days = Object.entries(byDate).sort(([a], [b]) => b.localeCompare(a))
-    let streak = 0
+    let dailyStreak = 0
     for (const [, pnl] of days) {
-      if (pnl > 0) streak++
+      if (pnl > 0) dailyStreak++
       else break
     }
+
+    // Exit streaks — consecutive winning/losing exits in chronological order
+    let curWin = 0, curLoss = 0, bestWinRun = 0, worstLossRun = 0
+    sortedClosed.forEach(t => {
+      if (pnlOf(t) > 0) { curWin++;  curLoss = 0; bestWinRun   = Math.max(bestWinRun, curWin) }
+      else              { curLoss++; curWin  = 0; worstLossRun = Math.max(worstLossRun, curLoss) }
+    })
+    const lastPnl = sortedClosed.length ? pnlOf(sortedClosed[sortedClosed.length - 1]) : 0
+    const currentStreak = lastPnl > 0 ? curWin : -curLoss
+
+    // Setup breakdown — setup_type lives on the entry row; group exits by it
+    const bySetup = {}
+    closed.forEach(t => {
+      const key = entryMap[t.trade_id]?.setup_type || 'Untagged'
+      if (!bySetup[key]) bySetup[key] = { wins: 0, total: 0, pnl: 0 }
+      bySetup[key].total++
+      bySetup[key].pnl += pnlOf(t)
+      if (pnlOf(t) > 0) bySetup[key].wins++
+    })
+    const setupRows = Object.entries(bySetup).sort((a, b) => b[1].total - a[1].total)
+
+    // Expectancy per exit
+    const expectancy = closed.length > 0 ? netPnl / closed.length : null
 
     // Equity curve points for sparkline
     const equityCurve = sortedClosed.reduce((acc, t) => {
       const prev = acc[acc.length - 1] ?? 0
-      acc.push(prev + (parseFloat(t.realized_pnl) || 0))
+      acc.push(prev + pnlOf(t))
       return acc
     }, [])
 
@@ -388,19 +411,43 @@ export default function AuditTab({ range = '1M', symbol = 'all', onSymbolsLoaded
       grossProfit,
       grossLoss,
       profitFactor,
+      avgWin,
+      avgLoss,
       brokerFees,
       cgt,
       netAfterTaxFees,
-      avgRR,
-      maxDDPct,
+      maxDD,
       bestTrade,
       worstTrade,
       avgHoldDays,
-      streak,
+      dailyStreak,
+      currentStreak,
+      bestWinRun,
+      worstLossRun,
+      setupRows,
+      expectancy,
       totalTradedValue,
       equityCurve,
     }
-  }, [rangedTrades, closed, entryDateMap])
+  }, [rangedTrades, closed, entryMap, entryDateMap])
+
+  // Avg planned R:R — computed separately for clarity: reward/risk from the
+  // entry row's fill price vs its SL/TP.
+  const avgRR = useMemo(() => {
+    const entries = [...new Set(closed.map(t => t.trade_id))]
+      .map(id => {
+        const e = entryMap[id]
+        if (!e || !e.sl || !e.tp) return null
+        const fill = parseFloat(e.entry_price)
+        const sl   = parseFloat(e.sl)
+        const tp   = parseFloat(e.tp)
+        if (!fill || !sl || !tp) return null
+        const risk = Math.abs(fill - sl)
+        return risk > 0 ? Math.abs(tp - fill) / risk : null
+      })
+      .filter(v => v != null)
+    return entries.length > 0 ? entries.reduce((a, b) => a + b, 0) / entries.length : null
+  }, [closed, entryMap])
 
   const pnlColor = (n) => n > 0 ? 'text-emerald-500' : n < 0 ? 'text-red-400' : 'text-gray-400'
 
@@ -410,12 +457,14 @@ export default function AuditTab({ range = '1M', symbol = 'all', onSymbolsLoaded
       ? appliedFrom
       : `${appliedFrom} – ${appliedTo}`
 
+  // Share-card KPIs — pass the entry-derived avgRR through
+  const shareKpis = useMemo(() => ({ ...kpis, avgRR }), [kpis, avgRR])
+
   // Script audit rows — all exit actions for the selected symbol in range
-  // MUST be above the early return — hooks cannot be conditional
   const scriptAuditRows = useMemo(() => {
     if (symbol === 'all') return []
     return rangedTrades
-      .filter(t => (t.action_type === 'Close Position' || t.action_type === 'Partial Exit') && t.symbol === symbol)
+      .filter(t => EXIT_TYPES.includes(t.action_type) && t.symbol === symbol)
       .sort((a, b) => (b.date || '') > (a.date || '') ? 1 : -1)
   }, [rangedTrades, symbol])
 
@@ -426,11 +475,22 @@ export default function AuditTab({ range = '1M', symbol = 'all', onSymbolsLoaded
     const total = pnls.reduce((a, b) => a + b, 0)
     return {
       total,
-      winRate: scriptAuditRows.length > 0 ? (wins.length / scriptAuditRows.length * 100) : 0,
+      winRate: (wins.length / scriptAuditRows.length) * 100,
       count: scriptAuditRows.length,
       winCount: wins.length,
     }
   }, [scriptAuditRows])
+
+  const streakLabel = kpis.currentStreak > 0
+    ? `${kpis.currentStreak} win${kpis.currentStreak > 1 ? 's' : ''} ✓`
+    : kpis.currentStreak < 0
+      ? `${Math.abs(kpis.currentStreak)} loss${Math.abs(kpis.currentStreak) > 1 ? 'es' : ''} ✗`
+      : '—'
+  const streakColor = kpis.currentStreak > 0
+    ? 'text-emerald-500'
+    : kpis.currentStreak < 0
+      ? 'text-red-400'
+      : 'text-gray-400'
 
   if (loading) return (
     <div className="flex items-center justify-center py-16">
@@ -449,6 +509,11 @@ export default function AuditTab({ range = '1M', symbol = 'all', onSymbolsLoaded
             {symbol}
           </span>
         )}
+        {trades.length >= 1000 && (
+          <span className="px-1.5 py-0.5 bg-amber-100 dark:bg-amber-900/30 text-amber-700 dark:text-amber-300 rounded font-semibold">
+            Showing latest 1,000 actions
+          </span>
+        )}
         <span className="ml-auto text-gray-300 dark:text-gray-700">{dateLabel}</span>
       </div>
 
@@ -463,15 +528,15 @@ export default function AuditTab({ range = '1M', symbol = 'all', onSymbolsLoaded
             {scriptKpis && (
               <div className="flex items-center gap-4">
                 <div className="text-right">
-                  <p className="text-[10px] uppercase tracking-widest font-semibold text-gray-400">Win Rate</p>
+                  <p className={LABEL}>Win Rate</p>
                   <p className={`text-[13px] font-bold tabular-nums ${scriptKpis.winRate >= 50 ? 'text-emerald-500' : 'text-red-400'}`}>
                     {scriptKpis.winRate.toFixed(0)}% ({scriptKpis.winCount}/{scriptKpis.count})
                   </p>
                 </div>
                 <div className="text-right">
-                  <p className="text-[10px] uppercase tracking-widest font-semibold text-gray-400">Net P&L</p>
+                  <p className={LABEL}>Net P&L</p>
                   <p className={`text-[13px] font-bold tabular-nums ${scriptKpis.total >= 0 ? 'text-emerald-500' : 'text-red-400'}`}>
-                    {scriptKpis.total >= 0 ? '+' : '−'}Rs.{Math.abs(Math.round(scriptKpis.total)).toLocaleString()}
+                    {fmtPnl(scriptKpis.total)}
                   </p>
                 </div>
               </div>
@@ -487,7 +552,7 @@ export default function AuditTab({ range = '1M', symbol = 'all', onSymbolsLoaded
                 <thead>
                   <tr className="border-b border-gray-100 dark:border-gray-800">
                     {['Date', 'Action', 'Qty', 'Entry', 'Exit', 'Hold', 'P&L'].map(h => (
-                      <th key={h} className="text-left px-4 py-2 text-[10px] uppercase tracking-widest font-semibold text-gray-400">{h}</th>
+                      <th key={h} className={`text-left px-4 py-2 ${LABEL}`}>{h}</th>
                     ))}
                   </tr>
                 </thead>
@@ -522,20 +587,18 @@ export default function AuditTab({ range = '1M', symbol = 'all', onSymbolsLoaded
       )}
 
       {kpis.closedCount === 0 ? (
-        <div className="bg-white dark:bg-gray-900 rounded-2xl border border-gray-100 dark:border-gray-800 py-20 text-center">
-          <div className="w-10 h-10 rounded-2xl bg-gray-50 dark:bg-gray-800 flex items-center justify-center mx-auto mb-3">
-            <svg className="w-5 h-5 text-gray-300 dark:text-gray-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z" />
-            </svg>
-          </div>
-          <p className="text-[12px] font-medium text-gray-400">No closed trades in this date range</p>
-          <p className="text-[10px] text-gray-300 dark:text-gray-700 mt-1">Adjust the date range or close some trades first</p>
+        <div className="bg-white dark:bg-gray-900 rounded-2xl border border-gray-100 dark:border-gray-800">
+          <EmptyState
+            icon="📊"
+            title="No closed trades in this date range"
+            subtitle="Adjust the date range or close some trades first."
+          />
         </div>
       ) : (
         <>
           {/* ── KPI Grid Row 1: Core ── */}
           <div>
-            <p className="text-[10px] uppercase tracking-widest font-semibold text-gray-400 mb-2">Performance</p>
+            <p className={`${LABEL} mb-2`}>Performance</p>
             <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
               <KpiCard
                 label="Total Trades"
@@ -569,19 +632,56 @@ export default function AuditTab({ range = '1M', symbol = 'all', onSymbolsLoaded
 
           {/* ── KPI Grid Row 2: P&L Breakdown ── */}
           <div>
-            <p className="text-[10px] uppercase tracking-widest font-semibold text-gray-400 mb-2">P&L Breakdown</p>
-            <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
+            <p className={`${LABEL} mb-2`}>P&L Breakdown</p>
+            <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
               <KpiCard
                 label="Gross Profit"
                 value={fmtAbs(kpis.grossProfit)}
                 valueClass="text-emerald-500"
-                sub={`${kpis.winners} winning trades`}
+                sub={`${kpis.winners} winning exits`}
               />
               <KpiCard
                 label="Gross Loss"
                 value={fmtAbs(kpis.grossLoss)}
                 valueClass="text-red-400"
-                sub={`${kpis.losers} losing trades`}
+                sub={`${kpis.losers} losing exits`}
+              />
+              <KpiCard
+                label="Avg Win"
+                value={kpis.avgWin !== null ? fmtAbs(kpis.avgWin) : '—'}
+                valueClass={kpis.avgWin !== null ? 'text-emerald-500' : 'text-gray-400'}
+                sub="per winning exit"
+              />
+              <KpiCard
+                label="Avg Loss"
+                value={kpis.avgLoss !== null ? fmtAbs(kpis.avgLoss) : '—'}
+                valueClass={kpis.avgLoss !== null ? 'text-red-400' : 'text-gray-400'}
+                sub="per losing exit"
+              />
+            </div>
+          </div>
+
+          {/* ── KPI Grid Row 3: Tax & Fees ── */}
+          <div>
+            <p className={`${LABEL} mb-2`}>Tax & Fees (Nepal)</p>
+            <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
+              <KpiCard
+                label="Est. Broker Fees"
+                value={`Rs.${Math.round(kpis.brokerFees).toLocaleString()}`}
+                valueClass="text-violet-500"
+                sub="SEBON tiers (0.36%–0.24%)"
+              />
+              <KpiCard
+                label="Est. CGT Tax"
+                value={`Rs.${Math.round(kpis.cgt).toLocaleString()}`}
+                valueClass="text-violet-500"
+                sub="7.5% ST · 5% LT, net of fees"
+              />
+              <KpiCard
+                label="Net After Tax & Fees"
+                value={fmtPnl(kpis.netAfterTaxFees)}
+                valueClass={pnlColor(kpis.netAfterTaxFees)}
+                sub="P&L − fees − CGT"
               />
               <KpiCard
                 label="Total Traded Value"
@@ -590,51 +690,26 @@ export default function AuditTab({ range = '1M', symbol = 'all', onSymbolsLoaded
                 sub="entry value of closed"
               />
             </div>
-          </div>
-
-          {/* ── KPI Grid Row 3: Tax & Fees ── */}
-          <div>
-            <p className="text-[10px] uppercase tracking-widest font-semibold text-gray-400 mb-2">Tax & Fees (Nepal)</p>
-              <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
-                <KpiCard
-                  label="Est. Broker Fees"
-                  value={`Rs.${Math.round(kpis.brokerFees).toLocaleString()}`}
-                  valueClass="text-violet-500"
-                  sub="SEBON tiers (0.36%–0.24%)"
-                />
-                <KpiCard
-                  label="Est. CGT Tax"
-                  value={`Rs.${Math.round(kpis.cgt).toLocaleString()}`}
-                  valueClass="text-violet-500"
-                  sub="7.5% ST · 5% LT"
-                />
-                <KpiCard
-                  label="Net After Tax & Fees"
-                  value={fmtPnl(kpis.netAfterTaxFees)}
-                  valueClass={pnlColor(kpis.netAfterTaxFees)}
-                  sub="P&L − fees − CGT"
-                />
-              </div>
-              <p className="text-[10px] text-gray-400 mt-1.5 px-0.5">
-                Estimates only. Nepal CGT: short-term (&lt;365d) 7.5%, long-term (≥365d) 5%. Fiscal year Jul 16–Jul 15. Consult a tax advisor.
-              </p>
+            <p className="text-[10px] text-gray-400 mt-1.5 px-0.5">
+              Estimates only. Nepal CGT: short-term (&lt;365d) 7.5%, long-term (≥365d) 5%, applied to gains net of fees. Fiscal year Jul 16–Jul 15. Consult a tax advisor.
+            </p>
           </div>
 
           {/* ── KPI Grid Row 4: Risk & Timing ── */}
           <div>
-            <p className="text-[10px] uppercase tracking-widest font-semibold text-gray-400 mb-2">Risk & Timing</p>
+            <p className={`${LABEL} mb-2`}>Risk & Timing</p>
             <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
               <KpiCard
-                label="Avg R:R"
-                value={kpis.avgRR !== null ? `${kpis.avgRR.toFixed(2)}R` : '—'}
-                valueClass={kpis.avgRR !== null ? (kpis.avgRR >= 2 ? 'text-emerald-500' : kpis.avgRR >= 1 ? 'text-amber-500' : 'text-red-400') : 'text-gray-400'}
-                sub="from trades with SL+TP"
+                label="Avg Planned R:R"
+                value={avgRR !== null ? `${avgRR.toFixed(2)}R` : '—'}
+                valueClass={avgRR !== null ? (avgRR >= 2 ? 'text-emerald-500' : avgRR >= 1 ? 'text-amber-500' : 'text-red-400') : 'text-gray-400'}
+                sub="from entries with SL+TP"
               />
               <KpiCard
                 label="Max Drawdown"
-                value={kpis.maxDDPct > 0 ? `${kpis.maxDDPct.toFixed(1)}%` : '0%'}
-                valueClass={kpis.maxDDPct > 20 ? 'text-red-500' : kpis.maxDDPct > 10 ? 'text-amber-500' : 'text-emerald-500'}
-                sub="from peak equity"
+                value={kpis.maxDD > 0 ? fmtAbs(kpis.maxDD) : 'None'}
+                valueClass={kpis.maxDD > 0 ? 'text-red-400' : 'text-emerald-500'}
+                sub="peak-to-trough equity"
               />
               <KpiCard
                 label="Avg Hold Days"
@@ -642,25 +717,89 @@ export default function AuditTab({ range = '1M', symbol = 'all', onSymbolsLoaded
                 sub="closed trades"
               />
               <KpiCard
-                label="Win Streak"
-                value={kpis.streak > 0 ? `${kpis.streak}d` : '—'}
-                valueClass={kpis.streak >= 3 ? 'text-emerald-500' : 'text-gray-700 dark:text-gray-200'}
-                sub="current consecutive wins"
+                label="Daily Win Streak"
+                value={kpis.dailyStreak > 0 ? `${kpis.dailyStreak}d` : '—'}
+                valueClass={kpis.dailyStreak >= 3 ? 'text-emerald-500' : 'text-gray-700 dark:text-gray-200'}
+                sub="consecutive green days"
               />
+            </div>
+          </div>
+
+          {/* ── Row 5: Setup breakdown + streak panel ── */}
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+
+            {/* Setup type breakdown */}
+            <div className="bg-white dark:bg-gray-900 rounded-xl border border-gray-100 dark:border-gray-800 px-4 py-4">
+              <p className={`${LABEL} mb-3`}>By Setup Type</p>
+              {kpis.setupRows.length === 0 ? (
+                <p className="text-xs text-gray-400">No setup types tagged.</p>
+              ) : (
+                <div className="space-y-1.5">
+                  {kpis.setupRows.map(([name, data]) => {
+                    const wr = data.total > 0 ? data.wins / data.total : 0
+                    return (
+                      <div key={name} className="flex items-center gap-2">
+                        <span className="text-[11px] text-gray-600 dark:text-gray-300 w-28 truncate shrink-0">{name}</span>
+                        <div className="flex-1 h-1.5 bg-gray-100 dark:bg-gray-800 rounded-full overflow-hidden">
+                          <div
+                            className={`h-full rounded-full ${wr >= 0.5 ? 'bg-emerald-400' : 'bg-red-400'}`}
+                            style={{ width: `${Math.round(wr * 100)}%` }}
+                          />
+                        </div>
+                        <span className={`text-[10px] font-bold tabular-nums shrink-0 w-8 text-right ${wr >= 0.5 ? 'text-emerald-500' : 'text-red-400'}`}>
+                          {Math.round(wr * 100)}%
+                        </span>
+                        <span className="text-[10px] text-gray-400 shrink-0">({data.wins}/{data.total})</span>
+                      </div>
+                    )
+                  })}
+                </div>
+              )}
+            </div>
+
+            {/* Streak + expectancy panel */}
+            <div className="bg-white dark:bg-gray-900 rounded-xl border border-gray-100 dark:border-gray-800 px-4 py-4">
+              <p className={`${LABEL} mb-3`}>Win / Loss Streak</p>
+              <div className="space-y-3">
+                <div>
+                  <p className={LABEL}>Current</p>
+                  <p className={`text-[15px] font-black tracking-tight ${streakColor}`}>{streakLabel}</p>
+                </div>
+                <div className="flex gap-6">
+                  <div>
+                    <p className={LABEL}>Best Win Run</p>
+                    <p className="text-[13px] font-bold text-emerald-500 tabular-nums">
+                      {kpis.bestWinRun > 0 ? `${kpis.bestWinRun} in a row` : '—'}
+                    </p>
+                  </div>
+                  <div>
+                    <p className={LABEL}>Worst Loss Run</p>
+                    <p className="text-[13px] font-bold text-red-400 tabular-nums">
+                      {kpis.worstLossRun > 0 ? `${kpis.worstLossRun} in a row` : '—'}
+                    </p>
+                  </div>
+                </div>
+                <div className="pt-1 border-t border-gray-100 dark:border-gray-800">
+                  <p className={`${LABEL} mb-1`}>Expectancy per exit</p>
+                  <p className={`text-[13px] font-bold tabular-nums ${pnlColor(kpis.expectancy ?? 0)}`}>
+                    {kpis.expectancy !== null ? fmtPnl(kpis.expectancy) : '—'}
+                  </p>
+                </div>
+              </div>
             </div>
           </div>
 
           {/* ── Best / Worst ── */}
           {(kpis.bestTrade || kpis.worstTrade) && (
             <div>
-              <p className="text-[10px] uppercase tracking-widest font-semibold text-gray-400 mb-2">Best & Worst Trade</p>
+              <p className={`${LABEL} mb-2`}>Best & Worst Trade</p>
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
                 {kpis.bestTrade && (
                   <div className="bg-white dark:bg-gray-900 rounded-xl border border-emerald-100 dark:border-emerald-800/30 px-4 py-3 flex items-center justify-between">
                     <div className="flex items-center gap-3">
                       <div className="w-1.5 h-8 rounded-full bg-emerald-400 flex-shrink-0" />
                       <div>
-                        <p className="text-[10px] uppercase tracking-widest font-semibold text-gray-400">Best Trade</p>
+                        <p className={LABEL}>Best Trade</p>
                         <p className="text-[13px] font-bold text-gray-900 dark:text-white mt-0.5">{kpis.bestTrade.symbol}</p>
                         <p className="text-[10px] text-gray-400">{kpis.bestTrade.date} · {kpis.bestTrade.position}</p>
                       </div>
@@ -673,7 +812,7 @@ export default function AuditTab({ range = '1M', symbol = 'all', onSymbolsLoaded
                     <div className="flex items-center gap-3">
                       <div className="w-1.5 h-8 rounded-full bg-red-400 flex-shrink-0" />
                       <div>
-                        <p className="text-[10px] uppercase tracking-widest font-semibold text-gray-400">Worst Trade</p>
+                        <p className={LABEL}>Worst Trade</p>
                         <p className="text-[13px] font-bold text-gray-900 dark:text-white mt-0.5">{kpis.worstTrade.symbol}</p>
                         <p className="text-[10px] text-gray-400">{kpis.worstTrade.date} · {kpis.worstTrade.position}</p>
                       </div>
@@ -688,7 +827,7 @@ export default function AuditTab({ range = '1M', symbol = 'all', onSymbolsLoaded
           {/* ── Equity sparkline ── */}
           {kpis.equityCurve.length > 1 && (
             <div>
-              <p className="text-[10px] uppercase tracking-widest font-semibold text-gray-400 mb-2">Cumulative Equity Curve</p>
+              <p className={`${LABEL} mb-2`}>Cumulative Equity Curve</p>
               <div className="bg-white dark:bg-gray-900 rounded-xl border border-gray-100 dark:border-gray-800 p-4">
                 {(() => {
                   const pts  = kpis.equityCurve
@@ -700,30 +839,30 @@ export default function AuditTab({ range = '1M', symbol = 'all', onSymbolsLoaded
                   const step = w / Math.max(pts.length - 1, 1)
                   const toY  = (v) => h - ((v - minV) / range) * h
                   const points = pts.map((v, i) => `${i * step},${toY(v)}`).join(' ')
-                  const fill   = pts.map((v, i) => `${i * step},${toY(v)}`).join(' ')
                   const lastY  = toY(pts[pts.length - 1])
                   const endPnl = pts[pts.length - 1]
+                  const col    = endPnl >= 0 ? '#10b981' : '#f87171'
                   return (
                     <svg viewBox={`0 0 ${w} ${h + 4}`} className="w-full" style={{ height: 88 }}>
                       <defs>
                         <linearGradient id={gradId} x1="0" y1="0" x2="0" y2="1">
-                          <stop offset="0%" stopColor={endPnl >= 0 ? '#10b981' : '#f87171'} stopOpacity="0.3" />
-                          <stop offset="100%" stopColor={endPnl >= 0 ? '#10b981' : '#f87171'} stopOpacity="0" />
+                          <stop offset="0%" stopColor={col} stopOpacity="0.3" />
+                          <stop offset="100%" stopColor={col} stopOpacity="0" />
                         </linearGradient>
                       </defs>
                       <polygon
-                        points={`0,${h + 4} ${fill} ${(pts.length - 1) * step},${h + 4}`}
+                        points={`0,${h + 4} ${points} ${(pts.length - 1) * step},${h + 4}`}
                         fill={`url(#${gradId})`}
                       />
                       <polyline
                         points={points}
                         fill="none"
-                        stroke={endPnl >= 0 ? '#10b981' : '#f87171'}
+                        stroke={col}
                         strokeWidth="1.5"
                         strokeLinejoin="round"
                         strokeLinecap="round"
                       />
-                      <circle cx={(pts.length - 1) * step} cy={lastY} r="3" fill={endPnl >= 0 ? '#10b981' : '#f87171'} />
+                      <circle cx={(pts.length - 1) * step} cy={lastY} r="3" fill={col} />
                     </svg>
                   )
                 })()}
@@ -738,12 +877,13 @@ export default function AuditTab({ range = '1M', symbol = 'all', onSymbolsLoaded
         </>
       )}
 
-      {/* Share modal */}
-      {showShare && (
+      {/* Share modal — single source of truth is the parent toolbar's shareOpen */}
+      {shareOpen && (
         <ShareModal
-          onClose={() => { setShowShare(false); onShareClose?.() }}
-          kpis={kpis}
+          onClose={onShareClose}
+          kpis={shareKpis}
           trades={closed}
+          entryDateMap={entryDateMap}
           dateLabel={dateLabel}
           user={user}
         />

@@ -379,6 +379,9 @@ export default function LeftPanel() {
       sl:                 p.sl,
       tp:                 p.tp,
       status:             p.status,
+      // entry_date drives the chart's entry marker, line clipping, and zoom-to-entry —
+      // without it the position lines span the entire chart history
+      entry_date:         p.opened_at || null,
     })), [sharedPositions])
 
   const [watchlist,     setWatchlist]     = useState([])
@@ -413,15 +416,16 @@ export default function LeftPanel() {
   useChatRefresh(['trades', 'watchlist'], loadData)
 
   const alertPositionsKey = useMemo(
-    () => positions.filter(p => p.sl || p.tp).map(p => `${p.id}:${p.sl}:${p.tp}`).sort().join(','),
+    () => positions.map(p => `${p.id}:${p.symbol}:${p.sl}:${p.tp}`).sort().join(','),
     [positions]
   )
 
   useEffect(() => {
-    const withAlerts = positions.filter(p => p.sl || p.tp)
-    if (!withAlerts.length) { setAlertPositions([]); return }
+    // Prices fetched for ALL open positions — every card needs latestPrice for P&L.
+    // (Previously only SL/TP positions were fetched, so the rest showed "—" forever.)
+    if (!positions.length) { setAlertPositions([]); setLatestPrices({}); return }
     let cancelled = false
-    const symbols = [...new Set(withAlerts.map(p => p.symbol))]
+    const symbols = [...new Set(positions.map(p => p.symbol))]
     getBatchPrices(symbols)
       .then(res => {
         if (cancelled) return
@@ -430,6 +434,7 @@ export default function LeftPanel() {
         const prices = {}
         symbols.forEach(s => { if (priceMap[s]?.price) prices[s] = parseFloat(priceMap[s].price) })
         setLatestPrices(prices)
+        const withAlerts = positions.filter(p => p.sl || p.tp)
         const alerts = withAlerts.reduce((acc, p) => {
           const price = parseFloat(priceMap[p.symbol]?.price || 0)
           if (!price) return acc

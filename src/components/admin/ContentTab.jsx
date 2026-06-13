@@ -78,11 +78,11 @@ export default function ContentTab() {
       </div>
 
       {/* Rows */}
-      <div className="divide-y divide-gray-100 dark:divide-gray-800/60">
+      <div className="divide-y divide-gray-100 dark:divide-gray-800/60 min-h-[420px]">
         {loading ? (
           Array.from({ length: 8 }).map((_, i) => <SkeletonRow key={i} />)
         ) : posts.length === 0 ? (
-          <div className="flex items-center justify-center py-16 text-sm text-gray-400 dark:text-gray-500">
+          <div className="min-h-[420px] flex items-center justify-center text-sm text-gray-400 dark:text-gray-500">
             No posts found
           </div>
         ) : (

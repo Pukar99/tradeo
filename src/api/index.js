@@ -56,7 +56,10 @@ API.interceptors.request.use((config) => {
 
   // Dedup identical GET requests fired within DEDUP_MS of each other.
   // Stores the in-flight promise so all callers get the same result — no forever-pending promises.
-  if (config.method === 'get') {
+  // Skip dedup for a 403-refresh retry: the replayed request (API(error.config)) re-enters this
+  // interceptor and could otherwise be dedup'd against a stale in-flight entry, returning a
+  // different request's outcome instead of the intended retry.
+  if (config.method === 'get' && !config._retried) {
     const key = config.url + JSON.stringify(config.params || '')
     const entry = _inFlight.get(key)
     if (entry && Date.now() - entry.ts < DEDUP_MS) {
@@ -282,15 +285,14 @@ export const deleteChatSession = (id)  => API.delete(`/api/chat/sessions/${id}`)
 // 9. COMPLEX TABS — INSIGHT + BREAKDOWN
 // =============================================================================
 
-export const getInsightSignals    = (params)      => API.get('/api/insight/signals', { params })
 export const getMonthlyReturns    = (params, cfg) => API.get('/api/insight/monthly-returns', { params, ...cfg })
 export const getMonthDetail       = (params, cfg) => API.get('/api/insight/month-detail', { params, ...cfg })
 export const getSectorMonth       = (params, cfg) => API.get('/api/insight/sector-month', { params, ...cfg })
 
-export const scanBreakdown        = (data)        => API.post('/api/breakdown/scan', data)
-export const getSectorYear        = (params, cfg) => API.get('/api/breakdown/sector-year', { params, ...cfg })
 export const getSectorCycles      = (data, cfg)   => API.post('/api/breakdown/sector-cycles', data, cfg)
 export const getSectorMonthStocks = (params, cfg) => API.get('/api/breakdown/sector-month-stocks', { params, ...cfg })
+export const getStockReturns      = (params, cfg) => API.get('/api/breakdown/stock-returns', { params, ...cfg })
+export const getStockMonthDetail  = (params, cfg) => API.get('/api/breakdown/stock-month-detail', { params, ...cfg })
 export const getMarketCycles      = (params, cfg) => API.get('/api/breakdown/market-cycles', { params, ...cfg })
 export const runDropAnalysis      = (data, cfg)   => API.post('/api/breakdown/drop-analysis', data, cfg)
 export const getSectorStocks      = (params, cfg) => API.get('/api/breakdown/sector-stocks', { params, ...cfg })

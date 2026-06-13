@@ -52,7 +52,7 @@ function ResearchCard({ post, onDelete, onVerify, onPin, isAdmin, currentUserId 
   return (
     <div
       onContextMenu={ctxItems ? onContextMenu(ctxItems) : undefined}
-      className={`relative bg-white dark:bg-gray-900 rounded-2xl border transition-all duration-200 overflow-hidden cursor-pointer
+      className={`group relative bg-white dark:bg-gray-900 rounded-2xl border transition-all duration-200 overflow-hidden cursor-pointer
         hover:shadow-md hover:-translate-y-0.5
         ${post.is_pinned
           ? 'border-emerald-200 dark:border-emerald-800/60'
@@ -112,7 +112,21 @@ function ResearchCard({ post, onDelete, onVerify, onPin, isAdmin, currentUserId 
           </div>
 
 
-          {!isAdmin && post.user_id !== currentUserId && (
+          {ctxItems ? (
+            /* Visible actions trigger — same menu as right-click. Required for
+               touch devices, where contextmenu never fires. */
+            <button
+              onClick={(e) => { e.stopPropagation(); onContextMenu(ctxItems)(e) }}
+              aria-haspopup="true"
+              aria-label="Post actions"
+              title="Post actions"
+              className="w-6 h-6 flex items-center justify-center rounded-lg text-gray-300 dark:text-gray-600 hover:text-gray-600 dark:hover:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors"
+            >
+              <svg className="w-3.5 h-3.5" viewBox="0 0 24 24" fill="currentColor">
+                <circle cx="5" cy="12" r="1.8" /><circle cx="12" cy="12" r="1.8" /><circle cx="19" cy="12" r="1.8" />
+              </svg>
+            </button>
+          ) : (
             <span className="text-[10px] text-blue-500 dark:text-blue-400 font-medium group-hover:underline">
               Read →
             </span>
@@ -152,7 +166,7 @@ function EligibilityBanner({ eligibility }) {
           return (
             <div key={label} className="space-y-1.5">
               <div className="flex items-baseline justify-between">
-                <span className="text-[10px] font-semibold uppercase tracking-wider text-gray-400">{label}</span>
+                <span className="text-[10px] font-semibold uppercase tracking-widest text-gray-400">{label}</span>
                 <span className={`text-[11px] font-bold ${met ? 'text-emerald-500' : 'text-gray-600 dark:text-gray-300'}`}>
                   {prefix}{val}{suffix}
                 </span>

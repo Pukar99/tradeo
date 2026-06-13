@@ -1,5 +1,5 @@
 // === PriceActionPage.jsx — Price Action chart tab: swings (HH/HL/LH/LL), S/R, demand/supply zones, volume spikes, patterns ===
-import { useState, useEffect, useCallback, useMemo, useRef } from 'react'
+import { useState, useEffect, useCallback, useMemo } from 'react'
 import { ScreenProvider, useScreen } from '../../context/ScreenContext'
 import StockChart from './StockChart'
 import { useScreenToolbarSlot } from '../../pages/ScreenPage'
@@ -12,8 +12,9 @@ import {
 } from './ScreenToolbarAtoms'
 
 // ── Constants ─────────────────────────────────────────────────────────────────
+// All three params are sent to the backend scan (cluster_pct / ds_move_pct /
+// vol_multiplier query params) — changing them re-runs the scan.
 const DEFAULT_CONFIG = {
-  swingSensitivity: 10,   // pivot lookback window (bars each side) — passed to backend informational only
   clusterPct:       1.5,  // S/R clustering tolerance %
   dsMovePct:        3,    // D/S min directional move %
   volMultiplier:    2.0,  // volume spike threshold vs 20-bar avg
@@ -106,8 +107,8 @@ function PAToolbar({ toggles, setToggles, config, setConfig, symbols }) {
 }
 
 // ── Left Panel ────────────────────────────────────────────────────────────────
-function PALeftPanel({ paData, chartData, currentPrice }) {
-  const LABEL = 'text-[10px] font-bold uppercase tracking-widest text-gray-400 dark:text-gray-500'
+function PALeftPanel({ paData, currentPrice }) {
+  const LABEL = 'text-[10px] font-semibold uppercase tracking-widest text-gray-400 dark:text-gray-500'
   const SUB   = 'text-[10px] text-gray-500 dark:text-gray-400'
   const VAL   = 'text-[11px] font-semibold text-gray-800 dark:text-gray-100'
 
@@ -314,7 +315,7 @@ function PALeftPanel({ paData, chartData, currentPrice }) {
 function PARightPanel({ paData, kpis }) {
   const [tab, setTab] = useState('signals')
 
-  const LABEL = 'text-[10px] font-bold uppercase tracking-widest text-gray-400 dark:text-gray-500'
+  const LABEL = 'text-[10px] font-semibold uppercase tracking-widest text-gray-400 dark:text-gray-500'
   const VAL   = 'text-[12px] font-bold tabular-nums text-gray-800 dark:text-gray-100'
   const SUB   = 'text-[10px] text-gray-500 dark:text-gray-400'
 
@@ -407,7 +408,6 @@ function PARightPanel({ paData, kpis }) {
                 <div className="mt-1.5 space-y-1.5">
                   {[
                     { label: 'Win Rate',         value: `${kpis.winRate}%` },
-                    { label: 'Avg Gain',         value: `+${kpis.avgGainPct.toFixed(1)}%` },
                     { label: 'Trend Streak',     value: kpis.trendStreak },
                     { label: 'Vol Spike / 30c',  value: kpis.spikeFreq.toFixed(1) },
                     { label: 'Avg S/R Touches',  value: kpis.avgTouches.toFixed(1) },
@@ -419,7 +419,7 @@ function PARightPanel({ paData, kpis }) {
                   ))}
                   {kpis.totalSignals > 0 && (
                     <p className="text-[9px] text-gray-300 dark:text-gray-700 mt-1">
-                      {kpis.wins}W / {kpis.losses}L of {kpis.totalSignals} closed
+                      {kpis.wins}W / {kpis.losses}L resolved{kpis.pending > 0 ? ` · ${kpis.pending} pending` : ''}
                     </p>
                   )}
                 </div>
@@ -547,24 +547,25 @@ function computePAKPIs(paData, chartData) {
     ? support_resistance.reduce((s, z) => s + z.touches, 0) / support_resistance.length
     : 0
 
-  // Avg gain from closed wins (approximate)
-  const avgGainPct = total > 0 ? WIN_THRESHOLD * (wins / Math.max(total, 1)) : 0
+  // Win rate over RESOLVED outcomes only — patterns that hit neither the win nor
+  // loss threshold within the window are pending, not losses
+  const resolved = wins + losses
 
   return {
-    winRate:      total > 0 ? Math.round(wins / total * 100) : 0,
-    avgGainPct:   Math.round(avgGainPct * 10) / 10,
+    winRate:      resolved > 0 ? Math.round(wins / resolved * 100) : 0,
     trendStreak:  `${streak} streak`,
     spikeFreq,
     avgTouches,
     wins,
     losses,
-    totalSignals: total,
+    pending:      total - resolved,
+    totalSignals: resolved,
   }
 }
 
 // ── PA Inner ──────────────────────────────────────────────────────────────────
 function PAInner() {
-  const { selectedSymbol, timeframe, isIndex, latestClose } = useScreen() || {}
+  const { selectedSymbol, timeframe, isIndex } = useScreen() || {}
   const [leftOpen,  setLeftOpen]  = useState(() => localStorage.getItem('tradeo_pa_leftOpen')  !== 'false')
   const [rightOpen, setRightOpen] = useState(() => localStorage.getItem('tradeo_pa_rightOpen') !== 'false')
   const toggleLeft  = () => setLeftOpen(v  => { localStorage.setItem('tradeo_pa_leftOpen',  String(!v)); return !v })
@@ -576,7 +577,6 @@ function PAInner() {
   const [toggles,    setToggles]    = useState(DEFAULT_TOGGLES)
   const [config,     setConfig]     = useState(() => loadConfig())
   const [symbols, setSymbols] = useState(null)
-  const chartDataRef = useRef([])
 
   useEffect(() => {
     getMarketSymbols()
@@ -587,27 +587,36 @@ function PAInner() {
   const isStock = !isIndex?.()
   const days    = TIMEFRAME_DAYS[timeframe] ?? 280
 
-  const fetchPA = useCallback(async (sym, d) => {
-    if (!sym || !isStock) return
-    setLoading(true)
-    try {
-      const res = await getPriceActionScan({ symbol: sym, days: d })
-      setPaData(res.data)
-    } catch {
-      setPaData(null)
-    } finally {
-      setLoading(false)
-    }
-  }, [isStock])
-
+  // Fetch PA scan when symbol, timeframe, or config changes. Config params are sent
+  // to the backend (they were previously saved but never used — dead knobs).
+  // cancelled flag prevents a slow earlier response from overwriting a newer one.
   useEffect(() => {
-    if (selectedSymbol && isStock) fetchPA(selectedSymbol, days)
-    else setPaData(null)
-  }, [selectedSymbol, days, fetchPA, isStock])
+    if (!selectedSymbol || !isStock) { setPaData(null); return }
+    let cancelled = false
+    setLoading(true)
+    getPriceActionScan({
+      symbol:         selectedSymbol,
+      days,
+      cluster_pct:    config.clusterPct,
+      ds_move_pct:    config.dsMovePct,
+      vol_multiplier: config.volMultiplier,
+    })
+      .then(res  => { if (!cancelled) setPaData(res.data) })
+      .catch(()  => { if (!cancelled) setPaData(null) })
+      .finally(() => { if (!cancelled) setLoading(false) })
+    return () => { cancelled = true }
+  }, [selectedSymbol, days, isStock, config])
 
-  const currentPrice = latestClose ?? chartData?.[chartData.length - 1]?.close ?? 0
+  const currentPrice = chartData?.[chartData.length - 1]?.close ?? 0
 
-  const kpis = useMemo(() => computePAKPIs(paData, chartData), [paData, chartData])
+  // KPIs must run over the same window the backend scanned (paData.candles rows),
+  // not the full chart history — see SMC tab for the same fix
+  const scanData = useMemo(
+    () => (paData?.candles ? chartData.slice(-paData.candles) : chartData),
+    [chartData, paData]
+  )
+
+  const kpis = useMemo(() => computePAKPIs(paData, scanData), [paData, scanData])
 
   const paOverlayData = useMemo(() => ({
     paData:    isStock ? paData : null,
@@ -615,7 +624,6 @@ function PAInner() {
   }), [paData, toggles, isStock])
 
   const handleChartDataReady = useCallback((data) => {
-    chartDataRef.current = data
     setChartData(data)
   }, [])
 
@@ -639,7 +647,6 @@ function PAInner() {
           <div className="screen-panel-content flex flex-col h-full">
             <PALeftPanel
               paData={isStock ? paData : null}
-              chartData={chartData}
               currentPrice={currentPrice}
             />
           </div>

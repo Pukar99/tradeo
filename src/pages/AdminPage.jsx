@@ -39,14 +39,14 @@ export default function AdminPage() {
         </div>
 
         {/* Tab strip */}
-        <div className="bg-white dark:bg-gray-900 rounded-xl border border-gray-200 dark:border-gray-800 overflow-hidden">
-          <div className="px-3 py-1 border-b border-gray-200 dark:border-gray-800">
+        <div className="bg-white dark:bg-gray-900 rounded-2xl border border-gray-100 dark:border-gray-800 overflow-hidden">
+          <div className="px-3 py-1 border-b border-gray-100 dark:border-gray-800 overflow-x-auto overscroll-x-contain [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
             <div className="flex items-center gap-0.5 bg-gray-100 dark:bg-gray-800 rounded-lg p-0.5 w-fit">
               {TABS.map(t => (
                 <button
                   key={t.id}
                   onClick={() => setTab(t.id)}
-                  className={`px-3 py-1.5 text-[10px] font-semibold rounded-md transition-all ${
+                  className={`shrink-0 whitespace-nowrap px-3 py-1.5 text-[10px] font-semibold rounded-md transition-all ${
                     tab === t.id
                       ? 'bg-white dark:bg-gray-700 text-gray-900 dark:text-white shadow-sm'
                       : 'text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-300'

@@ -1,5 +1,5 @@
 // === SMCChartPage.jsx — SMC chart tab: StockChart + SMC overlays (BOS/CHoCH/OB/FVG/Sweeps/Entry), left/right panels, toolbar ===
-import { useState, useEffect, useCallback, useMemo, useRef } from 'react'
+import { useState, useEffect, useCallback, useMemo } from 'react'
 import { ScreenProvider, useScreen } from '../../context/ScreenContext'
 import StockChart from './StockChart'
 import { useScreenToolbarSlot } from '../../pages/ScreenPage'
@@ -172,7 +172,6 @@ function SMCLeftPanel({ smcData, chartData, currentPrice }) {
   const { bos, choch, order_blocks, fvg, sweeps } = smcData
 
   const lastBOS    = [...bos].pop()
-  const lastBullBOS = [...bos].filter(b => b.type === 'bullish').pop()
   const lastChoch  = choch[choch.length - 1]
   const bullOB     = order_blocks.filter(o => o.type === 'bullish')
   const bearOB     = order_blocks.filter(o => o.type === 'bearish')
@@ -479,7 +478,7 @@ function computeSignals(smcData, config, chartData) {
 
 // ── SMC Inner — reads ScreenContext ──────────────────────────────────────────
 function SMCInner() {
-  const { selectedSymbol, timeframe, isIndex, latestClose } = useScreen() || {}
+  const { selectedSymbol, timeframe, isIndex } = useScreen() || {}
   const [leftOpen,  setLeftOpen]  = useState(() => localStorage.getItem('tradeo_smc_leftOpen')  !== 'false')
   const [rightOpen, setRightOpen] = useState(() => localStorage.getItem('tradeo_smc_rightOpen') !== 'false')
   const toggleLeft  = () => setLeftOpen(v  => { localStorage.setItem('tradeo_smc_leftOpen',  String(!v)); return !v })
@@ -491,7 +490,6 @@ function SMCInner() {
   const [toggles,    setToggles]   = useState(DEFAULT_TOGGLES)
   const [config,     setConfig]    = useState(() => loadConfig())
   const [symbols, setSymbols] = useState(null)
-  const chartDataRef = useRef([])  // also kept as ref for non-reactive reads
 
   useEffect(() => {
     getMarketSymbols()
@@ -504,29 +502,31 @@ function SMCInner() {
   // Derive scan days from current chart timeframe — no separate selector needed
   const days = TIMEFRAME_DAYS[timeframe] ?? 280
 
-  // Fetch SMC data when symbol or timeframe changes
-  const fetchSMC = useCallback(async (sym, d) => {
-    if (!sym || !isStock) return
-    setLoading(true)
-    try {
-      const res = await getSMCScan({ symbol: sym, days: d })
-      setSmcData(res.data)
-    } catch {
-      setSmcData(null)
-    } finally {
-      setLoading(false)
-    }
-  }, [isStock])
-
+  // Fetch SMC data when symbol or timeframe changes — cancelled flag prevents a slow
+  // earlier response from overwriting a newer one on rapid symbol/timeframe switches
   useEffect(() => {
-    if (selectedSymbol && isStock) fetchSMC(selectedSymbol, days)
-    else setSmcData(null)
-  }, [selectedSymbol, days, fetchSMC, isStock])
+    if (!selectedSymbol || !isStock) { setSmcData(null); return }
+    let cancelled = false
+    setLoading(true)
+    getSMCScan({ symbol: selectedSymbol, days })
+      .then(res  => { if (!cancelled) setSmcData(res.data) })
+      .catch(()  => { if (!cancelled) setSmcData(null) })
+      .finally(() => { if (!cancelled) setLoading(false) })
+    return () => { cancelled = true }
+  }, [selectedSymbol, days, isStock])
 
-  const currentPrice = latestClose ?? 0
+  const currentPrice = chartData.length ? chartData[chartData.length - 1].close : 0
 
-  // chartData state ensures useMemo re-runs when chart loads
-  const signals = useMemo(() => computeSignals(smcData, config, chartData), [smcData, config, chartData])
+  // Score only the candles the backend actually scanned. The chart can hold far more
+  // history (ALL = full listing) than the scan window (≤750 requested, ≤400 in prod —
+  // smcData.candles is the authoritative count), and scoring outside that window
+  // produces signals against BOS/OB/FVG events that were never detected.
+  const scanData = useMemo(
+    () => (smcData?.candles ? chartData.slice(-smcData.candles) : chartData),
+    [chartData, smcData]
+  )
+
+  const signals = useMemo(() => computeSignals(smcData, config, scanData), [smcData, config, scanData])
 
   const smcOverlayData = useMemo(() => ({
     smcData:    isStock ? smcData : null,
@@ -535,7 +535,6 @@ function SMCInner() {
   }), [smcData, toggles, signals, isStock])
 
   const handleChartDataReady = useCallback((data) => {
-    chartDataRef.current = data
     setChartData(data)
   }, [])
 
@@ -559,7 +558,8 @@ function SMCInner() {
                         transition-all duration-200 ease-in-out
                         ${leftOpen ? 'w-[13%] min-w-[150px] max-w-[200px]' : 'w-0 min-w-0 max-w-0 overflow-hidden'} ${!leftOpen ? 'screen-panel-collapsed' : ''}`}>
           <div className="screen-panel-content flex flex-col h-full">
-            <SMCLeftPanel smcData={isStock ? smcData : null} chartData={chartData} currentPrice={currentPrice} />
+            {/* scanData (not full chartData) — zone position must use the same range as signal scoring */}
+            <SMCLeftPanel smcData={isStock ? smcData : null} chartData={scanData} currentPrice={currentPrice} />
           </div>
         </div>
 

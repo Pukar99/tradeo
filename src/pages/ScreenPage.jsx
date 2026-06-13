@@ -315,8 +315,11 @@ function ScreenInner() {
   useNavbarAutoHide()
   const { active: navAutoHide, hidden: navHidden, scheduleHide, showNavbar } = useNavbarState()
 
-  const handleMode       = (m) => { if (!user && m === 'complex') return; setMode(m); sessionStorage.setItem('tradeo_screen_mode', m) }
-  const handleSimpleTab  = (t) => { if (!user && t !== 'General') return; setSimpleTab(t); sessionStorage.setItem('tradeo_screen_simpleTab', t) }
+  // Locked tabs stay clickable for guests — the content area renders AuthWall,
+  // which is the feedback for why the feature is unavailable. A silent no-op
+  // click reads as a broken button.
+  const handleMode       = (m) => { setMode(m); sessionStorage.setItem('tradeo_screen_mode', m) }
+  const handleSimpleTab  = (t) => { setSimpleTab(t); sessionStorage.setItem('tradeo_screen_simpleTab', t) }
   const handleComplexTab = (t) => { setComplexTab(t); sessionStorage.setItem('tradeo_screen_complexTab', t) }
 
   useEffect(() => {
@@ -331,7 +334,13 @@ function ScreenInner() {
     <ScreenToolbarSlotCtx.Provider value={toolbarSlotRef}>
     <div
       className="flex flex-col overflow-hidden bg-white dark:bg-gray-900"
-      style={{ height: '100dvh', paddingTop: navAutoHide && !navHidden ? 56 : 0 }}
+      style={{
+        height: '100dvh',
+        paddingTop: navAutoHide && !navHidden ? 56 : 0,
+        // Match the navbar's slide (duration-300 ease-in-out) so content
+        // reflows with it instead of jumping 56px in one frame
+        transition: 'padding-top 300ms ease-in-out',
+      }}
     >
       {/* ── Toolbar strip ── */}
       {/* NOTE: ChartSymbolSearch uses absolute positioning — toolbar slot must

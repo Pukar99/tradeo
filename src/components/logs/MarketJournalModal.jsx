@@ -2,10 +2,13 @@
 
 import { useState, useEffect, useRef } from 'react'
 import { updateMarketJournal, getIndexChart } from '../../api'
+import { fmtCr } from '../../utils/format'
+import ModalShell from './ModalShell'
 
 // ── NEPSE sparkline — 3-month line chart (pure SVG, 1 API call, cached by ref) ─
 function NepseSparkline({ isUp }) {
   const [points, setPoints] = useState([])
+  const [failed, setFailed] = useState(false)
   const fetched = useRef(false)
 
   useEffect(() => {
@@ -16,10 +19,18 @@ function NepseSparkline({ isUp }) {
         const rows = r?.data?.data || []
         const closes = rows.map(r => parseFloat(r.close)).filter(Boolean)
         if (closes.length >= 2) setPoints(closes)
+        else setFailed(true)
       })
-      .catch(() => {})
+      .catch(() => setFailed(true))
   }, [])
 
+  if (failed) {
+    return (
+      <div className="w-full h-[56px] bg-gray-50 dark:bg-gray-800/50 rounded-lg flex items-center justify-center">
+        <span className="text-[10px] text-gray-400">Chart unavailable</span>
+      </div>
+    )
+  }
   if (points.length < 2) {
     return <div className="w-full h-[56px] bg-gray-50 dark:bg-gray-800/50 rounded-lg animate-pulse" />
   }
@@ -66,13 +77,6 @@ export default function MarketJournalModal({ entry, onClose, onSaved }) {
   const [saving, setSaving] = useState(false)
   const [saveErr, setSaveErr] = useState(null)
 
-  // Escape key closes
-  useEffect(() => {
-    const handler = (e) => { if (e.key === 'Escape') onClose() }
-    window.addEventListener('keydown', handler)
-    return () => window.removeEventListener('keydown', handler)
-  }, [onClose])
-
   const handleSubmit = async (e) => {
     e.preventDefault()
     setSaving(true); setSaveErr(null)
@@ -89,40 +93,23 @@ export default function MarketJournalModal({ entry, onClose, onSaved }) {
   const nepseClose  = entry?.nepse_close  != null ? parseFloat(entry.nepse_close)  : null
 
   return (
-    <div
-      className="fixed inset-0 z-50 flex items-center justify-center p-4"
-      style={{ background: 'rgba(0,0,0,0.6)', backdropFilter: 'blur(2px)' }}
-      onClick={onClose}
+    <ModalShell
+      title="Market Journal"
+      subtitle={entry?.date}
+      badge={
+        <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-amber-100 dark:bg-amber-900/30 text-amber-600 dark:text-amber-400 border border-amber-200 dark:border-amber-800/40">
+          Market
+        </span>
+      }
+      onClose={onClose}
+      maxWidth="max-w-xl"
+      closeOnBackdrop
     >
-      <div
-        className="bg-white dark:bg-gray-950 rounded-2xl border border-gray-100 dark:border-gray-800 w-full max-w-xl max-h-[92vh] overflow-y-auto shadow-2xl"
-        onClick={e => e.stopPropagation()}
-      >
-        {/* Header */}
-        <div className="flex items-start justify-between px-5 py-4 border-b border-gray-100 dark:border-gray-800/80">
-          <div>
-            <div className="flex items-center gap-2">
-              <p className="text-[13px] font-semibold text-gray-900 dark:text-white">Market Journal</p>
-              <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-amber-100 dark:bg-amber-900/30 text-amber-600 dark:text-amber-400 border border-amber-200 dark:border-amber-800/40">
-                Market
-              </span>
-            </div>
-            <p className="text-[11px] text-gray-400 mt-0.5">{entry?.date}</p>
-          </div>
-          <button
-            onClick={onClose}
-            className="w-6 h-6 flex items-center justify-center rounded-lg text-gray-400 hover:text-gray-600 dark:hover:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-800 transition-all mt-0.5"
-          >
-            <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
-            </svg>
-          </button>
-        </div>
-
+      <div className="overflow-y-auto flex-1">
         {/* Auto-populated section */}
         {entry && (
           <div className="px-5 pt-4 pb-3 bg-gray-50/60 dark:bg-gray-800/20 border-b border-gray-100 dark:border-gray-800">
-            <p className="text-[10px] uppercase tracking-widest font-bold text-gray-400 mb-3">Market Data (Auto-populated)</p>
+            <p className="text-[10px] uppercase tracking-widest font-semibold text-gray-400 mb-3">Market Data (Auto-populated)</p>
 
             {/* NEPSE 3-month chart */}
             <div className="mb-3">
@@ -174,7 +161,7 @@ export default function MarketJournalModal({ entry, onClose, onSaved }) {
                 <div className="bg-white dark:bg-gray-900 rounded-lg border border-gray-100 dark:border-gray-800 px-3 py-2">
                   <p className="text-[10px] uppercase tracking-widest text-gray-400">Volume</p>
                   <p className="text-[11px] font-semibold text-gray-700 dark:text-gray-300 mt-1 tabular-nums">
-                    Rs.{(parseFloat(entry.total_volume) / 1e7).toFixed(1)}Cr
+                    Rs.{fmtCr(entry.total_volume, 1)}
                   </p>
                 </div>
               )}
@@ -339,6 +326,6 @@ export default function MarketJournalModal({ entry, onClose, onSaved }) {
           </div>
         </form>
       </div>
-    </div>
+    </ModalShell>
   )
 }

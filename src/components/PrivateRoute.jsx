@@ -29,8 +29,13 @@ export default function PrivateRoute({ children }) {
   const { user, loading } = useAuth()
   const location = useLocation()
 
-  // Wait for /api/auth/me to resolve before deciding — prevents flash redirect on refresh
-  if (loading) return null
+  // Wait for /api/auth/me to resolve before deciding — prevents flash redirect on refresh.
+  // Spinner (not null) so a slow auth check doesn't look like a frozen blank page.
+  if (loading) return (
+    <div className="min-h-screen flex items-center justify-center bg-gray-50 dark:bg-gray-950">
+      <div className="w-6 h-6 border-2 border-green-500 border-t-transparent rounded-full animate-spin" />
+    </div>
+  )
 
   if (!user) {
     saveRedirectFrom(location.pathname + location.search)

@@ -300,7 +300,7 @@ export default function ReplayPage() {
   if (!ready) {
     return (
       <div className="flex-1 flex items-center justify-center bg-white dark:bg-gray-950">
-        <div className="w-full max-w-sm bg-white dark:bg-gray-900 rounded-xl border border-gray-200 dark:border-gray-800 shadow-sm p-6 flex flex-col gap-4">
+        <div className="w-full max-w-sm bg-white dark:bg-gray-900 rounded-2xl border border-gray-100 dark:border-gray-800 shadow-sm p-6 flex flex-col gap-4">
 
           <div>
             <h2 className="text-[14px] font-bold text-gray-800 dark:text-gray-100 mb-0.5">Chart Replay</h2>
@@ -311,12 +311,12 @@ export default function ReplayPage() {
 
           <div className="flex flex-col gap-3">
             <div>
-              <label className="block text-[10px] font-semibold text-gray-500 dark:text-gray-400 uppercase mb-1">Symbol</label>
+              <label className="block text-[10px] font-semibold text-gray-400 dark:text-gray-500 uppercase tracking-widest mb-1">Symbol</label>
               <ReplaySymbolSearch value={symbol} onChange={setSymbol} />
             </div>
 
             <div>
-              <label className="block text-[10px] font-semibold text-gray-500 dark:text-gray-400 uppercase mb-1">Start Date</label>
+              <label className="block text-[10px] font-semibold text-gray-400 dark:text-gray-500 uppercase tracking-widest mb-1">Start Date</label>
               <input
                 type="date"
                 value={startDate}
