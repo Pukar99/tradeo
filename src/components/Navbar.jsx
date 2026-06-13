@@ -8,6 +8,7 @@
 // =============================================================================
 
 import { useState, useRef, useEffect, useCallback, useMemo } from 'react'
+import { createPortal } from 'react-dom'
 import { Link, useLocation, useNavigate } from 'react-router-dom'
 import { useAuth } from '../context/AuthContext'
 import { useTheme } from '../context/ThemeContext'
@@ -229,7 +230,7 @@ function Navbar({ autoHide = false, hidden = false, onMouseEnter, onMouseLeave }
   return (
     <nav
       className={[
-        'glass-bar px-3 xs:px-4 lg:px-6 py-0 flex justify-between items-center z-50',
+        'glass-bar px-4 lg:px-6 py-0 flex justify-between items-center z-50',
         // When auto-hide is active: fixed + slide transition.
         // When normal: sticky (all other pages unchanged).
         autoHide
@@ -584,10 +585,27 @@ function Navbar({ autoHide = false, hidden = false, onMouseEnter, onMouseLeave }
 
       {/* ── Mobile menu drawer — slide-down on open ─────────────────────────── */}
       {mobileMenuOpen && (
-        <div className="lg:hidden absolute top-full left-0 right-0 bg-white/95 dark:bg-gray-950/95 backdrop-blur-md border-b border-gray-200/60 dark:border-gray-800/60 shadow-xl z-50 animate-slide-down">
-          {/* green accent bar at top */}
-          <div className="h-0.5 bg-gradient-to-r from-green-500 via-green-400 to-transparent" />
-          <div className="px-4 py-3 space-y-1">
+        <>
+          {/* Backdrop — dims the page and catches taps to close. The drawer itself
+              is now fully opaque, so page content no longer bleeds through it (the
+              old bg-white/95 + blur let the homepage show through — looked broken).
+              Portaled to <body>: the nav has backdrop-filter (.glass-bar), which
+              makes it a containing block for position:fixed children — an in-nav
+              backdrop gets clipped to the bar's height (the 360x60 bug) instead of
+              filling the viewport. The portal escapes that containing block. */}
+          {createPortal(
+            <button
+              type="button"
+              aria-label="Close menu"
+              onClick={() => setMobileMenuOpen(false)}
+              className="lg:hidden fixed inset-0 bg-black/40 z-40 animate-fade-in"
+            />,
+            document.body
+          )}
+          <div className="lg:hidden absolute top-full left-0 right-0 max-h-[calc(100vh-56px)] overflow-y-auto bg-white dark:bg-gray-950 border-b border-gray-200 dark:border-gray-800 shadow-2xl z-50 animate-slide-down">
+            {/* green accent bar at top */}
+            <div className="h-0.5 bg-gradient-to-r from-green-500 via-green-400 to-transparent" />
+            <div className="px-4 py-3 space-y-1">
             {NAV_LINKS.map((link, i) => (
               <Link
                 key={link.path}
@@ -656,7 +674,8 @@ function Navbar({ autoHide = false, hidden = false, onMouseEnter, onMouseLeave }
               </Link>
             </div>
           )}
-        </div>
+          </div>
+        </>
       )}
     </nav>
   )
