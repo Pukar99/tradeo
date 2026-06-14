@@ -2,9 +2,18 @@
 import { useState, useEffect } from 'react'
 import { useLanguage } from '../context/LanguageContext'
 import {
-  LineChart, Line, XAxis, YAxis,
-  Tooltip, ResponsiveContainer, PieChart, Pie,
-  Cell, BarChart, Bar, Legend
+  LineChart,
+  Line,
+  XAxis,
+  YAxis,
+  Tooltip,
+  ResponsiveContainer,
+  PieChart,
+  Pie,
+  Cell,
+  BarChart,
+  Bar,
+  Legend,
 } from 'recharts'
 import { nepseCommission, sebonFee, dpCharge, nepseCGTByTerm } from '../utils/format'
 
@@ -16,19 +25,22 @@ const getCGT = nepseCGTByTerm // rates live in utils/format — single source
 const PIE_COLORS = ['#3b82f6', '#ef4444', '#f59e0b', '#22c55e', '#8b5cf6']
 
 const TABS = [
-  { id: 'nepse',    label: 'NEPSE Calc', desc: 'Trade Calculator' },
-  { id: 'position', label: 'Position',   desc: 'Size & Risk/Reward' },
-  { id: 'sip',      label: 'SIP',        desc: 'Systematic Investment' },
+  { id: 'nepse', label: 'NEPSE Calc', desc: 'Trade Calculator' },
+  { id: 'position', label: 'Position', desc: 'Size & Risk/Reward' },
+  { id: 'sip', label: 'SIP', desc: 'Systematic Investment' },
 ]
 
-const INPUT = "bg-gray-50 dark:bg-gray-800 border border-gray-200 dark:border-gray-700 text-xs text-gray-800 dark:text-gray-100 focus:border-blue-400 rounded-xl px-3 py-2 w-full outline-none placeholder-gray-300 dark:placeholder-gray-600"
-const LABEL = "block text-[10px] font-semibold uppercase tracking-widest text-gray-400 mb-1"
+const INPUT =
+  'bg-gray-50 dark:bg-gray-800 border border-gray-200 dark:border-gray-700 text-xs text-gray-800 dark:text-gray-100 focus:border-blue-400 rounded-xl px-3 py-2 w-full outline-none placeholder-gray-300 dark:placeholder-gray-600'
+const LABEL = 'block text-[10px] font-semibold uppercase tracking-widest text-gray-400 mb-1'
 
 // ─── Stat Mini Card ─────────────────────────────────────────
 function StatCard({ label, value, color = 'text-gray-800 dark:text-gray-100' }) {
   return (
     <div className="bg-gray-50 dark:bg-gray-800/60 rounded-xl p-3 text-center border border-gray-100 dark:border-gray-800">
-      <p className="text-[10px] font-semibold uppercase tracking-widest text-gray-400 mb-0.5">{label}</p>
+      <p className="text-[10px] font-semibold uppercase tracking-widest text-gray-400 mb-0.5">
+        {label}
+      </p>
       <p className={`text-[13px] font-bold ${color}`}>{value}</p>
     </div>
   )
@@ -39,8 +51,18 @@ function EmptyState({ text }) {
   return (
     <div className="bg-white dark:bg-gray-900 rounded-2xl border border-gray-100 dark:border-gray-800 p-8 flex flex-col items-center justify-center text-center h-full">
       <div className="w-10 h-10 rounded-2xl bg-gray-50 dark:bg-gray-800 border border-gray-100 dark:border-gray-800 flex items-center justify-center mb-3">
-        <svg className="w-5 h-5 text-gray-300 dark:text-gray-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M9 7h6m0 10v-3m-3 3h.01M9 17h.01M9 11h.01M12 11h.01M15 11h.01M4 19h16a2 2 0 002-2V7a2 2 0 00-2-2H4a2 2 0 00-2 2v10a2 2 0 002 2z" />
+        <svg
+          className="w-5 h-5 text-gray-300 dark:text-gray-600"
+          fill="none"
+          viewBox="0 0 24 24"
+          stroke="currentColor"
+        >
+          <path
+            strokeLinecap="round"
+            strokeLinejoin="round"
+            strokeWidth={1.5}
+            d="M9 7h6m0 10v-3m-3 3h.01M9 17h.01M9 11h.01M12 11h.01M15 11h.01M4 19h16a2 2 0 002-2V7a2 2 0 00-2-2H4a2 2 0 00-2 2v10a2 2 0 002 2z"
+          />
         </svg>
       </div>
       <p className="text-[11px] text-gray-400">{text}</p>
@@ -53,13 +75,19 @@ function NEPSECalculator() {
   // Equity-only: commission slabs and CGT rates below are for ordinary shares.
   // (A security-type selector existed but never changed the math — removed.)
   const [form, setForm] = useState({
-    symbol: '', kitta: '', buyPrice: '', sellPrice: '',
-    buyDate: '', sellDate: '', bonusShares: '', cashDividend: '',
+    symbol: '',
+    kitta: '',
+    buyPrice: '',
+    sellPrice: '',
+    buyDate: '',
+    sellDate: '',
+    bonusShares: '',
+    cashDividend: '',
   })
   const [result, setResult] = useState(null)
   const [holdingPeriod, setHoldingPeriod] = useState(null)
 
-  const update = (key, val) => setForm(prev => ({ ...prev, [key]: val }))
+  const update = (key, val) => setForm((prev) => ({ ...prev, [key]: val }))
 
   useEffect(() => {
     if (form.buyDate && form.sellDate) {
@@ -98,7 +126,8 @@ function NEPSECalculator() {
     const sellDp = getDP()
     const isLongTerm = holdingPeriod !== null ? holdingPeriod >= 365 : false
     // CGT is levied on net capital gain after all transaction costs (buy + sell excluding CGT itself)
-    const netCapitalGain = sellAmount - (kitta * buyPrice) - totalBuyCharges - sellBroker - sellSebon - sellDp
+    const netCapitalGain =
+      sellAmount - kitta * buyPrice - totalBuyCharges - sellBroker - sellSebon - sellDp
     const cgt = getCGT(netCapitalGain, isLongTerm)
     const totalSellCharges = sellBroker + sellSebon + sellDp + cgt
     const totalCharges = totalBuyCharges + totalSellCharges
@@ -107,9 +136,10 @@ function NEPSECalculator() {
     const netProfitPct = buyAmount > 0 ? (netProfit / buyAmount) * 100 : 0
     // Break-even: price at which net profit = 0, solved for sellPrice
     // Approximate: ignore small change in sell-side charges at break-even price
-    const breakEven = totalShares > 0
-      ? (buyAmount + totalBuyCharges + sellBroker + sellSebon + sellDp) / totalShares
-      : 0
+    const breakEven =
+      totalShares > 0
+        ? (buyAmount + totalBuyCharges + sellBroker + sellSebon + sellDp) / totalShares
+        : 0
     // Filter zero-value items from pie to avoid invisible Recharts slices
     const rawPieData = [
       { name: 'Buy Broker', value: Math.round(buyBroker) },
@@ -117,22 +147,38 @@ function NEPSECalculator() {
       { name: 'SEBON', value: Math.round(buySebon + sellSebon) },
       { name: 'DP Charges', value: Math.round(buyDp + sellDp) },
       { name: 'Capital Gain Tax', value: Math.round(cgt) },
-    ].filter(item => item.value > 0)
+    ].filter((item) => item.value > 0)
 
     // holdingPeriod from the long/short buttons is a sentinel, not a real day
     // count — only surface days when they came from actual dates
     const hasDates = !!(form.buyDate && form.sellDate)
 
     setResult({
-      kitta, totalShares, buyPrice, sellPrice, bonusShares,
+      kitta,
+      totalShares,
+      buyPrice,
+      sellPrice,
+      bonusShares,
       adjustedCostPerShare: adjustedCostPerShare.toFixed(2),
-      buyAmount, sellAmount,
-      buyBroker, buySebon, buyDp, totalBuyCharges,
-      sellBroker, sellSebon, sellDp, cgt,
-      totalSellCharges, totalCharges,
-      grossProfit, netProfit, netProfitPct,
-      cashDiv, breakEven: breakEven.toFixed(2),
-      isLongTerm, holdingPeriod: hasDates ? holdingPeriod : null,
+      buyAmount,
+      sellAmount,
+      buyBroker,
+      buySebon,
+      buyDp,
+      totalBuyCharges,
+      sellBroker,
+      sellSebon,
+      sellDp,
+      cgt,
+      totalSellCharges,
+      totalCharges,
+      grossProfit,
+      netProfit,
+      netProfitPct,
+      cashDiv,
+      breakEven: breakEven.toFixed(2),
+      isLongTerm,
+      holdingPeriod: hasDates ? holdingPeriod : null,
       pieData: rawPieData,
     })
   }
@@ -141,54 +187,120 @@ function NEPSECalculator() {
     <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
       {/* Input */}
       <div className="bg-white dark:bg-gray-900 rounded-2xl border border-gray-100 dark:border-gray-800 p-5 space-y-3">
-        <p className="text-[11px] font-semibold uppercase tracking-widest text-gray-400">NEPSE Trade Details</p>
+        <p className="text-[11px] font-semibold uppercase tracking-widest text-gray-400">
+          NEPSE Trade Details
+        </p>
 
         <div className="grid grid-cols-2 gap-3">
           <div className="col-span-2">
-            <label className={LABEL}>Symbol <span className="normal-case font-normal text-gray-300">equity / ordinary shares</span></label>
-            <input type="text" value={form.symbol} onChange={e => update('symbol', e.target.value.toUpperCase())} placeholder="e.g. NTC" className={INPUT} />
+            <label className={LABEL}>
+              Symbol{' '}
+              <span className="normal-case font-normal text-gray-300">
+                equity / ordinary shares
+              </span>
+            </label>
+            <input
+              type="text"
+              value={form.symbol}
+              onChange={(e) => update('symbol', e.target.value.toUpperCase())}
+              placeholder="e.g. NTC"
+              className={INPUT}
+            />
           </div>
           <div>
             <label className={LABEL}>Kitta (Units)</label>
-            <input type="number" value={form.kitta} onChange={e => update('kitta', e.target.value)} placeholder="100" className={INPUT} />
+            <input
+              type="number"
+              value={form.kitta}
+              onChange={(e) => update('kitta', e.target.value)}
+              placeholder="100"
+              className={INPUT}
+            />
           </div>
           <div>
             <label className={LABEL}>Buy Price (Rs.)</label>
-            <input type="number" value={form.buyPrice} onChange={e => update('buyPrice', e.target.value)} placeholder="800" className={INPUT} />
+            <input
+              type="number"
+              value={form.buyPrice}
+              onChange={(e) => update('buyPrice', e.target.value)}
+              placeholder="800"
+              className={INPUT}
+            />
           </div>
           <div>
             <label className={LABEL}>Sell Price (Rs.)</label>
-            <input type="number" value={form.sellPrice} onChange={e => update('sellPrice', e.target.value)} placeholder="950" className={INPUT} />
+            <input
+              type="number"
+              value={form.sellPrice}
+              onChange={(e) => update('sellPrice', e.target.value)}
+              placeholder="950"
+              className={INPUT}
+            />
           </div>
           <div>
-            <label className={LABEL}>Bonus Shares <span className="normal-case font-normal text-gray-300">opt.</span></label>
-            <input type="number" value={form.bonusShares} onChange={e => update('bonusShares', e.target.value)} placeholder="10" className={INPUT} />
+            <label className={LABEL}>
+              Bonus Shares <span className="normal-case font-normal text-gray-300">opt.</span>
+            </label>
+            <input
+              type="number"
+              value={form.bonusShares}
+              onChange={(e) => update('bonusShares', e.target.value)}
+              placeholder="10"
+              className={INPUT}
+            />
           </div>
           <div className="col-span-2">
-            <label className={LABEL}>Cash Dividend (Rs.) <span className="normal-case font-normal text-gray-300">opt.</span></label>
-            <input type="number" value={form.cashDividend} onChange={e => update('cashDividend', e.target.value)} placeholder="500" className={INPUT} />
+            <label className={LABEL}>
+              Cash Dividend (Rs.){' '}
+              <span className="normal-case font-normal text-gray-300">opt.</span>
+            </label>
+            <input
+              type="number"
+              value={form.cashDividend}
+              onChange={(e) => update('cashDividend', e.target.value)}
+              placeholder="500"
+              className={INPUT}
+            />
           </div>
         </div>
 
         <div className="border-t border-gray-100 dark:border-gray-800 pt-3 space-y-2">
-          <p className="text-[10px] font-semibold uppercase tracking-widest text-gray-400">Holding Period (CGT)</p>
+          <p className="text-[10px] font-semibold uppercase tracking-widest text-gray-400">
+            Holding Period (CGT)
+          </p>
           <div className="grid grid-cols-2 gap-3">
             <div>
-              <label className={LABEL}>Buy Date <span className="normal-case font-normal text-gray-300">opt.</span></label>
-              <input type="date" value={form.buyDate} onChange={e => update('buyDate', e.target.value)} className={INPUT} />
+              <label className={LABEL}>
+                Buy Date <span className="normal-case font-normal text-gray-300">opt.</span>
+              </label>
+              <input
+                type="date"
+                value={form.buyDate}
+                onChange={(e) => update('buyDate', e.target.value)}
+                className={INPUT}
+              />
             </div>
             <div>
-              <label className={LABEL}>Sell Date <span className="normal-case font-normal text-gray-300">opt.</span></label>
-              <input type="date" value={form.sellDate} onChange={e => update('sellDate', e.target.value)} className={INPUT} />
+              <label className={LABEL}>
+                Sell Date <span className="normal-case font-normal text-gray-300">opt.</span>
+              </label>
+              <input
+                type="date"
+                value={form.sellDate}
+                onChange={(e) => update('sellDate', e.target.value)}
+                className={INPUT}
+              />
             </div>
           </div>
 
           {holdingPeriod !== null && (
-            <div className={`flex items-center justify-between px-3 py-2 rounded-xl text-[10px] font-medium ${
-              holdingPeriod >= 365
-                ? 'bg-emerald-50 dark:bg-emerald-950 text-emerald-600 dark:text-emerald-400 border border-emerald-100 dark:border-emerald-900'
-                : 'bg-amber-50 dark:bg-amber-950 text-amber-600 dark:text-amber-400 border border-amber-100 dark:border-amber-900'
-            }`}>
+            <div
+              className={`flex items-center justify-between px-3 py-2 rounded-xl text-[10px] font-medium ${
+                holdingPeriod >= 365
+                  ? 'bg-emerald-50 dark:bg-emerald-950 text-emerald-600 dark:text-emerald-400 border border-emerald-100 dark:border-emerald-900'
+                  : 'bg-amber-50 dark:bg-amber-950 text-amber-600 dark:text-amber-400 border border-amber-100 dark:border-amber-900'
+              }`}
+            >
               <span>{form.buyDate && form.sellDate ? `${holdingPeriod} days` : 'Manual'}</span>
               <span>{holdingPeriod >= 365 ? 'Long-term · 5% CGT' : 'Short-term · 7.5% CGT'}</span>
             </div>
@@ -196,10 +308,16 @@ function NEPSECalculator() {
 
           {(!form.buyDate || !form.sellDate) && (
             <div className="flex gap-2">
-              <button onClick={() => setHoldingPeriod(400)} className={`flex-1 py-1.5 rounded-xl text-[10px] font-semibold border transition-colors ${holdingPeriod === 400 ? 'bg-emerald-500 text-white border-emerald-500' : 'border-gray-200 dark:border-gray-700 text-gray-500 hover:border-emerald-400'}`}>
+              <button
+                onClick={() => setHoldingPeriod(400)}
+                className={`flex-1 py-1.5 rounded-xl text-[10px] font-semibold border transition-colors ${holdingPeriod === 400 ? 'bg-emerald-500 text-white border-emerald-500' : 'border-gray-200 dark:border-gray-700 text-gray-500 hover:border-emerald-400'}`}
+              >
                 Long-term (≥1yr)
               </button>
-              <button onClick={() => setHoldingPeriod(100)} className={`flex-1 py-1.5 rounded-xl text-[10px] font-semibold border transition-colors ${holdingPeriod === 100 ? 'bg-amber-500 text-white border-amber-500' : 'border-gray-200 dark:border-gray-700 text-gray-500 hover:border-amber-400'}`}>
+              <button
+                onClick={() => setHoldingPeriod(100)}
+                className={`flex-1 py-1.5 rounded-xl text-[10px] font-semibold border transition-colors ${holdingPeriod === 100 ? 'bg-amber-500 text-white border-amber-500' : 'border-gray-200 dark:border-gray-700 text-gray-500 hover:border-amber-400'}`}
+              >
                 Short-term (&lt;1yr)
               </button>
             </div>
@@ -222,26 +340,43 @@ function NEPSECalculator() {
         ) : (
           <div className="space-y-3">
             {/* Summary */}
-            <div className={`rounded-2xl p-4 border ${
-              result.netProfit >= 0
-                ? 'bg-emerald-50 dark:bg-emerald-950 border-emerald-100 dark:border-emerald-900'
-                : 'bg-red-50 dark:bg-red-950 border-red-100 dark:border-red-900'
-            }`}>
+            <div
+              className={`rounded-2xl p-4 border ${
+                result.netProfit >= 0
+                  ? 'bg-emerald-50 dark:bg-emerald-950 border-emerald-100 dark:border-emerald-900'
+                  : 'bg-red-50 dark:bg-red-950 border-red-100 dark:border-red-900'
+              }`}
+            >
               <div className="flex items-start justify-between mb-3">
                 <div>
-                  <p className="text-[10px] text-gray-400">{form.symbol || 'Trade'} · {result.totalShares} shares{result.holdingPeriod !== null ? ` · ${result.holdingPeriod}d` : ''}</p>
-                  <p className={`text-2xl font-bold mt-0.5 ${result.netProfit >= 0 ? 'text-emerald-600 dark:text-emerald-400' : 'text-red-500'}`}>
-                    {result.netProfit >= 0 ? '+' : ''}Rs.{Math.round(result.netProfit).toLocaleString()}
+                  <p className="text-[10px] text-gray-400">
+                    {form.symbol || 'Trade'} · {result.totalShares} shares
+                    {result.holdingPeriod !== null ? ` · ${result.holdingPeriod}d` : ''}
                   </p>
-                  <p className={`text-[11px] font-semibold ${result.netProfit >= 0 ? 'text-emerald-500' : 'text-red-400'}`}>
-                    {result.netProfitPct >= 0 ? '+' : ''}{result.netProfitPct.toFixed(2)}% return
+                  <p
+                    className={`text-2xl font-bold mt-0.5 ${result.netProfit >= 0 ? 'text-emerald-600 dark:text-emerald-400' : 'text-red-500'}`}
+                  >
+                    {result.netProfit >= 0 ? '+' : ''}Rs.
+                    {Math.round(result.netProfit).toLocaleString()}
+                  </p>
+                  <p
+                    className={`text-[11px] font-semibold ${result.netProfit >= 0 ? 'text-emerald-500' : 'text-red-400'}`}
+                  >
+                    {result.netProfitPct >= 0 ? '+' : ''}
+                    {result.netProfitPct.toFixed(2)}% return
                   </p>
                 </div>
                 <div className="text-right">
-                  <p className="text-[10px] font-semibold uppercase tracking-widest text-gray-400">Break-even</p>
-                  <p className="text-base font-bold text-gray-800 dark:text-gray-100 mt-0.5">Rs.{result.breakEven}</p>
+                  <p className="text-[10px] font-semibold uppercase tracking-widest text-gray-400">
+                    Break-even
+                  </p>
+                  <p className="text-base font-bold text-gray-800 dark:text-gray-100 mt-0.5">
+                    Rs.{result.breakEven}
+                  </p>
                   {result.bonusShares > 0 && (
-                    <p className="text-[10px] text-blue-400">Adj. Rs.{result.adjustedCostPerShare}</p>
+                    <p className="text-[10px] text-blue-400">
+                      Adj. Rs.{result.adjustedCostPerShare}
+                    </p>
                   )}
                 </div>
               </div>
@@ -249,11 +384,24 @@ function NEPSECalculator() {
                 {[
                   { label: 'Buy', value: `Rs.${Math.round(result.buyAmount).toLocaleString()}` },
                   { label: 'Sell', value: `Rs.${Math.round(result.sellAmount).toLocaleString()}` },
-                  { label: 'Charges', value: `Rs.${Math.round(result.totalCharges).toLocaleString()}`, red: true },
+                  {
+                    label: 'Charges',
+                    value: `Rs.${Math.round(result.totalCharges).toLocaleString()}`,
+                    red: true,
+                  },
                 ].map((s, i) => (
-                  <div key={i} className="bg-white/60 dark:bg-gray-900/60 rounded-xl p-2 text-center border border-white/50 dark:border-gray-800/50">
-                    <p className="text-[10px] font-semibold text-gray-400 uppercase tracking-widest">{s.label}</p>
-                    <p className={`text-[11px] font-bold mt-0.5 ${s.red ? 'text-red-400' : 'text-gray-700 dark:text-gray-200'}`}>{s.value}</p>
+                  <div
+                    key={i}
+                    className="bg-white/60 dark:bg-gray-900/60 rounded-xl p-2 text-center border border-white/50 dark:border-gray-800/50"
+                  >
+                    <p className="text-[10px] font-semibold text-gray-400 uppercase tracking-widest">
+                      {s.label}
+                    </p>
+                    <p
+                      className={`text-[11px] font-bold mt-0.5 ${s.red ? 'text-red-400' : 'text-gray-700 dark:text-gray-200'}`}
+                    >
+                      {s.value}
+                    </p>
                   </div>
                 ))}
               </div>
@@ -261,7 +409,9 @@ function NEPSECalculator() {
 
             {/* Charges breakdown */}
             <div className="bg-white dark:bg-gray-900 rounded-2xl border border-gray-100 dark:border-gray-800 p-4 space-y-3">
-              <p className="text-[10px] font-semibold uppercase tracking-widest text-gray-400">Charges Breakdown</p>
+              <p className="text-[10px] font-semibold uppercase tracking-widest text-gray-400">
+                Charges Breakdown
+              </p>
               <div className="space-y-1.5">
                 {[
                   { label: 'Buy Broker Commission', value: result.buyBroker },
@@ -270,24 +420,50 @@ function NEPSECalculator() {
                   { label: 'Sell Broker Commission', value: result.sellBroker },
                   { label: 'Sell SEBON Fee', value: result.sellSebon },
                   { label: 'Sell DP Charge', value: result.sellDp },
-                  { label: `CGT (${result.isLongTerm ? '5% Long' : '7.5% Short'}-term)`, value: result.cgt, highlight: true },
-                  result.cashDiv > 0 && { label: 'Cash Dividend', value: result.cashDiv, positive: true },
-                ].filter(Boolean).map((item, i) => (
-                  <div key={i} className="flex justify-between items-center py-1 border-b border-gray-50 dark:border-gray-800">
-                    <span className="text-[10px] text-gray-500 dark:text-gray-400">{item.label}</span>
-                    <span className={`text-[10px] font-semibold ${item.positive ? 'text-emerald-500' : item.highlight ? 'text-red-400' : 'text-gray-700 dark:text-gray-200'}`}>
-                      {item.positive ? '+' : '-'}Rs.{Math.round(item.value).toLocaleString()}
-                    </span>
-                  </div>
-                ))}
+                  {
+                    label: `CGT (${result.isLongTerm ? '5% Long' : '7.5% Short'}-term)`,
+                    value: result.cgt,
+                    highlight: true,
+                  },
+                  result.cashDiv > 0 && {
+                    label: 'Cash Dividend',
+                    value: result.cashDiv,
+                    positive: true,
+                  },
+                ]
+                  .filter(Boolean)
+                  .map((item, i) => (
+                    <div
+                      key={i}
+                      className="flex justify-between items-center py-1 border-b border-gray-50 dark:border-gray-800"
+                    >
+                      <span className="text-[10px] text-gray-500 dark:text-gray-400">
+                        {item.label}
+                      </span>
+                      <span
+                        className={`text-[10px] font-semibold ${item.positive ? 'text-emerald-500' : item.highlight ? 'text-red-400' : 'text-gray-700 dark:text-gray-200'}`}
+                      >
+                        {item.positive ? '+' : '-'}Rs.{Math.round(item.value).toLocaleString()}
+                      </span>
+                    </div>
+                  ))}
               </div>
 
               <div>
-                <p className="text-[10px] font-semibold uppercase tracking-widest text-gray-400 mb-2">Charges Distribution</p>
+                <p className="text-[10px] font-semibold uppercase tracking-widest text-gray-400 mb-2">
+                  Charges Distribution
+                </p>
                 <div className="flex items-center gap-4">
                   <ResponsiveContainer width={100} height={100}>
                     <PieChart>
-                      <Pie data={result.pieData} cx={45} cy={45} innerRadius={25} outerRadius={45} dataKey="value">
+                      <Pie
+                        data={result.pieData}
+                        cx={45}
+                        cy={45}
+                        innerRadius={25}
+                        outerRadius={45}
+                        dataKey="value"
+                      >
                         {result.pieData.map((_, i) => (
                           <Cell key={i} fill={PIE_COLORS[i % PIE_COLORS.length]} />
                         ))}
@@ -298,10 +474,17 @@ function NEPSECalculator() {
                     {result.pieData.map((item, i) => (
                       <div key={i} className="flex items-center justify-between">
                         <div className="flex items-center gap-1.5">
-                          <div className="w-2 h-2 rounded-full flex-shrink-0" style={{ backgroundColor: PIE_COLORS[i % PIE_COLORS.length] }} />
-                          <span className="text-[10px] text-gray-500 dark:text-gray-400">{item.name}</span>
+                          <div
+                            className="w-2 h-2 rounded-full flex-shrink-0"
+                            style={{ backgroundColor: PIE_COLORS[i % PIE_COLORS.length] }}
+                          />
+                          <span className="text-[10px] text-gray-500 dark:text-gray-400">
+                            {item.name}
+                          </span>
                         </div>
-                        <span className="text-[10px] font-semibold text-gray-700 dark:text-gray-200">Rs.{item.value.toLocaleString()}</span>
+                        <span className="text-[10px] font-semibold text-gray-700 dark:text-gray-200">
+                          Rs.{item.value.toLocaleString()}
+                        </span>
                       </div>
                     ))}
                   </div>
@@ -318,7 +501,11 @@ function NEPSECalculator() {
 // ─── POSITION & RISK CALCULATOR ────────────────────────────
 function PositionCalculator() {
   const [form, setForm] = useState({
-    capital: '', riskPct: '2', entryPrice: '', slPrice: '', tpPrice: ''
+    capital: '',
+    riskPct: '2',
+    entryPrice: '',
+    slPrice: '',
+    tpPrice: '',
   })
   const [result, setResult] = useState(null)
   const [posErr, setPosErr] = useState(null)
@@ -341,7 +528,9 @@ function PositionCalculator() {
     const riskAmount = (capital * riskPct) / 100
     const positionSize = Math.floor(riskAmount / riskPerShare)
     if (positionSize === 0) {
-      setPosErr(`Position size is 0 — your risk per share (Rs.${riskPerShare.toFixed(2)}) exceeds your risk amount (Rs.${riskAmount.toFixed(2)}). Increase capital or raise stop-loss distance.`)
+      setPosErr(
+        `Position size is 0 — your risk per share (Rs.${riskPerShare.toFixed(2)}) exceeds your risk amount (Rs.${riskAmount.toFixed(2)}). Increase capital or raise stop-loss distance.`
+      )
       return
     }
 
@@ -353,37 +542,85 @@ function PositionCalculator() {
 
     const chartData = []
     for (let r = 0.5; r <= 5; r += 0.5) {
-      chartData.push({ rr: `1:${r}`, gain: Math.round(riskPerShare * positionSize * r), loss: Math.round(maxLoss) })
+      chartData.push({
+        rr: `1:${r}`,
+        gain: Math.round(riskPerShare * positionSize * r),
+        loss: Math.round(maxLoss),
+      })
     }
 
-    setResult({ riskAmount, riskPerShare, positionSize, positionValue, reward, rr, maxLoss, potentialGain, chartData })
+    setResult({
+      riskAmount,
+      riskPerShare,
+      positionSize,
+      positionValue,
+      reward,
+      rr,
+      maxLoss,
+      potentialGain,
+      chartData,
+    })
   }
 
   return (
     <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
       <div className="bg-white dark:bg-gray-900 rounded-2xl border border-gray-100 dark:border-gray-800 p-5 space-y-3">
-        <p className="text-[11px] font-semibold uppercase tracking-widest text-gray-400">Position Size & Risk/Reward</p>
+        <p className="text-[11px] font-semibold uppercase tracking-widest text-gray-400">
+          Position Size & Risk/Reward
+        </p>
         <div className="grid grid-cols-2 gap-3">
           <div className="col-span-2">
             <label className={LABEL}>Total Capital (Rs.)</label>
-            <input type="number" value={form.capital} onChange={e => setForm(p => ({ ...p, capital: e.target.value }))} placeholder="100000" className={INPUT} />
+            <input
+              type="number"
+              value={form.capital}
+              onChange={(e) => setForm((p) => ({ ...p, capital: e.target.value }))}
+              placeholder="100000"
+              className={INPUT}
+            />
           </div>
           <div>
             <label className={LABEL}>Risk % per Trade</label>
-            <input type="number" value={form.riskPct} onChange={e => setForm(p => ({ ...p, riskPct: e.target.value }))} placeholder="2" className={INPUT} />
+            <input
+              type="number"
+              value={form.riskPct}
+              onChange={(e) => setForm((p) => ({ ...p, riskPct: e.target.value }))}
+              placeholder="2"
+              className={INPUT}
+            />
             <p className="text-[10px] text-gray-400 mt-1">Recommended: 1–2%</p>
           </div>
           <div>
             <label className={LABEL}>Entry Price (Rs.)</label>
-            <input type="number" value={form.entryPrice} onChange={e => setForm(p => ({ ...p, entryPrice: e.target.value }))} placeholder="500" className={INPUT} />
+            <input
+              type="number"
+              value={form.entryPrice}
+              onChange={(e) => setForm((p) => ({ ...p, entryPrice: e.target.value }))}
+              placeholder="500"
+              className={INPUT}
+            />
           </div>
           <div>
             <label className={LABEL}>Stop Loss (Rs.)</label>
-            <input type="number" value={form.slPrice} onChange={e => setForm(p => ({ ...p, slPrice: e.target.value }))} placeholder="470" className={INPUT} />
+            <input
+              type="number"
+              value={form.slPrice}
+              onChange={(e) => setForm((p) => ({ ...p, slPrice: e.target.value }))}
+              placeholder="470"
+              className={INPUT}
+            />
           </div>
           <div>
-            <label className={LABEL}>Take Profit <span className="normal-case font-normal text-gray-300">opt.</span></label>
-            <input type="number" value={form.tpPrice} onChange={e => setForm(p => ({ ...p, tpPrice: e.target.value }))} placeholder="560" className={INPUT} />
+            <label className={LABEL}>
+              Take Profit <span className="normal-case font-normal text-gray-300">opt.</span>
+            </label>
+            <input
+              type="number"
+              value={form.tpPrice}
+              onChange={(e) => setForm((p) => ({ ...p, tpPrice: e.target.value }))}
+              placeholder="560"
+              className={INPUT}
+            />
           </div>
         </div>
         {posErr && (
@@ -391,7 +628,11 @@ function PositionCalculator() {
             {posErr}
           </div>
         )}
-        <button onClick={calculate} disabled={!form.capital || !form.entryPrice || !form.slPrice} className="w-full bg-blue-500 hover:bg-blue-600 text-white py-2.5 rounded-xl text-[11px] font-semibold disabled:opacity-40 transition-colors">
+        <button
+          onClick={calculate}
+          disabled={!form.capital || !form.entryPrice || !form.slPrice}
+          className="w-full bg-blue-500 hover:bg-blue-600 text-white py-2.5 rounded-xl text-[11px] font-semibold disabled:opacity-40 transition-colors"
+        >
           Calculate
         </button>
       </div>
@@ -402,24 +643,59 @@ function PositionCalculator() {
         ) : (
           <div className="bg-white dark:bg-gray-900 rounded-2xl border border-gray-100 dark:border-gray-800 p-5 space-y-4">
             <div className="grid grid-cols-2 gap-2">
-              <StatCard label="Position Size" value={`${result.positionSize} shares`} color="text-blue-500" />
-              <StatCard label="Position Value" value={`Rs.${Math.round(result.positionValue).toLocaleString()}`} />
-              <StatCard label="Max Risk" value={`-Rs.${Math.round(result.maxLoss).toLocaleString()}`} color="text-red-400" />
-              <StatCard label="Risk Amount" value={`Rs.${Math.round(result.riskAmount).toLocaleString()}`} color="text-amber-500" />
+              <StatCard
+                label="Position Size"
+                value={`${result.positionSize} shares`}
+                color="text-blue-500"
+              />
+              <StatCard
+                label="Position Value"
+                value={`Rs.${Math.round(result.positionValue).toLocaleString()}`}
+              />
+              <StatCard
+                label="Max Risk"
+                value={`-Rs.${Math.round(result.maxLoss).toLocaleString()}`}
+                color="text-red-400"
+              />
+              <StatCard
+                label="Risk Amount"
+                value={`Rs.${Math.round(result.riskAmount).toLocaleString()}`}
+                color="text-amber-500"
+              />
               <StatCard label="Risk per Share" value={`Rs.${result.riskPerShare.toFixed(2)}`} />
-              {result.rr && <StatCard label="Risk:Reward" value={`1:${result.rr}`} color={parseFloat(result.rr) >= 2 ? 'text-emerald-500' : 'text-amber-500'} />}
-              {result.potentialGain && <StatCard label="Potential Gain" value={`+Rs.${Math.round(result.potentialGain).toLocaleString()}`} color="text-emerald-500" />}
+              {result.rr && (
+                <StatCard
+                  label="Risk:Reward"
+                  value={`1:${result.rr}`}
+                  color={parseFloat(result.rr) >= 2 ? 'text-emerald-500' : 'text-amber-500'}
+                />
+              )}
+              {result.potentialGain && (
+                <StatCard
+                  label="Potential Gain"
+                  value={`+Rs.${Math.round(result.potentialGain).toLocaleString()}`}
+                  color="text-emerald-500"
+                />
+              )}
             </div>
 
             <div>
-              <p className="text-[10px] font-semibold uppercase tracking-widest text-gray-400 mb-2">Gain vs Risk at Different R:R</p>
+              <p className="text-[10px] font-semibold uppercase tracking-widest text-gray-400 mb-2">
+                Gain vs Risk at Different R:R
+              </p>
               <ResponsiveContainer width="100%" height={140}>
-                <BarChart data={result.chartData} margin={{ top: 0, right: 0, left: -20, bottom: 0 }}>
+                <BarChart
+                  data={result.chartData}
+                  margin={{ top: 0, right: 0, left: -20, bottom: 0 }}
+                >
                   <XAxis dataKey="rr" tick={{ fontSize: 9 }} tickLine={false} axisLine={false} />
                   <YAxis tick={{ fontSize: 9 }} tickLine={false} axisLine={false} />
-                  <Tooltip formatter={(val) => `Rs.${val.toLocaleString()}`} contentStyle={{ fontSize: 11, borderRadius: 8, border: '1px solid #e5e7eb' }} />
-                  <Bar dataKey="gain" fill="#10b981" radius={[4,4,0,0]} name="Potential Gain" />
-                  <Bar dataKey="loss" fill="#f87171" radius={[4,4,0,0]} name="Max Loss" />
+                  <Tooltip
+                    formatter={(val) => `Rs.${val.toLocaleString()}`}
+                    contentStyle={{ fontSize: 11, borderRadius: 8, border: '1px solid #e5e7eb' }}
+                  />
+                  <Bar dataKey="gain" fill="#10b981" radius={[4, 4, 0, 0]} name="Potential Gain" />
+                  <Bar dataKey="loss" fill="#f87171" radius={[4, 4, 0, 0]} name="Max Loss" />
                 </BarChart>
               </ResponsiveContainer>
             </div>
@@ -433,7 +709,10 @@ function PositionCalculator() {
 // ─── SIP CALCULATOR ─────────────────────────────────────────
 function SIPCalculator() {
   const [form, setForm] = useState({
-    monthly: '', annualReturn: '12', years: '10', initialLump: ''
+    monthly: '',
+    annualReturn: '12',
+    years: '10',
+    initialLump: '',
   })
   const [result, setResult] = useState(null)
   const [sipErr, setSipErr] = useState(null)
@@ -462,9 +741,8 @@ function SIPCalculator() {
     const months = years * 12
 
     // Standard SIP — ordinary annuity (payments at end of each period)
-    const sipValue = rate === 0
-      ? monthly * months
-      : monthly * ((Math.pow(1 + rate, months) - 1) / rate)
+    const sipValue =
+      rate === 0 ? monthly * months : monthly * ((Math.pow(1 + rate, months) - 1) / rate)
 
     const annualRate = annualReturnPct / 100
     const lumpValue = lump * Math.pow(1 + annualRate, years)
@@ -476,11 +754,13 @@ function SIPCalculator() {
     const chartData = []
     for (let y = 1; y <= years; y++) {
       const m = y * 12
-      const sv = rate === 0
-        ? monthly * m
-        : monthly * ((Math.pow(1 + rate, m) - 1) / rate)
+      const sv = rate === 0 ? monthly * m : monthly * ((Math.pow(1 + rate, m) - 1) / rate)
       const lv = lump * Math.pow(1 + annualRate, y)
-      chartData.push({ year: `Yr ${y}`, invested: Math.round(monthly * m + lump), value: Math.round(sv + lv) })
+      chartData.push({
+        year: `Yr ${y}`,
+        invested: Math.round(monthly * m + lump),
+        value: Math.round(sv + lv),
+      })
     }
 
     setResult({ totalValue, totalInvested, totalGain, gainPct, chartData })
@@ -489,23 +769,51 @@ function SIPCalculator() {
   return (
     <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
       <div className="bg-white dark:bg-gray-900 rounded-2xl border border-gray-100 dark:border-gray-800 p-5 space-y-3">
-        <p className="text-[11px] font-semibold uppercase tracking-widest text-gray-400">Systematic Investment Plan</p>
+        <p className="text-[11px] font-semibold uppercase tracking-widest text-gray-400">
+          Systematic Investment Plan
+        </p>
         <div className="grid grid-cols-2 gap-3">
           <div className="col-span-2">
             <label className={LABEL}>Monthly Investment (Rs.)</label>
-            <input type="number" value={form.monthly} onChange={e => setForm(p => ({ ...p, monthly: e.target.value }))} placeholder="5000" className={INPUT} />
+            <input
+              type="number"
+              value={form.monthly}
+              onChange={(e) => setForm((p) => ({ ...p, monthly: e.target.value }))}
+              placeholder="5000"
+              className={INPUT}
+            />
           </div>
           <div>
             <label className={LABEL}>Annual Return %</label>
-            <input type="number" value={form.annualReturn} onChange={e => setForm(p => ({ ...p, annualReturn: e.target.value }))} placeholder="12" className={INPUT} />
+            <input
+              type="number"
+              value={form.annualReturn}
+              onChange={(e) => setForm((p) => ({ ...p, annualReturn: e.target.value }))}
+              placeholder="12"
+              className={INPUT}
+            />
           </div>
           <div>
             <label className={LABEL}>Period (Years)</label>
-            <input type="number" value={form.years} onChange={e => setForm(p => ({ ...p, years: e.target.value }))} placeholder="10" className={INPUT} />
+            <input
+              type="number"
+              value={form.years}
+              onChange={(e) => setForm((p) => ({ ...p, years: e.target.value }))}
+              placeholder="10"
+              className={INPUT}
+            />
           </div>
           <div className="col-span-2">
-            <label className={LABEL}>Initial Lump Sum <span className="normal-case font-normal text-gray-300">opt.</span></label>
-            <input type="number" value={form.initialLump} onChange={e => setForm(p => ({ ...p, initialLump: e.target.value }))} placeholder="50000" className={INPUT} />
+            <label className={LABEL}>
+              Initial Lump Sum <span className="normal-case font-normal text-gray-300">opt.</span>
+            </label>
+            <input
+              type="number"
+              value={form.initialLump}
+              onChange={(e) => setForm((p) => ({ ...p, initialLump: e.target.value }))}
+              placeholder="50000"
+              className={INPUT}
+            />
           </div>
         </div>
         {sipErr && (
@@ -513,7 +821,11 @@ function SIPCalculator() {
             {sipErr}
           </div>
         )}
-        <button onClick={calculate} disabled={!form.monthly} className="w-full bg-blue-500 hover:bg-blue-600 text-white py-2.5 rounded-xl text-[11px] font-semibold disabled:opacity-40 transition-colors">
+        <button
+          onClick={calculate}
+          disabled={!form.monthly}
+          className="w-full bg-blue-500 hover:bg-blue-600 text-white py-2.5 rounded-xl text-[11px] font-semibold disabled:opacity-40 transition-colors"
+        >
           Calculate Growth
         </button>
       </div>
@@ -524,21 +836,61 @@ function SIPCalculator() {
         ) : (
           <div className="bg-white dark:bg-gray-900 rounded-2xl border border-gray-100 dark:border-gray-800 p-5 space-y-4">
             <div className="grid grid-cols-2 gap-2">
-              <StatCard label="Total Value" value={`Rs.${Math.round(result.totalValue).toLocaleString()}`} color="text-emerald-500" />
-              <StatCard label="Total Invested" value={`Rs.${Math.round(result.totalInvested).toLocaleString()}`} color="text-blue-500" />
-              <StatCard label="Total Gain" value={`+Rs.${Math.round(result.totalGain).toLocaleString()}`} color="text-emerald-500" />
+              <StatCard
+                label="Total Value"
+                value={`Rs.${Math.round(result.totalValue).toLocaleString()}`}
+                color="text-emerald-500"
+              />
+              <StatCard
+                label="Total Invested"
+                value={`Rs.${Math.round(result.totalInvested).toLocaleString()}`}
+                color="text-blue-500"
+              />
+              <StatCard
+                label="Total Gain"
+                value={`+Rs.${Math.round(result.totalGain).toLocaleString()}`}
+                color="text-emerald-500"
+              />
               <StatCard label="Return" value={`+${result.gainPct}%`} color="text-emerald-500" />
             </div>
 
             <div>
-              <p className="text-[10px] font-semibold uppercase tracking-widest text-gray-400 mb-2">Growth Projection</p>
+              <p className="text-[10px] font-semibold uppercase tracking-widest text-gray-400 mb-2">
+                Growth Projection
+              </p>
               <ResponsiveContainer width="100%" height={160}>
-                <LineChart data={result.chartData} margin={{ top: 0, right: 0, left: -10, bottom: 0 }}>
+                <LineChart
+                  data={result.chartData}
+                  margin={{ top: 0, right: 0, left: -10, bottom: 0 }}
+                >
                   <XAxis dataKey="year" tick={{ fontSize: 9 }} tickLine={false} axisLine={false} />
-                  <YAxis tick={{ fontSize: 9 }} tickLine={false} axisLine={false} tickFormatter={v => `${Math.round(v/1000)}K`} />
-                  <Tooltip formatter={(val) => `Rs.${val.toLocaleString()}`} contentStyle={{ fontSize: 11, borderRadius: 8, border: '1px solid #e5e7eb' }} />
-                  <Line type="monotone" dataKey="invested" stroke="#3b82f6" strokeWidth={2} dot={false} name="Invested" strokeDasharray="5 5" />
-                  <Line type="monotone" dataKey="value" stroke="#10b981" strokeWidth={2} dot={false} name="Portfolio Value" />
+                  <YAxis
+                    tick={{ fontSize: 9 }}
+                    tickLine={false}
+                    axisLine={false}
+                    tickFormatter={(v) => `${Math.round(v / 1000)}K`}
+                  />
+                  <Tooltip
+                    formatter={(val) => `Rs.${val.toLocaleString()}`}
+                    contentStyle={{ fontSize: 11, borderRadius: 8, border: '1px solid #e5e7eb' }}
+                  />
+                  <Line
+                    type="monotone"
+                    dataKey="invested"
+                    stroke="#3b82f6"
+                    strokeWidth={2}
+                    dot={false}
+                    name="Invested"
+                    strokeDasharray="5 5"
+                  />
+                  <Line
+                    type="monotone"
+                    dataKey="value"
+                    stroke="#10b981"
+                    strokeWidth={2}
+                    dot={false}
+                    name="Portfolio Value"
+                  />
                   <Legend iconSize={8} wrapperStyle={{ fontSize: 10 }} />
                 </LineChart>
               </ResponsiveContainer>
@@ -557,16 +909,17 @@ function RiskLabPage() {
 
   return (
     <div className="max-w-5xl mx-auto px-3 sm:px-6 pt-4 sm:pt-6 pb-10 space-y-5">
-
       {/* Header */}
       <div>
-        <h1 className="text-lg font-semibold text-gray-900 dark:text-white tracking-tight">{t('risklab.title')}</h1>
+        <h1 className="text-lg font-semibold text-gray-900 dark:text-white tracking-tight">
+          {t('risklab.title')}
+        </h1>
         <p className="text-[11px] text-gray-400 mt-0.5">{t('risklab.subtitle')}</p>
       </div>
 
       {/* Tabs — compact pill token (design.md: page-level tabs are never large py-2 buttons) */}
       <div className="inline-flex items-center gap-0.5 bg-gray-100 dark:bg-gray-800 rounded-lg p-0.5">
-        {TABS.map(tab => (
+        {TABS.map((tab) => (
           <button
             key={tab.id}
             onClick={() => setActiveTab(tab.id)}
@@ -583,10 +936,9 @@ function RiskLabPage() {
       </div>
 
       {/* Content */}
-      {activeTab === 'nepse'    && <NEPSECalculator />}
+      {activeTab === 'nepse' && <NEPSECalculator />}
       {activeTab === 'position' && <PositionCalculator />}
-      {activeTab === 'sip'      && <SIPCalculator />}
-
+      {activeTab === 'sip' && <SIPCalculator />}
     </div>
   )
 }

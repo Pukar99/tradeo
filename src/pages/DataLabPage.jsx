@@ -1,11 +1,20 @@
 // === DataLabPage.jsx — DataLab page: Performance / Insight / Breakdown tabs, toolbar slot portal, auth gating, navbar auto-hide ===
-import { useState, Suspense, lazy, createContext, useContext, useRef, useEffect, useLayoutEffect } from 'react'
-import { Link } from 'react-router-dom'
+import {
+  useState,
+  Suspense,
+  lazy,
+  createContext,
+  useContext,
+  useRef,
+  useEffect,
+  useLayoutEffect,
+} from 'react'
 import { useNavbarAutoHide, useNavbarState } from '../App'
 import { createPortal } from 'react-dom'
 import { ComplexTabProvider } from '../hooks/useComplexTab.jsx'
 import ErrorBoundary from '../components/ErrorBoundary'
 import UpgradePrompt from '../components/UpgradePrompt'
+import AuthWall from '../components/AuthWall'
 import { useAuth } from '../context/AuthContext'
 
 // ── Toolbar slot — portal approach ────────────────────────────────────────────
@@ -20,7 +29,9 @@ export function useToolbarSlot(node) {
   // useLayoutEffect fires synchronously after DOM commit — slotRef.current is
   // guaranteed populated before paint, preventing blank toolbar on re-renders.
   const [, setTick] = useState(0)
-  useLayoutEffect(() => { setTick(t => t + 1) }, [])
+  useLayoutEffect(() => {
+    setTick((t) => t + 1)
+  }, [])
 
   if (!slotRef?.current) return null
   return createPortal(node, slotRef.current)
@@ -29,21 +40,29 @@ export function useToolbarSlot(node) {
 // ── Lazy tab components ───────────────────────────────────────────────────────
 
 const PerformanceChart = lazy(() => import('../components/datalab/PerformanceChart'))
-const InsightPage      = lazy(() => import('../components/complex/InsightPage'))
-const BreakdownPage    = lazy(() => import('../components/complex/BreakdownPage'))
+const InsightPage = lazy(() => import('../components/complex/InsightPage'))
+const BreakdownPage = lazy(() => import('../components/complex/BreakdownPage'))
 
 // ── Tab definitions ───────────────────────────────────────────────────────────
 
 const TABS = [
   {
-    id:    'performance',
+    id: 'performance',
     label: 'Performance',
     icon: (
-      <svg className="w-3 h-3" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round">
+      <svg
+        className="w-3 h-3"
+        viewBox="0 0 24 24"
+        fill="none"
+        stroke="currentColor"
+        strokeWidth={2}
+        strokeLinecap="round"
+        strokeLinejoin="round"
+      >
         <polyline points="22 12 18 12 15 21 9 3 6 12 2 12" />
       </svg>
     ),
-    hint:  'Stock vs NEPSE cycle comparison',
+    hint: 'Stock vs NEPSE cycle comparison',
     steps: [
       'Search a stock symbol or leave empty for NEPSE only',
       'Set swing threshold — higher = fewer, larger cycles',
@@ -53,33 +72,49 @@ const TABS = [
     ],
   },
   {
-    id:    'insight',
+    id: 'insight',
     label: 'Insight',
     icon: (
-      <svg className="w-3 h-3" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round">
+      <svg
+        className="w-3 h-3"
+        viewBox="0 0 24 24"
+        fill="none"
+        stroke="currentColor"
+        strokeWidth={2}
+        strokeLinecap="round"
+        strokeLinejoin="round"
+      >
         <rect x="3" y="4" width="18" height="18" rx="2" />
         <line x1="3" y1="9" x2="21" y2="9" />
         <line x1="9" y1="21" x2="9" y2="9" />
       </svg>
     ),
-    hint:  'Monthly return heatmap & seasonality',
+    hint: 'Monthly return heatmap & seasonality',
     steps: [
       'Pick an index from the left panel (NEPSE, Banking, etc.)',
-      'Click any heatmap cell to see that month\'s detail chart',
+      "Click any heatmap cell to see that month's detail chart",
       'Click a month name to profile it across all years',
       'Weighted Avg row shows the historically strongest months',
       'Use ← → arrow keys to navigate months in the detail view',
     ],
   },
   {
-    id:    'breakdown',
+    id: 'breakdown',
     label: 'Breakdown',
     icon: (
-      <svg className="w-3 h-3" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round">
+      <svg
+        className="w-3 h-3"
+        viewBox="0 0 24 24"
+        fill="none"
+        stroke="currentColor"
+        strokeWidth={2}
+        strokeLinecap="round"
+        strokeLinejoin="round"
+      >
         <path d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z" />
       </svg>
     ),
-    hint:  'Sector drawdown & cycle analysis',
+    hint: 'Sector drawdown & cycle analysis',
     steps: [
       'Click a shaded zone on the overview chart to select a cycle',
       'Or pick a cycle from the left sidebar list',
@@ -92,9 +127,9 @@ const TABS = [
 // ── Info button ───────────────────────────────────────────────────────────────
 
 function InfoButton({ tab }) {
-  const [open,    setOpen]    = useState(false)
+  const [open, setOpen] = useState(false)
   const [hovered, setHovered] = useState(false)
-  const [rect,    setRect]    = useState(null)
+  const [rect, setRect] = useState(null)
   const btnRef = useRef(null)
   const dropdownRef = useRef(null)
 
@@ -113,7 +148,9 @@ function InfoButton({ tab }) {
       setOpen(false)
     }
     // Escape key also closes
-    function onKey(e) { if (e.key === 'Escape') setOpen(false) }
+    function onKey(e) {
+      if (e.key === 'Escape') setOpen(false)
+    }
     document.addEventListener('mousedown', handler)
     document.addEventListener('keydown', onKey)
     return () => {
@@ -130,14 +167,16 @@ function InfoButton({ tab }) {
       if (btnRef.current) setRect(btnRef.current.getBoundingClientRect())
     }
     window.addEventListener('resize', reposition)
-    window.addEventListener('scroll', reposition, true)  // capture for nested scrollers
+    window.addEventListener('scroll', reposition, true) // capture for nested scrollers
     return () => {
       window.removeEventListener('resize', reposition)
       window.removeEventListener('scroll', reposition, true)
     }
   }, [open, hovered])
 
-  useEffect(() => { setOpen(false) }, [tab?.id])
+  useEffect(() => {
+    setOpen(false)
+  }, [tab?.id])
 
   if (!tab) return null
 
@@ -149,8 +188,14 @@ function InfoButton({ tab }) {
         aria-label={`${tab.label} tab — show help`}
         aria-expanded={open}
         aria-haspopup="dialog"
-        onClick={() => { updateRect(); setOpen(o => !o) }}
-        onMouseEnter={() => { updateRect(); setHovered(true) }}
+        onClick={() => {
+          updateRect()
+          setOpen((o) => !o)
+        }}
+        onMouseEnter={() => {
+          updateRect()
+          setHovered(true)
+        }}
         onMouseLeave={() => setHovered(false)}
         className={`w-5 h-5 flex items-center justify-center rounded-full text-[10px] font-bold italic transition-all border ${
           open
@@ -179,13 +224,20 @@ function InfoButton({ tab }) {
           style={{ top: rect.bottom + 5, right: window.innerWidth - rect.right }}
         >
           <div className="pt-3 pb-1 px-4">
-            <p className="text-[10px] font-semibold uppercase tracking-widest text-blue-500">{tab.label}</p>
+            <p className="text-[10px] font-semibold uppercase tracking-widest text-blue-500">
+              {tab.label}
+            </p>
             <p className="text-[10px] text-gray-400 dark:text-gray-500 mt-0.5">{tab.hint}</p>
           </div>
           <ul className="px-4 pb-3 pt-2 space-y-2">
             {tab.steps.map((step, i) => (
-              <li key={i} className="flex items-start gap-2.5 border-l-2 border-gray-100 dark:border-gray-800 pl-2.5">
-                <span className="text-[10px] text-gray-400 dark:text-gray-500 leading-snug">{step}</span>
+              <li
+                key={i}
+                className="flex items-start gap-2.5 border-l-2 border-gray-100 dark:border-gray-800 pl-2.5"
+              >
+                <span className="text-[10px] text-gray-400 dark:text-gray-500 leading-snug">
+                  {step}
+                </span>
               </li>
             ))}
           </ul>
@@ -205,64 +257,46 @@ function TabLoader() {
   )
 }
 
-// ── Auth wall ─────────────────────────────────────────────────────────────────
-
-function AuthWall() {
-  return (
-    <div className="flex-1 h-full flex flex-col items-center justify-center gap-4 text-center px-6 animate-fade-up">
-      <div className="w-12 h-12 rounded-full bg-gray-100 dark:bg-gray-800 flex items-center justify-center">
-        <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" className="text-gray-400">
-          <rect x="3" y="11" width="18" height="11" rx="2" ry="2"/>
-          <path d="M7 11V7a5 5 0 0 1 10 0v4"/>
-        </svg>
-      </div>
-      <div>
-        <p className="text-sm font-semibold text-gray-800 dark:text-gray-100">Login required</p>
-        <p className="text-xs text-gray-400 mt-1">Sign in to access Data Lab analytics</p>
-      </div>
-      <div className="flex items-center gap-3">
-        <Link to="/login" className="px-4 py-2 bg-blue-600 text-white text-sm font-semibold rounded-lg hover:bg-blue-700 transition-colors">Login</Link>
-        <Link to="/signup" className="px-4 py-2 border border-gray-300 dark:border-gray-600 text-sm font-medium rounded-lg hover:bg-gray-50 dark:hover:bg-gray-800 transition-colors text-gray-700 dark:text-gray-300">Sign up free</Link>
-      </div>
-    </div>
-  )
-}
-
 // ── Tab content ───────────────────────────────────────────────────────────────
 
 function TabContent({ activeTab }) {
   const { user } = useAuth()
-  if (!user) return <AuthWall />
+  if (!user) return <AuthWall subtitle="Sign in to access Data Lab analytics" />
 
-  if (activeTab === 'performance') return (
-    <ErrorBoundary label="Performance">
-      <Suspense fallback={<TabLoader />}>
-        <PerformanceChart />
-      </Suspense>
-    </ErrorBoundary>
-  )
-
-  if (activeTab === 'insight') return (
-    user.tier === 'basic' && !user?.is_admin ? <UpgradePrompt feature="Insight" /> :
-    <ComplexTabProvider>
-      <ErrorBoundary label="Insight">
+  if (activeTab === 'performance')
+    return (
+      <ErrorBoundary label="Performance">
         <Suspense fallback={<TabLoader />}>
-          <InsightPage />
+          <PerformanceChart />
         </Suspense>
       </ErrorBoundary>
-    </ComplexTabProvider>
-  )
+    )
 
-  if (activeTab === 'breakdown') return (
-    user.tier === 'basic' && !user?.is_admin ? <UpgradePrompt feature="Breakdown" /> :
-    <ComplexTabProvider>
-      <ErrorBoundary label="Breakdown">
-        <Suspense fallback={<TabLoader />}>
-          <BreakdownPage />
-        </Suspense>
-      </ErrorBoundary>
-    </ComplexTabProvider>
-  )
+  if (activeTab === 'insight')
+    return user.tier === 'basic' && !user?.is_admin ? (
+      <UpgradePrompt feature="Insight" />
+    ) : (
+      <ComplexTabProvider>
+        <ErrorBoundary label="Insight">
+          <Suspense fallback={<TabLoader />}>
+            <InsightPage />
+          </Suspense>
+        </ErrorBoundary>
+      </ComplexTabProvider>
+    )
+
+  if (activeTab === 'breakdown')
+    return user.tier === 'basic' && !user?.is_admin ? (
+      <UpgradePrompt feature="Breakdown" />
+    ) : (
+      <ComplexTabProvider>
+        <ErrorBoundary label="Breakdown">
+          <Suspense fallback={<TabLoader />}>
+            <BreakdownPage />
+          </Suspense>
+        </ErrorBoundary>
+      </ComplexTabProvider>
+    )
 
   return null
 }
@@ -273,16 +307,24 @@ function TabContent({ activeTab }) {
 // Wrap in try/catch so a single denial doesn't crash the whole DataLab tree.
 // Exported: the tab components persist their own controls (index, threshold, symbol).
 export function safeSessionGet(key, fallback) {
-  try { return sessionStorage.getItem(key) ?? fallback }
-  catch { return fallback }
+  try {
+    return sessionStorage.getItem(key) ?? fallback
+  } catch {
+    return fallback
+  }
 }
 export function safeSessionSet(key, value) {
-  try { sessionStorage.setItem(key, value) }
-  catch { /* fail silently — feature degrades to no persistence */ }
+  try {
+    sessionStorage.setItem(key, value)
+  } catch {
+    /* fail silently — feature degrades to no persistence */
+  }
 }
 
 export default function DataLabPage() {
-  const [activeTab, setActiveTab] = useState(() => safeSessionGet('tradeo_datalab_tab', 'performance'))
+  const [activeTab, setActiveTab] = useState(() =>
+    safeSessionGet('tradeo_datalab_tab', 'performance')
+  )
   const slotRef = useRef(null)
   const { user } = useAuth()
 
@@ -307,7 +349,6 @@ export default function DataLabPage() {
           transition: 'padding-top 300ms ease-in-out',
         }}
       >
-
         {/* ── Tab bar + inline toolbar ──
             Strategy: ONLY the slot scrolls horizontally. The outer row is a
             simple flex with hard shrink-0 on the chips and info button so they
@@ -319,10 +360,9 @@ export default function DataLabPage() {
           className="shrink-0 flex items-center gap-1.5 px-3 py-1 border-b border-gray-200 dark:border-gray-800 bg-white dark:bg-gray-900"
           onMouseEnter={showNavbar}
         >
-
           {/* Compact tab chips — never compress */}
           <div className="flex items-center gap-0.5 bg-gray-100 dark:bg-gray-800 rounded-lg p-0.5 shrink-0">
-            {TABS.map(tab => {
+            {TABS.map((tab) => {
               const isActive = tab.id === activeTab
               return (
                 <button
@@ -337,8 +377,19 @@ export default function DataLabPage() {
                   {tab.icon}
                   <span>{tab.label}</span>
                   {!user && (
-                    <svg width="8" height="8" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" className="opacity-40">
-                      <rect x="3" y="11" width="18" height="11" rx="2" ry="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/>
+                    <svg
+                      width="8"
+                      height="8"
+                      viewBox="0 0 24 24"
+                      fill="none"
+                      stroke="currentColor"
+                      strokeWidth="2.5"
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                      className="opacity-40"
+                    >
+                      <rect x="3" y="11" width="18" height="11" rx="2" ry="2" />
+                      <path d="M7 11V7a5 5 0 0 1 10 0v4" />
                     </svg>
                   )}
                 </button>
@@ -358,14 +409,17 @@ export default function DataLabPage() {
           />
 
           {/* Info button — never compress */}
-          <InfoButton tab={TABS.find(t => t.id === activeTab)} />
+          <InfoButton tab={TABS.find((t) => t.id === activeTab)} />
         </div>
 
         {/* ── Content — mouse entering chart area triggers navbar hide ──
             MUST be a flex container: Insight/Breakdown roots use `flex-1 min-h-0`,
             which is inert in a block parent — the page then grows to content
             height, the ancestor clips it, and every inner scroll panel dies. */}
-        <div className="flex-1 overflow-hidden min-h-0 flex flex-col" onMouseEnter={navHidden ? undefined : scheduleHide}>
+        <div
+          className="flex-1 overflow-hidden min-h-0 flex flex-col"
+          onMouseEnter={navHidden ? undefined : scheduleHide}
+        >
           <TabContent activeTab={activeTab} />
         </div>
       </div>

@@ -14,5 +14,5 @@ createRoot(document.getElementById('root')).render(
         </AuthProvider>
       </LanguageProvider>
     </ThemeProvider>
-  </StrictMode>,
+  </StrictMode>
 )

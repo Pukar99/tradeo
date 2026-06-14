@@ -18,13 +18,25 @@ export default function UpgradePrompt({ feature, requiredTier = 'pro' }) {
       <div className="relative w-14 h-14">
         <div className="absolute inset-0 rounded-2xl bg-amber-400/15 animate-pulse-ring" />
         <div className="w-14 h-14 rounded-2xl bg-gray-100 dark:bg-gray-800 flex items-center justify-center relative z-10">
-          <svg className="w-7 h-7 text-amber-500" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M5 13l4 4L19 7" />
+          <svg
+            className="w-7 h-7 text-amber-500"
+            fill="none"
+            viewBox="0 0 24 24"
+            stroke="currentColor"
+          >
+            <path
+              strokeLinecap="round"
+              strokeLinejoin="round"
+              strokeWidth={1.5}
+              d="M5 13l4 4L19 7"
+            />
           </svg>
         </div>
       </div>
       <div className="animate-fade-up" style={{ animationDelay: '80ms' }}>
-        <p className="text-sm font-bold text-gray-700 dark:text-gray-200">{feature} requires {tierLabel}</p>
+        <p className="text-sm font-bold text-gray-700 dark:text-gray-200">
+          {feature} requires {tierLabel}
+        </p>
         <p className="text-xs text-gray-400 mt-1 max-w-xs">
           Upgrade your plan to unlock {feature} and other {tierLabel} features.
         </p>

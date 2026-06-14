@@ -12,7 +12,11 @@ import { useAuth } from '../context/AuthContext'
 function saveRedirectFrom(path) {
   if (!path || path === '/login' || path === '/signup') return
   if (/^https?:\/\/|^\/\//.test(path)) return
-  try { sessionStorage.setItem('authRedirectFrom', path) } catch { /* private browsing */ }
+  try {
+    sessionStorage.setItem('authRedirectFrom', path)
+  } catch {
+    /* private browsing */
+  }
 }
 
 export function getRedirectFrom() {
@@ -20,7 +24,9 @@ export function getRedirectFrom() {
   try {
     from = sessionStorage.getItem('authRedirectFrom') || '/'
     sessionStorage.removeItem('authRedirectFrom')
-  } catch { /* private browsing */ }
+  } catch {
+    /* private browsing */
+  }
   if (!from.startsWith('/') || /^\/\//.test(from)) return '/'
   return from
 }
@@ -31,11 +37,12 @@ export default function PrivateRoute({ children }) {
 
   // Wait for /api/auth/me to resolve before deciding — prevents flash redirect on refresh.
   // Spinner (not null) so a slow auth check doesn't look like a frozen blank page.
-  if (loading) return (
-    <div className="min-h-screen flex items-center justify-center bg-gray-50 dark:bg-gray-950">
-      <div className="w-6 h-6 border-2 border-green-500 border-t-transparent rounded-full animate-spin" />
-    </div>
-  )
+  if (loading)
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-gray-50 dark:bg-gray-950">
+        <div className="w-6 h-6 border-2 border-green-500 border-t-transparent rounded-full animate-spin" />
+      </div>
+    )
 
   if (!user) {
     saveRedirectFrom(location.pathname + location.search)

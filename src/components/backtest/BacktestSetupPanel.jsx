@@ -6,53 +6,57 @@ import { btGetSymbols, btCreateSession } from '../../api/backtest'
 const SPEEDS = ['0.5', '1', '2', '5', '10']
 
 export default function BacktestSetupPanel({ onSessionStarted }) {
-  const [symbols, setSymbols]             = useState([])
-  const [symbol, setSymbol]               = useState('')
-  const [symbolSearch, setSymbolSearch]   = useState('')
+  const [symbols, setSymbols] = useState([])
+  const [symbol, setSymbol] = useState('')
+  const [symbolSearch, setSymbolSearch] = useState('')
   const [showSymbolList, setShowSymbolList] = useState(false)
-  const [startDate, setStartDate]         = useState('')
-  const [capital, setCapital]             = useState('500000')
-  const [strategyName, setStrategyName]   = useState('')
-  const [runMode, setRunMode]             = useState('PLAY')
-  const [speed, setSpeed]                 = useState('1')
-  const [slMode, setSlMode]               = useState('MANUAL')
-  const [loading, setLoading]             = useState(false)
-  const [error, setError]                 = useState('')
+  const [startDate, setStartDate] = useState('')
+  const [capital, setCapital] = useState('500000')
+  const [strategyName, setStrategyName] = useState('')
+  const [runMode, setRunMode] = useState('PLAY')
+  const [speed, setSpeed] = useState('1')
+  const [slMode, setSlMode] = useState('MANUAL')
+  const [loading, setLoading] = useState(false)
+  const [error, setError] = useState('')
   const [symbolsLoading, setSymbolsLoading] = useState(true)
-  const [symbolsError, setSymbolsError]   = useState('')
-  const dropdownRef                       = useRef(null)
+  const [symbolsError, setSymbolsError] = useState('')
+  const dropdownRef = useRef(null)
 
   useEffect(() => {
     btGetSymbols()
-      .then(r => setSymbols(r.data.symbols || []))
+      .then((r) => setSymbols(r.data.symbols || []))
       .catch(() => setSymbolsError('Failed to load symbols — check server'))
       .finally(() => setSymbolsLoading(false))
   }, [])
 
   // Close dropdown on Escape
   useEffect(() => {
-    const h = e => { if (e.key === 'Escape') setShowSymbolList(false) }
+    const h = (e) => {
+      if (e.key === 'Escape') setShowSymbolList(false)
+    }
     window.addEventListener('keydown', h)
     return () => window.removeEventListener('keydown', h)
   }, [])
 
   // Close dropdown on outside click
   useEffect(() => {
-    const h = e => { if (dropdownRef.current && !dropdownRef.current.contains(e.target)) setShowSymbolList(false) }
+    const h = (e) => {
+      if (dropdownRef.current && !dropdownRef.current.contains(e.target)) setShowSymbolList(false)
+    }
     document.addEventListener('mousedown', h)
     return () => document.removeEventListener('mousedown', h)
   }, [])
 
-  const filteredSymbols = symbols.filter(s =>
-    s.symbol.toLowerCase().includes(symbolSearch.toLowerCase())
-  ).slice(0, 50)
+  const filteredSymbols = symbols
+    .filter((s) => s.symbol.toLowerCase().includes(symbolSearch.toLowerCase()))
+    .slice(0, 50)
 
-  const selectedSymbolData = symbols.find(s => s.symbol === symbol)
+  const selectedSymbolData = symbols.find((s) => s.symbol === symbol)
 
   const handleStart = useCallback(async () => {
     setError('')
-    if (!symbol)          return setError('Select a script (symbol)')
-    if (!startDate)       return setError('Select a start date')
+    if (!symbol) return setError('Select a script (symbol)')
+    if (!startDate) return setError('Select a start date')
     if (!strategyName.trim()) return setError('Enter a strategy name')
     const cap = parseFloat(capital)
     if (!cap || cap < 10000) return setError('Minimum capital is Rs. 10,000')
@@ -60,14 +64,16 @@ export default function BacktestSetupPanel({ onSessionStarted }) {
     setLoading(true)
     try {
       const res = await btCreateSession({
-        strategy_name:   strategyName.trim(),
+        strategy_name: strategyName.trim(),
         initial_capital: cap,
-        sl_mode:         slMode,
+        sl_mode: slMode,
         scripts: [{ symbol, start_date: startDate }],
       })
       onSessionStarted(res.data, { runMode, speed })
     } catch (err) {
-      setError(err.response?.data?.message || err.response?.data?.error || 'Failed to start session')
+      setError(
+        err.response?.data?.message || err.response?.data?.error || 'Failed to start session'
+      )
     } finally {
       setLoading(false)
     }
@@ -88,15 +94,24 @@ export default function BacktestSetupPanel({ onSessionStarted }) {
 
       {/* Script */}
       <div className="relative" ref={dropdownRef}>
-        <label className="text-[10px] font-semibold text-gray-400 dark:text-gray-500 uppercase tracking-widest">Script</label>
+        <label className="text-[10px] font-semibold text-gray-400 dark:text-gray-500 uppercase tracking-widest">
+          Script
+        </label>
         <div
           className="mt-0.5 flex items-center gap-1 px-2 py-1.5 rounded-md border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 cursor-pointer text-[11px]"
-          onClick={() => setShowSymbolList(v => !v)}
+          onClick={() => setShowSymbolList((v) => !v)}
         >
-          <span className={symbol ? 'text-gray-900 dark:text-white font-semibold' : 'text-gray-400'}>
+          <span
+            className={symbol ? 'text-gray-900 dark:text-white font-semibold' : 'text-gray-400'}
+          >
             {symbol || (symbolsLoading ? 'Loading…' : 'Select symbol')}
           </span>
-          <svg className="ml-auto w-3 h-3 text-gray-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+          <svg
+            className="ml-auto w-3 h-3 text-gray-400"
+            fill="none"
+            viewBox="0 0 24 24"
+            stroke="currentColor"
+          >
             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
           </svg>
         </div>
@@ -105,15 +120,19 @@ export default function BacktestSetupPanel({ onSessionStarted }) {
             <input
               autoFocus
               value={symbolSearch}
-              onChange={e => setSymbolSearch(e.target.value)}
+              onChange={(e) => setSymbolSearch(e.target.value)}
               placeholder="Search…"
               className="w-full px-2 py-1.5 text-[11px] border-b border-gray-100 dark:border-gray-700 bg-transparent outline-none dark:text-white"
             />
             <div className="max-h-40 overflow-y-auto">
-              {filteredSymbols.map(s => (
+              {filteredSymbols.map((s) => (
                 <div
                   key={s.symbol}
-                  onClick={() => { setSymbol(s.symbol); setShowSymbolList(false); setSymbolSearch('') }}
+                  onClick={() => {
+                    setSymbol(s.symbol)
+                    setShowSymbolList(false)
+                    setSymbolSearch('')
+                  }}
                   className="px-2 py-1 text-[11px] hover:bg-blue-50 dark:hover:bg-blue-900/20 cursor-pointer text-gray-800 dark:text-gray-200"
                 >
                   <span className="font-semibold">{s.symbol}</span>
@@ -130,13 +149,15 @@ export default function BacktestSetupPanel({ onSessionStarted }) {
 
       {/* Start Date */}
       <div>
-        <label className="text-[10px] font-semibold text-gray-400 dark:text-gray-500 uppercase tracking-widest">Start Date</label>
+        <label className="text-[10px] font-semibold text-gray-400 dark:text-gray-500 uppercase tracking-widest">
+          Start Date
+        </label>
         <input
           type="date"
           value={startDate}
           min={selectedSymbolData?.earliest_date}
           max={selectedSymbolData?.latest_date}
-          onChange={e => setStartDate(e.target.value)}
+          onChange={(e) => setStartDate(e.target.value)}
           className="mt-0.5 w-full px-2 py-1.5 text-[11px] rounded-md border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 dark:text-white outline-none focus:ring-1 focus:ring-blue-500"
         />
         {selectedSymbolData && (
@@ -148,25 +169,29 @@ export default function BacktestSetupPanel({ onSessionStarted }) {
 
       {/* Initial Capital */}
       <div>
-        <label className="text-[10px] font-semibold text-gray-400 dark:text-gray-500 uppercase tracking-widest">Capital (NPR)</label>
+        <label className="text-[10px] font-semibold text-gray-400 dark:text-gray-500 uppercase tracking-widest">
+          Capital (NPR)
+        </label>
         <input
           type="number"
           value={capital}
           min={10000}
           step={1000}
           autoComplete="off"
-          onChange={e => setCapital(e.target.value)}
+          onChange={(e) => setCapital(e.target.value)}
           className="mt-0.5 w-full px-2 py-1.5 text-[11px] rounded-md border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 dark:text-white outline-none focus:ring-1 focus:ring-blue-500"
         />
       </div>
 
       {/* Strategy Name */}
       <div>
-        <label className="text-[10px] font-semibold text-gray-400 dark:text-gray-500 uppercase tracking-widest">Strategy Name</label>
+        <label className="text-[10px] font-semibold text-gray-400 dark:text-gray-500 uppercase tracking-widest">
+          Strategy Name
+        </label>
         <input
           type="text"
           value={strategyName}
-          onChange={e => setStrategyName(e.target.value)}
+          onChange={(e) => setStrategyName(e.target.value)}
           placeholder="e.g. Breakout Test"
           autoComplete="off"
           className="mt-0.5 w-full px-2 py-1.5 text-[11px] rounded-md border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 dark:text-white outline-none focus:ring-1 focus:ring-blue-500"
@@ -175,9 +200,11 @@ export default function BacktestSetupPanel({ onSessionStarted }) {
 
       {/* Run Mode */}
       <div>
-        <label className="text-[10px] font-semibold text-gray-400 dark:text-gray-500 uppercase tracking-widest">Run Mode</label>
+        <label className="text-[10px] font-semibold text-gray-400 dark:text-gray-500 uppercase tracking-widest">
+          Run Mode
+        </label>
         <div className="mt-0.5 flex gap-2">
-          {['PLAY', 'MANUAL'].map(m => (
+          {['PLAY', 'MANUAL'].map((m) => (
             <button
               key={m}
               onClick={() => setRunMode(m)}
@@ -196,9 +223,11 @@ export default function BacktestSetupPanel({ onSessionStarted }) {
       {/* Play Speed — only if PLAY */}
       {runMode === 'PLAY' && (
         <div>
-          <label className="text-[10px] font-semibold text-gray-400 dark:text-gray-500 uppercase tracking-widest">Play Speed</label>
+          <label className="text-[10px] font-semibold text-gray-400 dark:text-gray-500 uppercase tracking-widest">
+            Play Speed
+          </label>
           <div className="mt-0.5 flex gap-1 flex-wrap">
-            {SPEEDS.map(s => (
+            {SPEEDS.map((s) => (
               <button
                 key={s}
                 onClick={() => setSpeed(s)}
@@ -221,7 +250,7 @@ export default function BacktestSetupPanel({ onSessionStarted }) {
           SL Validation
         </label>
         <div className="mt-0.5 flex gap-2">
-          {['MANUAL', 'AUTO'].map(m => (
+          {['MANUAL', 'AUTO'].map((m) => (
             <button
               key={m}
               onClick={() => setSlMode(m)}

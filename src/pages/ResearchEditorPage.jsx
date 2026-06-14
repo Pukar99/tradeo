@@ -3,12 +3,7 @@ import { useState, useEffect, useRef, useCallback } from 'react'
 import { useNavigate, useParams } from 'react-router-dom'
 import { useAuth } from '../context/AuthContext'
 import { useTheme } from '../context/ThemeContext'
-import {
-  createResearchPost,
-  updateResearchPost,
-  getResearchPost,
-  uploadResearchFile
-} from '../api'
+import { createResearchPost, updateResearchPost, getResearchPost, uploadResearchFile } from '../api'
 import { useCreateBlockNote } from '@blocknote/react'
 import { BlockNoteView } from '@blocknote/mantine'
 import '@blocknote/core/fonts/inter.css'
@@ -44,13 +39,13 @@ function ResearchEditorPage() {
       } catch {
         return undefined
       }
-    }
+    },
   })
 
   useEffect(() => {
     if (isEditing) {
       getResearchPost(id)
-        .then(async res => {
+        .then(async (res) => {
           const post = res.data
           setTitle(post.title)
           setStatus(post.status)
@@ -67,12 +62,12 @@ function ResearchEditorPage() {
             }
           }
         })
-        .catch(err => {
+        .catch((err) => {
           setError(err.response?.data?.message || 'Failed to load post for editing')
         })
         .finally(() => setLoading(false))
     }
-  // eslint-disable-next-line react-hooks/exhaustive-deps
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [id])
 
   const handlePdfDrop = async (e) => {
@@ -145,9 +140,7 @@ function ResearchEditorPage() {
         title,
         status: saveStatus || status,
         post_type: postType,
-        excerpt: postType === 'pdf'
-          ? `PDF Research: ${pdfName}`
-          : getExcerpt(),
+        excerpt: postType === 'pdf' ? `PDF Research: ${pdfName}` : getExcerpt(),
         content,
         pdf_url: postType === 'pdf' ? pdfUrl : null,
         pdf_name: postType === 'pdf' ? pdfName : null,
@@ -172,15 +165,15 @@ function ResearchEditorPage() {
 
   if (!user) return null
 
-  if (loading) return (
-    <div className="w-full px-3 sm:px-6 py-6 max-w-4xl mx-auto">
-      <p className="text-gray-400 text-sm">Loading editor...</p>
-    </div>
-  )
+  if (loading)
+    return (
+      <div className="w-full px-3 sm:px-6 py-6 max-w-4xl mx-auto">
+        <p className="text-gray-400 text-sm">Loading editor...</p>
+      </div>
+    )
 
   return (
     <div className="w-full px-3 sm:px-6 py-6 max-w-4xl mx-auto">
-
       {/* Header */}
       <div className="flex flex-wrap items-center justify-between gap-3 mb-5">
         <button
@@ -188,7 +181,12 @@ function ResearchEditorPage() {
           className="flex items-center gap-1.5 text-[11px] text-gray-400 hover:text-gray-600 dark:hover:text-gray-300 transition-colors"
         >
           <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
+            <path
+              strokeLinecap="round"
+              strokeLinejoin="round"
+              strokeWidth={2}
+              d="M15 19l-7-7 7-7"
+            />
           </svg>
           Research Hub
         </button>
@@ -217,21 +215,25 @@ function ResearchEditorPage() {
       )}
 
       <div className="bg-white dark:bg-gray-900 rounded-2xl border border-gray-100 dark:border-gray-800 overflow-hidden mb-4">
-
         <div className="px-3 sm:px-6 py-5 border-b border-gray-100 dark:border-gray-800">
           <input
             type="text"
             value={title}
-            onChange={e => setTitle(e.target.value)}
+            onChange={(e) => setTitle(e.target.value)}
             placeholder="Research Title..."
             className="w-full text-xl font-bold text-gray-900 dark:text-white bg-transparent border-none outline-none placeholder-gray-300 dark:placeholder-gray-600"
           />
         </div>
 
         <div className="px-3 sm:px-6 py-3 border-b border-gray-100 dark:border-gray-800 flex flex-wrap items-center gap-3">
-          <p className="text-[10px] font-semibold uppercase tracking-widest text-gray-400">Format</p>
+          <p className="text-[10px] font-semibold uppercase tracking-widest text-gray-400">
+            Format
+          </p>
           <div className="flex gap-1.5">
-            {[{ val: 'editor', label: 'Editor' }, { val: 'pdf', label: 'PDF Upload' }].map(({ val, label }) => (
+            {[
+              { val: 'editor', label: 'Editor' },
+              { val: 'pdf', label: 'PDF Upload' },
+            ].map(({ val, label }) => (
               <button
                 key={val}
                 onClick={() => setPostType(val)}
@@ -247,12 +249,9 @@ function ResearchEditorPage() {
           </div>
         </div>
 
-{postType === 'editor' && (
-  <div className="min-h-96 dark:bg-gray-900 rounded-b-xl overflow-hidden">
-            <BlockNoteView
-              editor={editor}
-              theme={isDark ? 'dark' : 'light'}
-            />
+        {postType === 'editor' && (
+          <div className="min-h-96 dark:bg-gray-900 rounded-b-xl overflow-hidden">
+            <BlockNoteView editor={editor} theme={isDark ? 'dark' : 'light'} />
           </div>
         )}
 
@@ -261,7 +260,10 @@ function ResearchEditorPage() {
             {!pdfUrl ? (
               <div
                 onDrop={handlePdfDrop}
-                onDragOver={(e) => { e.preventDefault(); setDragOver(true) }}
+                onDragOver={(e) => {
+                  e.preventDefault()
+                  setDragOver(true)
+                }}
                 onDragLeave={() => setDragOver(false)}
                 onClick={() => fileInputRef.current?.click()}
                 className={`border-2 border-dashed rounded-xl p-12 text-center cursor-pointer transition-colors ${
@@ -280,9 +282,7 @@ function ResearchEditorPage() {
                 {uploading ? (
                   <div>
                     <div className="w-8 h-8 border-4 border-blue-500 border-t-transparent rounded-full animate-spin mx-auto mb-3" />
-                    <p className="text-sm text-gray-500 dark:text-gray-400">
-                      Uploading PDF...
-                    </p>
+                    <p className="text-sm text-gray-500 dark:text-gray-400">Uploading PDF...</p>
                   </div>
                 ) : (
                   <div>
@@ -290,9 +290,7 @@ function ResearchEditorPage() {
                     <p className="text-base font-medium text-gray-700 dark:text-gray-300 mb-1">
                       Drop your PDF here
                     </p>
-                    <p className="text-sm text-gray-400">
-                      or click to browse — max 10MB
-                    </p>
+                    <p className="text-sm text-gray-400">or click to browse — max 10MB</p>
                   </div>
                 )}
               </div>
@@ -303,12 +301,8 @@ function ResearchEditorPage() {
                     <span className="text-red-500 text-lg">📄</span>
                   </div>
                   <div>
-                    <p className="text-sm font-medium text-gray-900 dark:text-white">
-                      {pdfName}
-                    </p>
-                    <p className="text-xs text-green-500">
-                      ✓ Uploaded successfully
-                    </p>
+                    <p className="text-sm font-medium text-gray-900 dark:text-white">{pdfName}</p>
+                    <p className="text-xs text-green-500">✓ Uploaded successfully</p>
                   </div>
                 </div>
                 <div className="flex items-center gap-2">
@@ -321,7 +315,10 @@ function ResearchEditorPage() {
                     Preview
                   </a>
                   <button
-                    onClick={() => { setPdfUrl(''); setPdfName('') }}
+                    onClick={() => {
+                      setPdfUrl('')
+                      setPdfName('')
+                    }}
                     className="text-xs text-red-400 hover:text-red-600"
                   >
                     Remove
@@ -331,20 +328,25 @@ function ResearchEditorPage() {
             )}
           </div>
         )}
-
       </div>
 
       <div className="flex items-center justify-between">
         <p className="text-[10px] text-gray-400">
-          {postType === 'editor'
-            ? <>Type <kbd className="bg-gray-100 dark:bg-gray-800 px-1 rounded text-[10px]">/</kbd> for headings, tables, code blocks · paste images directly</>
-            : 'Upload a pre-made PDF research document'}
+          {postType === 'editor' ? (
+            <>
+              Type <kbd className="bg-gray-100 dark:bg-gray-800 px-1 rounded text-[10px]">/</kbd>{' '}
+              for headings, tables, code blocks · paste images directly
+            </>
+          ) : (
+            'Upload a pre-made PDF research document'
+          )}
         </p>
-        <span className={`text-[10px] font-medium ${status === 'published' ? 'text-emerald-500' : 'text-amber-400'}`}>
+        <span
+          className={`text-[10px] font-medium ${status === 'published' ? 'text-emerald-500' : 'text-amber-400'}`}
+        >
           {status === 'published' ? 'Published' : 'Draft'}
         </span>
       </div>
-
     </div>
   )
 }

@@ -17,10 +17,10 @@ async function _getFlags() {
   if (_cache && Date.now() - _cacheTs < TTL) return _cache
   try {
     const { data } = await API.get('/api/feature-flags')
-    _cache   = data.flags || []
+    _cache = data.flags || []
     _cacheTs = Date.now()
   } catch {
-    _cache   = _cache || []  // keep stale on error
+    _cache = _cache || [] // keep stale on error
   }
   return _cache
 }
@@ -30,10 +30,12 @@ export function useFeatureFlag(flagName) {
 
   useEffect(() => {
     let cancelled = false
-    _getFlags().then(flags => {
+    _getFlags().then((flags) => {
       if (!cancelled) setEnabled(flags.includes(flagName))
     })
-    return () => { cancelled = true }
+    return () => {
+      cancelled = true
+    }
   }, [flagName])
 
   return enabled

@@ -1,0 +1,13 @@
+# Normalize line endings to LF in the repo (matches Prettier endOfLine: lf).
+# Prevents CRLF/LF churn between Windows and Unix checkouts.
+* text=auto eol=lf
+
+# Keep binaries untouched
+*.png binary
+*.jpg binary
+*.jpeg binary
+*.gif binary
+*.ico binary
+*.svg text
+*.woff binary
+*.woff2 binary

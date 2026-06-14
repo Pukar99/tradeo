@@ -34,12 +34,18 @@ function msUntilEOD() {
 // Session-scoped set of already-notified alert IDs — prevents repeat notifications
 const NOTIFIED_KEY = 'tradeo_alerted_ids'
 function getNotified() {
-  try { return new Set(JSON.parse(sessionStorage.getItem(NOTIFIED_KEY) || '[]')) } catch { return new Set() }
+  try {
+    return new Set(JSON.parse(sessionStorage.getItem(NOTIFIED_KEY) || '[]'))
+  } catch {
+    return new Set()
+  }
 }
 function markNotified(id) {
   const set = getNotified()
   set.add(String(id))
-  try { sessionStorage.setItem(NOTIFIED_KEY, JSON.stringify([...set])) } catch {}
+  try {
+    sessionStorage.setItem(NOTIFIED_KEY, JSON.stringify([...set]))
+  } catch {}
 }
 
 // =============================================================================
@@ -47,11 +53,11 @@ function markNotified(id) {
 // =============================================================================
 
 export function usePriceAlerts({ user, onAlert }) {
-  const timerRef   = useRef(null)
+  const timerRef = useRef(null)
   const onAlertRef = useRef(onAlert)
-  const userRef    = useRef(user)
+  const userRef = useRef(user)
   onAlertRef.current = onAlert
-  userRef.current    = user
+  userRef.current = user
 
   // pollRef holds the latest poll function — never changes identity, so safe in useEffect deps
   const pollRef = useRef(null)
@@ -63,7 +69,7 @@ export function usePriceAlerts({ user, onAlert }) {
       if (!triggered.length) return
 
       const notified = getNotified()
-      const fresh = triggered.filter(a => !notified.has(String(a.id)))
+      const fresh = triggered.filter((a) => !notified.has(String(a.id)))
       if (!fresh.length) return
 
       if (Notification.permission === 'default') {
@@ -76,12 +82,14 @@ export function usePriceAlerts({ user, onAlert }) {
           new Notification(`Tradeo Alert — ${alert.symbol}`, {
             body: `LTP Rs.${parseFloat(alert.ltp).toLocaleString()} is ${alert.direction} your alert Rs.${parseFloat(alert.price_alert).toLocaleString()} (${alert.dist_pct}% away)`,
             icon: '/favicon.ico',
-            tag:  `tradeo_alert_${alert.id}`,
+            tag: `tradeo_alert_${alert.id}`,
           })
         }
         onAlertRef.current?.(alert)
       }
-    } catch { /* silent */ }
+    } catch {
+      /* silent */
+    }
   }
 
   const userId = user?.id ?? null

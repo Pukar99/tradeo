@@ -29,116 +29,154 @@ const BUTTON_SIZE = 48
 const EDGE_PAD = 16
 
 function FloatingChat() {
-  const [isOpen, setIsOpen]   = useState(false)
-  const { user }              = useAuth()
-  const location              = useLocation()
+  const [isOpen, setIsOpen] = useState(false)
+  const { user } = useAuth()
+  const location = useLocation()
 
-  // Position of the FAB (bottom-right by default, stored as distance from top-left)
-  const [pos, setPos] = useState(() => {
-    try {
-      const saved = sessionStorage.getItem('floatingChat_pos')
-      if (saved) return JSON.parse(saved)
-    } catch {}
-    return {
-      x: window.innerWidth  - BUTTON_SIZE - EDGE_PAD,
-      y: window.innerHeight - BUTTON_SIZE - EDGE_PAD,
-    }
+  // Default bottom-right anchor for the current viewport.
+  const defaultPos = () => ({
+    x: window.innerWidth - BUTTON_SIZE - EDGE_PAD,
+    y: window.innerHeight - BUTTON_SIZE - EDGE_PAD,
   })
 
-  const dragging  = useRef(false)
-  const dragStart = useRef({ mx: 0, my: 0, px: 0, py: 0 })
-  const hasMoved  = useRef(false)
-  const fabRef    = useRef(null)
+  // Position of the FAB (stored as distance from top-left). A saved position is
+  // only used if it's a valid pair of finite numbers; it is clamped to the
+  // current viewport below so a stale off-screen value can't hide the button.
+  const [pos, setPos] = useState(() => {
+    try {
+      const saved = JSON.parse(sessionStorage.getItem('floatingChat_pos'))
+      if (saved && Number.isFinite(saved.x) && Number.isFinite(saved.y)) return saved
+    } catch {}
+    return defaultPos()
+  })
 
-  // Keep in bounds when window resizes
+  const dragging = useRef(false)
+  const dragStart = useRef({ mx: 0, my: 0, px: 0, py: 0 })
+  const hasMoved = useRef(false)
+  const fabRef = useRef(null)
+
+  // Clamp into the viewport on mount AND on resize. The mount clamp is the fix
+  // for "the chat bubble disappeared": a position saved on a larger/rotated
+  // screen (or a different device) could be off-screen for the current viewport,
+  // and the resize handler alone never ran on load — so the FAB rendered outside
+  // the visible area and looked gone.
   useEffect(() => {
-    const onResize = () => {
-      setPos(p => ({
-        x: clamp(p.x, EDGE_PAD, window.innerWidth  - BUTTON_SIZE - EDGE_PAD),
+    const reclamp = () => {
+      setPos((p) => ({
+        x: clamp(p.x, EDGE_PAD, window.innerWidth - BUTTON_SIZE - EDGE_PAD),
         y: clamp(p.y, EDGE_PAD, window.innerHeight - BUTTON_SIZE - EDGE_PAD),
       }))
     }
-    window.addEventListener('resize', onResize)
-    return () => window.removeEventListener('resize', onResize)
+    reclamp() // run once on mount
+    window.addEventListener('resize', reclamp)
+    return () => window.removeEventListener('resize', reclamp)
   }, [])
 
-  const onMouseDown = useCallback((e) => {
-    // Only drag on the FAB itself (not inside the open panel)
-    if (isOpen) return
-    e.preventDefault()
-    dragging.current  = true
-    hasMoved.current  = false
-    dragStart.current = { mx: e.clientX, my: e.clientY, px: pos.x, py: pos.y }
+  const onMouseDown = useCallback(
+    (e) => {
+      // Only drag on the FAB itself (not inside the open panel)
+      if (isOpen) return
+      e.preventDefault()
+      dragging.current = true
+      hasMoved.current = false
+      dragStart.current = { mx: e.clientX, my: e.clientY, px: pos.x, py: pos.y }
 
-    const onMove = (e) => {
-      if (!dragging.current) return
-      const dx = e.clientX - dragStart.current.mx
-      const dy = e.clientY - dragStart.current.my
-      if (Math.abs(dx) > 3 || Math.abs(dy) > 3) hasMoved.current = true
-      const nx = clamp(dragStart.current.px + dx, EDGE_PAD, window.innerWidth  - BUTTON_SIZE - EDGE_PAD)
-      const ny = clamp(dragStart.current.py + dy, EDGE_PAD, window.innerHeight - BUTTON_SIZE - EDGE_PAD)
-      setPos({ x: nx, y: ny })
-    }
+      const onMove = (e) => {
+        if (!dragging.current) return
+        const dx = e.clientX - dragStart.current.mx
+        const dy = e.clientY - dragStart.current.my
+        if (Math.abs(dx) > 3 || Math.abs(dy) > 3) hasMoved.current = true
+        const nx = clamp(
+          dragStart.current.px + dx,
+          EDGE_PAD,
+          window.innerWidth - BUTTON_SIZE - EDGE_PAD
+        )
+        const ny = clamp(
+          dragStart.current.py + dy,
+          EDGE_PAD,
+          window.innerHeight - BUTTON_SIZE - EDGE_PAD
+        )
+        setPos({ x: nx, y: ny })
+      }
 
-    const onUp = () => {
-      dragging.current = false
-      window.removeEventListener('mousemove', onMove)
-      window.removeEventListener('mouseup',   onUp)
-      // Save position
-      setPos(p => {
-        try { sessionStorage.setItem('floatingChat_pos', JSON.stringify(p)) } catch {}
-        return p
-      })
-    }
+      const onUp = () => {
+        dragging.current = false
+        window.removeEventListener('mousemove', onMove)
+        window.removeEventListener('mouseup', onUp)
+        // Save position
+        setPos((p) => {
+          try {
+            sessionStorage.setItem('floatingChat_pos', JSON.stringify(p))
+          } catch {}
+          return p
+        })
+      }
 
-    window.addEventListener('mousemove', onMove)
-    window.addEventListener('mouseup',   onUp)
-  }, [isOpen, pos])
+      window.addEventListener('mousemove', onMove)
+      window.addEventListener('mouseup', onUp)
+    },
+    [isOpen, pos]
+  )
 
   // Touch support
-  const onTouchStart = useCallback((e) => {
-    if (isOpen) return
-    const t = e.touches[0]
-    dragging.current  = true
-    hasMoved.current  = false
-    dragStart.current = { mx: t.clientX, my: t.clientY, px: pos.x, py: pos.y }
+  const onTouchStart = useCallback(
+    (e) => {
+      if (isOpen) return
+      const t = e.touches[0]
+      dragging.current = true
+      hasMoved.current = false
+      dragStart.current = { mx: t.clientX, my: t.clientY, px: pos.x, py: pos.y }
 
-    const onMove = (e) => {
-      if (!dragging.current) return
-      const t  = e.touches[0]
-      const dx = t.clientX - dragStart.current.mx
-      const dy = t.clientY - dragStart.current.my
-      if (Math.abs(dx) > 3 || Math.abs(dy) > 3) hasMoved.current = true
-      const nx = clamp(dragStart.current.px + dx, EDGE_PAD, window.innerWidth  - BUTTON_SIZE - EDGE_PAD)
-      const ny = clamp(dragStart.current.py + dy, EDGE_PAD, window.innerHeight - BUTTON_SIZE - EDGE_PAD)
-      setPos({ x: nx, y: ny })
-    }
+      const onMove = (e) => {
+        if (!dragging.current) return
+        const t = e.touches[0]
+        const dx = t.clientX - dragStart.current.mx
+        const dy = t.clientY - dragStart.current.my
+        if (Math.abs(dx) > 3 || Math.abs(dy) > 3) hasMoved.current = true
+        const nx = clamp(
+          dragStart.current.px + dx,
+          EDGE_PAD,
+          window.innerWidth - BUTTON_SIZE - EDGE_PAD
+        )
+        const ny = clamp(
+          dragStart.current.py + dy,
+          EDGE_PAD,
+          window.innerHeight - BUTTON_SIZE - EDGE_PAD
+        )
+        setPos({ x: nx, y: ny })
+      }
 
-    const onEnd = () => {
-      dragging.current = false
-      window.removeEventListener('touchmove', onMove)
-      window.removeEventListener('touchend',  onEnd)
-      // Use setPos callback to read current position — avoids stale closure on pos
-      setPos(p => {
-        try { sessionStorage.setItem('floatingChat_pos', JSON.stringify(p)) } catch {}
-        return p
-      })
-    }
+      const onEnd = () => {
+        dragging.current = false
+        window.removeEventListener('touchmove', onMove)
+        window.removeEventListener('touchend', onEnd)
+        // Use setPos callback to read current position — avoids stale closure on pos
+        setPos((p) => {
+          try {
+            sessionStorage.setItem('floatingChat_pos', JSON.stringify(p))
+          } catch {}
+          return p
+        })
+      }
 
-    window.addEventListener('touchmove', onMove, { passive: true })
-    window.addEventListener('touchend',  onEnd)
-  }, [isOpen, pos])
+      window.addEventListener('touchmove', onMove, { passive: true })
+      window.addEventListener('touchend', onEnd)
+    },
+    [isOpen, pos]
+  )
 
   const handleClick = useCallback(() => {
     // Don't toggle if this was a drag
     if (hasMoved.current) return
-    setIsOpen(o => !o)
+    setIsOpen((o) => !o)
   }, [])
 
   // Escape closes the panel — same convention as every other overlay in the app
   useEffect(() => {
     if (!isOpen) return
-    const onKey = (e) => { if (e.key === 'Escape') setIsOpen(false) }
+    const onKey = (e) => {
+      if (e.key === 'Escape') setIsOpen(false)
+    }
     window.addEventListener('keydown', onKey)
     return () => window.removeEventListener('keydown', onKey)
   }, [isOpen])
@@ -147,17 +185,17 @@ function FloatingChat() {
   if (!user) return null
 
   // Panel: open above or below FAB, left or right, whichever fits
-  const panelRight  = pos.x + BUTTON_SIZE
-  const panelLeft   = panelRight - PANEL_W
+  const panelRight = pos.x + BUTTON_SIZE
+  const panelLeft = panelRight - PANEL_W
   const panelBottom = pos.y + BUTTON_SIZE
-  const panelTop    = pos.y - PANEL_H - 8
+  const panelTop = pos.y - PANEL_H - 8
 
   // Horizontal: prefer aligning right edge of panel to right edge of FAB
   const panelX = clamp(panelLeft, EDGE_PAD, window.innerWidth - PANEL_W - EDGE_PAD)
 
   // Vertical: prefer opening upward, fall back to downward
-  const openUpward   = panelTop >= EDGE_PAD
-  const panelY       = openUpward
+  const openUpward = panelTop >= EDGE_PAD
+  const panelY = openUpward
     ? panelTop
     : clamp(panelBottom + 8, EDGE_PAD, window.innerHeight - PANEL_H - EDGE_PAD)
 
@@ -181,28 +219,39 @@ function FloatingChat() {
               cursor-move select-none"
             onMouseDown={(e) => {
               e.preventDefault()
-              const startX = e.clientX, startY = e.clientY
+              const startX = e.clientX,
+                startY = e.clientY
               const startPos = { ...pos }
               let moved = false
 
               const onMove = (e) => {
                 moved = true
-                const nx = clamp(startPos.x + (e.clientX - startX), EDGE_PAD, window.innerWidth  - BUTTON_SIZE - EDGE_PAD)
-                const ny = clamp(startPos.y + (e.clientY - startY), EDGE_PAD, window.innerHeight - BUTTON_SIZE - EDGE_PAD)
+                const nx = clamp(
+                  startPos.x + (e.clientX - startX),
+                  EDGE_PAD,
+                  window.innerWidth - BUTTON_SIZE - EDGE_PAD
+                )
+                const ny = clamp(
+                  startPos.y + (e.clientY - startY),
+                  EDGE_PAD,
+                  window.innerHeight - BUTTON_SIZE - EDGE_PAD
+                )
                 setPos({ x: nx, y: ny })
               }
               const onUp = () => {
                 window.removeEventListener('mousemove', onMove)
-                window.removeEventListener('mouseup',   onUp)
+                window.removeEventListener('mouseup', onUp)
                 if (moved) {
-                  setPos(p => {
-                    try { sessionStorage.setItem('floatingChat_pos', JSON.stringify(p)) } catch {}
+                  setPos((p) => {
+                    try {
+                      sessionStorage.setItem('floatingChat_pos', JSON.stringify(p))
+                    } catch {}
                     return p
                   })
                 }
               }
               window.addEventListener('mousemove', onMove)
-              window.addEventListener('mouseup',   onUp)
+              window.addEventListener('mouseup', onUp)
             }}
           >
             <div className="flex items-center gap-1.5">
@@ -211,7 +260,9 @@ function FloatingChat() {
                 <div className="w-3 h-0.5 rounded-full bg-gray-300 dark:bg-gray-600" />
                 <div className="w-3 h-0.5 rounded-full bg-gray-300 dark:bg-gray-600" />
               </div>
-              <span className="text-[10px] text-gray-400 font-semibold select-none">drag to move</span>
+              <span className="text-[10px] text-gray-400 font-semibold select-none">
+                drag to move
+              </span>
             </div>
             <button
               onClick={() => setIsOpen(false)}
@@ -245,16 +296,16 @@ function FloatingChat() {
           aria-label="Open Tradeo AI chat"
         >
           <svg width="26" height="26" viewBox="0 0 40 40" fill="none">
-            <rect width="40" height="40" rx="8" className="tradeo-logo-bg" strokeWidth="1"/>
-            <rect x="6" y="18" width="6" height="14" rx="1.5" fill="#22c55e"/>
-            <line x1="9" y1="12" x2="9" y2="18" stroke="#22c55e" strokeWidth="1.5"/>
-            <line x1="9" y1="32" x2="9" y2="36" stroke="#22c55e" strokeWidth="1.5"/>
-            <rect x="17" y="12" width="6" height="16" rx="1.5" fill="#ef4444"/>
-            <line x1="20" y1="6" x2="20" y2="12" stroke="#ef4444" strokeWidth="1.5"/>
-            <line x1="20" y1="28" x2="20" y2="32" stroke="#ef4444" strokeWidth="1.5"/>
-            <rect x="28" y="14" width="6" height="12" rx="1.5" fill="#22c55e"/>
-            <line x1="31" y1="8" x2="31" y2="14" stroke="#22c55e" strokeWidth="1.5"/>
-            <line x1="31" y1="26" x2="31" y2="30" stroke="#22c55e" strokeWidth="1.5"/>
+            <rect width="40" height="40" rx="8" className="tradeo-logo-bg" strokeWidth="1" />
+            <rect x="6" y="18" width="6" height="14" rx="1.5" fill="#22c55e" />
+            <line x1="9" y1="12" x2="9" y2="18" stroke="#22c55e" strokeWidth="1.5" />
+            <line x1="9" y1="32" x2="9" y2="36" stroke="#22c55e" strokeWidth="1.5" />
+            <rect x="17" y="12" width="6" height="16" rx="1.5" fill="#ef4444" />
+            <line x1="20" y1="6" x2="20" y2="12" stroke="#ef4444" strokeWidth="1.5" />
+            <line x1="20" y1="28" x2="20" y2="32" stroke="#ef4444" strokeWidth="1.5" />
+            <rect x="28" y="14" width="6" height="12" rx="1.5" fill="#22c55e" />
+            <line x1="31" y1="8" x2="31" y2="14" stroke="#22c55e" strokeWidth="1.5" />
+            <line x1="31" y1="26" x2="31" y2="30" stroke="#22c55e" strokeWidth="1.5" />
           </svg>
         </button>
       </div>

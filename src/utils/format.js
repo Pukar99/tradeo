@@ -7,7 +7,6 @@
 //   3. Safe Parsers             — safeFloat, isCanceled, apiError, safeUrl
 // =============================================================================
 
-
 // =============================================================================
 // 1. NEPSE FEE UTILITIES
 // =============================================================================
@@ -15,19 +14,19 @@
 // SEBON-regulated broker commission tiers (effective 2024, per transaction side)
 // Source: SEBON official fee schedule — do NOT change without verifying new schedule
 const COMMISSION_TIERS = [
-  { max: 0,         flat: 0,   rate: 0      },
-  { max: 2500,      flat: 10,  rate: 0      }, // flat Rs.10
-  { max: 50000,     flat: 0,   rate: 0.0036 }, // 0.36%
-  { max: 500000,    flat: 0,   rate: 0.0033 }, // 0.33%
-  { max: 2000000,   flat: 0,   rate: 0.0031 }, // 0.31%
-  { max: 10000000,  flat: 0,   rate: 0.0027 }, // 0.27%
-  { max: Infinity,  flat: 0,   rate: 0.0024 }, // 0.24%
+  { max: 0, flat: 0, rate: 0 },
+  { max: 2500, flat: 10, rate: 0 }, // flat Rs.10
+  { max: 50000, flat: 0, rate: 0.0036 }, // 0.36%
+  { max: 500000, flat: 0, rate: 0.0033 }, // 0.33%
+  { max: 2000000, flat: 0, rate: 0.0031 }, // 0.31%
+  { max: 10000000, flat: 0, rate: 0.0027 }, // 0.27%
+  { max: Infinity, flat: 0, rate: 0.0024 }, // 0.24%
 ]
 
 // Broker commission for one side of a trade (buy or sell separately)
 export function nepseCommission(amount) {
   if (!amount || amount <= 0) return 0
-  const tier = COMMISSION_TIERS.find(t => amount <= t.max)
+  const tier = COMMISSION_TIERS.find((t) => amount <= t.max)
   return tier.flat || amount * tier.rate
 }
 
@@ -54,7 +53,7 @@ export function nepseCGT(netGain, entryDateStr, exitDateStr) {
   if (!netGain || netGain <= 0) return 0
 
   const entry = new Date(entryDateStr)
-  const exit  = new Date(exitDateStr)
+  const exit = new Date(exitDateStr)
 
   // Guard: invalid dates return NaN from subtraction — return 0 instead of NaN
   if (isNaN(entry.getTime()) || isNaN(exit.getTime())) return 0
@@ -62,7 +61,6 @@ export function nepseCGT(netGain, entryDateStr, exitDateStr) {
   const days = Math.max(0, Math.floor((exit - entry) / 86400000))
   return nepseCGTByTerm(netGain, days >= 365)
 }
-
 
 // =============================================================================
 // 2. NUMBER FORMATTERS
@@ -73,9 +71,10 @@ export const today = () => new Date().toISOString().split('T')[0]
 
 // Absolute Rupees — no sign, rounded integer. e.g. fmtRs(-500) → 'Rs.500'
 // forex=true switches to USD display: fmtRs(12.5, true) → '$12.50'
-export const fmtRs = (n, forex = false) => forex
-  ? `$${Math.abs(parseFloat(n) || 0).toFixed(2)}`
-  : `Rs.${Math.abs(Math.round(parseFloat(n) || 0)).toLocaleString()}`
+export const fmtRs = (n, forex = false) =>
+  forex
+    ? `$${Math.abs(parseFloat(n) || 0).toFixed(2)}`
+    : `Rs.${Math.abs(Math.round(parseFloat(n) || 0)).toLocaleString()}`
 
 // Signed Rupees — explicit +/− prefix. e.g. fmtRsSigned(-800) → '−Rs.800'
 export const fmtRsSigned = (n) => {
@@ -111,7 +110,6 @@ export const fmtCr = (v, dec = 2) => {
   return `${(n / 1e7).toFixed(dec)} Cr`
 }
 
-
 // =============================================================================
 // 3. SAFE PARSERS
 // =============================================================================
@@ -138,10 +136,7 @@ export const isCanceled = (err) => {
 export const apiError = (err, fallback = 'Something went wrong. Please try again.') => {
   if (isCanceled(err)) return ''
 
-  const msg = err?.response?.data?.message
-           || err?.response?.data?.error
-           || err?.message
-           || ''
+  const msg = err?.response?.data?.message || err?.response?.data?.error || err?.message || ''
 
   if (!msg || typeof msg !== 'string') return fallback
 
@@ -158,7 +153,7 @@ export const safeUrl = (url) => {
   if (!url || typeof url !== 'string') return null
   try {
     const u = new URL(url)
-    return (u.protocol === 'http:' || u.protocol === 'https:') ? url : null
+    return u.protocol === 'http:' || u.protocol === 'https:' ? url : null
   } catch {
     return null
   }

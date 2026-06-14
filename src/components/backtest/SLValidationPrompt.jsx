@@ -6,7 +6,9 @@ export default function SLValidationPrompt({ prompt, onClose }) {
   const { type, pos, candle, options } = prompt
 
   useEffect(() => {
-    const h = e => { if (e.key === 'Escape') onClose() }
+    const h = (e) => {
+      if (e.key === 'Escape') onClose()
+    }
     window.addEventListener('keydown', h)
     return () => window.removeEventListener('keydown', h)
   }, [onClose])
@@ -16,17 +18,21 @@ export default function SLValidationPrompt({ prompt, onClose }) {
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50">
-      <div className={`bg-white dark:bg-gray-900 rounded-xl shadow-2xl w-76 p-4 border-2 ${
-        isPreSettlement ? 'border-orange-400' : 'border-red-400'
-      }`}>
+      <div
+        className={`bg-white dark:bg-gray-900 rounded-xl shadow-2xl w-76 p-4 border-2 ${
+          isPreSettlement ? 'border-orange-400' : 'border-red-400'
+        }`}
+      >
         {/* Header */}
         <div className="flex items-center gap-2 mb-3">
           <span className="text-xl">{isPreSettlement ? '⚠️' : isTP ? '🎯' : '🛑'}</span>
           <div>
-            <div className={`text-[12px] font-bold ${isPreSettlement ? 'text-orange-600 dark:text-orange-400' : 'text-red-600 dark:text-red-400'}`}>
+            <div
+              className={`text-[12px] font-bold ${isPreSettlement ? 'text-orange-600 dark:text-orange-400' : 'text-red-600 dark:text-red-400'}`}
+            >
               {type === 'PRE_SETTLEMENT_SL' && 'SL Hit — Not Yet Settled'}
               {type === 'PRE_SETTLEMENT_TP' && 'TP Hit — Not Yet Settled'}
-              {type === 'MANUAL_SL'         && 'Stop-Loss Triggered'}
+              {type === 'MANUAL_SL' && 'Stop-Loss Triggered'}
             </div>
             <div className="text-[10px] text-gray-400">Playback paused</div>
           </div>
@@ -75,8 +81,7 @@ export default function SLValidationPrompt({ prompt, onClose }) {
           <div className="text-[10px] text-orange-600 dark:text-orange-400 bg-orange-50 dark:bg-orange-900/10 rounded-md px-2 py-1.5 mb-3 leading-tight">
             {isTP
               ? 'TP reached but T+2 settlement is not yet cleared. You cannot sell under NEPSE rules.'
-              : 'SL was breached but T+2 settlement is not cleared. You cannot sell under NEPSE rules.'
-            }
+              : 'SL was breached but T+2 settlement is not cleared. You cannot sell under NEPSE rules.'}
           </div>
         )}
 
@@ -105,7 +110,7 @@ export default function SLValidationPrompt({ prompt, onClose }) {
           ))}
         </div>
 
-        {options.some(o => o.label.toLowerCase().includes('ignore')) && (
+        {options.some((o) => o.label.toLowerCase().includes('ignore')) && (
           <div className="text-[10px] text-gray-400 text-center mt-2">
             ⚠ Ignoring is logged in your behavior report
           </div>

@@ -5,15 +5,23 @@ import { btGetReport, btEndSession } from '../../api/backtest'
 import { AreaChart, Area, XAxis, YAxis, Tooltip, ResponsiveContainer } from 'recharts'
 import { useTheme } from '../../context/ThemeContext'
 
-function fmt(n) { return n == null ? '—' : Number(n).toLocaleString('en-IN', { maximumFractionDigits: 0 }) }
-function fmtPct(n) { return n == null ? '—' : (n >= 0 ? '+' : '') + Number(n).toFixed(2) + '%' }
-function fmtDec(n, d = 2) { return n == null ? '—' : Number(n).toFixed(d) }
+function fmt(n) {
+  return n == null ? '—' : Number(n).toLocaleString('en-IN', { maximumFractionDigits: 0 })
+}
+function fmtPct(n) {
+  return n == null ? '—' : (n >= 0 ? '+' : '') + Number(n).toFixed(2) + '%'
+}
+function fmtDec(n, d = 2) {
+  return n == null ? '—' : Number(n).toFixed(d)
+}
 
 function StatCard({ label, value, sub, color, hint }) {
   return (
     <div className="bg-white dark:bg-gray-900 rounded-xl border border-gray-100 dark:border-gray-800 p-3 flex flex-col gap-0.5">
       <div className="flex items-center gap-1">
-        <div className="text-[10px] text-gray-400 uppercase tracking-widest font-semibold">{label}</div>
+        <div className="text-[10px] text-gray-400 uppercase tracking-widest font-semibold">
+          {label}
+        </div>
         {hint && (
           <div className="relative group">
             <span className="text-[10px] text-gray-300 dark:text-gray-600 cursor-default">ⓘ</span>
@@ -23,26 +31,48 @@ function StatCard({ label, value, sub, color, hint }) {
           </div>
         )}
       </div>
-      <div className={`text-[15px] font-bold ${color || 'text-gray-900 dark:text-white'}`}>{value}</div>
+      <div className={`text-[15px] font-bold ${color || 'text-gray-900 dark:text-white'}`}>
+        {value}
+      </div>
       {sub && <div className="text-[10px] text-gray-400">{sub}</div>}
     </div>
   )
 }
 
 const BEHAVIOR_LABELS = {
-  SL_IGNORED:  { label: 'SL Ignored',    color: 'text-red-500',    bg: 'bg-red-50 dark:bg-red-900/20',    icon: '🚫' },
-  EARLY_EXIT:  { label: 'Early Exit',    color: 'text-orange-500', bg: 'bg-orange-50 dark:bg-orange-900/20', icon: '⚡' },
-  MANUAL_EXIT: { label: 'Manual Exit',   color: 'text-blue-500',   bg: 'bg-blue-50 dark:bg-blue-900/20',  icon: '👋' },
+  SL_IGNORED: {
+    label: 'SL Ignored',
+    color: 'text-red-500',
+    bg: 'bg-red-50 dark:bg-red-900/20',
+    icon: '🚫',
+  },
+  EARLY_EXIT: {
+    label: 'Early Exit',
+    color: 'text-orange-500',
+    bg: 'bg-orange-50 dark:bg-orange-900/20',
+    icon: '⚡',
+  },
+  MANUAL_EXIT: {
+    label: 'Manual Exit',
+    color: 'text-blue-500',
+    bg: 'bg-blue-50 dark:bg-blue-900/20',
+    icon: '👋',
+  },
 }
 
 function BehaviorEntry({ e }) {
-  const meta = BEHAVIOR_LABELS[e.event_type] || { label: e.event_type, color: 'text-gray-500', bg: 'bg-gray-50 dark:bg-gray-800', icon: '•' }
+  const meta = BEHAVIOR_LABELS[e.event_type] || {
+    label: e.event_type,
+    color: 'text-gray-500',
+    bg: 'bg-gray-50 dark:bg-gray-800',
+    icon: '•',
+  }
   const detail = e.detail || {}
   let desc = ''
   if (e.event_type === 'SL_IGNORED') {
     desc = `Low Rs.${detail.low ?? '?'} breached SL Rs.${detail.sl ?? '?'} — ignored`
   } else if (e.event_type === 'EARLY_EXIT') {
-    if (detail.tp)  desc = `TP Rs.${detail.tp ?? '?'} touched before T+2 — exited early`
+    if (detail.tp) desc = `TP Rs.${detail.tp ?? '?'} touched before T+2 — exited early`
     else if (detail.sl) desc = `SL Rs.${detail.sl ?? '?'} breached before T+2 — exited early`
     else desc = `Position closed before settlement`
   } else {
@@ -58,7 +88,11 @@ function BehaviorEntry({ e }) {
           <span className="text-gray-500 dark:text-gray-400">{e.event_date?.slice(0, 10)}</span>
           <span className="font-semibold dark:text-gray-300">{e.symbol}</span>
         </div>
-        {desc && <div className="text-gray-500 dark:text-gray-400 text-[10px] mt-0.5 leading-tight">{desc}</div>}
+        {desc && (
+          <div className="text-gray-500 dark:text-gray-400 text-[10px] mt-0.5 leading-tight">
+            {desc}
+          </div>
+        )}
       </div>
     </div>
   )
@@ -68,78 +102,116 @@ export default function BacktestReport({ sessionId, onClose }) {
   const { isDark } = useTheme()
   const [report, setReport] = useState(null)
   const [loading, setLoading] = useState(true)
-  const [error, setError]    = useState('')
+  const [error, setError] = useState('')
 
   useEffect(() => {
     btGetReport(sessionId)
-      .then(r => setReport(r.data))
-      .catch(e => setError(e.response?.data?.message || 'Failed to load report'))
+      .then((r) => setReport(r.data))
+      .catch((e) => setError(e.response?.data?.message || 'Failed to load report'))
       .finally(() => setLoading(false))
   }, [sessionId])
 
   // Build equity curve data
-  const equityData = report ? (() => {
-    let eq = parseFloat(report.initial_capital)
-    return [
-      { date: 'Start', equity: eq },
-      ...(report.trades || []).map(t => {
-        eq += parseFloat(t.net_pnl || 0)
-        return { date: t.exit_date?.slice(0, 10) || '', equity: +eq.toFixed(0) }
-      })
-    ]
-  })() : []
+  const equityData = report
+    ? (() => {
+        let eq = parseFloat(report.initial_capital)
+        return [
+          { date: 'Start', equity: eq },
+          ...(report.trades || []).map((t) => {
+            eq += parseFloat(t.net_pnl || 0)
+            return { date: t.exit_date?.slice(0, 10) || '', equity: +eq.toFixed(0) }
+          }),
+        ]
+      })()
+    : []
 
   const isPositive = parseFloat(report?.total_pnl) >= 0
 
   // Compute extra stats — guard every field; API may return partial summary
-  const extraStats = report?.summary ? (() => {
-    const s       = report.summary
-    const avgWin  = Math.max(0, parseFloat(s.avg_win)  || 0)
-    // avg_loss comes from backend as negative (e.g. -500); take abs value
-    const avgLoss = Math.abs(parseFloat(s.avg_loss) || 0)
-    // win_rate is a percentage 0-100 from backend; divide to decimal for formula
-    const wr      = Math.min(1, Math.max(0, (parseFloat(s.win_rate) || 0) / 100))
-    // Expectancy = (WinRate × AvgWin) − (LossRate × AvgLoss)
-    const expectancy = (wr * avgWin) - ((1 - wr) * avgLoss)
-    // R:R ratio (only meaningful when both sides are positive)
-    const avgRR = avgLoss > 0 ? (avgWin / avgLoss).toFixed(2) : null
+  const extraStats = report?.summary
+    ? (() => {
+        const s = report.summary
+        const avgWin = Math.max(0, parseFloat(s.avg_win) || 0)
+        // avg_loss comes from backend as negative (e.g. -500); take abs value
+        const avgLoss = Math.abs(parseFloat(s.avg_loss) || 0)
+        // win_rate is a percentage 0-100 from backend; divide to decimal for formula
+        const wr = Math.min(1, Math.max(0, (parseFloat(s.win_rate) || 0) / 100))
+        // Expectancy = (WinRate × AvgWin) − (LossRate × AvgLoss)
+        const expectancy = wr * avgWin - (1 - wr) * avgLoss
+        // R:R ratio (only meaningful when both sides are positive)
+        const avgRR = avgLoss > 0 ? (avgWin / avgLoss).toFixed(2) : null
 
-    // Consecutive win/loss streaks
-    const trades = report.trades || []
-    let maxWStrk = 0, maxLStrk = 0, curW = 0, curL = 0
-    for (const t of trades) {
-      if (parseFloat(t.net_pnl) > 0) { curW++; curL = 0; maxWStrk = Math.max(maxWStrk, curW) }
-      else                            { curL++; curW = 0; maxLStrk = Math.max(maxLStrk, curL) }
-    }
+        // Consecutive win/loss streaks
+        const trades = report.trades || []
+        let maxWStrk = 0,
+          maxLStrk = 0,
+          curW = 0,
+          curL = 0
+        for (const t of trades) {
+          if (parseFloat(t.net_pnl) > 0) {
+            curW++
+            curL = 0
+            maxWStrk = Math.max(maxWStrk, curW)
+          } else {
+            curL++
+            curW = 0
+            maxLStrk = Math.max(maxLStrk, curL)
+          }
+        }
 
-    return { expectancy, avgRR, maxWStrk, maxLStrk }
-  })() : null
+        return { expectancy, avgRR, maxWStrk, maxLStrk }
+      })()
+    : null
 
   const handleExportCSV = useCallback(() => {
     if (!report?.trades?.length) return
-    const headers = ['Symbol','Entry Date','Exit Date','Qty','Entry Price','Exit Price','Net P&L','Return %','Hold Days','Reason']
-    const rows = report.trades.map(t => [
-      t.symbol, t.entry_date?.slice(0,10), t.exit_date?.slice(0,10),
-      t.quantity, t.entry_price, t.exit_price,
-      t.net_pnl, t.return_pct, t.hold_days, t.exit_reason
+    const headers = [
+      'Symbol',
+      'Entry Date',
+      'Exit Date',
+      'Qty',
+      'Entry Price',
+      'Exit Price',
+      'Net P&L',
+      'Return %',
+      'Hold Days',
+      'Reason',
+    ]
+    const rows = report.trades.map((t) => [
+      t.symbol,
+      t.entry_date?.slice(0, 10),
+      t.exit_date?.slice(0, 10),
+      t.quantity,
+      t.entry_price,
+      t.exit_price,
+      t.net_pnl,
+      t.return_pct,
+      t.hold_days,
+      t.exit_reason,
     ])
-    const csv = [headers, ...rows].map(r => r.map(c => `"${c ?? ''}"`).join(',')).join('\n')
+    const csv = [headers, ...rows].map((r) => r.map((c) => `"${c ?? ''}"`).join(',')).join('\n')
     const blob = new Blob([csv], { type: 'text/csv' })
-    const url  = URL.createObjectURL(blob)
-    const a    = document.createElement('a')
-    a.href = url; a.download = `backtest_${report.strategy_name?.replace(/\s+/g,'_')}.csv`
-    a.click(); URL.revokeObjectURL(url)
+    const url = URL.createObjectURL(blob)
+    const a = document.createElement('a')
+    a.href = url
+    a.download = `backtest_${report.strategy_name?.replace(/\s+/g, '_')}.csv`
+    a.click()
+    URL.revokeObjectURL(url)
   }, [report])
 
-  if (loading) return (
-    <div className="flex-1 flex items-center justify-center text-[12px] text-gray-400">
-      Loading report…
-    </div>
-  )
+  if (loading)
+    return (
+      <div className="flex-1 flex items-center justify-center text-[12px] text-gray-400">
+        Loading report…
+      </div>
+    )
 
-  if (error) return (
-    <div className="flex-1 flex items-center justify-center text-[12px] text-red-500">{error}</div>
-  )
+  if (error)
+    return (
+      <div className="flex-1 flex items-center justify-center text-[12px] text-red-500">
+        {error}
+      </div>
+    )
 
   const s = report.summary
 
@@ -150,13 +222,22 @@ export default function BacktestReport({ sessionId, onClose }) {
         <div>
           <h2 className="text-[16px] font-bold dark:text-white">{report.strategy_name}</h2>
           <div className="text-[11px] text-gray-400 mt-0.5">
-            {report.trades?.[0]?.entry_date?.slice(0,10) || '—'} → {report.trades?.[report.trades.length-1]?.exit_date?.slice(0,10) || '—'}
-            {' · '}SL: <span className={`font-semibold ${report.sl_mode === 'AUTO' ? 'text-orange-500' : 'text-blue-500'}`}>{report.sl_mode}</span>
-            {' · '}{s.total_trades} trades
+            {report.trades?.[0]?.entry_date?.slice(0, 10) || '—'} →{' '}
+            {report.trades?.[report.trades.length - 1]?.exit_date?.slice(0, 10) || '—'}
+            {' · '}SL:{' '}
+            <span
+              className={`font-semibold ${report.sl_mode === 'AUTO' ? 'text-orange-500' : 'text-blue-500'}`}
+            >
+              {report.sl_mode}
+            </span>
+            {' · '}
+            {s.total_trades} trades
           </div>
         </div>
-        <button onClick={onClose}
-          className="text-[11px] font-semibold border border-gray-200 dark:border-gray-700 px-3 py-1 rounded-md text-gray-500 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-gray-800">
+        <button
+          onClick={onClose}
+          className="text-[11px] font-semibold border border-gray-200 dark:border-gray-700 px-3 py-1 rounded-md text-gray-500 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-gray-800"
+        >
           ← Back
         </button>
       </div>
@@ -203,8 +284,20 @@ export default function BacktestReport({ sessionId, onClose }) {
           <StatCard
             label="Avg R:R"
             value={extraStats.avgRR ? `1 : ${extraStats.avgRR}` : '—'}
-            sub={extraStats.avgRR ? (parseFloat(extraStats.avgRR) >= 2 ? 'Excellent' : parseFloat(extraStats.avgRR) >= 1 ? 'Acceptable' : 'Poor') : null}
-            color={extraStats.avgRR && parseFloat(extraStats.avgRR) >= 2 ? 'text-green-600' : 'text-orange-500'}
+            sub={
+              extraStats.avgRR
+                ? parseFloat(extraStats.avgRR) >= 2
+                  ? 'Excellent'
+                  : parseFloat(extraStats.avgRR) >= 1
+                    ? 'Acceptable'
+                    : 'Poor'
+                : null
+            }
+            color={
+              extraStats.avgRR && parseFloat(extraStats.avgRR) >= 2
+                ? 'text-green-600'
+                : 'text-orange-500'
+            }
             hint="Average reward-to-risk ratio across all trades."
           />
           <StatCard
@@ -225,13 +318,29 @@ export default function BacktestReport({ sessionId, onClose }) {
       {/* Equity curve */}
       {equityData.length > 1 && (
         <div className="bg-white dark:bg-gray-900 rounded-xl border border-gray-100 dark:border-gray-800 p-3 mb-4">
-          <div className="text-[10px] font-semibold text-gray-400 uppercase tracking-widest mb-2">Equity Curve</div>
+          <div className="text-[10px] font-semibold text-gray-400 uppercase tracking-widest mb-2">
+            Equity Curve
+          </div>
           <ResponsiveContainer width="100%" height={120}>
             <AreaChart data={equityData} margin={{ top: 4, right: 4, bottom: 0, left: 0 }}>
               <defs>
-                <linearGradient id={`btEqGrad${isPositive ? 'P' : 'N'}`} x1="0" y1="0" x2="0" y2="1">
-                  <stop offset="5%"  stopColor={isPositive ? '#22c55e' : '#ef4444'} stopOpacity={0.3} />
-                  <stop offset="95%" stopColor={isPositive ? '#22c55e' : '#ef4444'} stopOpacity={0} />
+                <linearGradient
+                  id={`btEqGrad${isPositive ? 'P' : 'N'}`}
+                  x1="0"
+                  y1="0"
+                  x2="0"
+                  y2="1"
+                >
+                  <stop
+                    offset="5%"
+                    stopColor={isPositive ? '#22c55e' : '#ef4444'}
+                    stopOpacity={0.3}
+                  />
+                  <stop
+                    offset="95%"
+                    stopColor={isPositive ? '#22c55e' : '#ef4444'}
+                    stopOpacity={0}
+                  />
                 </linearGradient>
               </defs>
               <XAxis dataKey="date" hide />
@@ -244,12 +353,15 @@ export default function BacktestReport({ sessionId, onClose }) {
                   borderRadius: 6,
                   color: isDark ? '#e5e7eb' : '#111827',
                 }}
-                formatter={v => [`Rs.${fmt(v)}`, 'Equity']}
+                formatter={(v) => [`Rs.${fmt(v)}`, 'Equity']}
               />
               <Area
-                type="monotone" dataKey="equity" stroke={isPositive ? '#22c55e' : '#ef4444'}
+                type="monotone"
+                dataKey="equity"
+                stroke={isPositive ? '#22c55e' : '#ef4444'}
                 fill={`url(#btEqGrad${isPositive ? 'P' : 'N'})`}
-                strokeWidth={1.5} dot={false}
+                strokeWidth={1.5}
+                dot={false}
               />
             </AreaChart>
           </ResponsiveContainer>
@@ -290,8 +402,22 @@ export default function BacktestReport({ sessionId, onClose }) {
             <table className="w-full text-[10px]">
               <thead>
                 <tr className="text-gray-400 border-b border-gray-100 dark:border-gray-800">
-                  {['#','Symbol','Entry','Exit','Qty','Entry P','Exit P','Net P&L','R%','Days','Reason'].map(h => (
-                    <th key={h} className="text-left py-1 px-1 font-semibold whitespace-nowrap">{h}</th>
+                  {[
+                    '#',
+                    'Symbol',
+                    'Entry',
+                    'Exit',
+                    'Qty',
+                    'Entry P',
+                    'Exit P',
+                    'Net P&L',
+                    'R%',
+                    'Days',
+                    'Reason',
+                  ].map((h) => (
+                    <th key={h} className="text-left py-1 px-1 font-semibold whitespace-nowrap">
+                      {h}
+                    </th>
                   ))}
                 </tr>
               </thead>
@@ -299,29 +425,58 @@ export default function BacktestReport({ sessionId, onClose }) {
                 {report.trades.map((t, i) => {
                   const pnl = parseFloat(t.net_pnl || 0)
                   return (
-                    <tr key={t.id} className="border-b border-gray-50 dark:border-gray-800 hover:bg-gray-50 dark:hover:bg-gray-800">
+                    <tr
+                      key={t.id}
+                      className="border-b border-gray-50 dark:border-gray-800 hover:bg-gray-50 dark:hover:bg-gray-800"
+                    >
                       <td className="py-1 px-1 text-gray-400">{i + 1}</td>
                       <td className="py-1 px-1 font-bold dark:text-white">{t.symbol}</td>
-                      <td className="py-1 px-1 text-gray-600 dark:text-gray-400 whitespace-nowrap">{t.entry_date?.slice(0,10)}</td>
-                      <td className="py-1 px-1 text-gray-600 dark:text-gray-400 whitespace-nowrap">{t.exit_date?.slice(0,10)}</td>
-                      <td className="py-1 px-1 dark:text-gray-300">{t.remaining_quantity != null ? t.quantity - t.remaining_quantity || t.quantity : t.quantity}</td>
-                      <td className="py-1 px-1 dark:text-gray-300 whitespace-nowrap">Rs.{fmt(t.entry_price)}</td>
-                      <td className="py-1 px-1 dark:text-gray-300 whitespace-nowrap">Rs.{fmt(t.exit_price)}</td>
-                      <td className={`py-1 px-1 font-bold whitespace-nowrap ${pnl >= 0 ? 'text-green-600' : 'text-red-500'}`}>
+                      <td className="py-1 px-1 text-gray-600 dark:text-gray-400 whitespace-nowrap">
+                        {t.entry_date?.slice(0, 10)}
+                      </td>
+                      <td className="py-1 px-1 text-gray-600 dark:text-gray-400 whitespace-nowrap">
+                        {t.exit_date?.slice(0, 10)}
+                      </td>
+                      <td className="py-1 px-1 dark:text-gray-300">
+                        {t.remaining_quantity != null
+                          ? t.quantity - t.remaining_quantity || t.quantity
+                          : t.quantity}
+                      </td>
+                      <td className="py-1 px-1 dark:text-gray-300 whitespace-nowrap">
+                        Rs.{fmt(t.entry_price)}
+                      </td>
+                      <td className="py-1 px-1 dark:text-gray-300 whitespace-nowrap">
+                        Rs.{fmt(t.exit_price)}
+                      </td>
+                      <td
+                        className={`py-1 px-1 font-bold whitespace-nowrap ${pnl >= 0 ? 'text-green-600' : 'text-red-500'}`}
+                      >
                         {pnl >= 0 ? '+' : ''}Rs.{fmt(pnl)}
                       </td>
-                      <td className={`py-1 px-1 whitespace-nowrap ${parseFloat(t.return_pct) >= 0 ? 'text-green-600' : 'text-red-500'}`}>
+                      <td
+                        className={`py-1 px-1 whitespace-nowrap ${parseFloat(t.return_pct) >= 0 ? 'text-green-600' : 'text-red-500'}`}
+                      >
                         {fmtPct(t.return_pct)}
                       </td>
-                      <td className="py-1 px-1 text-gray-500 dark:text-gray-400">{t.hold_days || '—'}</td>
+                      <td className="py-1 px-1 text-gray-500 dark:text-gray-400">
+                        {t.hold_days || '—'}
+                      </td>
                       <td className="py-1 px-1">
-                        <span className={`px-1 py-0.5 rounded text-[10px] font-semibold whitespace-nowrap ${
-                          t.exit_reason === 'TP_HIT'     ? 'bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400' :
-                          t.exit_reason === 'SL_HIT'     ? 'bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-400' :
-                          t.exit_reason === 'SL_IGNORED' ? 'bg-orange-100 text-orange-700 dark:bg-orange-900/30 dark:text-orange-400' :
-                          t.exit_reason === 'EARLY_EXIT' ? 'bg-yellow-100 text-yellow-700 dark:bg-yellow-900/30 dark:text-yellow-400' :
-                          'bg-gray-100 text-gray-600 dark:bg-gray-800 dark:text-gray-400'
-                        }`}>{t.exit_reason || '—'}</span>
+                        <span
+                          className={`px-1 py-0.5 rounded text-[10px] font-semibold whitespace-nowrap ${
+                            t.exit_reason === 'TP_HIT'
+                              ? 'bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400'
+                              : t.exit_reason === 'SL_HIT'
+                                ? 'bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-400'
+                                : t.exit_reason === 'SL_IGNORED'
+                                  ? 'bg-orange-100 text-orange-700 dark:bg-orange-900/30 dark:text-orange-400'
+                                  : t.exit_reason === 'EARLY_EXIT'
+                                    ? 'bg-yellow-100 text-yellow-700 dark:bg-yellow-900/30 dark:text-yellow-400'
+                                    : 'bg-gray-100 text-gray-600 dark:bg-gray-800 dark:text-gray-400'
+                          }`}
+                        >
+                          {t.exit_reason || '—'}
+                        </span>
                       </td>
                     </tr>
                   )
@@ -343,9 +498,10 @@ export default function BacktestReport({ sessionId, onClose }) {
               <BehaviorEntry key={i} e={e} />
             ))}
           </div>
-          {report.behavior_log.some(e => e.event_type === 'SL_IGNORED') && (
+          {report.behavior_log.some((e) => e.event_type === 'SL_IGNORED') && (
             <div className="mt-2 text-[10px] text-orange-500 bg-orange-50 dark:bg-orange-900/10 rounded px-2 py-1 leading-tight">
-              ⚠ SL ignored trades are logged but not penalized. Review your discipline score on the Home page.
+              ⚠ SL ignored trades are logged but not penalized. Review your discipline score on the
+              Home page.
             </div>
           )}
         </div>

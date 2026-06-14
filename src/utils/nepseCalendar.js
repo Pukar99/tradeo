@@ -14,8 +14,8 @@ export function nptNow() {
 // isoDate: 'YYYY-MM-DD'; dow: getUTCDay() of that date in NPT-shifted time
 export function isNepseWeekend(isoDate, dow) {
   return isoDate >= WEEKEND_RULE_CUTOFF
-    ? (dow === 0 || dow === 6)   // Sat + Sun off (Nepali year 2082 onwards)
-    : (dow === 5 || dow === 6)   // Fri + Sat off (before 2082)
+    ? dow === 0 || dow === 6 // Sat + Sun off (Nepali year 2082 onwards)
+    : dow === 5 || dow === 6 // Fri + Sat off (before 2082)
 }
 
 // Most recent date (today or earlier, NPT) that is a NEPSE trading day.

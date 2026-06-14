@@ -3,25 +3,55 @@
 const SPEEDS = ['0.5', '1', '2', '5', '10']
 
 // SVG icons — no emoji, always visible on all OS/fonts
-function IconPlay()  { return <svg viewBox="0 0 16 16" fill="currentColor" className="w-4 h-4"><path d="M3 2.5l10 5.5-10 5.5V2.5z"/></svg> }
-function IconPause() { return <svg viewBox="0 0 16 16" fill="currentColor" className="w-4 h-4"><path d="M4 2h3v12H4V2zm5 0h3v12H9V2z"/></svg> }
-function IconStepB() { return <svg viewBox="0 0 16 16" fill="currentColor" className="w-3.5 h-3.5"><path d="M4 2h2v12H4V2zm2 6l7-5v10L6 8z"/></svg> }
-function IconStepF() { return <svg viewBox="0 0 16 16" fill="currentColor" className="w-3.5 h-3.5"><path d="M10 2h2v12h-2V2zm-2 6L1 3v10l7-5z"/></svg> }
+function IconPlay() {
+  return (
+    <svg viewBox="0 0 16 16" fill="currentColor" className="w-4 h-4">
+      <path d="M3 2.5l10 5.5-10 5.5V2.5z" />
+    </svg>
+  )
+}
+function IconPause() {
+  return (
+    <svg viewBox="0 0 16 16" fill="currentColor" className="w-4 h-4">
+      <path d="M4 2h3v12H4V2zm5 0h3v12H9V2z" />
+    </svg>
+  )
+}
+function IconStepB() {
+  return (
+    <svg viewBox="0 0 16 16" fill="currentColor" className="w-3.5 h-3.5">
+      <path d="M4 2h2v12H4V2zm2 6l7-5v10L6 8z" />
+    </svg>
+  )
+}
+function IconStepF() {
+  return (
+    <svg viewBox="0 0 16 16" fill="currentColor" className="w-3.5 h-3.5">
+      <path d="M10 2h2v12h-2V2zm-2 6L1 3v10l7-5z" />
+    </svg>
+  )
+}
 
 export default function BacktestControls({
-  playing, speed, cursorIndex, totalCandles, currentDate,
-  onPlay, onPause, onStep, onStepBack, onSpeedChange,
+  playing,
+  speed,
+  cursorIndex,
+  totalCandles,
+  currentDate,
+  onPlay,
+  onPause,
+  onStep,
+  onStepBack,
+  onSpeedChange,
 }) {
   const progress = totalCandles > 0 ? Math.round((cursorIndex / totalCandles) * 100) : 0
-  const atEnd    = totalCandles > 0 && cursorIndex >= totalCandles - 1
-  const atStart  = cursorIndex <= 0
+  const atEnd = totalCandles > 0 && cursorIndex >= totalCandles - 1
+  const atStart = cursorIndex <= 0
 
   return (
     <div className="flex items-center gap-2 px-3 py-2 border-t border-gray-100 dark:border-gray-800 bg-white dark:bg-gray-950 shrink-0">
-
       {/* ── Playback controls ─────────────────────────────────── */}
       <div className="flex items-center gap-1 shrink-0">
-
         {/* Step back */}
         <button
           onClick={onStepBack}
@@ -63,7 +93,7 @@ export default function BacktestControls({
       {/* ── Speed ─────────────────────────────────────────────── */}
       <div className="flex items-center gap-1 shrink-0">
         <span className="text-[10px] text-gray-400 dark:text-gray-500 font-medium">Speed</span>
-        {SPEEDS.map(s => (
+        {SPEEDS.map((s) => (
           <button
             key={s}
             onClick={() => onSpeedChange(s)}

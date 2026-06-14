@@ -3,14 +3,17 @@
 // BreakdownPage). These strings were previously duplicated per-file and drifted.
 
 // ── Design tokens ─────────────────────────────────────────────────────────────
-export const CARD   = 'bg-white dark:bg-gray-900 rounded-2xl border border-gray-100 dark:border-gray-800'
-export const LABEL  = 'text-[10px] font-semibold uppercase tracking-widest text-gray-400'
+export const CARD =
+  'bg-white dark:bg-gray-900 rounded-2xl border border-gray-100 dark:border-gray-800'
+export const LABEL = 'text-[10px] font-semibold uppercase tracking-widest text-gray-400'
 export const STITLE = 'text-[11px] font-semibold text-gray-700 dark:text-gray-200'
-export const SVAL   = 'text-[13px] font-bold tabular-nums'
+export const SVAL = 'text-[13px] font-bold tabular-nums'
 
 // Thin styled scrollbars (vertical / horizontal variants)
-export const SCROLL_Y = '[scrollbar-width:thin] [&::-webkit-scrollbar]:w-1.5 [&::-webkit-scrollbar-thumb]:bg-gray-300 dark:[&::-webkit-scrollbar-thumb]:bg-gray-700 [&::-webkit-scrollbar-thumb]:rounded-full'
-export const SCROLL_X = '[scrollbar-width:thin] [&::-webkit-scrollbar]:h-1.5 [&::-webkit-scrollbar-track]:bg-transparent [&::-webkit-scrollbar-thumb]:bg-gray-300 dark:[&::-webkit-scrollbar-thumb]:bg-gray-700 [&::-webkit-scrollbar-thumb]:rounded-full'
+export const SCROLL_Y =
+  '[scrollbar-width:thin] [&::-webkit-scrollbar]:w-1.5 [&::-webkit-scrollbar-thumb]:bg-gray-300 dark:[&::-webkit-scrollbar-thumb]:bg-gray-700 [&::-webkit-scrollbar-thumb]:rounded-full'
+export const SCROLL_X =
+  '[scrollbar-width:thin] [&::-webkit-scrollbar]:h-1.5 [&::-webkit-scrollbar-track]:bg-transparent [&::-webkit-scrollbar-thumb]:bg-gray-300 dark:[&::-webkit-scrollbar-thumb]:bg-gray-700 [&::-webkit-scrollbar-thumb]:rounded-full'
 
 // ── Formatting ────────────────────────────────────────────────────────────────
 export function fmtPct(n, dec = 1) {

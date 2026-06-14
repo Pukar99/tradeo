@@ -15,9 +15,9 @@ function NepseSparkline({ isUp }) {
     if (fetched.current) return
     fetched.current = true
     getIndexChart({ index_id: 12, timeframe: '3M' })
-      .then(r => {
+      .then((r) => {
         const rows = r?.data?.data || []
-        const closes = rows.map(r => parseFloat(r.close)).filter(Boolean)
+        const closes = rows.map((r) => parseFloat(r.close)).filter(Boolean)
         if (closes.length >= 2) setPoints(closes)
         else setFailed(true)
       })
@@ -32,54 +32,100 @@ function NepseSparkline({ isUp }) {
     )
   }
   if (points.length < 2) {
-    return <div className="w-full h-[56px] bg-gray-50 dark:bg-gray-800/50 rounded-lg animate-pulse" />
+    return (
+      <div className="w-full h-[56px] bg-gray-50 dark:bg-gray-800/50 rounded-lg animate-pulse" />
+    )
   }
 
-  const W = 280, H = 56
+  const W = 280,
+    H = 56
   const min = Math.min(...points)
   const max = Math.max(...points)
   const range = max - min || 1
   const toX = (i) => (i / (points.length - 1)) * W
   const toY = (v) => H - ((v - min) / range) * (H - 6) - 3
-  const linePath = points.map((v, i) => `${i === 0 ? 'M' : 'L'}${toX(i).toFixed(1)},${toY(v).toFixed(1)}`).join(' ')
+  const linePath = points
+    .map((v, i) => `${i === 0 ? 'M' : 'L'}${toX(i).toFixed(1)},${toY(v).toFixed(1)}`)
+    .join(' ')
   // Filled area path: go along the line then close at the bottom
   const fillPath = `${linePath} L${W},${H} L0,${H} Z`
   const color = isUp ? '#10b981' : '#f87171'
   const fillColor = isUp ? 'rgba(16,185,129,0.08)' : 'rgba(248,113,113,0.08)'
 
   return (
-    <svg width="100%" height={H} viewBox={`0 0 ${W} ${H}`} preserveAspectRatio="none" className="rounded-lg overflow-hidden">
+    <svg
+      width="100%"
+      height={H}
+      viewBox={`0 0 ${W} ${H}`}
+      preserveAspectRatio="none"
+      className="rounded-lg overflow-hidden"
+    >
       <path d={fillPath} fill={fillColor} />
-      <path d={linePath} fill="none" stroke={color} strokeWidth="1.5" strokeLinejoin="round" strokeLinecap="round" />
+      <path
+        d={linePath}
+        fill="none"
+        stroke={color}
+        strokeWidth="1.5"
+        strokeLinejoin="round"
+        strokeLinecap="round"
+      />
     </svg>
   )
 }
 
 const MOODS = [
-  { value: 'Bullish',  label: '↑ Bullish',  color: 'text-emerald-600 bg-emerald-50 dark:bg-emerald-900/30 dark:text-emerald-400 border-emerald-200 dark:border-emerald-800/40' },
-  { value: 'Bearish',  label: '↓ Bearish',  color: 'text-red-600 bg-red-50 dark:bg-red-900/30 dark:text-red-400 border-red-200 dark:border-red-800/40' },
-  { value: 'Neutral',  label: '→ Neutral',  color: 'text-gray-600 bg-gray-100 dark:bg-gray-800 dark:text-gray-300 border-gray-200 dark:border-gray-700' },
-  { value: 'Confused', label: '? Confused', color: 'text-amber-600 bg-amber-50 dark:bg-amber-900/30 dark:text-amber-400 border-amber-200 dark:border-amber-800/40' },
-  { value: 'Excited',  label: '⚡ Excited', color: 'text-violet-600 bg-violet-50 dark:bg-violet-900/30 dark:text-violet-400 border-violet-200 dark:border-violet-800/40' },
+  {
+    value: 'Bullish',
+    label: '↑ Bullish',
+    color:
+      'text-emerald-600 bg-emerald-50 dark:bg-emerald-900/30 dark:text-emerald-400 border-emerald-200 dark:border-emerald-800/40',
+  },
+  {
+    value: 'Bearish',
+    label: '↓ Bearish',
+    color:
+      'text-red-600 bg-red-50 dark:bg-red-900/30 dark:text-red-400 border-red-200 dark:border-red-800/40',
+  },
+  {
+    value: 'Neutral',
+    label: '→ Neutral',
+    color:
+      'text-gray-600 bg-gray-100 dark:bg-gray-800 dark:text-gray-300 border-gray-200 dark:border-gray-700',
+  },
+  {
+    value: 'Confused',
+    label: '? Confused',
+    color:
+      'text-amber-600 bg-amber-50 dark:bg-amber-900/30 dark:text-amber-400 border-amber-200 dark:border-amber-800/40',
+  },
+  {
+    value: 'Excited',
+    label: '⚡ Excited',
+    color:
+      'text-violet-600 bg-violet-50 dark:bg-violet-900/30 dark:text-violet-400 border-violet-200 dark:border-violet-800/40',
+  },
 ]
 
-const INPUT = 'w-full bg-gray-50 dark:bg-gray-800/80 border border-gray-200 dark:border-gray-700 rounded-lg px-3 py-2 text-[12px] text-gray-800 dark:text-white placeholder-gray-400 focus:outline-none focus:ring-1 focus:ring-blue-500 focus:border-blue-500 transition-all resize-none leading-relaxed'
-const LABEL = 'block text-[10px] font-semibold uppercase tracking-widest text-gray-400 dark:text-gray-500 mb-1.5'
+const INPUT =
+  'w-full bg-gray-50 dark:bg-gray-800/80 border border-gray-200 dark:border-gray-700 rounded-lg px-3 py-2 text-[12px] text-gray-800 dark:text-white placeholder-gray-400 focus:outline-none focus:ring-1 focus:ring-blue-500 focus:border-blue-500 transition-all resize-none leading-relaxed'
+const LABEL =
+  'block text-[10px] font-semibold uppercase tracking-widest text-gray-400 dark:text-gray-500 mb-1.5'
 
 export default function MarketJournalModal({ entry, onClose, onSaved }) {
   const [form, setForm] = useState({
-    pre_market:      entry?.pre_market      || '',
-    during_market:   entry?.during_market   || '',
-    post_market:     entry?.post_market     || '',
+    pre_market: entry?.pre_market || '',
+    during_market: entry?.during_market || '',
+    post_market: entry?.post_market || '',
     market_surprise: entry?.market_surprise || '',
-    mood:            entry?.mood            || '',
+    mood: entry?.mood || '',
   })
   const [saving, setSaving] = useState(false)
   const [saveErr, setSaveErr] = useState(null)
 
   const handleSubmit = async (e) => {
     e.preventDefault()
-    setSaving(true); setSaveErr(null)
+    setSaving(true)
+    setSaveErr(null)
     try {
       const res = await updateMarketJournal(entry.date, form)
       onSaved(res.data) // caller closes the modal — don't setState after this
@@ -90,7 +136,7 @@ export default function MarketJournalModal({ entry, onClose, onSaved }) {
   }
 
   const nepseChange = entry?.nepse_change_pct != null ? parseFloat(entry.nepse_change_pct) : null
-  const nepseClose  = entry?.nepse_close  != null ? parseFloat(entry.nepse_close)  : null
+  const nepseClose = entry?.nepse_close != null ? parseFloat(entry.nepse_close) : null
 
   return (
     <ModalShell
@@ -109,15 +155,24 @@ export default function MarketJournalModal({ entry, onClose, onSaved }) {
         {/* Auto-populated section */}
         {entry && (
           <div className="px-5 pt-4 pb-3 bg-gray-50/60 dark:bg-gray-800/20 border-b border-gray-100 dark:border-gray-800">
-            <p className="text-[10px] uppercase tracking-widest font-semibold text-gray-400 mb-3">Market Data (Auto-populated)</p>
+            <p className="text-[10px] uppercase tracking-widest font-semibold text-gray-400 mb-3">
+              Market Data (Auto-populated)
+            </p>
 
             {/* NEPSE 3-month chart */}
             <div className="mb-3">
               <div className="flex items-center justify-between mb-1">
-                <p className="text-[10px] uppercase tracking-widest text-gray-400">NEPSE All-Share — 3 Month</p>
+                <p className="text-[10px] uppercase tracking-widest text-gray-400">
+                  NEPSE All-Share — 3 Month
+                </p>
                 {nepseClose != null && (
-                  <span className={`text-[10px] font-bold tabular-nums ${nepseChange != null && nepseChange >= 0 ? 'text-emerald-500' : 'text-red-400'}`}>
-                    {nepseClose.toLocaleString()} {nepseChange != null ? `${nepseChange >= 0 ? '+' : ''}${nepseChange.toFixed(2)}%` : ''}
+                  <span
+                    className={`text-[10px] font-bold tabular-nums ${nepseChange != null && nepseChange >= 0 ? 'text-emerald-500' : 'text-red-400'}`}
+                  >
+                    {nepseClose.toLocaleString()}{' '}
+                    {nepseChange != null
+                      ? `${nepseChange >= 0 ? '+' : ''}${nepseChange.toFixed(2)}%`
+                      : ''}
                   </span>
                 )}
               </div>
@@ -132,8 +187,11 @@ export default function MarketJournalModal({ entry, onClose, onSaved }) {
                   {nepseClose != null ? nepseClose.toLocaleString() : '—'}
                 </p>
                 {nepseChange != null && (
-                  <p className={`text-[10px] font-semibold tabular-nums mt-0.5 ${nepseChange >= 0 ? 'text-emerald-500' : 'text-red-400'}`}>
-                    {nepseChange >= 0 ? '+' : ''}{nepseChange.toFixed(2)}%
+                  <p
+                    className={`text-[10px] font-semibold tabular-nums mt-0.5 ${nepseChange >= 0 ? 'text-emerald-500' : 'text-red-400'}`}
+                  >
+                    {nepseChange >= 0 ? '+' : ''}
+                    {nepseChange.toFixed(2)}%
                   </p>
                 )}
               </div>
@@ -144,10 +202,14 @@ export default function MarketJournalModal({ entry, onClose, onSaved }) {
                   <p className="text-[10px] uppercase tracking-widest text-gray-400">Breadth</p>
                   <div className="flex items-center gap-2 mt-1 flex-wrap">
                     {entry.advancing != null && (
-                      <span className="text-[10px] font-semibold text-emerald-500">{entry.advancing}↑</span>
+                      <span className="text-[10px] font-semibold text-emerald-500">
+                        {entry.advancing}↑
+                      </span>
                     )}
                     {entry.declining != null && (
-                      <span className="text-[10px] font-semibold text-red-400">{entry.declining}↓</span>
+                      <span className="text-[10px] font-semibold text-red-400">
+                        {entry.declining}↓
+                      </span>
                     )}
                     {entry.unchanged != null && (
                       <span className="text-[10px] text-gray-400">{entry.unchanged}→</span>
@@ -169,11 +231,13 @@ export default function MarketJournalModal({ entry, onClose, onSaved }) {
               {/* Active trades badge */}
               <div className="bg-white dark:bg-gray-900 rounded-lg border border-gray-100 dark:border-gray-800 px-3 py-2">
                 <p className="text-[10px] uppercase tracking-widest text-gray-400">Your Trades</p>
-                <span className={`text-[10px] font-semibold mt-1 inline-block px-2 py-0.5 rounded-full ${
-                  entry.has_active_trades
-                    ? 'bg-blue-100 dark:bg-blue-900/30 text-blue-600 dark:text-blue-400'
-                    : 'bg-gray-100 dark:bg-gray-800 text-gray-500 dark:text-gray-400'
-                }`}>
+                <span
+                  className={`text-[10px] font-semibold mt-1 inline-block px-2 py-0.5 rounded-full ${
+                    entry.has_active_trades
+                      ? 'bg-blue-100 dark:bg-blue-900/30 text-blue-600 dark:text-blue-400'
+                      : 'bg-gray-100 dark:bg-gray-800 text-gray-500 dark:text-gray-400'
+                  }`}
+                >
                   {entry.has_active_trades ? 'Active' : 'Inactive'}
                 </span>
               </div>
@@ -184,12 +248,18 @@ export default function MarketJournalModal({ entry, onClose, onSaved }) {
               <div className="grid grid-cols-2 gap-2">
                 {entry.top_gainers?.length > 0 && (
                   <div>
-                    <p className="text-[10px] uppercase tracking-widest text-gray-400 mb-1.5">Top Gainers</p>
+                    <p className="text-[10px] uppercase tracking-widest text-gray-400 mb-1.5">
+                      Top Gainers
+                    </p>
                     <div className="space-y-1">
-                      {entry.top_gainers.map(g => (
+                      {entry.top_gainers.map((g) => (
                         <div key={g.symbol} className="flex items-center justify-between">
-                          <span className="text-[10px] font-bold text-gray-700 dark:text-gray-300">{g.symbol}</span>
-                          <span className="text-[10px] font-semibold text-emerald-500">+{parseFloat(g.diff_pct).toFixed(2)}%</span>
+                          <span className="text-[10px] font-bold text-gray-700 dark:text-gray-300">
+                            {g.symbol}
+                          </span>
+                          <span className="text-[10px] font-semibold text-emerald-500">
+                            +{parseFloat(g.diff_pct).toFixed(2)}%
+                          </span>
                         </div>
                       ))}
                     </div>
@@ -197,12 +267,18 @@ export default function MarketJournalModal({ entry, onClose, onSaved }) {
                 )}
                 {entry.top_losers?.length > 0 && (
                   <div>
-                    <p className="text-[10px] uppercase tracking-widest text-gray-400 mb-1.5">Top Losers</p>
+                    <p className="text-[10px] uppercase tracking-widest text-gray-400 mb-1.5">
+                      Top Losers
+                    </p>
                     <div className="space-y-1">
-                      {entry.top_losers.map(l => (
+                      {entry.top_losers.map((l) => (
                         <div key={l.symbol} className="flex items-center justify-between">
-                          <span className="text-[10px] font-bold text-gray-700 dark:text-gray-300">{l.symbol}</span>
-                          <span className="text-[10px] font-semibold text-red-400">{parseFloat(l.diff_pct).toFixed(2)}%</span>
+                          <span className="text-[10px] font-bold text-gray-700 dark:text-gray-300">
+                            {l.symbol}
+                          </span>
+                          <span className="text-[10px] font-semibold text-red-400">
+                            {parseFloat(l.diff_pct).toFixed(2)}%
+                          </span>
                         </div>
                       ))}
                     </div>
@@ -214,18 +290,26 @@ export default function MarketJournalModal({ entry, onClose, onSaved }) {
             {/* Sector data */}
             {entry.sector_data?.length > 0 && (
               <div className="mt-3">
-                <p className="text-[10px] uppercase tracking-widest text-gray-400 mb-1.5">Sector Performance</p>
+                <p className="text-[10px] uppercase tracking-widest text-gray-400 mb-1.5">
+                  Sector Performance
+                </p>
                 <div className="flex flex-wrap gap-1.5">
-                  {entry.sector_data.map(s => (
-                    <div key={s.index_id} className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-lg text-[10px] font-semibold border ${
-                      parseFloat(s.per_change) > 0
-                        ? 'bg-emerald-50 dark:bg-emerald-900/20 border-emerald-200 dark:border-emerald-800/40 text-emerald-600 dark:text-emerald-400'
-                        : parseFloat(s.per_change) < 0
-                        ? 'bg-red-50 dark:bg-red-900/20 border-red-200 dark:border-red-800/40 text-red-500 dark:text-red-400'
-                        : 'bg-gray-50 dark:bg-gray-800 border-gray-200 dark:border-gray-700 text-gray-500 dark:text-gray-400'
-                    }`}>
+                  {entry.sector_data.map((s) => (
+                    <div
+                      key={s.index_id}
+                      className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-lg text-[10px] font-semibold border ${
+                        parseFloat(s.per_change) > 0
+                          ? 'bg-emerald-50 dark:bg-emerald-900/20 border-emerald-200 dark:border-emerald-800/40 text-emerald-600 dark:text-emerald-400'
+                          : parseFloat(s.per_change) < 0
+                            ? 'bg-red-50 dark:bg-red-900/20 border-red-200 dark:border-red-800/40 text-red-500 dark:text-red-400'
+                            : 'bg-gray-50 dark:bg-gray-800 border-gray-200 dark:border-gray-700 text-gray-500 dark:text-gray-400'
+                      }`}
+                    >
                       {s.name}
-                      <span className="ml-0.5">{parseFloat(s.per_change) >= 0 ? '+' : ''}{parseFloat(s.per_change).toFixed(2)}%</span>
+                      <span className="ml-0.5">
+                        {parseFloat(s.per_change) >= 0 ? '+' : ''}
+                        {parseFloat(s.per_change).toFixed(2)}%
+                      </span>
                     </div>
                   ))}
                 </div>
@@ -236,16 +320,17 @@ export default function MarketJournalModal({ entry, onClose, onSaved }) {
 
         {/* Editable fields */}
         <form onSubmit={handleSubmit} className="p-5 space-y-4">
-
           {/* Mood */}
           <div>
             <label className={LABEL}>Overall Mood</label>
             <div className="flex flex-wrap gap-1.5">
-              {MOODS.map(m => (
+              {MOODS.map((m) => (
                 <button
                   key={m.value}
                   type="button"
-                  onClick={() => setForm(p => ({ ...p, mood: p.mood === m.value ? '' : m.value }))}
+                  onClick={() =>
+                    setForm((p) => ({ ...p, mood: p.mood === m.value ? '' : m.value }))
+                  }
                   className={`px-2.5 py-1 rounded-lg text-[10px] font-semibold border transition-all ${
                     form.mood === m.value
                       ? m.color
@@ -262,7 +347,7 @@ export default function MarketJournalModal({ entry, onClose, onSaved }) {
             <label className={LABEL}>Pre-market Expectation</label>
             <textarea
               value={form.pre_market}
-              onChange={e => setForm(p => ({ ...p, pre_market: e.target.value }))}
+              onChange={(e) => setForm((p) => ({ ...p, pre_market: e.target.value }))}
               placeholder="What were you expecting before market opened? Key levels, catalysts, macro context…"
               rows={3}
               className={INPUT}
@@ -273,7 +358,7 @@ export default function MarketJournalModal({ entry, onClose, onSaved }) {
             <label className={LABEL}>During-market Notes</label>
             <textarea
               value={form.during_market}
-              onChange={e => setForm(p => ({ ...p, during_market: e.target.value }))}
+              onChange={(e) => setForm((p) => ({ ...p, during_market: e.target.value }))}
               placeholder="What happened intraday? Key price action, sector rotations, order flow…"
               rows={3}
               className={INPUT}
@@ -284,7 +369,7 @@ export default function MarketJournalModal({ entry, onClose, onSaved }) {
             <label className={LABEL}>Post-market Reflection</label>
             <textarea
               value={form.post_market}
-              onChange={e => setForm(p => ({ ...p, post_market: e.target.value }))}
+              onChange={(e) => setForm((p) => ({ ...p, post_market: e.target.value }))}
               placeholder="How did the day unfold vs your expectations? What worked, what didn't?"
               rows={3}
               className={INPUT}
@@ -292,10 +377,13 @@ export default function MarketJournalModal({ entry, onClose, onSaved }) {
           </div>
 
           <div>
-            <label className={LABEL}>Market Surprise <span className="normal-case font-normal text-gray-300">— what was unexpected?</span></label>
+            <label className={LABEL}>
+              Market Surprise{' '}
+              <span className="normal-case font-normal text-gray-300">— what was unexpected?</span>
+            </label>
             <textarea
               value={form.market_surprise}
-              onChange={e => setForm(p => ({ ...p, market_surprise: e.target.value }))}
+              onChange={(e) => setForm((p) => ({ ...p, market_surprise: e.target.value }))}
               placeholder="Any unexpected moves, news, or patterns that surprised you today…"
               rows={2}
               className={INPUT}

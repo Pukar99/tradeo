@@ -22,6 +22,15 @@ jobs:
       - name: Install dependencies
         run: npm ci --legacy-peer-deps
 
+      - name: Security audit (production deps — fail on high/critical)
+        # Gates what actually ships to users. Dev/build-only advisories
+        # (vite/esbuild, blocknote/uuid) are tracked separately and surfaced
+        # by the next step without failing the build.
+        run: npm audit --omit=dev --audit-level=high
+
+      - name: Security audit (full — report only, non-blocking)
+        run: npm audit || true
+
       - name: Lint
         run: npm run lint
 

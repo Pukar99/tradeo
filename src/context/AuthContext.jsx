@@ -11,12 +11,12 @@ const AuthContext = createContext()
 
 // Refresh 60 seconds before the 1-day JWT expires
 const REFRESH_BEFORE_EXPIRY_MS = 60 * 1000
-const JWT_LIFETIME_MS          = 24 * 60 * 60 * 1000
+const JWT_LIFETIME_MS = 24 * 60 * 60 * 1000
 
 export function AuthProvider({ children }) {
-  const [user, setUser]       = useState(null)
+  const [user, setUser] = useState(null)
   const [loading, setLoading] = useState(true)
-  const refreshTimer          = useRef(null)
+  const refreshTimer = useRef(null)
 
   function scheduleRefresh() {
     clearTimeout(refreshTimer.current)
@@ -49,7 +49,7 @@ export function AuthProvider({ children }) {
   }
 
   const updateUser = (updatedData) => {
-    setUser(prev => prev ? { ...prev, ...updatedData } : updatedData)
+    setUser((prev) => (prev ? { ...prev, ...updatedData } : updatedData))
   }
 
   const logout = () => {

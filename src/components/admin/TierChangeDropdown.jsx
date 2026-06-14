@@ -4,17 +4,20 @@ import { patchUserTier } from '@api/admin'
 import toast from 'react-hot-toast'
 
 const TIERS = [
-  { value: 'basic',   label: 'Basic'   },
-  { value: 'pro',     label: 'Pro'     },
+  { value: 'basic', label: 'Basic' },
+  { value: 'pro', label: 'Pro' },
   { value: 'premium', label: 'Premium' },
 ]
 
 export default function TierChangeDropdown({ user, onClose, onSuccess }) {
   const [selected, setSelected] = useState(user.tier)
-  const [loading,  setLoading]  = useState(false)
+  const [loading, setLoading] = useState(false)
 
   async function handleConfirm() {
-    if (selected === user.tier) { onClose(); return }
+    if (selected === user.tier) {
+      onClose()
+      return
+    }
     setLoading(true)
     try {
       await patchUserTier(user.id, selected)
@@ -32,7 +35,7 @@ export default function TierChangeDropdown({ user, onClose, onSuccess }) {
       <div className="flex items-center gap-2">
         <span className="text-xs text-amber-700 dark:text-amber-400 font-medium">Change tier:</span>
         <div className="flex items-center gap-1">
-          {TIERS.map(t => (
+          {TIERS.map((t) => (
             <button
               key={t.value}
               onClick={() => setSelected(t.value)}

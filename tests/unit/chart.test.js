@@ -39,15 +39,16 @@ function calcRSI(closes, period = 14) {
   const result = new Array(closes.length).fill(null)
   const changes = closes.slice(1).map((v, i) => v - closes[i])
 
-  let avgGain = 0, avgLoss = 0
+  let avgGain = 0,
+    avgLoss = 0
   for (let i = 0; i < period; i++) {
     if (changes[i] > 0) avgGain += changes[i]
-    else                avgLoss += Math.abs(changes[i])
+    else avgLoss += Math.abs(changes[i])
   }
   avgGain /= period
   avgLoss /= period
 
-  const rs     = avgLoss === 0 ? 100 : avgGain / avgLoss
+  const rs = avgLoss === 0 ? 100 : avgGain / avgLoss
   result[period] = 100 - 100 / (1 + rs)
 
   for (let i = period + 1; i < closes.length; i++) {
@@ -68,45 +69,60 @@ function calcMACD(closes, fast = 12, slow = 26, signal = 9) {
     v !== null && emaSlow[i] !== null ? v - emaSlow[i] : null
   )
   // Signal = EMA of MACD
-  const macdValues = macdLine.filter(v => v !== null)
-  const signalEma  = calcEMA(macdValues, signal)
+  const macdValues = macdLine.filter((v) => v !== null)
+  const signalEma = calcEMA(macdValues, signal)
   // Align back to full length
-  const offset = macdLine.findIndex(v => v !== null)
+  const offset = macdLine.findIndex((v) => v !== null)
   const fullSignal = new Array(closes.length).fill(null)
-  signalEma.forEach((v, i) => { fullSignal[offset + i] = v })
+  signalEma.forEach((v, i) => {
+    fullSignal[offset + i] = v
+  })
   return { macdLine, signalLine: fullSignal }
 }
 
 // OHLCV normalization — ensures all numeric fields are parsed
 function normalizeCandles(raw) {
-  return raw.map(r => ({
-    date:       r.date,
-    open:       parseFloat(r.open)       || 0,
-    high:       parseFloat(r.high)       || 0,
-    low:        parseFloat(r.low)        || 0,
-    close:      parseFloat(r.close)      || 0,
-    volume:     parseFloat(r.volume)     || 0,
-    turnover:   parseFloat(r.turnover)   || 0,
-    diff_pct:   parseFloat(r.diff_pct)   || 0,
+  return raw.map((r) => ({
+    date: r.date,
+    open: parseFloat(r.open) || 0,
+    high: parseFloat(r.high) || 0,
+    low: parseFloat(r.low) || 0,
+    close: parseFloat(r.close) || 0,
+    volume: parseFloat(r.volume) || 0,
+    turnover: parseFloat(r.turnover) || 0,
+    diff_pct: parseFloat(r.diff_pct) || 0,
   }))
 }
 
 // Date range helper
 function getDateRange(period) {
-  const to   = new Date()
+  const to = new Date()
   const from = new Date(to)
   switch (period) {
-    case '1M':  from.setMonth(from.getMonth() - 1);    break
-    case '3M':  from.setMonth(from.getMonth() - 3);    break
-    case '6M':  from.setMonth(from.getMonth() - 6);    break
-    case '1Y':  from.setFullYear(from.getFullYear()-1); break
-    case '3Y':  from.setFullYear(from.getFullYear()-3); break
-    case 'ALL': from.setFullYear(2000);                  break
-    default:    from.setMonth(from.getMonth() - 6)
+    case '1M':
+      from.setMonth(from.getMonth() - 1)
+      break
+    case '3M':
+      from.setMonth(from.getMonth() - 3)
+      break
+    case '6M':
+      from.setMonth(from.getMonth() - 6)
+      break
+    case '1Y':
+      from.setFullYear(from.getFullYear() - 1)
+      break
+    case '3Y':
+      from.setFullYear(from.getFullYear() - 3)
+      break
+    case 'ALL':
+      from.setFullYear(2000)
+      break
+    default:
+      from.setMonth(from.getMonth() - 6)
   }
   return {
     from: from.toISOString().slice(0, 10),
-    to:   to.toISOString().slice(0, 10),
+    to: to.toISOString().slice(0, 10),
   }
 }
 
@@ -118,15 +134,14 @@ function isBullishCandle(candle) {
 // Detect volume spike (> 2x 20-period average)
 function isVolumeSpike(candles, index, multiplier = 2, period = 20) {
   if (index < period) return false
-  const avg = candles.slice(index - period, index)
-    .reduce((s, c) => s + c.volume, 0) / period
+  const avg = candles.slice(index - period, index).reduce((s, c) => s + c.volume, 0) / period
   return candles[index].volume > avg * multiplier
 }
 
 // ── Sample data ───────────────────────────────────────────────────────────────
 const CLOSES_20 = [
-  500, 505, 510, 508, 512, 515, 513, 518, 522, 520,
-  525, 530, 528, 532, 535, 533, 538, 542, 540, 545,
+  500, 505, 510, 508, 512, 515, 513, 518, 522, 520, 525, 530, 528, 532, 535, 533, 538, 542, 540,
+  545,
 ]
 
 const CLOSES_FLAT = Array(20).fill(500)
@@ -155,7 +170,7 @@ describe('calcSMA', () => {
   })
 
   test('SMA rises in uptrend', () => {
-    const sma = calcSMA(CLOSES_20, 5).filter(v => v !== null)
+    const sma = calcSMA(CLOSES_20, 5).filter((v) => v !== null)
     expect(sma[sma.length - 1]).toBeGreaterThan(sma[0])
   })
 })
@@ -192,10 +207,12 @@ describe('calcEMA', () => {
 describe('calcRSI', () => {
   test('RSI is between 0 and 100', () => {
     const rsi = calcRSI(CLOSES_20, 14)
-    rsi.filter(v => v !== null).forEach(v => {
-      expect(v).toBeGreaterThanOrEqual(0)
-      expect(v).toBeLessThanOrEqual(100)
-    })
+    rsi
+      .filter((v) => v !== null)
+      .forEach((v) => {
+        expect(v).toBeGreaterThanOrEqual(0)
+        expect(v).toBeLessThanOrEqual(100)
+      })
   })
 
   test('RSI approaches 100 in strong uptrend', () => {
@@ -214,7 +231,7 @@ describe('calcRSI', () => {
 
   test('RSI ≈ 50 in flat market', () => {
     // Alternating up/down
-    const zigzag = Array.from({ length: 30 }, (_, i) => i % 2 === 0 ? 510 : 490)
+    const zigzag = Array.from({ length: 30 }, (_, i) => (i % 2 === 0 ? 510 : 490))
     const rsi = calcRSI(zigzag, 14)
     const last = rsi[rsi.length - 1]
     if (last !== null) expect(Math.abs(last - 50)).toBeLessThan(10)
@@ -222,7 +239,7 @@ describe('calcRSI', () => {
 
   test('not enough data → all null', () => {
     const rsi = calcRSI([500, 505], 14)
-    expect(rsi.every(v => v === null)).toBe(true)
+    expect(rsi.every((v) => v === null)).toBe(true)
   })
 })
 
@@ -256,7 +273,18 @@ describe('calcMACD', () => {
 // ── OHLCV normalization ───────────────────────────────────────────────────────
 describe('normalizeCandles', () => {
   test('parses string numbers to floats', () => {
-    const raw = [{ date: '2025-01-01', open: '500.5', high: '510.2', low: '495.0', close: '505.1', volume: '5000', turnover: '2525500', diff_pct: '1.02' }]
+    const raw = [
+      {
+        date: '2025-01-01',
+        open: '500.5',
+        high: '510.2',
+        low: '495.0',
+        close: '505.1',
+        volume: '5000',
+        turnover: '2525500',
+        diff_pct: '1.02',
+      },
+    ]
     const norm = normalizeCandles(raw)
     expect(typeof norm[0].open).toBe('number')
     expect(norm[0].open).toBe(500.5)
@@ -264,7 +292,18 @@ describe('normalizeCandles', () => {
   })
 
   test('null/undefined values → 0', () => {
-    const raw = [{ date: '2025-01-01', open: null, high: undefined, low: '', close: NaN, volume: null, turnover: null, diff_pct: null }]
+    const raw = [
+      {
+        date: '2025-01-01',
+        open: null,
+        high: undefined,
+        low: '',
+        close: NaN,
+        volume: null,
+        turnover: null,
+        diff_pct: null,
+      },
+    ]
     const norm = normalizeCandles(raw)
     expect(norm[0].open).toBe(0)
     expect(norm[0].high).toBe(0)
@@ -272,7 +311,18 @@ describe('normalizeCandles', () => {
   })
 
   test('date string preserved', () => {
-    const raw = [{ date: '2025-03-15', open: 500, high: 510, low: 490, close: 505, volume: 5000, turnover: 2525000, diff_pct: 1 }]
+    const raw = [
+      {
+        date: '2025-03-15',
+        open: 500,
+        high: 510,
+        low: 490,
+        close: 505,
+        volume: 5000,
+        turnover: 2525000,
+        diff_pct: 1,
+      },
+    ]
     expect(normalizeCandles(raw)[0].date).toBe('2025-03-15')
   })
 })
@@ -313,9 +363,12 @@ describe('getDateRange', () => {
 
 // ── Candle helpers ────────────────────────────────────────────────────────────
 describe('isBullishCandle', () => {
-  test('true when close > open',  () => expect(isBullishCandle({ open: 100, close: 110 })).toBe(true))
-  test('false when close < open', () => expect(isBullishCandle({ open: 110, close: 100 })).toBe(false))
-  test('false when equal (doji)', () => expect(isBullishCandle({ open: 100, close: 100 })).toBe(false))
+  test('true when close > open', () =>
+    expect(isBullishCandle({ open: 100, close: 110 })).toBe(true))
+  test('false when close < open', () =>
+    expect(isBullishCandle({ open: 110, close: 100 })).toBe(false))
+  test('false when equal (doji)', () =>
+    expect(isBullishCandle({ open: 100, close: 100 })).toBe(false))
 })
 
 describe('isVolumeSpike', () => {
@@ -323,10 +376,7 @@ describe('isVolumeSpike', () => {
     volume: i === 24 ? 50000 : 2000, // spike on last candle
   }))
 
-  test('true on volume spike candle', () =>
-    expect(isVolumeSpike(candles, 24, 2, 20)).toBe(true))
-  test('false on normal volume',     () =>
-    expect(isVolumeSpike(candles, 10, 2, 20)).toBe(false))
-  test('false when not enough history', () =>
-    expect(isVolumeSpike(candles, 5, 2, 20)).toBe(false))
+  test('true on volume spike candle', () => expect(isVolumeSpike(candles, 24, 2, 20)).toBe(true))
+  test('false on normal volume', () => expect(isVolumeSpike(candles, 10, 2, 20)).toBe(false))
+  test('false when not enough history', () => expect(isVolumeSpike(candles, 5, 2, 20)).toBe(false))
 })

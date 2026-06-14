@@ -9,9 +9,9 @@ import {
 import toast from 'react-hot-toast'
 
 const TARGET_COLORS = {
-  all:     'bg-gray-100 text-gray-600 dark:bg-gray-800 dark:text-gray-400',
-  basic:   'bg-gray-100 text-gray-600 dark:bg-gray-800 dark:text-gray-400',
-  pro:     'bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-400',
+  all: 'bg-gray-100 text-gray-600 dark:bg-gray-800 dark:text-gray-400',
+  basic: 'bg-gray-100 text-gray-600 dark:bg-gray-800 dark:text-gray-400',
+  pro: 'bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-400',
   premium: 'bg-amber-100 text-amber-700 dark:bg-amber-900/30 dark:text-amber-400',
 }
 
@@ -25,14 +25,21 @@ function AnnouncementRow({ item, onToggle, onDelete }) {
   async function handleToggle() {
     if (toggling) return
     setToggling(true)
-    try { await onToggle(item.id, !item.is_active) }
-    finally { setToggling(false) }
+    try {
+      await onToggle(item.id, !item.is_active)
+    } finally {
+      setToggling(false)
+    }
   }
 
   async function handleDelete() {
     setDeleting(true)
-    try { await onDelete(item.id) }
-    finally { setDeleting(false); setConfirming(false) }
+    try {
+      await onDelete(item.id)
+    } finally {
+      setDeleting(false)
+      setConfirming(false)
+    }
   }
 
   const date = item.created_at
@@ -41,20 +48,32 @@ function AnnouncementRow({ item, onToggle, onDelete }) {
 
   return (
     <div>
-      <div className={`flex items-start gap-3 px-4 py-3 hover:bg-gray-50 dark:hover:bg-gray-800/50 transition-colors ${
-        !item.is_active ? 'opacity-50' : ''
-      }`}>
+      <div
+        className={`flex items-start gap-3 px-4 py-3 hover:bg-gray-50 dark:hover:bg-gray-800/50 transition-colors ${
+          !item.is_active ? 'opacity-50' : ''
+        }`}
+      >
         {/* Title + body */}
         <div className="flex-1 min-w-0">
-          <p className="text-xs font-semibold text-gray-900 dark:text-white truncate">{item.title}</p>
-          <p className="text-[10px] text-gray-500 dark:text-gray-400 mt-0.5 line-clamp-2">{item.body}</p>
+          <p className="text-xs font-semibold text-gray-900 dark:text-white truncate">
+            {item.title}
+          </p>
+          <p className="text-[10px] text-gray-500 dark:text-gray-400 mt-0.5 line-clamp-2">
+            {item.body}
+          </p>
           <div className="flex items-center gap-2 mt-1">
-            <span className={`px-1.5 py-0.5 text-[10px] font-semibold rounded-full ${TARGET_COLORS[item.target] || TARGET_COLORS.all}`}>
+            <span
+              className={`px-1.5 py-0.5 text-[10px] font-semibold rounded-full ${TARGET_COLORS[item.target] || TARGET_COLORS.all}`}
+            >
               {item.target}
             </span>
             {item.expires_at && (
               <span className="text-[10px] text-gray-400 dark:text-gray-500">
-                expires {new Date(item.expires_at).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}
+                expires{' '}
+                {new Date(item.expires_at).toLocaleDateString('en-US', {
+                  month: 'short',
+                  day: 'numeric',
+                })}
               </span>
             )}
           </div>
@@ -74,19 +93,31 @@ function AnnouncementRow({ item, onToggle, onDelete }) {
             item.is_active ? 'bg-green-500' : 'bg-gray-200 dark:bg-gray-700'
           } disabled:opacity-50`}
         >
-          <span className={`absolute left-0 top-0.5 w-4 h-4 bg-white rounded-full shadow transition-transform ${
-            item.is_active ? 'translate-x-4' : 'translate-x-0.5'
-          }`} />
+          <span
+            className={`absolute left-0 top-0.5 w-4 h-4 bg-white rounded-full shadow transition-transform ${
+              item.is_active ? 'translate-x-4' : 'translate-x-0.5'
+            }`}
+          />
         </button>
 
         {/* Delete */}
         <button
-          onClick={() => setConfirming(prev => !prev)}
+          onClick={() => setConfirming((prev) => !prev)}
           aria-label="Delete announcement"
           className="mt-0.5 flex-shrink-0 w-7 h-7 flex items-center justify-center rounded-lg text-gray-400 hover:text-red-500 hover:bg-red-50 dark:hover:bg-red-900/20 transition-colors disabled:opacity-40"
         >
-          <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-            <path strokeLinecap="round" strokeLinejoin="round" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+          <svg
+            className="w-3.5 h-3.5"
+            fill="none"
+            viewBox="0 0 24 24"
+            stroke="currentColor"
+            strokeWidth={2}
+          >
+            <path
+              strokeLinecap="round"
+              strokeLinejoin="round"
+              d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"
+            />
           </svg>
         </button>
       </div>
@@ -133,15 +164,15 @@ function SkeletonRow() {
 }
 
 export default function BroadcastTab() {
-  const [items,   setItems]   = useState([])
+  const [items, setItems] = useState([])
   const [loading, setLoading] = useState(true)
 
   // Create form state
-  const [title,     setTitle]     = useState('')
-  const [body,      setBody]      = useState('')
-  const [target,    setTarget]    = useState('all')
+  const [title, setTitle] = useState('')
+  const [body, setBody] = useState('')
+  const [target, setTarget] = useState('all')
   const [expiresAt, setExpiresAt] = useState('')
-  const [creating,  setCreating]  = useState(false)
+  const [creating, setCreating] = useState(false)
 
   const fetchAnnouncements = useCallback(async () => {
     try {
@@ -154,7 +185,9 @@ export default function BroadcastTab() {
     }
   }, [])
 
-  useEffect(() => { fetchAnnouncements() }, [fetchAnnouncements])
+  useEffect(() => {
+    fetchAnnouncements()
+  }, [fetchAnnouncements])
 
   async function handleCreate(e) {
     e.preventDefault()
@@ -163,7 +196,7 @@ export default function BroadcastTab() {
     try {
       await postAdminAnnouncement({
         title: title.trim(),
-        body:  body.trim(),
+        body: body.trim(),
         target,
         expires_at: expiresAt || null,
       })
@@ -183,7 +216,7 @@ export default function BroadcastTab() {
   async function handleToggle(id, isActive) {
     try {
       await patchAdminAnnouncement(id, { is_active: isActive })
-      setItems(prev => prev.map(a => a.id === id ? { ...a, is_active: isActive } : a))
+      setItems((prev) => prev.map((a) => (a.id === id ? { ...a, is_active: isActive } : a)))
       toast.success(isActive ? 'Announcement activated' : 'Announcement deactivated')
     } catch {
       toast.error('Failed to update announcement')
@@ -193,7 +226,7 @@ export default function BroadcastTab() {
   async function handleDelete(id) {
     try {
       await deleteAdminAnnouncement(id)
-      setItems(prev => prev.filter(a => a.id !== id))
+      setItems((prev) => prev.filter((a) => a.id !== id))
       toast.success('Deleted')
     } catch {
       toast.error('Failed to delete')
@@ -211,7 +244,7 @@ export default function BroadcastTab() {
           <input
             type="text"
             value={title}
-            onChange={e => setTitle(e.target.value)}
+            onChange={(e) => setTitle(e.target.value)}
             placeholder="Title"
             maxLength={120}
             required
@@ -219,7 +252,7 @@ export default function BroadcastTab() {
           />
           <textarea
             value={body}
-            onChange={e => setBody(e.target.value)}
+            onChange={(e) => setBody(e.target.value)}
             placeholder="Message body"
             maxLength={500}
             required
@@ -229,17 +262,19 @@ export default function BroadcastTab() {
           <div className="flex items-center gap-2">
             <select
               value={target}
-              onChange={e => setTarget(e.target.value)}
+              onChange={(e) => setTarget(e.target.value)}
               className="h-8 px-2 text-xs bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg text-gray-700 dark:text-gray-300 focus:outline-none focus:ring-1 focus:ring-green-500"
             >
-              {TARGETS.map(t => (
-                <option key={t} value={t}>{t}</option>
+              {TARGETS.map((t) => (
+                <option key={t} value={t}>
+                  {t}
+                </option>
               ))}
             </select>
             <input
               type="date"
               value={expiresAt}
-              onChange={e => setExpiresAt(e.target.value)}
+              onChange={(e) => setExpiresAt(e.target.value)}
               className="h-8 px-2 text-xs bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg text-gray-700 dark:text-gray-300 focus:outline-none focus:ring-1 focus:ring-green-500"
               title="Expires on (optional)"
             />
@@ -256,8 +291,12 @@ export default function BroadcastTab() {
 
       {/* Table header */}
       <div className="flex items-center gap-3 px-4 py-2 bg-gray-50 dark:bg-gray-900/50 border-b border-gray-200 dark:border-gray-800">
-        <div className="flex-1 text-[10px] font-semibold text-gray-400 dark:text-gray-500 uppercase tracking-wide">Announcement</div>
-        <div className="hidden md:block w-16 text-[10px] font-semibold text-gray-400 dark:text-gray-500 uppercase tracking-wide flex-shrink-0">Date</div>
+        <div className="flex-1 text-[10px] font-semibold text-gray-400 dark:text-gray-500 uppercase tracking-wide">
+          Announcement
+        </div>
+        <div className="hidden md:block w-16 text-[10px] font-semibold text-gray-400 dark:text-gray-500 uppercase tracking-wide flex-shrink-0">
+          Date
+        </div>
         <div className="w-9 flex-shrink-0" />
         <div className="w-7 flex-shrink-0" />
       </div>
@@ -271,7 +310,7 @@ export default function BroadcastTab() {
             No announcements yet
           </div>
         ) : (
-          items.map(item => (
+          items.map((item) => (
             <AnnouncementRow
               key={item.id}
               item={item}

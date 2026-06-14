@@ -8,40 +8,51 @@ import EditActionModal from './EditActionModal'
 import { fmt } from '../../utils/format'
 import { DIRECTION_CFG, STATUS_CFG, computePositionMetrics } from './tradeConstants'
 
-export default function PositionRow({ position, ltp, onAdd, onPartialExit, onClose, onDelete, onDeleteAction, onRefresh, refreshTick }) {
-  const [expanded,   setExpanded]   = useState(false)
-  const [actions,    setActions]    = useState(null)
+export default function PositionRow({
+  position,
+  ltp,
+  onAdd,
+  onPartialExit,
+  onClose,
+  onDelete,
+  onDeleteAction,
+  onRefresh,
+  refreshTick,
+}) {
+  const [expanded, setExpanded] = useState(false)
+  const [actions, setActions] = useState(null)
   const fetchedRef = useRef(false)
-  const [loading,    setLoading]    = useState(false)
-  const [error,      setError]      = useState(null)
+  const [loading, setLoading] = useState(false)
+  const [error, setError] = useState(null)
   const [editTarget, setEditTarget] = useState(null)
 
   const { onContextMenu, ContextMenuPortal } = useContextMenu()
 
-  const {
-    wacc, totalQty, ltpNum, isClosed, direction,
-    pnlValue, hasPnl, slPct, tpPct, rr,
-  } = computePositionMetrics(position, ltp)
+  const { wacc, totalQty, ltpNum, isClosed, direction, pnlValue, hasPnl, slPct, tpPct, rr } =
+    computePositionMetrics(position, ltp)
 
-  const dirCfg    = DIRECTION_CFG[direction]
+  const dirCfg = DIRECTION_CFG[direction]
   const statusCfg = STATUS_CFG[position.status] || STATUS_CFG.CLOSED
-  const pnlLabel  = isClosed ? 'P&L' : 'Unreal'
-  const pnlPos    = hasPnl && pnlValue >= 0
+  const pnlLabel = isClosed ? 'P&L' : 'Unreal'
+  const pnlPos = hasPnl && pnlValue >= 0
 
-  const loadHistory = useCallback(async (force = false) => {
-    if (!force && fetchedRef.current) return
-    setLoading(true)
-    setError(null)
-    try {
-      const res = await getTradeHistory(position.trade_id)
-      setActions(res.data)
-      fetchedRef.current = true
-    } catch {
-      setError('Failed to load history')
-    } finally {
-      setLoading(false)
-    }
-  }, [position.trade_id])
+  const loadHistory = useCallback(
+    async (force = false) => {
+      if (!force && fetchedRef.current) return
+      setLoading(true)
+      setError(null)
+      try {
+        const res = await getTradeHistory(position.trade_id)
+        setActions(res.data)
+        fetchedRef.current = true
+      } catch {
+        setError('Failed to load history')
+      } finally {
+        setLoading(false)
+      }
+    },
+    [position.trade_id]
+  )
 
   useEffect(() => {
     if (expanded) loadHistory()
@@ -51,7 +62,10 @@ export default function PositionRow({ position, ltp, onAdd, onPartialExit, onClo
   // cached actions so the next expand (or immediate if already open) re-fetches.
   const isFirstTick = useRef(true)
   useEffect(() => {
-    if (isFirstTick.current) { isFirstTick.current = false; return }
+    if (isFirstTick.current) {
+      isFirstTick.current = false
+      return
+    }
     setActions(null)
     fetchedRef.current = false
     if (expanded) loadHistory(true)
@@ -61,17 +75,22 @@ export default function PositionRow({ position, ltp, onAdd, onPartialExit, onClo
     ? [{ label: 'Delete Trade', icon: '🗑', danger: true, action: () => onDelete(position) }]
     : [
         { label: 'Add to Position', icon: '＋', action: () => onAdd(position) },
-        { label: 'Partial Exit',    icon: '↗', action: () => onPartialExit(position) },
-        { label: 'Close Position',  icon: '✓', action: () => onClose(position) },
+        { label: 'Partial Exit', icon: '↗', action: () => onPartialExit(position) },
+        { label: 'Close Position', icon: '✓', action: () => onClose(position) },
         { separator: true },
-        { label: 'Delete Trade',    icon: '🗑', danger: true, action: () => onDelete(position) },
+        { label: 'Delete Trade', icon: '🗑', danger: true, action: () => onDelete(position) },
       ]
 
-  const handleEditSaved = useCallback((updatedAction) => {
-    setActions(prev => prev ? prev.map(a => a.id === updatedAction.id ? updatedAction : a) : prev)
-    setEditTarget(null)
-    onRefresh()
-  }, [onRefresh])
+  const handleEditSaved = useCallback(
+    (updatedAction) => {
+      setActions((prev) =>
+        prev ? prev.map((a) => (a.id === updatedAction.id ? updatedAction : a)) : prev
+      )
+      setEditTarget(null)
+      onRefresh()
+    },
+    [onRefresh]
+  )
 
   return (
     <>
@@ -84,33 +103,44 @@ export default function PositionRow({ position, ltp, onAdd, onPartialExit, onClo
         />
       )}
 
-      <div className={`rounded-2xl border transition-all duration-200 overflow-hidden ${
-        expanded
-          ? 'border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-900 shadow-lg shadow-black/5 dark:shadow-black/30'
-          : 'border-gray-100 dark:border-gray-800/80 bg-white dark:bg-gray-900/80 hover:border-gray-200 dark:hover:border-gray-700 hover:shadow-md hover:shadow-black/5 dark:hover:shadow-black/20'
-      }`}>
-
+      <div
+        className={`rounded-2xl border transition-all duration-200 overflow-hidden ${
+          expanded
+            ? 'border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-900 shadow-lg shadow-black/5 dark:shadow-black/30'
+            : 'border-gray-100 dark:border-gray-800/80 bg-white dark:bg-gray-900/80 hover:border-gray-200 dark:hover:border-gray-700 hover:shadow-md hover:shadow-black/5 dark:hover:shadow-black/20'
+        }`}
+      >
         {/* ── direction accent bar ── */}
         <div className={`h-0.5 w-full ${dirCfg.accent} opacity-60`} />
 
         {/* ── main card row ── */}
         <div
           className="flex items-center gap-4 px-4 py-3.5 cursor-pointer select-none"
-          onClick={() => setExpanded(e => !e)}
+          onClick={() => setExpanded((e) => !e)}
           onContextMenu={onContextMenu(menuItems)}
         >
           {/* chevron */}
-          <span className={`text-gray-300 dark:text-gray-600 transition-transform duration-200 text-[10px] shrink-0 ${expanded ? 'rotate-90' : ''}`}>▶</span>
+          <span
+            className={`text-gray-300 dark:text-gray-600 transition-transform duration-200 text-[10px] shrink-0 ${expanded ? 'rotate-90' : ''}`}
+          >
+            ▶
+          </span>
 
           {/* symbol block */}
           <div className="flex-1 min-w-0">
             <div className="flex items-center gap-2 mb-0.5">
-              <span className="font-bold text-[14px] text-gray-900 dark:text-gray-50 tracking-wide">{position.symbol}</span>
+              <span className="font-bold text-[14px] text-gray-900 dark:text-gray-50 tracking-wide">
+                {position.symbol}
+              </span>
               <span className={`text-[10px] font-bold px-1.5 py-0.5 rounded-md ${dirCfg.pill}`}>
                 {dirCfg.label}
               </span>
-              <span className={`flex items-center gap-1 text-[10px] font-semibold px-1.5 py-0.5 rounded-md ${statusCfg.pill}`}>
-                <span className={`w-1.5 h-1.5 rounded-full ${statusCfg.dot} ${statusCfg.pulse ? 'animate-pulse' : ''}`} />
+              <span
+                className={`flex items-center gap-1 text-[10px] font-semibold px-1.5 py-0.5 rounded-md ${statusCfg.pill}`}
+              >
+                <span
+                  className={`w-1.5 h-1.5 rounded-full ${statusCfg.dot} ${statusCfg.pulse ? 'animate-pulse' : ''}`}
+                />
                 {statusCfg.label}
               </span>
             </div>
@@ -122,19 +152,33 @@ export default function PositionRow({ position, ltp, onAdd, onPartialExit, onClo
           {/* mobile stats + P&L — shown only on xs/sm when full stats bar is hidden */}
           <div className="sm:hidden flex items-center gap-2 flex-shrink-0">
             <div className="text-right">
-              <div className="text-[10px] uppercase tracking-wide font-semibold text-gray-400 dark:text-gray-500">Qty</div>
-              <div className="text-[11px] font-bold font-mono text-gray-700 dark:text-gray-300">{totalQty}</div>
+              <div className="text-[10px] uppercase tracking-wide font-semibold text-gray-400 dark:text-gray-500">
+                Qty
+              </div>
+              <div className="text-[11px] font-bold font-mono text-gray-700 dark:text-gray-300">
+                {totalQty}
+              </div>
             </div>
             <div className="text-right">
-              <div className="text-[10px] uppercase tracking-wide font-semibold text-gray-400 dark:text-gray-500">WACC</div>
-              <div className="text-[11px] font-bold font-mono text-gray-700 dark:text-gray-300">Rs.{fmt(wacc)}</div>
+              <div className="text-[10px] uppercase tracking-wide font-semibold text-gray-400 dark:text-gray-500">
+                WACC
+              </div>
+              <div className="text-[11px] font-bold font-mono text-gray-700 dark:text-gray-300">
+                Rs.{fmt(wacc)}
+              </div>
             </div>
             {hasPnl && (
-              <div className={`flex-shrink-0 px-2 py-1 rounded-lg text-right ${
-                pnlPos ? 'bg-emerald-50 dark:bg-emerald-500/10' : 'bg-red-50 dark:bg-red-500/10'
-              }`}>
-                <div className="text-[10px] uppercase tracking-wide font-semibold text-gray-400 dark:text-gray-500">{pnlLabel}</div>
-                <div className={`text-[11px] font-bold font-mono ${pnlPos ? 'text-emerald-600 dark:text-emerald-400' : 'text-red-600 dark:text-red-400'}`}>
+              <div
+                className={`flex-shrink-0 px-2 py-1 rounded-lg text-right ${
+                  pnlPos ? 'bg-emerald-50 dark:bg-emerald-500/10' : 'bg-red-50 dark:bg-red-500/10'
+                }`}
+              >
+                <div className="text-[10px] uppercase tracking-wide font-semibold text-gray-400 dark:text-gray-500">
+                  {pnlLabel}
+                </div>
+                <div
+                  className={`text-[11px] font-bold font-mono ${pnlPos ? 'text-emerald-600 dark:text-emerald-400' : 'text-red-600 dark:text-red-400'}`}
+                >
                   {pnlPos ? '+' : ''}Rs.{fmt(pnlValue)}
                 </div>
               </div>
@@ -143,12 +187,20 @@ export default function PositionRow({ position, ltp, onAdd, onPartialExit, onClo
 
           {/* stats row — desktop */}
           <div className="hidden sm:flex items-center gap-5 shrink-0">
-            <StatCell label="Qty"  value={totalQty} mono />
+            <StatCell label="Qty" value={totalQty} mono />
             <StatCell label="WACC" value={`Rs.${fmt(wacc)}`} mono />
 
             {ltpNum != null && !isClosed && (
-              <StatCell label="LTP" value={`Rs.${fmt(ltpNum)}`} mono
-                color={ltpNum >= wacc ? 'text-emerald-500 dark:text-emerald-400' : 'text-red-500 dark:text-red-400'} />
+              <StatCell
+                label="LTP"
+                value={`Rs.${fmt(ltpNum)}`}
+                mono
+                color={
+                  ltpNum >= wacc
+                    ? 'text-emerald-500 dark:text-emerald-400'
+                    : 'text-red-500 dark:text-red-400'
+                }
+              />
             )}
 
             {/* SL / TP with % */}
@@ -175,13 +227,17 @@ export default function PositionRow({ position, ltp, onAdd, onPartialExit, onClo
 
             {/* P&L */}
             {hasPnl && (
-              <div className={`px-2.5 py-1.5 rounded-xl text-right ${
-                pnlPos
-                  ? 'bg-emerald-50 dark:bg-emerald-500/10'
-                  : 'bg-red-50 dark:bg-red-500/10'
-              }`}>
-                <div className="text-[10px] uppercase tracking-wide font-semibold text-gray-400 dark:text-gray-500 mb-0.5">{pnlLabel}</div>
-                <div className={`text-[12px] font-bold font-mono ${pnlPos ? 'text-emerald-600 dark:text-emerald-400' : 'text-red-600 dark:text-red-400'}`}>
+              <div
+                className={`px-2.5 py-1.5 rounded-xl text-right ${
+                  pnlPos ? 'bg-emerald-50 dark:bg-emerald-500/10' : 'bg-red-50 dark:bg-red-500/10'
+                }`}
+              >
+                <div className="text-[10px] uppercase tracking-wide font-semibold text-gray-400 dark:text-gray-500 mb-0.5">
+                  {pnlLabel}
+                </div>
+                <div
+                  className={`text-[12px] font-bold font-mono ${pnlPos ? 'text-emerald-600 dark:text-emerald-400' : 'text-red-600 dark:text-red-400'}`}
+                >
                   {pnlPos ? '+' : ''}Rs.{fmt(pnlValue)}
                 </div>
               </div>
@@ -190,13 +246,15 @@ export default function PositionRow({ position, ltp, onAdd, onPartialExit, onClo
 
           {/* action menu — visible button so actions work without right-click (touch) */}
           <button
-            onClick={e => { e.stopPropagation(); onContextMenu(menuItems)(e) }}
+            onClick={(e) => {
+              e.stopPropagation()
+              onContextMenu(menuItems)(e)
+            }}
             aria-label={`Actions for ${position.symbol}`}
             className="shrink-0 w-7 h-7 flex items-center justify-center rounded-lg text-gray-400 hover:text-gray-600 dark:hover:text-gray-200 hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors text-[14px] leading-none"
           >
             ⋯
           </button>
-
         </div>
 
         {/* ── expanded action history ── */}
@@ -212,8 +270,8 @@ export default function PositionRow({ position, ltp, onAdd, onPartialExit, onClo
             {!loading && !error && actions !== null && (
               <ActionHistory
                 actions={actions}
-                onEdit={a => setEditTarget(a)}
-                onDelete={a => onDeleteAction(a, () => loadHistory(true))}
+                onEdit={(a) => setEditTarget(a)}
+                onDelete={(a) => onDeleteAction(a, () => loadHistory(true))}
               />
             )}
           </div>
@@ -223,13 +281,22 @@ export default function PositionRow({ position, ltp, onAdd, onPartialExit, onClo
   )
 }
 
-
 function StatCell({ label, value, mono, color, sub, subColor }) {
   return (
     <div className="text-right">
-      <div className="text-[10px] font-semibold text-gray-500 dark:text-gray-500 uppercase tracking-wide mb-0.5">{label}</div>
-      <div className={`text-[12px] ${mono ? 'font-mono' : ''} ${color || 'text-gray-900 dark:text-gray-200'}`}>{value}</div>
-      {sub && <div className={`text-[10px] font-mono ${subColor || 'text-gray-500 dark:text-gray-400'}`}>{sub}</div>}
+      <div className="text-[10px] font-semibold text-gray-500 dark:text-gray-500 uppercase tracking-wide mb-0.5">
+        {label}
+      </div>
+      <div
+        className={`text-[12px] ${mono ? 'font-mono' : ''} ${color || 'text-gray-900 dark:text-gray-200'}`}
+      >
+        {value}
+      </div>
+      {sub && (
+        <div className={`text-[10px] font-mono ${subColor || 'text-gray-500 dark:text-gray-400'}`}>
+          {sub}
+        </div>
+      )}
     </div>
   )
 }

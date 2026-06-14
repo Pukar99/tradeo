@@ -25,7 +25,9 @@ function Toast({ alert, onDismiss }) {
   return (
     <div className="flex items-start gap-3 bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-700 rounded-2xl shadow-xl px-4 py-3 w-72 animate-fade-up">
       {/* Icon */}
-      <div className={`w-8 h-8 rounded-xl flex items-center justify-center flex-shrink-0 ${isAbove ? 'bg-emerald-50 dark:bg-emerald-900/20' : 'bg-amber-50 dark:bg-amber-900/20'}`}>
+      <div
+        className={`w-8 h-8 rounded-xl flex items-center justify-center flex-shrink-0 ${isAbove ? 'bg-emerald-50 dark:bg-emerald-900/20' : 'bg-amber-50 dark:bg-amber-900/20'}`}
+      >
         <span className="text-[16px]">{isAbove ? '🎯' : '⚠️'}</span>
       </div>
 
@@ -35,15 +37,21 @@ function Toast({ alert, onDismiss }) {
           {alert.symbol} — Alert Triggered
         </p>
         <p className="text-[10px] text-gray-500 dark:text-gray-400 mt-0.5 leading-snug">
-          LTP <span className="font-semibold text-gray-800 dark:text-gray-200">Rs.{parseFloat(alert.ltp).toLocaleString()}</span>
-          {' '}{isAbove ? 'reached' : 'near'} your target{' '}
+          LTP{' '}
+          <span className="font-semibold text-gray-800 dark:text-gray-200">
+            Rs.{parseFloat(alert.ltp).toLocaleString()}
+          </span>{' '}
+          {isAbove ? 'reached' : 'near'} your target{' '}
           <span className={`font-semibold ${isAbove ? 'text-emerald-500' : 'text-amber-500'}`}>
             Rs.{parseFloat(alert.price_alert).toLocaleString()}
           </span>
         </p>
         {alert.pct_change != null && (
-          <p className={`text-[10px] font-semibold mt-0.5 ${alert.pct_change >= 0 ? 'text-emerald-500' : 'text-red-400'}`}>
-            {alert.pct_change >= 0 ? '+' : ''}{alert.pct_change.toFixed(2)}% today
+          <p
+            className={`text-[10px] font-semibold mt-0.5 ${alert.pct_change >= 0 ? 'text-emerald-500' : 'text-red-400'}`}
+          >
+            {alert.pct_change >= 0 ? '+' : ''}
+            {alert.pct_change.toFixed(2)}% today
           </p>
         )}
       </div>
@@ -54,7 +62,12 @@ function Toast({ alert, onDismiss }) {
         className="text-gray-300 dark:text-gray-600 hover:text-gray-500 dark:hover:text-gray-400 transition-colors flex-shrink-0 mt-0.5"
       >
         <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+          <path
+            strokeLinecap="round"
+            strokeLinejoin="round"
+            strokeWidth={2}
+            d="M6 18L18 6M6 6l12 12"
+          />
         </svg>
       </button>
     </div>
@@ -87,11 +100,11 @@ export function useAlertToasts() {
   const [toasts, setToasts] = useState([])
 
   const addToast = useCallback((alert) => {
-    setToasts(prev => [...prev, alert])
+    setToasts((prev) => [...prev, alert])
   }, [])
 
   const dismissToast = useCallback((idx) => {
-    setToasts(prev => prev.filter((_, i) => i !== idx))
+    setToasts((prev) => prev.filter((_, i) => i !== idx))
   }, [])
 
   return { toasts, addToast, dismissToast }
