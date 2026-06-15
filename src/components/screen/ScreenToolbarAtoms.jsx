@@ -425,7 +425,7 @@ export function useCompactToolbar() {
 // Hamburger (☰) trigger + portalled popover — the mobile equivalent of the
 // General tab's chart-options menu. Pass the menu body (timeframe/toggles/config
 // sections) as children. `activeCount` shows a small badge when > 0.
-export function ToolbarMenu({ children, activeCount = 0 }) {
+export function ToolbarMenu({ children, activeCount = 0, ariaLabel = 'Chart options' }) {
   const { triggerRef, open, setOpen, portal, updateRect } = useFixedDropdown('right')
   const { showNavbar } = useNavbarState()
 
@@ -443,7 +443,7 @@ export function ToolbarMenu({ children, activeCount = 0 }) {
           setOpen((v) => !v)
           updateRect()
         }}
-        aria-label="Chart options"
+        aria-label={ariaLabel}
         className={`flex items-center gap-1 px-2 py-1 rounded-lg text-[10px] font-semibold border transition-all ${
           open || activeCount > 0
             ? 'bg-blue-500 border-blue-500 text-white shadow-sm'
