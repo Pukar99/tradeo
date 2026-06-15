@@ -674,11 +674,11 @@ function AlertsWidget({ initData }) {
 // ── Stats bar ─────────────────────────────────────────────────────────────────
 function StatCard({ label, value, color, sub }) {
   return (
-    <div className="hp-stat bg-white/70 dark:bg-gray-900/60 backdrop-blur-md rounded-xl sm:rounded-2xl px-3 sm:px-4 py-2.5 sm:py-3 border border-white/60 dark:border-white/10 shadow-sm">
-      <p className="text-[10px] font-medium text-gray-400 uppercase tracking-wide mb-0.5 sm:mb-1 truncate">
+    <div className="hp-stat bg-white/70 dark:bg-gray-900/60 backdrop-blur-md rounded-xl sm:rounded-2xl px-2.5 sm:px-4 py-2 sm:py-3 border border-white/60 dark:border-white/10 shadow-sm">
+      <p className="text-[9px] sm:text-[10px] font-medium text-gray-400 uppercase tracking-wide mb-0.5 sm:mb-1 truncate">
         {label}
       </p>
-      <p className={`text-base sm:text-lg font-bold tracking-tight leading-none ${color}`}>
+      <p className={`text-sm sm:text-lg font-bold tracking-tight leading-none ${color}`}>
         {value}
       </p>
       {sub && <p className="hidden sm:block text-[10px] text-gray-400 mt-0.5">{sub}</p>}
@@ -687,7 +687,7 @@ function StatCard({ label, value, color, sub }) {
 }
 
 // ── Center dashboard (authenticated) ─────────────────────────────────────────
-function CenterDashboard({ navigate, initData, onRefresh, onDataReady }) {
+function CenterDashboard({ navigate, initData, onRefresh, onDataReady, mobileTopTab, setMobileTopTab }) {
   const { t: tr } = useLanguage()
   const [openPositions, setOpenPositions] = useState([])
   const [perfStats, setPerfStats] = useState(null)
@@ -1329,6 +1329,45 @@ function CenterDashboard({ navigate, initData, onRefresh, onDataReady }) {
         )}
       </div>
       {/* end stats section */}
+
+      {/* ── MOBILE only — Routine ↔ Score toggle, sits between the stat cards and
+          the chart (desktop shows these in the side columns instead). No header
+          label: TaskBoard / DisciplineScore render their own title. ───────────── */}
+      <div className="lg:hidden flex flex-col gap-2">
+        <div className="flex items-center justify-end px-1">
+          <div className="flex items-center bg-gray-100 dark:bg-gray-800 rounded-lg p-0.5">
+            <button
+              onClick={() => setMobileTopTab('tasks')}
+              className={`px-2.5 py-0.5 rounded-md text-[10px] font-semibold transition-all whitespace-nowrap ${
+                mobileTopTab === 'tasks'
+                  ? 'bg-white dark:bg-gray-700 text-gray-900 dark:text-white shadow-sm'
+                  : 'text-gray-500 dark:text-gray-400'
+              }`}
+            >
+              Routine
+            </button>
+            <button
+              onClick={() => setMobileTopTab('discipline')}
+              className={`px-2.5 py-0.5 rounded-md text-[10px] font-semibold transition-all whitespace-nowrap ${
+                mobileTopTab === 'discipline'
+                  ? 'bg-white dark:bg-gray-700 text-gray-900 dark:text-white shadow-sm'
+                  : 'text-gray-500 dark:text-gray-400'
+              }`}
+            >
+              Score
+            </button>
+          </div>
+        </div>
+        {initData ? (
+          mobileTopTab === 'tasks' ? (
+            <TaskBoard initData={initData.tasks} mindsetContent={initData.mindset?.content} />
+          ) : (
+            <DisciplineScore initData={initData.discipline} />
+          )
+        ) : (
+          <div className="rounded-2xl bg-gray-100 dark:bg-gray-800 animate-pulse min-h-[180px]" />
+        )}
+      </div>
 
       {/* ── NEPSE Chart ──────────────────────────────────────────────────────── */}
       <div>
@@ -2320,7 +2359,13 @@ function LoggedInHome() {
         <div className="flex-1 min-h-0 grid grid-cols-12 gap-3 sm:gap-4">
           {/* CENTER — always first on mobile */}
           <div className="col-span-12 lg:col-span-6 order-1 lg:order-2 min-h-0">
-            <CenterDashboard navigate={navigate} initData={initData} onRefresh={onRefresh} />
+            <CenterDashboard
+              navigate={navigate}
+              initData={initData}
+              onRefresh={onRefresh}
+              mobileTopTab={mobileTopTab}
+              setMobileTopTab={setMobileTopTab}
+            />
           </div>
 
           {/* LEFT column — desktop only: stacked 35/65 rows, fills remaining height exactly */}
@@ -2358,54 +2403,14 @@ function LoggedInHome() {
             )}
           </div>
 
-          {/* MOBILE only — two independent toggled cards */}
+          {/* MOBILE only — Goals ↔ Alerts toggle. Sits last (after the center
+              column's stats → routine/score → chart → watchlist). The Routine ↔
+              Score toggle now lives inside CenterDashboard, between stats and chart. */}
           <div className="col-span-12 lg:hidden order-2 flex flex-col gap-3">
-            {/* Top toggle: Daily Routine ↔ Discipline Score */}
+            {/* Goals ↔ Alerts toggle.
+                No header label — MonthlyGoals / AlertsWidget self-title. */}
             <div className="flex flex-col gap-2">
-              <div className="flex items-center justify-between px-1">
-                <p className="text-[10px] font-semibold uppercase tracking-widest text-gray-400">
-                  {mobileTopTab === 'tasks' ? 'Daily Routine' : 'Discipline Score'}
-                </p>
-                <div className="flex items-center bg-gray-100 dark:bg-gray-800 rounded-lg p-0.5">
-                  <button
-                    onClick={() => setMobileTopTab('tasks')}
-                    className={`px-2.5 py-0.5 rounded-md text-[10px] font-semibold transition-all whitespace-nowrap ${
-                      mobileTopTab === 'tasks'
-                        ? 'bg-white dark:bg-gray-700 text-gray-900 dark:text-white shadow-sm'
-                        : 'text-gray-500 dark:text-gray-400'
-                    }`}
-                  >
-                    Routine
-                  </button>
-                  <button
-                    onClick={() => setMobileTopTab('discipline')}
-                    className={`px-2.5 py-0.5 rounded-md text-[10px] font-semibold transition-all whitespace-nowrap ${
-                      mobileTopTab === 'discipline'
-                        ? 'bg-white dark:bg-gray-700 text-gray-900 dark:text-white shadow-sm'
-                        : 'text-gray-500 dark:text-gray-400'
-                    }`}
-                  >
-                    Score
-                  </button>
-                </div>
-              </div>
-              {initData ? (
-                mobileTopTab === 'tasks' ? (
-                  <TaskBoard initData={initData.tasks} mindsetContent={initData.mindset?.content} />
-                ) : (
-                  <DisciplineScore initData={initData.discipline} />
-                )
-              ) : (
-                <div className="rounded-2xl bg-gray-100 dark:bg-gray-800 animate-pulse min-h-[180px]" />
-              )}
-            </div>
-
-            {/* Bottom toggle: Goals ↔ Alerts */}
-            <div className="flex flex-col gap-2">
-              <div className="flex items-center justify-between px-1">
-                <p className="text-[10px] font-semibold uppercase tracking-widest text-gray-400">
-                  {mobileBottomTab === 'goals' ? 'Monthly Goals' : 'Alerts'}
-                </p>
+              <div className="flex items-center justify-end px-1">
                 <div className="flex items-center bg-gray-100 dark:bg-gray-800 rounded-lg p-0.5">
                   <button
                     onClick={() => setMobileBottomTab('goals')}
