@@ -293,15 +293,15 @@ export default function LogsPage() {
                   ))}
                 </div>
               )}
+              {/* Market: only a View toggle — show it inline, no menu needed */}
+              {activeTab === 'market' && <div className="shrink-0">{viewToggle}</div>}
 
-              {/* ☰ menu holds the rest */}
-              <ToolbarMenu ariaLabel="Log options">
-                {(activeTab === 'trades' || activeTab === 'market') && (
+              {/* ☰ menu holds the rest (Trades only — View + Symbol) */}
+              {activeTab === 'trades' && (
+                <ToolbarMenu ariaLabel="Log options">
                   <ToolbarMenuSection label="View" divider={false}>
                     {viewToggle}
                   </ToolbarMenuSection>
-                )}
-                {activeTab === 'trades' && (
                   <ToolbarMenuSection label="Symbol">
                     <div className="relative">
                       <span className="absolute left-2 top-1/2 -translate-y-1/2 text-gray-400 dark:text-gray-500 text-[10px] pointer-events-none select-none">
@@ -323,8 +323,11 @@ export default function LogsPage() {
                       </datalist>
                     </div>
                   </ToolbarMenuSection>
-                )}
-                {activeTab === 'audit' && auditSymbols.length > 0 && (
+                </ToolbarMenu>
+              )}
+              {/* Stats: Script filter — in its own ☰ menu */}
+              {activeTab === 'audit' && auditSymbols.length > 0 && (
+                <ToolbarMenu ariaLabel="Log options">
                   <ToolbarMenuSection label="Script" divider={false}>
                     <select
                       value={auditSymbol}
@@ -339,8 +342,8 @@ export default function LogsPage() {
                       ))}
                     </select>
                   </ToolbarMenuSection>
-                )}
-              </ToolbarMenu>
+                </ToolbarMenu>
+              )}
             </>
           ) : (
             <>
