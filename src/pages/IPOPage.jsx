@@ -2426,26 +2426,53 @@ function IPOPage({ isActive = true }) {
                                     </span>
                                   )}
                                 </div>
-                                {/* Cross-account applied status pills — visible regardless of selected account */}
+                                {/* Cross-account applied status pills — visible regardless of selected account.
+                                    GET /ipos is single-account, so an account's applied state is only
+                                    KNOWN once it's been fetched (tabCache holds its ipos). For unfetched
+                                    accounts we show a neutral "tap to check" pill — NOT a false
+                                    "not applied" — and tapping selects the account, which lazy-loads it. */}
                                 {hasMultipleAcc && (
                                   <div className="flex flex-wrap gap-1.5 mt-2">
                                     {accounts.map((a) => {
                                       const applied = appliedMap[ipo.companyShareId]?.has(a.id)
+                                      // Known = this account's IPO list has been fetched (or it's the
+                                      // selected account, whose data is live in state).
+                                      const known =
+                                        a.id === selectedAcc || !!tabCache.current[`${a.id}:ipos`]
+                                      const unknown = !applied && !known
                                       return (
-                                        <span
+                                        <button
                                           key={a.id}
-                                          className={`inline-flex items-center gap-1 text-[10px] font-semibold px-2 py-0.5 rounded-full border ${
+                                          type="button"
+                                          onClick={() => unknown && handleSelectAccount(a.id)}
+                                          disabled={!unknown}
+                                          title={
+                                            applied
+                                              ? `${a.label} — applied`
+                                              : known
+                                                ? `${a.label} — not applied`
+                                                : `${a.label} — tap to check`
+                                          }
+                                          className={`inline-flex items-center gap-1 text-[10px] font-semibold px-2 py-0.5 rounded-full border transition-colors ${
                                             applied
                                               ? 'bg-emerald-50 dark:bg-emerald-900/20 border-emerald-200 dark:border-emerald-800/40 text-emerald-600 dark:text-emerald-400'
-                                              : 'bg-gray-50 dark:bg-gray-800/60 border-gray-200 dark:border-gray-700 text-gray-400 dark:text-gray-500'
+                                              : unknown
+                                                ? 'border-dashed border-gray-300 dark:border-gray-600 text-gray-400 dark:text-gray-500 hover:bg-gray-50 dark:hover:bg-gray-800/60 cursor-pointer'
+                                                : 'bg-gray-50 dark:bg-gray-800/60 border-gray-200 dark:border-gray-700 text-gray-400 dark:text-gray-500'
                                           }`}
                                         >
                                           <span
-                                            className={`w-1.5 h-1.5 rounded-full flex-shrink-0 ${applied ? 'bg-emerald-500' : 'bg-gray-300 dark:bg-gray-600'}`}
+                                            className={`w-1.5 h-1.5 rounded-full flex-shrink-0 ${
+                                              applied
+                                                ? 'bg-emerald-500'
+                                                : unknown
+                                                  ? 'bg-gray-300 dark:bg-gray-600 opacity-50'
+                                                  : 'bg-gray-300 dark:bg-gray-600'
+                                            }`}
                                           />
                                           {a.label}
-                                          {applied ? ' ✓' : ''}
-                                        </span>
+                                          {applied ? ' ✓' : unknown ? ' ?' : ''}
+                                        </button>
                                       )
                                     })}
                                   </div>
