@@ -38,6 +38,8 @@ export default function BacktestControls({
   cursorIndex,
   totalCandles,
   currentDate,
+  stepBackDisabled,
+  stepBackReason,
   onPlay,
   onPause,
   onStep,
@@ -46,7 +48,9 @@ export default function BacktestControls({
 }) {
   const progress = totalCandles > 0 ? Math.round((cursorIndex / totalCandles) * 100) : 0
   const atEnd = totalCandles > 0 && cursorIndex >= totalCandles - 1
-  const atStart = cursorIndex <= 0
+  // Step-back disabled state is computed by the page (it also blocks once a position
+  // exists). Fall back to the local at-start/playing check if the prop isn't passed.
+  const backDisabled = stepBackDisabled ?? (playing || cursorIndex <= 0)
 
   return (
     <div className="flex items-center gap-2 px-3 py-2 border-t border-gray-100 dark:border-gray-800 bg-white dark:bg-gray-950 shrink-0">
@@ -55,8 +59,8 @@ export default function BacktestControls({
         {/* Step back */}
         <button
           onClick={onStepBack}
-          disabled={playing || atStart}
-          title="Step back (ArrowLeft)"
+          disabled={backDisabled}
+          title={stepBackReason || 'Step back (ArrowLeft)'}
           className="w-7 h-7 flex items-center justify-center rounded-md border border-gray-200 dark:border-gray-700 text-gray-600 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-800 disabled:opacity-30 disabled:cursor-not-allowed transition-colors"
         >
           <IconStepB />

@@ -18,6 +18,7 @@ import {
   markNotificationRead,
   markAllNotificationsRead,
 } from '../api/notifications'
+import PageSkeleton from './PageSkeleton'
 
 // =============================================================================
 // 1. LOGO
@@ -61,7 +62,7 @@ function getInitials(name) {
 // =============================================================================
 
 function Navbar({ autoHide = false, hidden = false, onMouseEnter, onMouseLeave }) {
-  const { user, logout } = useAuth()
+  const { user, logout, loading: authLoading } = useAuth()
   const { isDark, toggleTheme } = useTheme()
   const { t, isNepali, toggleLang } = useLanguage()
   const location = useLocation()
@@ -430,7 +431,13 @@ function Navbar({ autoHide = false, hidden = false, onMouseEnter, onMouseLeave }
           </div>
         )}
 
-        {user ? (
+        {authLoading ? (
+          /* ── Auth still resolving (/api/auth/me in flight) ──────────────────
+             Render a neutral placeholder, NOT the guest branch — otherwise the
+             logged-out Login/Get-Started UI flashes for ~1s on every reload
+             before `user` hydrates. Sized to the avatar to avoid layout shift. */
+          <PageSkeleton variant="navbar" />
+        ) : user ? (
           /* ── User profile dropdown — desktop only ──────────────────────────
              On mobile, profile + logout live in the hamburger drawer; keeping
              this avatar in the top bar too overflowed the row at 320px. */
@@ -644,7 +651,11 @@ function Navbar({ autoHide = false, hidden = false, onMouseEnter, onMouseLeave }
               </Link>
             )}
           </div>
-          {user ? (
+          {authLoading ? (
+            /* Auth resolving — show nothing rather than the guest login, matching
+               the desktop placeholder behavior (no flash, no layout commitment). */
+            null
+          ) : user ? (
             <div className="px-4 pb-3 pt-1 border-t border-gray-100 dark:border-gray-800/60 space-y-1">
               {/* Notifications — the standalone bell is desktop-only, so surface
                   it here on mobile. Reuses the same notif state/handlers. */}

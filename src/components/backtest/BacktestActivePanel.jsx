@@ -26,9 +26,10 @@ function PositionCard({ pos, currentCandle, onEditSLTP, onExit, onPartial }) {
       <div className="flex items-center justify-between mb-1">
         <span className="font-bold text-[11px] dark:text-white">{pos.symbol}</span>
         <span
-          className={`text-[10px] font-semibold px-1.5 py-0.5 rounded-full ${settled ? 'bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400' : 'bg-orange-100 text-orange-700 dark:bg-orange-900/30 dark:text-orange-400'}`}
+          className={`inline-flex items-center gap-1 text-[10px] font-semibold px-1.5 py-0.5 rounded-full ${settled ? 'bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400' : 'bg-orange-100 text-orange-700 dark:bg-orange-900/30 dark:text-orange-400'}`}
         >
-          {settled ? '✓ Settled' : '⏳ Settling'}
+          <span className={`w-1.5 h-1.5 rounded-full ${settled ? 'bg-green-500' : 'bg-orange-500 animate-pulse'}`} />
+          {settled ? 'Settled' : 'Settling'}
         </span>
       </div>
 
@@ -63,7 +64,10 @@ function PositionCard({ pos, currentCandle, onEditSLTP, onExit, onPartial }) {
       )}
 
       {nearSL && (
-        <div className="text-[10px] text-red-600 font-semibold animate-pulse mt-0.5">⚠ Near SL</div>
+        <div className="flex items-center gap-1 text-[10px] text-red-600 font-semibold mt-0.5">
+          <span className="w-1.5 h-1.5 rounded-full bg-red-500 animate-pulse" />
+          Near SL
+        </div>
       )}
 
       <div className="flex gap-1 mt-1.5">

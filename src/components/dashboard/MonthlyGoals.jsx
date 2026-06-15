@@ -1,8 +1,8 @@
 // === MonthlyGoals.jsx ===
-import { useState, useEffect, useCallback, useMemo } from 'react'
+import { useState, useEffect, useCallback, useMemo, useRef } from 'react'
 import { getGoals, addGoal, updateGoal, deleteGoal } from '../../api'
 import { useContextMenu } from '../ContextMenu'
-import { useChatRefresh } from '../../utils/chatEvents'
+import { useChatRefresh, useHighlightListener } from '../../utils/chatEvents'
 import { gCache } from '../../utils/globalCache'
 
 // ── Date helpers ──────────────────────────────────────────────────────────────
@@ -144,6 +144,9 @@ function MonthlyGoals({ initData }) {
   const [editForm, setEditForm] = useState({ title: '', description: '', target_date: '' })
   const [saving, setSaving] = useState(false)
   const [showAllGoals, setShowAllGoals] = useState(false)
+  const [highlightId, setHighlightId] = useState(null)
+  const rowRefs = useRef({}) // goalId → row DOM node
+  const highlightTimer = useRef(null)
 
   const fetchGoals = useCallback(async () => {
     setFetchError(null)
@@ -209,6 +212,29 @@ function MonthlyGoals({ initData }) {
     ? sortedCurrentGoals
     : sortedCurrentGoals.slice(0, GOALS_DEFAULT_LIMIT)
   const hasMoreGoals = sortedCurrentGoals.length > GOALS_DEFAULT_LIMIT
+
+  // ── Highlight on alert click ───────────────────────────────────────────────
+  // A goal alert was clicked → expand the list if the goal is collapsed, scroll
+  // it into view, and flash the glow. Match by id, or fall back to title (alerts
+  // built from /init carry the title when the id isn't to hand).
+  useHighlightListener('goals', (key) => {
+    const match = goals.find((g) => g.id === key || g.title === key)
+    if (!match) return
+    // Ensure it's rendered: if it's past the fold, expand "Show all".
+    const idx = sortedCurrentGoals.findIndex((g) => g.id === match.id)
+    if (idx >= GOALS_DEFAULT_LIMIT) setShowAllGoals(true)
+    setHighlightId(match.id)
+    // Wait a frame for layout (expand / route change), then scroll + flash.
+    requestAnimationFrame(() => {
+      requestAnimationFrame(() => {
+        rowRefs.current[match.id]?.scrollIntoView({ behavior: 'smooth', block: 'center' })
+      })
+    })
+    clearTimeout(highlightTimer.current)
+    highlightTimer.current = setTimeout(() => setHighlightId(null), 2100)
+  })
+
+  useEffect(() => () => clearTimeout(highlightTimer.current), [])
 
   // ── Mutations ─────────────────────────────────────────────────────────────
 
@@ -523,6 +549,11 @@ function MonthlyGoals({ initData }) {
                 key={goal.id}
                 goal={goal}
                 editingId={editingId}
+                highlighted={highlightId === goal.id}
+                rowRef={(el) => {
+                  if (el) rowRefs.current[goal.id] = el
+                  else delete rowRefs.current[goal.id]
+                }}
                 onToggle={handleToggle}
                 onStartEdit={startEdit}
                 onDelete={handleDelete}
@@ -545,6 +576,11 @@ function MonthlyGoals({ initData }) {
                   key={goal.id}
                   goal={goal}
                   editingId={editingId}
+                  highlighted={highlightId === goal.id}
+                  rowRef={(el) => {
+                    if (el) rowRefs.current[goal.id] = el
+                    else delete rowRefs.current[goal.id]
+                  }}
                   editForm={editForm}
                   setEditForm={setEditForm}
                   saving={saving}
@@ -576,11 +612,21 @@ function MonthlyGoals({ initData }) {
 
 // ── GoalRow ───────────────────────────────────────────────────────────────────
 
-function GoalRow({ goal, editingId, onToggle, onStartEdit, onDelete, onContextMenu }) {
+function GoalRow({
+  goal,
+  editingId,
+  highlighted,
+  rowRef,
+  onToggle,
+  onStartEdit,
+  onDelete,
+  onContextMenu,
+}) {
   const isEditing = editingId === goal.id
 
   return (
     <div
+      ref={rowRef}
       onContextMenu={onContextMenu([
         { label: 'Edit', icon: '✏️', action: () => onStartEdit(goal) },
         { separator: true },
@@ -590,7 +636,7 @@ function GoalRow({ goal, editingId, onToggle, onStartEdit, onDelete, onContextMe
         isEditing
           ? 'bg-indigo-50 dark:bg-indigo-900/20 ring-1 ring-indigo-200 dark:ring-indigo-800'
           : 'hover:bg-gray-50 dark:hover:bg-gray-800/60'
-      } ${goal.completed ? 'opacity-55' : ''}`}
+      } ${goal.completed ? 'opacity-55' : ''} ${highlighted ? 'hp-highlight' : ''}`}
     >
       {/* Checkbox */}
       <button

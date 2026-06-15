@@ -26,6 +26,7 @@ export function useBacktestEngine({
   onSLBreach,
   onTPHit,
   onDataEnd,
+  onActionError,
 }) {
   const playingRef = useRef(false)
   const processingRef = useRef(false) // guard against concurrent processCandle calls
@@ -152,8 +153,18 @@ export function useBacktestEngine({
               closePositionLocal(pos.id, res.data)
               continue // position closed — skip TP check for this pos
             } catch (err) {
+              // The SL was hit but the exit failed server-side. Silently falling
+              // through here would (a) leave the position open while we move on, and
+              // (b) evaluate TP for a position the strategy already exited — desyncing
+              // local state from the DB. Pause, surface the error, and stop processing
+              // this candle so the user can retry rather than trade on a phantom fill.
               console.error('[Engine] AUTO SL exit failed for', pos.id, err?.message)
-              // don't continue — fall through so TP check is also skipped (SL already hit)
+              pauseInternal()
+              onActionError?.(
+                err?.response?.data?.message || `Auto SL exit failed for ${pos.symbol} — playback paused`
+              )
+              processingRef.current = false
+              return
             }
           }
 
@@ -254,7 +265,17 @@ export function useBacktestEngine({
               reason: 'TP_HIT',
             })
             closePositionLocal(pos.id, res.data)
-          } catch {}
+          } catch (err) {
+            // TP hit but exit failed — pause and surface rather than silently
+            // leaving the position open (it would re-trigger every candle).
+            console.error('[Engine] TP exit failed for', pos.id, err?.message)
+            pauseInternal()
+            onActionError?.(
+              err?.response?.data?.message || `Auto TP exit failed for ${pos.symbol} — playback paused`
+            )
+            processingRef.current = false
+            return
+          }
         }
       }
 
@@ -281,6 +302,7 @@ export function useBacktestEngine({
       onSLBreach,
       onTPHit,
       onDataEnd,
+      onActionError,
       pauseInternal,
     ]
   )
@@ -332,15 +354,34 @@ export function useBacktestEngine({
     await processCandle(candle, idx)
   }, [processCandle, onDataEnd])
 
+  // ── Step back ───────────────────────────────────────────────────────────────
+  // IMPORTANT: step-back is a CHART-VIEW REWIND ONLY. It decrements the cursor so
+  // the user can re-examine the prior candle, but it does NOT undo side effects that
+  // were already applied while advancing forward — settlements (btSettleOrder),
+  // SL/TP auto-closes and exits (btExitOrder) are committed to the backend and have
+  // no inverse endpoint. Rewinding across a candle that mutated a position would
+  // desync the chart cursor from position state.
+  //
+  // Guard: once the script has ANY position (open, partial, or closed), its
+  // lifecycle was evaluated relative to the forward cursor path, so we block
+  // step-back to prevent that desync. With zero positions the cursor is the only
+  // state, so rewinding is fully safe. canStepBack() reflects this for the UI.
+  const hasAnyPosition = useCallback(() => {
+    return (scriptRef.current?.positions || []).length > 0
+  }, [])
+
+  const canStepBack = useCallback(() => {
+    return !playingRef.current && cursorRef.current > 0 && !hasAnyPosition()
+  }, [hasAnyPosition])
+
   const stepBack = useCallback(() => {
-    if (playingRef.current) return
+    if (!canStepBack()) return
     const idx = cursorRef.current
-    if (idx <= 0) return
     const newIndex = idx - 1
     const candle = candlesRef.current[newIndex]
     if (!candle) return
     advanceCursor(newIndex, candle.date)
-  }, [advanceCursor])
+  }, [advanceCursor, canStepBack])
 
   const setSpeed = useCallback(
     (s) => {
@@ -380,6 +421,7 @@ export function useBacktestEngine({
     pause,
     stepForward,
     stepBack,
+    canStepBack,
     setSpeed,
   }
 }

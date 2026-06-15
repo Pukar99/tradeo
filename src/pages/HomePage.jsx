@@ -2,7 +2,7 @@
 import { useAuth } from '../context/AuthContext'
 import { useLanguage } from '../context/LanguageContext'
 import { useContextMenu } from '../components/ContextMenu'
-import { useChatRefresh } from '../utils/chatEvents'
+import { useChatRefresh, useHighlightListener, dispatchHighlight } from '../utils/chatEvents'
 import TaskBoard from '../components/dashboard/TaskBoard'
 import DisciplineScore from '../components/dashboard/DisciplineScore'
 import MonthlyGoals from '../components/dashboard/MonthlyGoals'
@@ -10,6 +10,7 @@ import { Link, useNavigate } from 'react-router-dom'
 import { useState, useEffect, useCallback, useRef, useMemo } from 'react'
 import { useEscapeKey } from '../hooks/useEscapeKey'
 import NEPSEChart from '../components/NEPSEChart'
+import PageSkeleton from '../components/PageSkeleton'
 import { addToWatchlist, updateWatchlist, removeFromWatchlist } from '../api'
 import { getDashboardInit, getMarketSymbols } from '../utils/globalCache'
 
@@ -59,17 +60,24 @@ const STOCK_BAR_COLORS = [
   'bg-cyan-400',
 ]
 
+// Hash the full symbol — using only charCodeAt(0) collapsed every same-initial
+// symbol (NABIL/NTC/NLIC/NICA…) onto one color, which is common in NEPSE banks.
+function hashSymbol(symbol) {
+  let h = 0
+  for (let i = 0; i < symbol.length; i++) h = (h * 31 + symbol.charCodeAt(i)) | 0
+  return Math.abs(h)
+}
 function getStockColor(symbol) {
   if (!symbol) return 'bg-blue-500'
-  return STOCK_COLORS[symbol.charCodeAt(0) % STOCK_COLORS.length]
+  return STOCK_COLORS[hashSymbol(symbol) % STOCK_COLORS.length]
 }
 function getStockBorder(symbol) {
   if (!symbol) return 'border-blue-400'
-  return STOCK_BORDERS[symbol.charCodeAt(0) % STOCK_BORDERS.length]
+  return STOCK_BORDERS[hashSymbol(symbol) % STOCK_BORDERS.length]
 }
 function getStockBar(symbol) {
   if (!symbol) return 'bg-blue-400'
-  return STOCK_BAR_COLORS[symbol.charCodeAt(0) % STOCK_BAR_COLORS.length]
+  return STOCK_BAR_COLORS[hashSymbol(symbol) % STOCK_BAR_COLORS.length]
 }
 
 function StockAvatar({ symbol, size = 'w-8 h-8', textSize = 'text-xs' }) {
@@ -444,7 +452,15 @@ function AlertsWidget({ initData }) {
   const goals = initData?.goals || []
   const prices = initData?.prices || {}
 
-  const today = new Date().toISOString().slice(0, 10)
+  // Local calendar day (NEPSE is UTC+5:45 — toISOString rolls over after ~18:15
+  // local, throwing the goal day-count off by one in the evening).
+  const today = (() => {
+    const d = new Date()
+    const y = d.getFullYear()
+    const m = String(d.getMonth() + 1).padStart(2, '0')
+    const day = String(d.getDate()).padStart(2, '0')
+    return `${y}-${m}-${day}`
+  })()
 
   const alerts = []
 
@@ -457,12 +473,28 @@ function AlertsWidget({ initData }) {
     const tp = t.tp != null ? parseFloat(t.tp) : null
 
     if (!sl) {
-      alerts.push({ type: 'nosl', label: `${t.symbol} — No SL set`, severity: 'warn', to: '/logs' })
+      alerts.push({
+        type: 'nosl',
+        symbol: t.symbol,
+        label: `${t.symbol} — No SL set`,
+        severity: 'warn',
+        to: '/logs',
+      })
     } else if (ltp > 0) {
+      // Positive = price still above SL (LONG) / below SL (SHORT); negative = SL breached.
       const slDist = t.position === 'LONG' ? ((ltp - sl) / ltp) * 100 : ((sl - ltp) / ltp) * 100
-      if (slDist >= 0 && slDist <= 3)
+      if (slDist < 0)
         alerts.push({
           type: 'sl',
+          symbol: t.symbol,
+          label: `${t.symbol} SL breached — ${Math.abs(slDist).toFixed(1)}% past`,
+          severity: 'danger',
+          to: '/logs',
+        })
+      else if (slDist <= 3)
+        alerts.push({
+          type: 'sl',
+          symbol: t.symbol,
           label: `${t.symbol} SL near — ${slDist.toFixed(1)}% away`,
           severity: 'danger',
           to: '/logs',
@@ -474,6 +506,7 @@ function AlertsWidget({ initData }) {
       if (tpDist >= 0 && tpDist <= 3)
         alerts.push({
           type: 'tp',
+          symbol: t.symbol,
           label: `${t.symbol} TP near — ${tpDist.toFixed(1)}% away`,
           severity: 'success',
           to: '/logs',
@@ -491,22 +524,31 @@ function AlertsWidget({ initData }) {
     if (dist <= 2)
       alerts.push({
         type: 'watch',
+        symbol: w.symbol,
         label: `${w.symbol} near alert Rs.${target.toLocaleString()} — ${dist.toFixed(1)}% away`,
         severity: 'info',
         to: '/',
+        highlight: { domain: 'watchlist', key: w.symbol },
       })
   }
 
-  // Goal deadline — expiring within 7 days
+  // Goal deadline — expiring within 7 days. Anchor both dates to local midnight so
+  // the day-count is timezone-stable.
+  const todayMidnight = new Date(today + 'T00:00:00')
   for (const g of goals) {
     if (g.completed || !g.target_date) continue
-    const daysLeft = Math.ceil((new Date(g.target_date) - new Date(today)) / 86400000)
+    const goalDate = new Date(g.target_date.slice(0, 10) + 'T00:00:00')
+    const daysLeft = Math.round((goalDate - todayMidnight) / 86400000)
     if (daysLeft >= 0 && daysLeft <= 7)
       alerts.push({
         type: 'goal',
+        title: g.title,
+        daysLeft,
         label: `Goal "${g.title}" — ${daysLeft === 0 ? 'due today' : `${daysLeft}d left`}`,
         severity: 'warn',
-        to: '/logs',
+        // Goals live in the MonthlyGoals card on the home page, not the trade log.
+        to: '/',
+        highlight: { domain: 'goals', key: g.id ?? g.title },
       })
   }
 
@@ -519,17 +561,21 @@ function AlertsWidget({ initData }) {
     if (Math.abs(chg) >= 8)
       alerts.push({
         type: 'circuit',
+        symbol: t.symbol,
         label: `${t.symbol} near circuit — ${chg > 0 ? '+' : ''}${chg}%`,
         severity: chg > 0 ? 'success' : 'danger',
-        to: '/screen',
+        // It's the user's own open position — take them to their trade log, not the
+        // market-wide screener.
+        to: '/logs',
       })
   }
 
-  // Sort by severity (danger first) then by deadline proximity for goal alerts
+  // Sort by severity (danger first); within equal severity, sooner goal deadlines win.
   const sortedAlerts = [...alerts].sort((a, b) => {
     const sd = (SEVERITY_ORDER[a.severity] ?? 9) - (SEVERITY_ORDER[b.severity] ?? 9)
     if (sd !== 0) return sd
-    // secondary: goal alerts sorted by days-left embedded in label (lower = more urgent)
+    // Secondary: goal alerts with fewer days left are more urgent.
+    if (a.type === 'goal' && b.type === 'goal') return a.daysLeft - b.daysLeft
     return 0
   })
 
@@ -590,10 +636,17 @@ function AlertsWidget({ initData }) {
         <>
           {/* Scrollable alert list */}
           <div className="flex-1 min-h-0 overflow-y-auto no-scrollbar divide-y divide-gray-50 dark:divide-gray-800">
-            {visibleAlerts.map((a, i) => (
+            {visibleAlerts.map((a) => (
               <button
-                key={i}
-                onClick={() => navigate(a.to)}
+                key={`${a.type}-${a.symbol ?? a.title ?? a.label}`}
+                onClick={() => {
+                  navigate(a.to)
+                  // Flash the matching card item. If we're already on the target page
+                  // the listener fires immediately; if we just navigated to '/', the
+                  // card mounts and the listener picks it up on the next dispatch tick.
+                  if (a.highlight)
+                    requestAnimationFrame(() => dispatchHighlight(a.highlight))
+                }}
                 className={`hp-alert-row w-full text-left flex items-center gap-2.5 px-3 py-2.5 border-l-2 ${severityClass[a.severity]}`}
               >
                 <span className="text-[13px] flex-shrink-0">{iconMap[a.type]}</span>
@@ -670,6 +723,10 @@ function CenterDashboard({ navigate, initData, onRefresh, onDataReady }) {
   // edit-form state
   const [watchEditForm, setWatchEditForm] = useState(null)
   const [watchSaving, setWatchSaving] = useState(false)
+  // highlight-on-alert-click
+  const [highlightSym, setHighlightSym] = useState(null)
+  const watchRowRefs = useRef({}) // symbol → row DOM node
+  const highlightTimer = useRef(null)
 
   useEscapeKey(() => {
     setWatchAddState(null)
@@ -695,6 +752,16 @@ function CenterDashboard({ navigate, initData, onRefresh, onDataReady }) {
         const pnl = ltp ? (t.position === 'LONG' ? (ltp - entry) * qty : (entry - ltp) * qty) : 0
         const pnlPct =
           entry > 0 && qty > 0 && ltp ? ((pnl / (entry * qty)) * 100).toFixed(2) : '0.00'
+        // Today's intraday move on this open position. `change` is the day's % move
+        // (diff_pct vs previous close), so prevClose = ltp / (1 + change/100), and
+        // today's gain = (ltp − prevClose) * qty (inverted for SHORT).
+        const dayChgPct = p?.change != null ? parseFloat(p.change) : null
+        let dayPnl = 0
+        if (ltp && dayChgPct != null && Number.isFinite(dayChgPct)) {
+          const prevClose = ltp / (1 + dayChgPct / 100)
+          const move = (ltp - prevClose) * qty
+          dayPnl = t.position === 'LONG' ? move : -move
+        }
         return {
           ...t,
           entry_price: entry,
@@ -705,34 +772,50 @@ function CenterDashboard({ navigate, initData, onRefresh, onDataReady }) {
           currentPrice: ltp || null,
           change: p?.change ?? null,
           unrealizedPnl: ltp ? Math.round(pnl) : null,
+          dayPnl: ltp ? Math.round(dayPnl) : 0,
           pnlPct: ltp ? pnlPct : null,
         }
       })
       setOpenPositions(openWithPrices)
 
       const totalUnrealized = openWithPrices.reduce((s, t) => s + (t.unrealizedPnl || 0), 0)
-      const todayStr = new Date().toISOString().slice(0, 10)
-      // 2-month window for Realized P/L and Win Rate
+      // Local calendar day (NEPSE is UTC+5:45 — toISOString would roll the date
+      // over after ~18:15 local and misattribute late-evening trades to tomorrow).
+      const todayStr = (() => {
+        const d = new Date()
+        const y = d.getFullYear()
+        const m = String(d.getMonth() + 1).padStart(2, '0')
+        const day = String(d.getDate()).padStart(2, '0')
+        return `${y}-${m}-${day}`
+      })()
+      // 2-month window for the explicitly-labeled "Realized P/L (2M)" / "Win Rate (2M)" cards
       const twoMonthsAgo = new Date()
       twoMonthsAgo.setMonth(twoMonthsAgo.getMonth() - 2)
       twoMonthsAgo.setHours(0, 0, 0, 0)
       // Backend /init maps last_action_at → updated_at in the trade shape
       const recent = closed.filter((t) => t.updated_at && new Date(t.updated_at) >= twoMonthsAgo)
-      const totalRealized = recent.reduce((s, t) => s + (parseFloat(t.realized_pnl) || 0), 0)
+      const realized2M = recent.reduce((s, t) => s + (parseFloat(t.realized_pnl) || 0), 0)
       const profitable = recent.filter((t) => (parseFloat(t.realized_pnl) || 0) > 0).length
       const winRate = recent.length > 0 ? Math.round((profitable / recent.length) * 100) : 0
-      const todayPnl = closed
+      // "Total P/L" must be a true lifetime figure: all closed realized P/L + open
+      // unrealized. Using the 2-month subset here silently dropped older gains.
+      const realizedAll = closed.reduce((s, t) => s + (parseFloat(t.realized_pnl) || 0), 0)
+      // Today's P/L = realized P/L from trades closed today + today's intraday move
+      // on still-open positions (was 0 unless something was closed today).
+      const realizedToday = closed
         .filter((t) => t.updated_at?.slice(0, 10) === todayStr)
         .reduce((s, t) => s + (parseFloat(t.realized_pnl) || 0), 0)
+      const openDayPnl = openWithPrices.reduce((s, t) => s + (t.dayPnl || 0), 0)
+      const todayPnl = realizedToday + openDayPnl
       const totalInvested = openWithPrices.reduce((s, t) => s + t.entry_price * t.quantity, 0)
       const currentValue = openWithPrices.reduce(
         (s, t) => s + (t.currentPrice || t.entry_price) * t.quantity,
         0
       )
       const stats = {
-        totalPnl: totalRealized + totalUnrealized,
+        totalPnl: realizedAll + totalUnrealized,
         unrealizedPnl: totalUnrealized,
-        realizedPnl: totalRealized,
+        realizedPnl: realized2M,
         todayPnl,
         winRate,
         openCount: openWithPrices.length,
@@ -832,6 +915,30 @@ function CenterDashboard({ navigate, initData, onRefresh, onDataReady }) {
   const preWatchItems = classifiedWatch.filter((w) => w.category === 'pre')
   const filteredWatch = watchlistTab === 'active' ? activeWatchItems : preWatchItems
 
+  // ── Highlight a watchlist / position row when its alert is clicked ──────────
+  // Switch to whichever tab actually contains the symbol, scroll it into view,
+  // and flash the glow. Matches by symbol (case-insensitive).
+  useHighlightListener('watchlist', (key) => {
+    const sym = String(key).toUpperCase()
+    let tab = null
+    if (activeWatchItems.some((w) => w.symbol?.toUpperCase() === sym)) tab = 'active'
+    else if (preWatchItems.some((w) => w.symbol?.toUpperCase() === sym)) tab = 'pre'
+    else if (openPositions.some((t) => t.symbol?.toUpperCase() === sym)) tab = 'positions'
+    if (!tab) return
+    setWatchlistTab(tab)
+    setWatchAddState(null)
+    setHighlightSym(sym)
+    requestAnimationFrame(() => {
+      requestAnimationFrame(() => {
+        watchRowRefs.current[sym]?.scrollIntoView({ behavior: 'smooth', block: 'center' })
+      })
+    })
+    clearTimeout(highlightTimer.current)
+    highlightTimer.current = setTimeout(() => setHighlightSym(null), 2100)
+  })
+
+  useEffect(() => () => clearTimeout(highlightTimer.current), [])
+
   // ── Autocomplete suggestions ────────────────────────────────────────────────
   // WL-03 fix: depend on symbolsReady so memo re-runs after symbols load
   const watchSuggestions = useMemo(() => {
@@ -890,7 +997,11 @@ function CenterDashboard({ navigate, initData, onRefresh, onDataReady }) {
   const handleAddWatch = async (e) => {
     e.preventDefault()
     if (!watchAddState || typeof watchAddState !== 'object') return
-    if (watchlist.some((w) => w.symbol === watchAddState.symbol)) {
+    // Case-insensitive guard. Note this only covers non-portfolio items in local
+    // state; a symbol held as a 'portfolio' entry is caught by the backend's unique
+    // constraint (409), surfaced via the catch below.
+    const dupSym = watchAddState.symbol.toUpperCase()
+    if (watchlist.some((w) => w.symbol?.toUpperCase() === dupSym)) {
       setWatchActionErr(`${watchAddState.symbol} is already in your watchlist.`)
       return
     }
@@ -957,12 +1068,16 @@ function CenterDashboard({ navigate, initData, onRefresh, onDataReady }) {
 
   // ── Remove handler ──────────────────────────────────────────────────────────
   const handleRemoveWatch = async (id) => {
-    const snapshot = watchlist.find((w) => w.id === id)
+    const snapshot = watchlist
+    setWatchActionErr(null)
     setWatchlist((prev) => prev.filter((w) => w.id !== id))
     try {
       await removeFromWatchlist(id)
     } catch {
-      if (snapshot) setWatchlist((prev) => [...prev, snapshot])
+      // Restore the full prior list so the item returns to its original position,
+      // and tell the user it failed instead of silently reappearing.
+      setWatchlist(snapshot)
+      setWatchActionErr('Failed to remove — please try again.')
     }
   }
 
@@ -1146,9 +1261,11 @@ function CenterDashboard({ navigate, initData, onRefresh, onDataReady }) {
                     : 'text-gray-500 dark:text-gray-400'
               }
               sub={
-                perfStats.todayPnl === 0
-                  ? 'No trades closed today'
-                  : `${perfStats.closedCount} total closed`
+                perfStats.openCount > 0
+                  ? `Live on ${perfStats.openCount} open position${perfStats.openCount !== 1 ? 's' : ''}`
+                  : perfStats.todayPnl !== 0
+                    ? 'Closed today'
+                    : 'No activity today'
               }
             />
             <StatCard
@@ -1196,15 +1313,17 @@ function CenterDashboard({ navigate, initData, onRefresh, onDataReady }) {
           </div>
         )}
 
-        {/* Drawdown warning */}
-        {perfStats && perfStats.totalPnl < 0 && perfStats.totalInvested > 0 && (
+        {/* Drawdown warning — open positions underwater. Based on UNREALIZED P/L over
+            invested capital (both open-position quantities) so it stays a coherent
+            ratio; lifetime totalPnl would mix in realized gains over the wrong base. */}
+        {perfStats && perfStats.unrealizedPnl < 0 && perfStats.totalInvested > 0 && (
           <div className="hp-drawdown flex items-center gap-2 bg-red-50 dark:bg-red-900/30 border border-red-100 dark:border-red-800 rounded-xl px-3 py-2">
             <span className="w-1.5 h-1.5 bg-red-500 rounded-full flex-shrink-0" />
             <p className="text-[11px] text-red-600 dark:text-red-300 font-medium">
               {/* Rule 6 — guard denominator */}
-              Drawdown: {((perfStats.totalPnl / perfStats.totalInvested) * 100).toFixed(2)}%
-              {perfStats.totalInvested + perfStats.totalPnl > 0 &&
-                ` — Need +${Math.abs((perfStats.totalPnl / (perfStats.totalInvested + perfStats.totalPnl)) * 100).toFixed(2)}% to recover`}
+              Drawdown: {((perfStats.unrealizedPnl / perfStats.totalInvested) * 100).toFixed(2)}%
+              {perfStats.totalInvested + perfStats.unrealizedPnl > 0 &&
+                ` — Need +${Math.abs((perfStats.unrealizedPnl / (perfStats.totalInvested + perfStats.unrealizedPnl)) * 100).toFixed(2)}% to recover`}
             </p>
           </div>
         )}
@@ -1217,8 +1336,10 @@ function CenterDashboard({ navigate, initData, onRefresh, onDataReady }) {
       </div>
 
       {/* ── Watchlist ────────────────────────────────────────────────────────── */}
-      <div className="flex flex-col overflow-hidden">
-        {/* ── Watchlist edit modal — outside overflow-hidden container (WL-04 fix) ── */}
+      {/* No overflow-hidden here: it has no border-radius and was clipping the inner
+          rounded-2xl card's corners square. The card clips its own content already. */}
+      <div className="flex flex-col">
+        {/* ── Watchlist edit modal — rendered via portal (WL-04 fix) ── */}
         <WatchMenuPortal />
         {watchEditItem &&
           watchEditForm &&
@@ -1815,7 +1936,13 @@ function CenterDashboard({ navigate, initData, onRefresh, onDataReady }) {
                             key={tag}
                             type="button"
                             onClick={() =>
-                              setWatchForm((f) => ({ ...f, notes: f.notes ? f.notes : tag }))
+                              setWatchForm((f) => {
+                                // Append the tag (comma-separated) instead of no-op'ing once
+                                // notes had any text. Skip if the tag is already present.
+                                const cur = f.notes.trim()
+                                if (cur.split(/,\s*/).includes(tag)) return f
+                                return { ...f, notes: cur ? `${cur}, ${tag}` : tag }
+                              })
                             }
                             className="px-1.5 py-0.5 rounded text-[9px] font-medium border border-gray-200 dark:border-gray-700 text-gray-500 dark:text-gray-400 hover:bg-gray-50 dark:hover:bg-gray-800 transition-colors"
                           >
@@ -1879,10 +2006,17 @@ function CenterDashboard({ navigate, initData, onRefresh, onDataReady }) {
                           ? (((t.currentPrice - t.tp) / t.currentPrice) * 100).toFixed(1)
                           : (((t.tp - t.currentPrice) / t.currentPrice) * 100).toFixed(1)
                         : null
+                    const isHl = highlightSym === t.symbol?.toUpperCase()
                     return (
                       <div
                         key={t.id}
-                        className="px-3 py-2.5 hover:bg-gray-50 dark:hover:bg-gray-800 transition-colors"
+                        ref={(el) => {
+                          const k = t.symbol?.toUpperCase()
+                          if (!k) return
+                          if (el) watchRowRefs.current[k] = el
+                          else delete watchRowRefs.current[k]
+                        }}
+                        className={`px-3 py-2.5 hover:bg-gray-50 dark:hover:bg-gray-800 transition-colors ${isHl ? 'hp-highlight' : ''}`}
                         translate="no"
                       >
                         <div className="flex items-center justify-between">
@@ -2008,9 +2142,16 @@ function CenterDashboard({ navigate, initData, onRefresh, onDataReady }) {
                       : item.notes || null
                   const isUp = item.change != null && item.change >= 0
 
+                  const isHl = highlightSym === item.symbol?.toUpperCase()
                   return (
                     <div
                       key={item.id}
+                      ref={(el) => {
+                        const k = item.symbol?.toUpperCase()
+                        if (!k) return
+                        if (el) watchRowRefs.current[k] = el
+                        else delete watchRowRefs.current[k]
+                      }}
                       onContextMenu={watchCtx([
                         { label: 'Edit', icon: '✏️', action: () => openWatchEdit(item) },
                         { separator: true },
@@ -2024,7 +2165,7 @@ function CenterDashboard({ navigate, initData, onRefresh, onDataReady }) {
                       className={`hp-watch-item relative flex flex-col gap-1 px-1.5 py-1.5 rounded-xl cursor-default
                     bg-white/70 dark:bg-gray-800/50 border border-white/80 dark:border-white/5
                     backdrop-blur-sm shadow-sm border-l-[3px] ${getStockBorder(item.symbol)}
-                    ${isExpired ? 'opacity-50' : ''}`}
+                    ${isExpired ? 'opacity-50' : ''} ${isHl ? 'hp-highlight' : ''}`}
                       translate="no"
                     >
                       {/* Avatar + symbol */}
@@ -2308,10 +2449,19 @@ function LoggedInHome() {
 
 // ── Root ──────────────────────────────────────────────────────────────────────
 function HomePage() {
-  const { user } = useAuth()
+  const { user, loading } = useAuth()
   return (
     <div className="min-h-[100dvh] bg-gradient-to-br from-slate-100 via-gray-50 to-blue-50/30 dark:from-gray-950 dark:via-gray-950 dark:to-slate-900 transition-colors">
-      {user ? <LoggedInHome /> : <LoggedOutHome />}
+      {/* Wait for /api/auth/me before choosing a view. `/` is public, so without
+          this gate `user` is null on reload and the logged-OUT landing flashes
+          for ~1s before flipping to LoggedInHome. Spinner matches PrivateRoute. */}
+      {loading ? (
+        <PageSkeleton />
+      ) : user ? (
+        <LoggedInHome />
+      ) : (
+        <LoggedOutHome />
+      )}
     </div>
   )
 }

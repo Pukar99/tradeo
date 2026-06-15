@@ -2,8 +2,8 @@
 import {
   useState,
   useEffect,
-  useLayoutEffect,
   useRef,
+  useLayoutEffect,
   lazy,
   Suspense,
   createContext,
@@ -22,16 +22,31 @@ import ErrorBoundary from '../components/ErrorBoundary'
 import ComingSoon from '../components/ComingSoon'
 import UpgradePrompt from '../components/UpgradePrompt'
 import AuthWall from '../components/AuthWall'
+import PageSkeleton from '../components/PageSkeleton'
 
-// ── Screen toolbar slot — same portal pattern as DataLabPage ─────────────────
+// ── Screen toolbar slot — EXACT same portal pattern as DataLabPage.useToolbarSlot ──
+// Context value is a stable useRef object; the hook forces one re-render after DOM
+// commit via useLayoutEffect+setTick so slotRef.current is read AFTER the slot div
+// attaches. This is the proven, in-production pattern.
+//
+// DO NOT rewrite this to a state-backed callback ref (ref={setState}). That variant
+// re-fires the callback with `null` on every toolbar-strip remount (mode/tab/navbar
+// auto-hide re-render), which strands the portal and silently drops StockChart's
+// symbol-search/timeframe controls. The consumers (StockChart/SMC/PriceAction/
+// MultiChart) were written for THIS ref-based contract — keep them in sync if you
+// ever change it. (Regression history: state-backed rewrite dropped the chart
+// controls; reverted to this. See memory feedback_portal_toolbar.)
 const ScreenToolbarSlotCtx = createContext(null)
 
 export function useScreenToolbarSlot(node) {
   const slotRef = useContext(ScreenToolbarSlotCtx)
+  // useLayoutEffect fires synchronously after DOM commit — slotRef.current is
+  // guaranteed populated before paint, so the toolbar never renders blank.
   const [, setTick] = useState(0)
   useLayoutEffect(() => {
     setTick((t) => t + 1)
   }, [])
+
   if (!slotRef?.current) return null
   return createPortal(node, slotRef.current)
 }
@@ -434,7 +449,7 @@ function ScreenInner() {
     () => localStorage.getItem('tradeo_screen_rightOpen') !== 'false'
   )
   const toolbarSlotRef = useRef(null)
-  const { user } = useAuth()
+  const { user, loading: authLoading } = useAuth()
 
   const toggleLeft = () =>
     setLeftOpen((v) => {
@@ -476,6 +491,20 @@ function ScreenInner() {
   }, [])
 
   const isSimple = mode === 'simple'
+
+  // Whole shell is skeleton while /api/auth/me resolves — gating only the content
+  // body would leave the real tab labels (Simple/Complex/SMC…) + market badge text
+  // visible above the skeleton on reload.
+  if (authLoading) {
+    return (
+      <div
+        className="flex flex-col overflow-hidden bg-white dark:bg-gray-900"
+        style={{ height: '100dvh' }}
+      >
+        <PageSkeleton toolbar />
+      </div>
+    )
+  }
 
   return (
     <ScreenToolbarSlotCtx.Provider value={toolbarSlotRef}>

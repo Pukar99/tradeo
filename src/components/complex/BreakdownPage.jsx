@@ -670,15 +670,7 @@ function SectorCycleMatrix({ cycles, activeCycle, onCycleSelect, dark }) {
         No cycles detected — adjust threshold
       </div>
     )
-  if (loading)
-    return (
-      <div className="flex items-center justify-center gap-2 py-6">
-        <div className="w-4 h-4 border-2 border-blue-500 border-t-transparent rounded-full animate-spin" />
-        <span className="text-[11px] text-gray-500 dark:text-gray-400">
-          Computing sector × cycle returns…
-        </span>
-      </div>
-    )
+  if (loading) return <Skeleton minH={140} />
   if (error)
     return (
       <div className="px-3 py-2 text-[11px] text-red-500 bg-red-50 dark:bg-red-950/20 rounded-lg">
@@ -1908,12 +1900,7 @@ export default function BreakdownPage() {
               </span>
             </div>
             {detecting && allCandles.length === 0 ? (
-              <div className="h-[160px] flex items-center justify-center gap-2">
-                <div className="w-4 h-4 border-2 border-blue-500 border-t-transparent rounded-full animate-spin" />
-                <span className="text-[11px] text-gray-500 dark:text-gray-400">
-                  Loading {selectedIndexLabel} history…
-                </span>
-              </div>
+              <Skeleton minH={160} />
             ) : allCandles.length === 0 ? (
               <div className="h-[160px] flex items-center justify-center text-[11px] text-gray-400">
                 No price data available
