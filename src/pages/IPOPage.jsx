@@ -1699,63 +1699,6 @@ function IPOPage({ isActive = true }) {
     if (selectedAcc) loadData(selectedAcc, activeTab)
   }, [selectedAcc, activeTab, loadData])
 
-  // Cross-account applied-state prefetch.
-  // The per-IPO account pills show applied/not for EVERY account, but
-  // GET /ipos is single-account: appliedMap only learns about an account once
-  // it's been fetched. Without this, after a load/refresh only the auto-selected
-  // account's pill is correct and the others falsely read "not applied" until
-  // clicked (and appliedMap is session-only, so it resets every refresh).
-  // So when there are multiple accounts, fetch each non-selected account's IPO
-  // list once — sequentially, with a gap — to populate appliedMap for all of
-  // them. Only updates appliedMap + tabCache; never touches the visible
-  // ipos/loading state (that belongs to the selected account).
-  const prefetchedAcc = useRef(new Set())
-  useEffect(() => {
-    if (accounts.length < 2) return
-    const others = accounts.filter(
-      (a) => a.id !== selectedAcc && !prefetchedAcc.current.has(a.id)
-    )
-    if (others.length === 0) return
-
-    let cancelled = false
-    others.forEach((a) => prefetchedAcc.current.add(a.id))
-
-    const run = async () => {
-      for (const a of others) {
-        if (cancelled) break
-        try {
-          const res = await getMeroshareIPOs(a.id)
-          const data = Array.isArray(res.data.ipos) ? res.data.ipos : []
-          if (cancelled) break
-          tabCache.current[`${a.id}:ipos`] = { data, ts: Date.now() }
-          setAppliedMap((m) => {
-            const next = { ...m }
-            data.forEach((ipo) => {
-              if (isApplied(ipo)) {
-                const s = new Set(next[ipo.companyShareId] || [])
-                s.add(a.id)
-                next[ipo.companyShareId] = s
-              }
-            })
-            return next
-          })
-        } catch {
-          // A failed prefetch shouldn't break the page — allow a retry next pass
-          prefetchedAcc.current.delete(a.id)
-        }
-        // Gap between accounts — Meroshare login per account is heavy; mirror
-        // the 300ms spacing used by the allotment auto-check.
-        await new Promise((r) => setTimeout(r, 300))
-      }
-    }
-    run()
-    return () => {
-      cancelled = true
-    }
-    // selectedAcc intentionally excluded: prefetch targets the OTHER accounts,
-    // and prefetchedAcc dedupes — re-running on every select would refetch.
-  }, [accounts]) // eslint-disable-line react-hooks/exhaustive-deps
-
   const handleSelectAccount = (id) => {
     setSelectedAcc(id)
     setIpos([])
