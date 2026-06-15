@@ -145,10 +145,17 @@ function ErrorBox({ children }) {
 }
 
 // ── Spinner ───────────────────────────────────────────────────────────────────
+// size keys map to FULL static class strings — never interpolate `w-${size}`,
+// the Tailwind JIT can't see interpolated class names and purges them.
+const SPINNER_SIZES = {
+  3: 'w-3 h-3',
+  3.5: 'w-3.5 h-3.5',
+}
 function Spinner({ size = 3 }) {
+  const dims = SPINNER_SIZES[size] || SPINNER_SIZES[3]
   return (
     <span
-      className={`w-${size} h-${size} border-2 border-white/40 border-t-white rounded-full animate-spin flex-shrink-0`}
+      className={`${dims} border-2 border-white/40 border-t-white rounded-full animate-spin flex-shrink-0`}
     />
   )
 }
@@ -279,7 +286,8 @@ function AddAccountModal({ dpList, onClose, onAdded }) {
           {!busy && (
             <button
               onClick={handleClose}
-              title="Close"
+              aria-label="Close"
+            title="Close"
               className="w-7 h-7 flex items-center justify-center rounded-lg text-gray-400 hover:text-gray-600 hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors text-lg leading-none"
             >
               ×
@@ -611,6 +619,7 @@ function EditAccountModal({ account, dpList, onClose, onUpdated }) {
           <button
             onClick={onClose}
             disabled={saving}
+            aria-label="Close"
             title="Close"
             className="w-7 h-7 flex items-center justify-center rounded-lg text-gray-400 hover:text-gray-600 hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors text-lg"
           >
@@ -992,6 +1001,7 @@ function ApplyModal({ ipo, accounts, activeAccountId, onClose, onApplied }) {
           </div>
           <button
             onClick={onClose}
+            aria-label="Close"
             title="Close"
             className="w-7 h-7 flex items-center justify-center rounded-lg text-gray-400 hover:text-gray-600 hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors text-lg"
           >
@@ -1296,7 +1306,8 @@ function BulkApplyModal({ ipo, accounts, inFlightRef, onClose, onApplied }) {
           {!applying && (
             <button
               onClick={handleClose}
-              title="Close"
+              aria-label="Close"
+            title="Close"
               className="w-7 h-7 flex items-center justify-center rounded-lg text-gray-400 hover:text-gray-600 hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors text-lg"
             >
               ×
@@ -2130,12 +2141,20 @@ function IPOPage({ isActive = true }) {
 
                 {/* Auto-apply toggle */}
                 <div className="flex items-center gap-2 flex-shrink-0">
-                  <div
+                  <button
+                    type="button"
+                    role="switch"
+                    aria-checked={!!activeAccount.auto_apply}
+                    aria-label={
+                      activeAccount.auto_apply
+                        ? 'Auto-apply ON — activate to disable'
+                        : 'Auto-apply OFF — activate to enable'
+                    }
+                    disabled={togglingAutoApply}
                     onClick={() =>
-                      !togglingAutoApply &&
                       handleToggleAutoApply(activeAccount, !activeAccount.auto_apply)
                     }
-                    className={`relative w-8 h-4 rounded-full transition-colors duration-200 flex-shrink-0 ${togglingAutoApply ? 'opacity-50 cursor-wait' : 'cursor-pointer'} ${activeAccount.auto_apply ? 'bg-emerald-500' : 'bg-gray-300 dark:bg-gray-600'}`}
+                    className={`relative w-8 h-4 rounded-full transition-colors duration-200 flex-shrink-0 focus-visible:ring-2 focus-visible:ring-emerald-500/40 focus-visible:outline-none ${togglingAutoApply ? 'opacity-50 cursor-wait' : 'cursor-pointer'} ${activeAccount.auto_apply ? 'bg-emerald-500' : 'bg-gray-300 dark:bg-gray-600'}`}
                     title={
                       activeAccount.auto_apply
                         ? 'Auto-apply ON — click to disable'
@@ -2145,7 +2164,7 @@ function IPOPage({ isActive = true }) {
                     <span
                       className={`absolute top-0.5 left-0.5 w-3 h-3 rounded-full bg-white shadow transition-transform duration-200 ${activeAccount.auto_apply ? 'translate-x-4' : 'translate-x-0'}`}
                     />
-                  </div>
+                  </button>
                   <span
                     className={`text-[10px] font-semibold ${activeAccount.auto_apply ? 'text-emerald-600 dark:text-emerald-400' : 'text-gray-400'}`}
                   >
@@ -2211,6 +2230,8 @@ function IPOPage({ isActive = true }) {
                   </p>
                   <button
                     onClick={() => setAutoApplyResults(null)}
+                    aria-label="Dismiss auto-apply results"
+                    title="Dismiss"
                     className="text-gray-300 dark:text-gray-600 hover:text-gray-500 text-sm leading-none"
                   >
                     ×
