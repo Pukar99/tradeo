@@ -522,17 +522,18 @@ function ScreenInner() {
         {/* NOTE: ChartSymbolSearch uses absolute positioning — toolbar slot must
           never be inside overflow-x-auto or the dropdown clips.
 
-          Layout splits at lg:
-          • Desktop (lg+) — single row: [tabs | divider | sub-tabs | divider | slot | badge].
-          • Mobile (<lg)  — two rows so the chart controls aren't crushed by the
-            tabs: row 1 = tab strips + status dot (h-scrolls if needed), row 2 =
-            the full-width toolbar slot (symbol search + chart controls). */}
+          Single row at every breakpoint: [tabs (scroll) | divider | sub-tabs |
+          divider | slot | badge]. On mobile the chart toolbar is compact
+          (search + menu only — see StockChart compactToolbar), so it fits on the
+          same line as the tabs. The tab group scrolls horizontally if it overflows;
+          the slot stays OUTSIDE that scroll container so the search dropdown never
+          clips. */}
         <div
-          className="flex flex-col lg:flex-row lg:items-center gap-1 lg:gap-2 px-3 py-1 border-b border-gray-100 dark:border-gray-800/80 shrink-0 bg-white/80 dark:bg-gray-900/80 backdrop-blur-sm"
+          className="flex flex-row items-center gap-1.5 lg:gap-2 px-3 py-1 border-b border-gray-100 dark:border-gray-800/80 shrink-0 bg-white/80 dark:bg-gray-900/80 backdrop-blur-sm"
           onMouseEnter={showNavbar}
         >
-          {/* Row 1 — tab strips (+ market badge). On mobile this scrolls
-            horizontally on its own line; on desktop it sits inline. */}
+          {/* Tab strips (+ mobile market dot) — scrolls horizontally if it
+            overflows so it never pushes the toolbar slot off-screen. */}
           <div className="flex items-center gap-2 min-w-0 overflow-x-auto no-scrollbar lg:overflow-visible">
             <TabStrip
               tabs={[
@@ -558,18 +559,16 @@ function ScreenInner() {
                 <TabStrip tabs={COMPLEX_TABS} active={complexTab} onChange={handleComplexTab} />
               )}
             </div>
-
-            {/* Market badge — pinned to the right of row 1 on mobile (dot only),
-              hidden here on desktop where it lives at the far end of the row. */}
-            <div className="ml-auto shrink-0 lg:hidden">
-              <MarketStatusBadge compact />
-            </div>
           </div>
 
           <div className="hidden lg:block w-px h-5 bg-gray-300/80 dark:bg-gray-600/70 shrink-0 mx-0.5" />
 
-          {/* Row 2 (mobile) / inline middle (desktop) — toolbar slot gets the full
-            width on phones instead of fighting the tabs for space. */}
+          {/* Toolbar slot — its own flex child so the symbol-search dropdown
+            (useFixedDropdown → fixed/portal, escapes overflow) never clips even
+            though the slot is overflow-x-auto. flex-1 so it takes the remaining
+            width and scrolls horizontally when a tab's toolbar is wide (SMC/PA
+            inject many controls here); the General tab's compact search+menu just
+            sits flush left with no scroll needed. */}
           <div
             ref={toolbarSlotRef}
             className="flex-1 flex items-center gap-1.5 min-w-0 overflow-x-auto no-scrollbar"

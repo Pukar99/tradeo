@@ -674,11 +674,11 @@ function AlertsWidget({ initData }) {
 // ── Stats bar ─────────────────────────────────────────────────────────────────
 function StatCard({ label, value, color, sub }) {
   return (
-    <div className="hp-stat bg-white/70 dark:bg-gray-900/60 backdrop-blur-md rounded-xl sm:rounded-2xl px-2.5 sm:px-4 py-2 sm:py-3 border border-white/60 dark:border-white/10 shadow-sm">
-      <p className="text-[9px] sm:text-[10px] font-medium text-gray-400 uppercase tracking-wide mb-0.5 sm:mb-1 truncate">
+    <div className="hp-stat bg-white/70 dark:bg-gray-900/60 backdrop-blur-md rounded-xl sm:rounded-2xl px-2 sm:px-4 py-1.5 sm:py-3 border border-white/60 dark:border-white/10 shadow-sm">
+      <p className="text-[8px] sm:text-[10px] font-medium text-gray-400 uppercase tracking-wide mb-0.5 sm:mb-1 truncate">
         {label}
       </p>
-      <p className={`text-sm sm:text-lg font-bold tracking-tight leading-none ${color}`}>
+      <p className={`text-[12px] sm:text-lg font-bold tracking-tight leading-none ${color}`}>
         {value}
       </p>
       {sub && <p className="hidden sm:block text-[10px] text-gray-400 mt-0.5">{sub}</p>}
@@ -1203,11 +1203,11 @@ function CenterDashboard({ navigate, initData, onRefresh, onDataReady, mobileTop
             <div className="flex-1" />
             <div className="h-6 bg-gray-100 dark:bg-gray-800 rounded-lg w-40" />
           </div>
-          <div className="grid grid-cols-4 gap-2 p-2">
+          <div className="flex gap-2 p-2 overflow-x-hidden">
             {[1, 2, 3, 4].map((i) => (
               <div
                 key={i}
-                className="bg-gray-50 dark:bg-gray-800/50 rounded-xl px-1.5 py-1.5 space-y-1.5"
+                className="shrink-0 basis-[calc((100%-1rem)/3)] sm:basis-[calc((100%-1.5rem)/4)] bg-gray-50 dark:bg-gray-800/50 rounded-xl px-1.5 py-1.5 space-y-1.5"
               >
                 <div className="flex items-center gap-1">
                   <div className="w-5 h-5 bg-gray-200 dark:bg-gray-700 rounded-lg flex-shrink-0" />
@@ -1241,10 +1241,10 @@ function CenterDashboard({ navigate, initData, onRefresh, onDataReady, mobileTop
             {[1, 2, 3, 4].map((i) => (
               <div
                 key={i}
-                className="bg-white/70 dark:bg-gray-900/60 backdrop-blur-md rounded-xl sm:rounded-2xl border border-white/60 dark:border-white/10 shadow-sm px-3 py-2.5"
+                className="bg-white/70 dark:bg-gray-900/60 backdrop-blur-md rounded-xl sm:rounded-2xl border border-white/60 dark:border-white/10 shadow-sm px-2 sm:px-3 py-1.5 sm:py-2.5"
               >
-                <div className="h-2 bg-gray-100 dark:bg-gray-800 rounded w-3/4 mb-2" />
-                <div className="h-5 bg-gray-100 dark:bg-gray-800 rounded w-1/2" />
+                <div className="h-2 bg-gray-100 dark:bg-gray-800 rounded w-3/4 mb-1.5 sm:mb-2" />
+                <div className="h-3.5 sm:h-5 bg-gray-100 dark:bg-gray-800 rounded w-1/2" />
               </div>
             ))}
           </div>
@@ -2142,9 +2142,9 @@ function CenterDashboard({ navigate, initData, onRefresh, onDataReady, mobileTop
               )}
             </div>
           ) : (
-            <div className="grid grid-cols-4 gap-2 p-2">
+            <div className="flex gap-2 p-2 overflow-x-auto no-scrollbar snap-x snap-mandatory">
               {filteredWatch.length === 0 ? (
-                <div className="col-span-4 py-8 text-center">
+                <div className="w-full py-8 text-center">
                   <p className="text-[11px] text-gray-400">
                     No stocks in {watchlistTab === 'active' ? 'Active' : 'Pre-Watch'}
                   </p>
@@ -2201,7 +2201,8 @@ function CenterDashboard({ navigate, initData, onRefresh, onDataReady, mobileTop
                           action: () => handleRemoveWatch(item.id),
                         },
                       ])}
-                      className={`hp-watch-item relative flex flex-col gap-1 px-1.5 py-1.5 rounded-xl cursor-default
+                      className={`hp-watch-item relative flex flex-col gap-1 px-1.5 py-1.5 rounded-xl cursor-default snap-start
+                    shrink-0 basis-[calc((100%-1rem)/3)] sm:basis-[calc((100%-1.5rem)/4)]
                     bg-white/70 dark:bg-gray-800/50 border border-white/80 dark:border-white/5
                     backdrop-blur-sm shadow-sm border-l-[3px] ${getStockBorder(item.symbol)}
                     ${isExpired ? 'opacity-50' : ''} ${isHl ? 'hp-highlight' : ''}`}

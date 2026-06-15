@@ -13,6 +13,9 @@ import {
   ToolbarConfigButton,
   ToolbarConfigTitle,
   ToolbarConfigSection,
+  ToolbarMenu,
+  ToolbarMenuSection,
+  useCompactToolbar,
 } from './ScreenToolbarAtoms'
 
 // ── Constants ─────────────────────────────────────────────────────────────────
@@ -56,8 +59,19 @@ function saveConfig(cfg) {
 
 const SMC_TIMEFRAMES = ['6M', '1Y', '3Y', 'ALL']
 
+// ── SMC overlay toggle definitions ──────────────────────────────────────────────
+const SMC_TOGGLES = [
+  { key: 'showBOS', label: 'BOS', color: '#22c55e' },
+  { key: 'showCHoCH', label: 'CHoCH', color: '#f59e0b' },
+  { key: 'showOB', label: 'OB', color: '#22c55e' },
+  { key: 'showFVG', label: 'FVG', color: '#3b82f6' },
+  { key: 'showSweeps', label: 'Sweeps', color: '#a78bfa' },
+  { key: 'showEntry', label: 'Entry', color: '#10b981' },
+]
+
 // ── SMC Toolbar ───────────────────────────────────────────────────────────────
 function SMCToolbar({ toggles, setToggles, config, setConfig, symbols }) {
+  const compact = useCompactToolbar()
   const toggle = (key) => setToggles((prev) => ({ ...prev, [key]: !prev[key] }))
   const updateConfig = (key, val) => {
     const next = { ...config, [key]: val }
@@ -65,56 +79,23 @@ function SMCToolbar({ toggles, setToggles, config, setConfig, symbols }) {
     saveConfig(next)
   }
 
-  return useScreenToolbarSlot(
-    <div className="flex items-center gap-1.5 min-w-0">
-      <ToolbarSymbolSearch symbols={symbols} stocksOnly />
-      <ToolbarDivider />
-      <ToolbarTimeframes frames={SMC_TIMEFRAMES} />
-      <ToolbarDivider />
+  // Overlay toggle chips — same control in both inline and menu layouts.
+  const toggleChips = SMC_TOGGLES.map((t) => (
+    <ToolbarToggleChip
+      key={t.key}
+      label={t.label}
+      active={toggles[t.key]}
+      onClick={() => toggle(t.key)}
+      activeColor={t.color}
+    />
+  ))
 
-      <ToolbarToggleChip
-        label="BOS"
-        active={toggles.showBOS}
-        onClick={() => toggle('showBOS')}
-        activeColor="#22c55e"
-      />
-      <ToolbarToggleChip
-        label="CHoCH"
-        active={toggles.showCHoCH}
-        onClick={() => toggle('showCHoCH')}
-        activeColor="#f59e0b"
-      />
-      <ToolbarToggleChip
-        label="OB"
-        active={toggles.showOB}
-        onClick={() => toggle('showOB')}
-        activeColor="#22c55e"
-      />
-      <ToolbarToggleChip
-        label="FVG"
-        active={toggles.showFVG}
-        onClick={() => toggle('showFVG')}
-        activeColor="#3b82f6"
-      />
-      <ToolbarToggleChip
-        label="Sweeps"
-        active={toggles.showSweeps}
-        onClick={() => toggle('showSweeps')}
-        activeColor="#a78bfa"
-      />
-      <ToolbarToggleChip
-        label="Entry"
-        active={toggles.showEntry}
-        onClick={() => toggle('showEntry')}
-        activeColor="#10b981"
-      />
+  // Config sections — shared between the desktop Config popover and the mobile menu.
+  const configBody = (
+    <>
+      <ToolbarConfigTitle>Signal Configuration</ToolbarConfigTitle>
 
-      <ToolbarDivider />
-
-      <ToolbarConfigButton>
-        <ToolbarConfigTitle>Signal Configuration</ToolbarConfigTitle>
-
-        <ToolbarConfigSection label="Min confluence score">
+      <ToolbarConfigSection label="Min confluence score">
           <div className="flex gap-1">
             {[1, 2, 3, 4, 5, 6].map((n) => (
               <button
@@ -191,17 +172,49 @@ function SMCToolbar({ toggles, setToggles, config, setConfig, symbols }) {
           </div>
         </ToolbarConfigSection>
 
-        <button
-          onClick={() => {
-            setConfig(DEFAULT_CONFIG)
-            saveConfig(DEFAULT_CONFIG)
-          }}
-          className="text-[10px] text-blue-500 hover:underline"
-        >
-          Reset to defaults
-        </button>
-      </ToolbarConfigButton>
-    </div>
+      <button
+        onClick={() => {
+          setConfig(DEFAULT_CONFIG)
+          saveConfig(DEFAULT_CONFIG)
+        }}
+        className="text-[10px] text-blue-500 hover:underline"
+      >
+        Reset to defaults
+      </button>
+    </>
+  )
+
+  // Count active overlay toggles for the menu badge (mobile).
+  const activeCount = SMC_TOGGLES.filter((t) => toggles[t.key]).length
+
+  return useScreenToolbarSlot(
+    compact ? (
+      // Mobile: search + a single menu holding timeframe, overlay toggles, config.
+      <div className="flex items-center gap-1.5 min-w-0">
+        <ToolbarSymbolSearch symbols={symbols} stocksOnly />
+        <div className="flex-1 min-w-0" />
+        <ToolbarMenu activeCount={activeCount}>
+          <ToolbarMenuSection label="Timeframe" divider={false}>
+            <ToolbarTimeframes frames={SMC_TIMEFRAMES} />
+          </ToolbarMenuSection>
+          <ToolbarMenuSection label="Overlays">
+            <div className="flex flex-wrap gap-1">{toggleChips}</div>
+          </ToolbarMenuSection>
+          <ToolbarMenuSection label="Signal config">{configBody}</ToolbarMenuSection>
+        </ToolbarMenu>
+      </div>
+    ) : (
+      // Desktop: full inline toolbar.
+      <div className="flex items-center gap-1.5 min-w-0">
+        <ToolbarSymbolSearch symbols={symbols} stocksOnly />
+        <ToolbarDivider />
+        <ToolbarTimeframes frames={SMC_TIMEFRAMES} />
+        <ToolbarDivider />
+        {toggleChips}
+        <ToolbarDivider />
+        <ToolbarConfigButton>{configBody}</ToolbarConfigButton>
+      </div>
+    )
   )
 }
 

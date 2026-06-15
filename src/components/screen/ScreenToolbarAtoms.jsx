@@ -41,13 +41,27 @@ export function useFixedDropdown(align = 'left') {
     return () => document.removeEventListener('mousedown', fn)
   }, [open])
 
+  // Position the dropdown and CLAMP it inside the viewport so it never spills off
+  // the right (or left) edge on a narrow screen. Without this, a left-aligned
+  // ~240px dropdown opened near the right side of a phone runs off-screen.
+  const VP_MARGIN = 8 // keep this gap from the viewport edges
+  const EST_WIDTH = 240 // dropdown design width (matches the portal content)
   const dropStyle = rect
-    ? {
-        position: 'fixed',
-        top: rect.bottom + 4,
-        ...(align === 'right' ? { right: window.innerWidth - rect.right } : { left: rect.left }),
-        zIndex: 9999,
-      }
+    ? (() => {
+        const vw = window.innerWidth
+        const maxWidth = vw - VP_MARGIN * 2 // never wider than the viewport
+        const width = Math.min(EST_WIDTH, maxWidth)
+        // Preferred left edge depends on alignment, then clamp into the viewport.
+        const preferredLeft = align === 'right' ? rect.right - width : rect.left
+        const left = Math.max(VP_MARGIN, Math.min(preferredLeft, vw - width - VP_MARGIN))
+        return {
+          position: 'fixed',
+          top: rect.bottom + 4,
+          left,
+          maxWidth,
+          zIndex: 9999,
+        }
+      })()
     : {}
 
   const portal = useCallback(
@@ -389,6 +403,93 @@ export function ToolbarConfigSection({ label, children }) {
       <p className="text-[10px] text-gray-500 dark:text-gray-400 mb-1">{label}</p>
       {children}
     </div>
+  )
+}
+
+// ── useCompactToolbar ──────────────────────────────────────────────────────────
+// True below lg (1024px) — the breakpoint where ScreenPage gives the toolbar its
+// own slot beside the tabs and StockChart's General toolbar goes compact. SMC/PA
+// use this to collapse their dense toolbars into a single menu on mobile.
+export function useCompactToolbar() {
+  const [compact, setCompact] = useState(() => window.matchMedia('(max-width: 1023px)').matches)
+  useEffect(() => {
+    const mq = window.matchMedia('(max-width: 1023px)')
+    const fn = (e) => setCompact(e.matches)
+    mq.addEventListener('change', fn)
+    return () => mq.removeEventListener('change', fn)
+  }, [])
+  return compact
+}
+
+// ── ToolbarMenu ────────────────────────────────────────────────────────────────
+// Hamburger (☰) trigger + portalled popover — the mobile equivalent of the
+// General tab's chart-options menu. Pass the menu body (timeframe/toggles/config
+// sections) as children. `activeCount` shows a small badge when > 0.
+export function ToolbarMenu({ children, activeCount = 0 }) {
+  const { triggerRef, open, setOpen, portal, updateRect } = useFixedDropdown('right')
+  const { showNavbar } = useNavbarState()
+
+  useEffect(() => {
+    if (!open) return
+    const fn = () => showNavbar()
+    document.addEventListener('mousemove', fn)
+    return () => document.removeEventListener('mousemove', fn)
+  }, [open, showNavbar])
+
+  return (
+    <div ref={triggerRef} className="shrink-0">
+      <button
+        onClick={() => {
+          setOpen((v) => !v)
+          updateRect()
+        }}
+        aria-label="Chart options"
+        className={`flex items-center gap-1 px-2 py-1 rounded-lg text-[10px] font-semibold border transition-all ${
+          open || activeCount > 0
+            ? 'bg-blue-500 border-blue-500 text-white shadow-sm'
+            : 'bg-gray-50 dark:bg-gray-800 border-gray-200 dark:border-gray-700 text-gray-500 dark:text-gray-400 hover:border-blue-300 dark:hover:border-blue-600 hover:text-blue-500'
+        }`}
+      >
+        <svg
+          className="w-3 h-3"
+          viewBox="0 0 16 16"
+          fill="none"
+          stroke="currentColor"
+          strokeWidth={1.8}
+          strokeLinecap="round"
+        >
+          <line x1="2" y1="4" x2="14" y2="4" />
+          <line x1="2" y1="8" x2="14" y2="8" />
+          <line x1="2" y1="12" x2="14" y2="12" />
+        </svg>
+        {activeCount > 0 && (
+          <span className="min-w-[14px] h-[14px] flex items-center justify-center rounded-full bg-white/25 text-[10px] font-bold leading-none px-0.5">
+            {activeCount}
+          </span>
+        )}
+      </button>
+      {portal(
+        <div className="w-[260px] bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-700 rounded-2xl shadow-2xl p-3 max-h-[80vh] overflow-y-auto">
+          {children}
+        </div>
+      )}
+    </div>
+  )
+}
+
+// ── ToolbarMenuSection ─────────────────────────────────────────────────────────
+// A titled section inside ToolbarMenu (Timeframe / Overlays / Config).
+export function ToolbarMenuSection({ label, children, divider = true }) {
+  return (
+    <>
+      {divider && <div className="h-px bg-gray-100 dark:bg-gray-800 -mx-3 my-2.5" />}
+      <div>
+        <p className="text-[10px] font-semibold text-gray-400 dark:text-gray-500 uppercase tracking-widest mb-2">
+          {label}
+        </p>
+        {children}
+      </div>
+    </>
   )
 }
 

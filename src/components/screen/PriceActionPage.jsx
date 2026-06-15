@@ -14,6 +14,9 @@ import {
   ToolbarConfigTitle,
   ToolbarConfigSection,
   ToolbarSegment,
+  ToolbarMenu,
+  ToolbarMenuSection,
+  useCompactToolbar,
 } from './ScreenToolbarAtoms'
 
 // ── Constants ─────────────────────────────────────────────────────────────────
@@ -53,8 +56,19 @@ function saveConfig(cfg) {
 
 const PA_TIMEFRAMES = ['6M', '1Y', '3Y', 'ALL']
 
+// ── PA overlay toggle definitions ─────────────────────────────────────────────
+const PA_TOGGLES = [
+  { key: 'showSwings', label: 'Swings', color: '#3b82f6' },
+  { key: 'showTrend', label: 'Trend', color: '#22c55e' },
+  { key: 'showSR', label: 'S/R', color: '#f97316' },
+  { key: 'showZones', label: 'D/S Zones', color: '#8b5cf6' },
+  { key: 'showVolume', label: 'Volume', color: '#a855f7' },
+  { key: 'showPatterns', label: 'Patterns', color: '#f59e0b' },
+]
+
 // ── PA Toolbar ────────────────────────────────────────────────────────────────
 function PAToolbar({ toggles, setToggles, config, setConfig, symbols }) {
+  const compact = useCompactToolbar()
   const toggle = (key) => setToggles((prev) => ({ ...prev, [key]: !prev[key] }))
   const updateConfig = (key, val) => {
     const next = { ...config, [key]: val }
@@ -62,93 +76,92 @@ function PAToolbar({ toggles, setToggles, config, setConfig, symbols }) {
     saveConfig(next)
   }
 
+  // Overlay toggle chips — same control in both inline and menu layouts.
+  const toggleChips = PA_TOGGLES.map((t) => (
+    <ToolbarToggleChip
+      key={t.key}
+      label={t.label}
+      active={toggles[t.key]}
+      onClick={() => toggle(t.key)}
+      activeColor={t.color}
+    />
+  ))
+
+  // Config sections — shared between the desktop Config popover and the mobile menu.
+  const configBody = (
+    <>
+      <ToolbarConfigTitle>Price Action Config</ToolbarConfigTitle>
+
+      <ToolbarConfigSection label="S/R cluster tolerance">
+        <ToolbarSegment
+          options={[1.0, 1.5, 2.0, 2.5].map((v) => ({ v, label: `${v}%` }))}
+          value={config.clusterPct}
+          onChange={(v) => updateConfig('clusterPct', v)}
+          activeColor="bg-orange-500"
+        />
+      </ToolbarConfigSection>
+
+      <ToolbarConfigSection label="D/S min move">
+        <ToolbarSegment
+          options={[2, 3, 5].map((v) => ({ v, label: `${v}%` }))}
+          value={config.dsMovePct}
+          onChange={(v) => updateConfig('dsMovePct', v)}
+          activeColor="bg-purple-500"
+        />
+      </ToolbarConfigSection>
+
+      <ToolbarConfigSection label="Volume spike threshold">
+        <ToolbarSegment
+          options={[1.5, 2.0, 2.5, 3.0].map((v) => ({ v, label: `${v}×` }))}
+          value={config.volMultiplier}
+          onChange={(v) => updateConfig('volMultiplier', v)}
+          activeColor="bg-purple-600"
+        />
+      </ToolbarConfigSection>
+
+      <button
+        onClick={() => {
+          setConfig(DEFAULT_CONFIG)
+          saveConfig(DEFAULT_CONFIG)
+        }}
+        className="text-[10px] text-blue-500 hover:underline"
+      >
+        Reset to defaults
+      </button>
+    </>
+  )
+
+  // Count active overlay toggles for the menu badge (mobile).
+  const activeCount = PA_TOGGLES.filter((t) => toggles[t.key]).length
+
   return useScreenToolbarSlot(
-    <div className="flex items-center gap-1.5 min-w-0">
-      <ToolbarSymbolSearch symbols={symbols} stocksOnly />
-      <ToolbarDivider />
-      <ToolbarTimeframes frames={PA_TIMEFRAMES} />
-      <ToolbarDivider />
-
-      <ToolbarToggleChip
-        label="Swings"
-        active={toggles.showSwings}
-        onClick={() => toggle('showSwings')}
-        activeColor="#3b82f6"
-      />
-      <ToolbarToggleChip
-        label="Trend"
-        active={toggles.showTrend}
-        onClick={() => toggle('showTrend')}
-        activeColor="#22c55e"
-      />
-      <ToolbarToggleChip
-        label="S/R"
-        active={toggles.showSR}
-        onClick={() => toggle('showSR')}
-        activeColor="#f97316"
-      />
-      <ToolbarToggleChip
-        label="D/S Zones"
-        active={toggles.showZones}
-        onClick={() => toggle('showZones')}
-        activeColor="#8b5cf6"
-      />
-      <ToolbarToggleChip
-        label="Volume"
-        active={toggles.showVolume}
-        onClick={() => toggle('showVolume')}
-        activeColor="#a855f7"
-      />
-      <ToolbarToggleChip
-        label="Patterns"
-        active={toggles.showPatterns}
-        onClick={() => toggle('showPatterns')}
-        activeColor="#f59e0b"
-      />
-
-      <ToolbarDivider />
-
-      <ToolbarConfigButton>
-        <ToolbarConfigTitle>Price Action Config</ToolbarConfigTitle>
-
-        <ToolbarConfigSection label="S/R cluster tolerance">
-          <ToolbarSegment
-            options={[1.0, 1.5, 2.0, 2.5].map((v) => ({ v, label: `${v}%` }))}
-            value={config.clusterPct}
-            onChange={(v) => updateConfig('clusterPct', v)}
-            activeColor="bg-orange-500"
-          />
-        </ToolbarConfigSection>
-
-        <ToolbarConfigSection label="D/S min move">
-          <ToolbarSegment
-            options={[2, 3, 5].map((v) => ({ v, label: `${v}%` }))}
-            value={config.dsMovePct}
-            onChange={(v) => updateConfig('dsMovePct', v)}
-            activeColor="bg-purple-500"
-          />
-        </ToolbarConfigSection>
-
-        <ToolbarConfigSection label="Volume spike threshold">
-          <ToolbarSegment
-            options={[1.5, 2.0, 2.5, 3.0].map((v) => ({ v, label: `${v}×` }))}
-            value={config.volMultiplier}
-            onChange={(v) => updateConfig('volMultiplier', v)}
-            activeColor="bg-purple-600"
-          />
-        </ToolbarConfigSection>
-
-        <button
-          onClick={() => {
-            setConfig(DEFAULT_CONFIG)
-            saveConfig(DEFAULT_CONFIG)
-          }}
-          className="text-[10px] text-blue-500 hover:underline"
-        >
-          Reset to defaults
-        </button>
-      </ToolbarConfigButton>
-    </div>
+    compact ? (
+      // Mobile: search + a single menu holding timeframe, overlay toggles, config.
+      <div className="flex items-center gap-1.5 min-w-0">
+        <ToolbarSymbolSearch symbols={symbols} stocksOnly />
+        <div className="flex-1 min-w-0" />
+        <ToolbarMenu activeCount={activeCount}>
+          <ToolbarMenuSection label="Timeframe" divider={false}>
+            <ToolbarTimeframes frames={PA_TIMEFRAMES} />
+          </ToolbarMenuSection>
+          <ToolbarMenuSection label="Overlays">
+            <div className="flex flex-wrap gap-1">{toggleChips}</div>
+          </ToolbarMenuSection>
+          <ToolbarMenuSection label="Config">{configBody}</ToolbarMenuSection>
+        </ToolbarMenu>
+      </div>
+    ) : (
+      // Desktop: full inline toolbar.
+      <div className="flex items-center gap-1.5 min-w-0">
+        <ToolbarSymbolSearch symbols={symbols} stocksOnly />
+        <ToolbarDivider />
+        <ToolbarTimeframes frames={PA_TIMEFRAMES} />
+        <ToolbarDivider />
+        {toggleChips}
+        <ToolbarDivider />
+        <ToolbarConfigButton>{configBody}</ToolbarConfigButton>
+      </div>
+    )
   )
 }
 
