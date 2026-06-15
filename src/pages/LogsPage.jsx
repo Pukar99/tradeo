@@ -168,12 +168,14 @@ export default function LogsPage() {
       <div className="flex flex-col h-[calc(100dvh-56px)] overflow-hidden bg-gray-50 dark:bg-gray-950 animate-pulse">
         {/* Toolbar skeleton */}
         <div className="shrink-0 flex items-center gap-1.5 px-3 py-1 border-b border-gray-200 dark:border-gray-800 bg-white dark:bg-gray-900 h-9">
-          <div className="h-6 w-48 bg-gray-100 dark:bg-gray-800 rounded-lg shrink-0" />
-          <div className="w-px h-3.5 bg-gray-200 dark:bg-gray-700 shrink-0" />
-          <div className="h-6 w-44 bg-gray-100 dark:bg-gray-800 rounded-md shrink-0" />
-          <div className="w-px h-3.5 bg-gray-200 dark:bg-gray-700 shrink-0" />
-          <div className="h-6 w-20 bg-gray-100 dark:bg-gray-800 rounded-md shrink-0" />
-          <div className="h-6 w-[140px] bg-gray-100 dark:bg-gray-800 rounded shrink-0" />
+          <div className="h-6 w-32 sm:w-48 bg-gray-100 dark:bg-gray-800 rounded-lg shrink-0" />
+          <div className="hidden sm:block w-px h-3.5 bg-gray-200 dark:bg-gray-700 shrink-0" />
+          <div className="hidden sm:block h-6 w-44 bg-gray-100 dark:bg-gray-800 rounded-md shrink-0" />
+          <div className="hidden sm:block w-px h-3.5 bg-gray-200 dark:bg-gray-700 shrink-0" />
+          <div className="hidden sm:block h-6 w-20 bg-gray-100 dark:bg-gray-800 rounded-md shrink-0" />
+          <div className="hidden sm:block h-6 w-[140px] bg-gray-100 dark:bg-gray-800 rounded shrink-0" />
+          {/* mobile-only ☰ menu placeholder */}
+          <div className="sm:hidden h-6 w-7 bg-gray-100 dark:bg-gray-800 rounded-lg shrink-0" />
           <div className="flex-1" />
           <div className="h-6 w-20 bg-gray-100 dark:bg-gray-800 rounded-md shrink-0" />
         </div>
