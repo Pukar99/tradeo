@@ -90,7 +90,7 @@ function InlineConfirm({ label, onConfirm, onCancel, danger = true, disabled = f
 // ── Field Label ───────────────────────────────────────────────────────────────
 function FieldLabel({ children }) {
   return (
-    <label className="block text-[10px] font-semibold text-gray-400 uppercase tracking-widest mb-1.5">
+    <label className="block text-[10px] font-semibold text-gray-400 dark:text-gray-500 uppercase tracking-widest mb-1.5">
       {children}
     </label>
   )
@@ -621,7 +621,7 @@ function EditAccountModal({ account, dpList, onClose, onUpdated }) {
         <div className="overflow-y-auto flex-1 p-5 space-y-4">
           {/* ── Login Details ── */}
           <div>
-            <p className="text-[10px] font-semibold uppercase tracking-widest text-gray-400 mb-2.5">
+            <p className="text-[10px] font-semibold uppercase tracking-widest text-gray-400 dark:text-gray-500 mb-2.5">
               Login Details
             </p>
             <div className="space-y-3">
@@ -674,7 +674,7 @@ function EditAccountModal({ account, dpList, onClose, onUpdated }) {
           {/* ── ASBA Bank ── */}
           <div>
             <div className="flex items-center justify-between mb-2.5">
-              <p className="text-[10px] font-semibold uppercase tracking-widest text-gray-400">
+              <p className="text-[10px] font-semibold uppercase tracking-widest text-gray-400 dark:text-gray-500">
                 ASBA Bank
               </p>
               <button
@@ -774,7 +774,7 @@ function EditAccountModal({ account, dpList, onClose, onUpdated }) {
 
           {/* ── Apply Settings ── */}
           <div>
-            <p className="text-[10px] font-semibold uppercase tracking-widest text-gray-400 mb-2.5">
+            <p className="text-[10px] font-semibold uppercase tracking-widest text-gray-400 dark:text-gray-500 mb-2.5">
               Apply Settings
             </p>
             <div className="space-y-3">
@@ -1031,7 +1031,7 @@ function ApplyModal({ ipo, accounts, activeAccountId, onClose, onApplied }) {
             {/* Account selector — only shown when multiple accounts */}
             {accounts.length > 1 && (
               <div>
-                <p className="text-[10px] font-semibold text-gray-400 uppercase tracking-widest mb-2">
+                <p className="text-[10px] font-semibold text-gray-400 dark:text-gray-500 uppercase tracking-widest mb-2">
                   Apply With
                 </p>
                 <div className="space-y-1.5">
@@ -1081,7 +1081,7 @@ function ApplyModal({ ipo, accounts, activeAccountId, onClose, onApplied }) {
             {selectedAccount && hasBank && (
               <div className="bg-gray-50 dark:bg-gray-800 rounded-xl px-4 py-3 space-y-1">
                 <div className="flex items-center justify-between mb-1">
-                  <p className="text-[10px] font-semibold text-gray-400 uppercase tracking-widest">
+                  <p className="text-[10px] font-semibold text-gray-400 dark:text-gray-500 uppercase tracking-widest">
                     ASBA Details
                   </p>
                   {hasSavedPin && (
@@ -1360,7 +1360,7 @@ function BulkApplyModal({ ipo, accounts, inFlightRef, onClose, onApplied }) {
             </div>
 
             <div className="space-y-2">
-              <p className="text-[10px] font-semibold text-gray-400 uppercase tracking-widest">
+              <p className="text-[10px] font-semibold text-gray-400 dark:text-gray-500 uppercase tracking-widest">
                 {readyAccounts.length} Account{readyAccounts.length !== 1 ? 's' : ''} Ready
               </p>
               {readyAccounts.map((a) => (
@@ -2021,7 +2021,7 @@ function IPOPage({ isActive = true }) {
   )
 
   const thCls =
-    'px-4 py-2.5 text-[10px] font-semibold uppercase tracking-widest text-gray-400 select-none'
+    'px-4 py-2.5 text-[10px] font-semibold uppercase tracking-widest text-gray-400 dark:text-gray-500 select-none'
   const sortThCls =
     thCls + ' cursor-pointer hover:text-gray-600 dark:hover:text-gray-200 transition-colors'
 
@@ -2206,7 +2206,7 @@ function IPOPage({ isActive = true }) {
             {autoApplyResults && (
               <div className="bg-white dark:bg-gray-900 rounded-xl border border-gray-100 dark:border-gray-800 px-4 py-3">
                 <div className="flex items-center justify-between mb-2">
-                  <p className="text-[10px] font-semibold text-gray-400 uppercase tracking-widest">
+                  <p className="text-[10px] font-semibold text-gray-400 dark:text-gray-500 uppercase tracking-widest">
                     Auto-Apply Results
                   </p>
                   <button
@@ -2750,7 +2750,7 @@ function IPOPage({ isActive = true }) {
                     </div>
                     {totalValue && (
                       <div className="text-right flex-shrink-0">
-                        <p className="text-[10px] text-gray-400 uppercase tracking-widest">
+                        <p className="text-[10px] font-semibold text-gray-400 dark:text-gray-500 uppercase tracking-widest">
                           Total Value
                         </p>
                         <p className="text-[15px] font-bold text-gray-900 dark:text-white font-mono tabular-nums">
