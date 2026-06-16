@@ -72,38 +72,37 @@ function FloatingChat() {
     return () => window.removeEventListener('resize', reclamp)
   }, [])
 
-  const onMouseDown = useCallback(
-    (e) => {
-      // Only drag on the FAB itself (not inside the open panel)
-      if (isOpen) return
-      e.preventDefault()
+  // Single drag core — shared by the FAB (closed) and the panel header (open),
+  // for both mouse and touch. Tracks the pointer, clamps into the viewport, and
+  // persists the position on release. Replaces three near-identical copies.
+  const startDrag = useCallback(
+    (startX, startY, isTouch) => {
       dragging.current = true
       hasMoved.current = false
-      dragStart.current = { mx: e.clientX, my: e.clientY, px: pos.x, py: pos.y }
+      dragStart.current = { mx: startX, my: startY, px: pos.x, py: pos.y }
 
-      const onMove = (e) => {
+      const moveTo = (clientX, clientY) => {
         if (!dragging.current) return
-        const dx = e.clientX - dragStart.current.mx
-        const dy = e.clientY - dragStart.current.my
+        const dx = clientX - dragStart.current.mx
+        const dy = clientY - dragStart.current.my
         if (Math.abs(dx) > 3 || Math.abs(dy) > 3) hasMoved.current = true
-        const nx = clamp(
-          dragStart.current.px + dx,
-          EDGE_PAD,
-          window.innerWidth - BUTTON_SIZE - EDGE_PAD
-        )
-        const ny = clamp(
-          dragStart.current.py + dy,
-          EDGE_PAD,
-          window.innerHeight - BUTTON_SIZE - EDGE_PAD
-        )
-        setPos({ x: nx, y: ny })
+        setPos({
+          x: clamp(dragStart.current.px + dx, EDGE_PAD, window.innerWidth - BUTTON_SIZE - EDGE_PAD),
+          y: clamp(dragStart.current.py + dy, EDGE_PAD, window.innerHeight - BUTTON_SIZE - EDGE_PAD),
+        })
       }
 
-      const onUp = () => {
+      const moveEvt = isTouch ? 'touchmove' : 'mousemove'
+      const endEvt = isTouch ? 'touchend' : 'mouseup'
+      const onMove = (e) => {
+        const p = isTouch ? e.touches[0] : e
+        moveTo(p.clientX, p.clientY)
+      }
+      const onEnd = () => {
         dragging.current = false
-        window.removeEventListener('mousemove', onMove)
-        window.removeEventListener('mouseup', onUp)
-        // Save position
+        window.removeEventListener(moveEvt, onMove)
+        window.removeEventListener(endEvt, onEnd)
+        // setPos callback reads the live position — avoids a stale closure on pos
         setPos((p) => {
           try {
             sessionStorage.setItem('floatingChat_pos', JSON.stringify(p))
@@ -112,57 +111,40 @@ function FloatingChat() {
         })
       }
 
-      window.addEventListener('mousemove', onMove)
-      window.addEventListener('mouseup', onUp)
+      window.addEventListener(moveEvt, onMove, isTouch ? { passive: true } : undefined)
+      window.addEventListener(endEvt, onEnd)
     },
-    [isOpen, pos]
+    [pos]
   )
 
-  // Touch support
+  // FAB drag (only when the panel is closed — when open, the header is the handle)
+  const onMouseDown = useCallback(
+    (e) => {
+      if (isOpen) return
+      e.preventDefault()
+      startDrag(e.clientX, e.clientY, false)
+    },
+    [isOpen, startDrag]
+  )
   const onTouchStart = useCallback(
     (e) => {
       if (isOpen) return
-      const t = e.touches[0]
-      dragging.current = true
-      hasMoved.current = false
-      dragStart.current = { mx: t.clientX, my: t.clientY, px: pos.x, py: pos.y }
-
-      const onMove = (e) => {
-        if (!dragging.current) return
-        const t = e.touches[0]
-        const dx = t.clientX - dragStart.current.mx
-        const dy = t.clientY - dragStart.current.my
-        if (Math.abs(dx) > 3 || Math.abs(dy) > 3) hasMoved.current = true
-        const nx = clamp(
-          dragStart.current.px + dx,
-          EDGE_PAD,
-          window.innerWidth - BUTTON_SIZE - EDGE_PAD
-        )
-        const ny = clamp(
-          dragStart.current.py + dy,
-          EDGE_PAD,
-          window.innerHeight - BUTTON_SIZE - EDGE_PAD
-        )
-        setPos({ x: nx, y: ny })
-      }
-
-      const onEnd = () => {
-        dragging.current = false
-        window.removeEventListener('touchmove', onMove)
-        window.removeEventListener('touchend', onEnd)
-        // Use setPos callback to read current position — avoids stale closure on pos
-        setPos((p) => {
-          try {
-            sessionStorage.setItem('floatingChat_pos', JSON.stringify(p))
-          } catch {}
-          return p
-        })
-      }
-
-      window.addEventListener('touchmove', onMove, { passive: true })
-      window.addEventListener('touchend', onEnd)
+      startDrag(e.touches[0].clientX, e.touches[0].clientY, true)
     },
-    [isOpen, pos]
+    [isOpen, startDrag]
+  )
+
+  // Panel header drag handle (passed into AIChat). Mouse + touch via the one core.
+  const onHeaderDrag = useCallback(
+    (e) => {
+      const t = e.touches?.[0]
+      if (t) startDrag(t.clientX, t.clientY, true)
+      else {
+        e.preventDefault()
+        startDrag(e.clientX, e.clientY, false)
+      }
+    },
+    [startDrag]
   )
 
   const handleClick = useCallback(() => {
@@ -212,76 +194,19 @@ function FloatingChat() {
             height: Math.min(PANEL_H, window.innerHeight - 80),
           }}
         >
-          {/* Drag handle strip at top of panel */}
-          <div
-            className="shrink-0 flex items-center justify-between px-3 py-1.5
-              bg-white/25 dark:bg-black/25 border-b border-white/30 dark:border-white/8
-              cursor-move select-none"
-            onMouseDown={(e) => {
-              e.preventDefault()
-              const startX = e.clientX,
-                startY = e.clientY
-              const startPos = { ...pos }
-              let moved = false
-
-              const onMove = (e) => {
-                moved = true
-                const nx = clamp(
-                  startPos.x + (e.clientX - startX),
-                  EDGE_PAD,
-                  window.innerWidth - BUTTON_SIZE - EDGE_PAD
-                )
-                const ny = clamp(
-                  startPos.y + (e.clientY - startY),
-                  EDGE_PAD,
-                  window.innerHeight - BUTTON_SIZE - EDGE_PAD
-                )
-                setPos({ x: nx, y: ny })
-              }
-              const onUp = () => {
-                window.removeEventListener('mousemove', onMove)
-                window.removeEventListener('mouseup', onUp)
-                if (moved) {
-                  setPos((p) => {
-                    try {
-                      sessionStorage.setItem('floatingChat_pos', JSON.stringify(p))
-                    } catch {}
-                    return p
-                  })
-                }
-              }
-              window.addEventListener('mousemove', onMove)
-              window.addEventListener('mouseup', onUp)
-            }}
-          >
-            <div className="flex items-center gap-1.5">
-              <div className="flex gap-0.5">
-                <div className="w-3 h-0.5 rounded-full bg-gray-300 dark:bg-gray-600" />
-                <div className="w-3 h-0.5 rounded-full bg-gray-300 dark:bg-gray-600" />
-                <div className="w-3 h-0.5 rounded-full bg-gray-300 dark:bg-gray-600" />
-              </div>
-              <span className="text-[10px] text-gray-400 font-semibold select-none">
-                drag to move
-              </span>
-            </div>
-            <button
-              onClick={() => setIsOpen(false)}
-              aria-label="Close chat"
-              className="w-7 h-7 flex items-center justify-center rounded
-                text-gray-400 hover:text-gray-600 dark:hover:text-gray-300
-                hover:bg-gray-200 dark:hover:bg-gray-700 text-sm leading-none transition-colors"
-            >
-              ×
-            </button>
-          </div>
-
+          {/* No separate drag strip — the AIChat header IS the drag handle (onDragStart). */}
           <div className="flex-1 min-h-0 overflow-hidden">
-            <AIChat isFullPage={false} onClose={() => setIsOpen(false)} />
+            <AIChat
+              isFullPage={false}
+              onClose={() => setIsOpen(false)}
+              onDragStart={onHeaderDrag}
+            />
           </div>
         </div>
       )}
 
-      {/* ── FAB button ── */}
+      {/* ── FAB button — shown ONLY when the panel is closed ── */}
+      {!isOpen && (
       <div
         ref={fabRef}
         className="fixed z-[60]"
@@ -309,6 +234,7 @@ function FloatingChat() {
           </svg>
         </button>
       </div>
+      )}
     </>
   )
 }
