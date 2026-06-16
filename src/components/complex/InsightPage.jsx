@@ -634,11 +634,7 @@ export default function InsightPage() {
                       const isLatest = row.year === curYear
                       const opacity = isRecent ? 1.0 : 0.78
                       return (
-                        <tr
-                          key={row.year}
-                          style={{ opacity }}
-                          className="hover:opacity-100 focus-within:!opacity-100 transition-opacity duration-150"
-                        >
+                        <tr key={row.year} className="group">
                           <td className="py-0.5 pr-2 sticky left-0 z-10 bg-white dark:bg-gray-900 translate-x-0">
                             <div className="flex items-center gap-1">
                               {isLatest ? (
@@ -699,12 +695,14 @@ export default function InsightPage() {
                                     isSel
                                       ? 'scale-105 shadow-md ring-2 ring-blue-500 ring-offset-1 dark:ring-offset-gray-950 z-10'
                                       : '',
+                                    'group-hover:opacity-100 focus-within:opacity-100 transition-opacity duration-150',
                                   ].join(' ')}
                                   style={{
                                     background: cellBg(val, dark),
                                     color: cellFg(val, dark),
                                     padding: '3px 1px',
                                     minWidth: 36,
+                                    opacity,
                                     // "Today" outline shows only when NOT selected — selection ring is
                                     // the relevant state once user interacts.
                                     outline: isCur && !isSel ? '1.5px dashed #60a5fa' : undefined,
@@ -723,7 +721,7 @@ export default function InsightPage() {
                             )
                           })}
                           {/* YTD column */}
-                          <td className="py-0.5 pl-2 pr-1 border-l-2 border-gray-200 dark:border-gray-700">
+                          <td className="py-0.5 pl-2 pr-1 border-l-2 border-gray-200 dark:border-gray-700 group-hover:opacity-100 focus-within:opacity-100 transition-opacity duration-150" style={{ opacity }}>
                             <div
                               className="text-right text-[10px] font-black tabular-nums"
                               style={{ color: (row.annual ?? 0) >= 0 ? '#22c55e' : '#ef4444' }}
