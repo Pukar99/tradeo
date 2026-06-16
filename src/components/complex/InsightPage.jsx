@@ -506,13 +506,12 @@ export default function InsightPage() {
 
       {/* ── Center — Heatmap + Annual strip ────────────────────────────────── */}
       <div className="flex-1 flex flex-col min-h-0 min-w-0 bg-gray-50/40 dark:bg-gray-900/40">
-        <div className="flex-1 min-h-0 overflow-y-auto overflow-x-auto p-3 relative bg-gray-50/40 dark:bg-gray-900/40 [scrollbar-width:thin] [&::-webkit-scrollbar]:w-1.5 [&::-webkit-scrollbar]:h-1.5 [&::-webkit-scrollbar-thumb]:bg-gray-300 dark:[&::-webkit-scrollbar-thumb]:bg-gray-700 [&::-webkit-scrollbar-thumb]:rounded-full">
+        <div className="flex-1 min-h-0 overflow-y-auto overflow-x-hidden sm:overflow-x-auto p-3 relative bg-gray-50/40 dark:bg-gray-900/40 [scrollbar-width:thin] [&::-webkit-scrollbar]:w-1.5 [&::-webkit-scrollbar]:h-1.5 [&::-webkit-scrollbar-thumb]:bg-gray-300 dark:[&::-webkit-scrollbar-thumb]:bg-gray-700 [&::-webkit-scrollbar-thumb]:rounded-full">
           {/* Heatmap card: fills the column width so there's no empty band on the
               right of the heatmap. minWidth keeps it readable when the column is narrow
               (outer overflow-x-auto provides horizontal scroll in that case). */}
           <div
-            className="bg-white dark:bg-gray-900 rounded-xl border border-gray-100 dark:border-gray-800/80 p-3"
-            style={{ minWidth: 520, width: '100%' }}
+            className="bg-white dark:bg-gray-900 rounded-xl border border-gray-100 dark:border-gray-800/80 p-3 w-full sm:min-w-[520px]"
           >
             {loading && !data && <Skeleton />}
 
@@ -592,6 +591,9 @@ export default function InsightPage() {
                   </div>
                 )}
 
+                {/* Mobile: only the grid scrolls sideways (year col stays frozen);
+                    hero strip + legend stay full-width. sm+ restores desktop (no wrapper scroll). */}
+                <div className="relative overflow-x-auto sm:overflow-x-visible [scrollbar-width:thin] [&::-webkit-scrollbar]:h-1.5 [&::-webkit-scrollbar-thumb]:bg-gray-300 dark:[&::-webkit-scrollbar-thumb]:bg-gray-700 [&::-webkit-scrollbar-thumb]:rounded-full">
                 <table className="w-full border-separate border-spacing-0">
                   {/* Sticky header: top-0 keeps month labels visible while scrolling
                       years; the Year corner cell needs both left+top and higher z. */}
@@ -829,6 +831,7 @@ export default function InsightPage() {
                     )}
                   </tbody>
                 </table>
+                </div>
 
                 {/* Legend */}
                 <div className="flex items-center gap-3 mt-1.5 mb-3 text-[10px] text-gray-500 dark:text-gray-500 px-0.5 flex-wrap">
