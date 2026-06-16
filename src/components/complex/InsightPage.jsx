@@ -217,6 +217,17 @@ export default function InsightPage() {
 
   const LABELS = MONTHS_EN
 
+  // Frozen (sticky left-0) cells need an opaque mask extending LEFT so colored
+  // month cells scrolling under them on mobile can't peek out beside the year.
+  // A wide box-shadow in the cell's own bg colour paints over that gap; willChange
+  // + backfaceVisibility promote the cell to its own GPU layer so it repaints in
+  // lockstep with momentum scroll (kills the mid-swipe flicker). bg = cell colour.
+  const stickyMask = (bgLight, bgDark) => ({
+    boxShadow: `-24px 0 0 ${dark ? bgDark : bgLight}`,
+    willChange: 'transform',
+    backfaceVisibility: 'hidden',
+  })
+
   const handleCell = useCallback(
     (year, month, value) => {
       setSelected({ year, month, value })
@@ -602,6 +613,7 @@ export default function InsightPage() {
                       <th
                         className="text-left pb-1.5 pr-2 sticky left-0 top-0 z-30 bg-white dark:bg-gray-900 translate-x-0
                         text-[10px] font-bold text-gray-500 dark:text-gray-400 uppercase tracking-wide w-10"
+                        style={stickyMask('#ffffff', '#111827')}
                       >
                         Year
                       </th>
@@ -635,7 +647,10 @@ export default function InsightPage() {
                       const opacity = isRecent ? 1.0 : 0.78
                       return (
                         <tr key={row.year} className="group">
-                          <td className="py-0.5 pr-2 sticky left-0 z-10 bg-white dark:bg-gray-900 translate-x-0">
+                          <td
+                            className="py-0.5 pr-2 sticky left-0 z-10 bg-white dark:bg-gray-900 translate-x-0"
+                            style={stickyMask('#ffffff', '#111827')}
+                          >
                             <div className="flex items-center gap-1">
                               {isLatest ? (
                                 <span className="text-[11px] font-black text-blue-500 leading-none">
@@ -736,7 +751,10 @@ export default function InsightPage() {
                     {/* Weighted Avg row */}
                     {wAvg.some((v) => v != null) && (
                       <tr className="border-t-2 border-gray-200 dark:border-gray-700 bg-gray-100 dark:bg-gray-800">
-                        <td className="py-1 pr-2 sticky left-0 z-10 bg-gray-100 dark:bg-gray-800 translate-x-0">
+                        <td
+                          className="py-1 pr-2 sticky left-0 z-10 bg-gray-100 dark:bg-gray-800 translate-x-0"
+                          style={stickyMask('#f3f4f6', '#1f2937')}
+                        >
                           <span
                             className="text-[10px] font-black text-gray-500 dark:text-gray-400 uppercase tracking-widest whitespace-nowrap"
                             title={`Weighted average — last ${RECENT_N} years count ×2`}
@@ -766,7 +784,10 @@ export default function InsightPage() {
                     {/* Win rate row */}
                     {wWinRate.some((v) => v != null) && (
                       <tr>
-                        <td className="py-0.5 pr-2 sticky left-0 z-10 bg-white dark:bg-gray-900 translate-x-0">
+                        <td
+                          className="py-0.5 pr-2 sticky left-0 z-10 bg-white dark:bg-gray-900 translate-x-0"
+                          style={stickyMask('#ffffff', '#111827')}
+                        >
                           <span
                             className="text-[10px] font-black text-gray-400 dark:text-gray-500 uppercase tracking-wide"
                             title={`Share of positive years — last ${RECENT_N} years weighted ×2`}
@@ -806,7 +827,10 @@ export default function InsightPage() {
                     {/* Volatility (σ) row */}
                     {wStdDev.some((v) => v != null) && (
                       <tr>
-                        <td className="py-0.5 pr-2 sticky left-0 z-10 bg-white dark:bg-gray-900 translate-x-0">
+                        <td
+                          className="py-0.5 pr-2 sticky left-0 z-10 bg-white dark:bg-gray-900 translate-x-0"
+                          style={stickyMask('#ffffff', '#111827')}
+                        >
                           <span
                             className="text-[10px] font-black text-gray-400 dark:text-gray-500 uppercase tracking-wide"
                             title="Standard deviation"
