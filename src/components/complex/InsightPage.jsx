@@ -228,6 +228,10 @@ export default function InsightPage() {
     backfaceVisibility: 'hidden',
   })
 
+  // Mobile cells get a wider/taller tap target; desktop keeps the EXACT 36px/3px.
+  // isLg gates both width and padding so the desktop heatmap is pixel-identical.
+  const cellMinW = isLg ? 36 : 38
+
   const handleCell = useCallback(
     (year, month, value) => {
       setSelected({ year, month, value })
@@ -602,9 +606,16 @@ export default function InsightPage() {
                   </div>
                 )}
 
+                {/* Mobile-only: signal the grid scrolls sideways (year col stays put). */}
+                <div className="sm:hidden mb-1 text-[10px] text-gray-400 dark:text-gray-500">
+                  Jan–Jun · swipe for more →
+                </div>
                 {/* Mobile: only the grid scrolls sideways (year col stays frozen);
-                    hero strip + legend stay full-width. sm+ restores desktop (no wrapper scroll). */}
-                <div className="relative overflow-x-auto sm:overflow-x-visible [scrollbar-width:thin] [&::-webkit-scrollbar]:h-1.5 [&::-webkit-scrollbar-thumb]:bg-gray-300 dark:[&::-webkit-scrollbar-thumb]:bg-gray-700 [&::-webkit-scrollbar-thumb]:rounded-full">
+                    hero strip + legend stay full-width. sm+ restores desktop (no wrapper scroll).
+                    The relative wrapper anchors the right-edge fade, which sits OUTSIDE the
+                    scroll container so it stays pinned to the visible edge (doesn't scroll away). */}
+                <div className="relative">
+                <div className="overflow-x-auto sm:overflow-x-visible [scrollbar-width:thin] [&::-webkit-scrollbar]:h-1.5 [&::-webkit-scrollbar-thumb]:bg-gray-300 dark:[&::-webkit-scrollbar-thumb]:bg-gray-700 [&::-webkit-scrollbar-thumb]:rounded-full">
                 <table className="w-full border-separate border-spacing-0">
                   {/* Sticky header: top-0 keeps month labels visible while scrolling
                       years; the Year corner cell needs both left+top and higher z. */}
@@ -620,7 +631,7 @@ export default function InsightPage() {
                       {LABELS.map((m, i) => (
                         <th
                           key={i}
-                          className="pb-1.5 px-px min-w-[36px] sticky top-0 z-20 bg-white dark:bg-gray-900"
+                          className="pb-1.5 px-px min-w-[38px] sm:min-w-[36px] sticky top-0 z-20 bg-white dark:bg-gray-900"
                         >
                           <button
                             onClick={() => handleMonthHeader(i + 1)}
@@ -715,8 +726,8 @@ export default function InsightPage() {
                                   style={{
                                     background: cellBg(val, dark),
                                     color: cellFg(val, dark),
-                                    padding: '3px 1px',
-                                    minWidth: 36,
+                                    padding: isLg ? '3px 1px' : '6px 2px',
+                                    minWidth: cellMinW,
                                     opacity,
                                     // "Today" outline shows only when NOT selected — selection ring is
                                     // the relevant state once user interacts.
@@ -770,7 +781,7 @@ export default function InsightPage() {
                                 background: cellBg(v, dark),
                                 color: cellFg(v, dark),
                                 padding: '2px 1px',
-                                minWidth: 36,
+                                minWidth: cellMinW,
                               }}
                             >
                               {v != null ? fmtPct(v) : '—'}
@@ -853,6 +864,10 @@ export default function InsightPage() {
                     )}
                   </tbody>
                 </table>
+                </div>
+                {/* Right-edge fade: pinned to the visible right edge (outside the scroll
+                    container) so it hints there's more grid to swipe to. Mobile only. */}
+                <div className="sm:hidden pointer-events-none absolute top-0 right-0 bottom-0 w-6 z-20 bg-gradient-to-l from-white dark:from-gray-900 to-transparent" />
                 </div>
 
                 {/* Legend */}
