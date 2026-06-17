@@ -361,7 +361,11 @@ function ConfirmCard({ pending, onConfirm, onCancel, done }) {
 
 // ── Slot-fill card — money action awaiting a missing field (multi-turn binding) ──
 function SlotFillCard({ slot, onSubmit, onCancel, done }) {
-  const [vals, setVals] = useState({})
+  // Pre-seed the optional trade date with today (buy/sell forms only). It rides in `vals`, so the
+  // existing submit() picks it up automatically; it is NOT in `slot.missing`, so it never gates Continue.
+  const [vals, setVals] = useState(() =>
+    slot?.dateField ? { date: new Date().toISOString().slice(0, 10) } : {}
+  )
   if (!slot?.missing?.length && !slot?.suggestion) return null
 
   const set = (f, v) => setVals((p) => ({ ...p, [f]: v }))
@@ -408,6 +412,19 @@ function SlotFillCard({ slot, onSubmit, onCancel, done }) {
           className="w-full mb-1.5 px-2 py-1.5 rounded-lg text-[12px] bg-white dark:bg-gray-800 border border-gray-300 dark:border-gray-700 text-gray-800 dark:text-gray-100"
         />
       ))}
+      {slot.dateField && (
+        <label className="block mb-1.5">
+          <span className="text-[10px] text-gray-500 dark:text-gray-400">{slot.dateField.label} (defaults to today)</span>
+          <input
+            type="date"
+            value={vals.date ?? ''}
+            disabled={done}
+            max={new Date().toISOString().slice(0, 10)}
+            onChange={(e) => set('date', e.target.value)}
+            className="w-full mt-0.5 px-2 py-1.5 rounded-lg text-[12px] bg-white dark:bg-gray-800 border border-gray-300 dark:border-gray-700 text-gray-800 dark:text-gray-100"
+          />
+        </label>
+      )}
       <div className="flex gap-2 mt-1">
         <button
           disabled={done || !ready}
