@@ -2141,8 +2141,14 @@ function AIChat({ isFullPage = false, onClose, onDragStart }) {
     // Keep lastAction alive for follow-ups
     // DELETE_TRADE removed — it now arrives as type:'pending' (covered by that clause below)
     const keepAliveActions = ['ADD_TRADE', 'CLOSE_TRADE', 'DRAFT_JOURNAL', 'NEEDS_DISAMBIGUATION']
-    if (data.type === 'pending' || (data.type === 'action' && keepAliveActions.includes(data.action))) {
-      setLastAction({ action: data.action, result: data.result })
+    if (
+      data.type === 'pending' ||
+      data.type === 'slotfill' ||
+      (data.type === 'action' && keepAliveActions.includes(data.action))
+    ) {
+      // slotfill carries knownArgs (symbol etc.); pending/action carry result. Either feeds the
+      // strengthened lastActionContext so a TYPED answer (not the form) still binds to this action.
+      setLastAction({ action: data.action, result: data.knownArgs || data.result })
     } else {
       setLastAction(null)
     }
@@ -2158,6 +2164,16 @@ function AIChat({ isFullPage = false, onClose, onDragStart }) {
         actionResult: (data.type === 'action' || data.type === 'pending') ? data.result : null,
         pending: data.type === 'pending'
           ? { token: data.result?.token, action: data.action, preview: data.result?.preview }
+          : null,
+        // multi-turn: a structured slot-fill request renders SlotFillCard (no LLM on the answer)
+        slotfill: data.type === 'slotfill'
+          ? {
+              action: data.action,
+              knownArgs: data.knownArgs || {},
+              missing: data.missing || [],
+              reply: data.reply,
+              suggestion: data.suggestion || null,
+            }
           : null,
       },
     ])
@@ -2553,6 +2569,8 @@ function AIChat({ isFullPage = false, onClose, onDragStart }) {
     // DRAFT_JOURNAL: shown as interactive JournalDraftCard (not inline here, added to messages area separately)
     // __PENDING__: shown as ConfirmCard below (DELETE_TRADE and other money actions via confirm-gate)
     const showConfirm = msg.pending?.token
+    // multi-turn: inline slot-fill form, dismissed once filled/cancelled (reuses confirmDone)
+    const showSlotfill = msg.slotfill && !msg.confirmDone
     const showStandardCard =
       msg.actionType &&
       msg.actionResult &&
@@ -2599,6 +2617,19 @@ function AIChat({ isFullPage = false, onClose, onDragStart }) {
                 markConfirmDone(msg.id)
                 handleAction({ action: 'CANCEL_ACTION', token })
               }}
+            />
+          )}
+          {/* Slot-fill card — missing money-action field; filled answer posts as a structured */}
+          {/* gated action (no LLM), flowing into the same confirm-gate as ConfirmCard. */}
+          {showSlotfill && (
+            <SlotFillCard
+              slot={msg.slotfill}
+              done={msg.confirmDone}
+              onSubmit={(payload) => {
+                markConfirmDone(msg.id)
+                handleAction(payload)
+              }}
+              onCancel={() => markConfirmDone(msg.id)}
             />
           )}
           {/* Standard action card */}
