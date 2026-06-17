@@ -11,6 +11,11 @@ import {
 } from '../utils/globalCache'
 import { useChatRefresh } from '../utils/chatEvents'
 import { PERF_RANGES } from '../components/logs/tradeConstants'
+import {
+  useCompactToolbar,
+  ToolbarMenu,
+  ToolbarMenuSection,
+} from '../components/screen/ScreenToolbarAtoms'
 
 import TradeActionsTab from '../components/logs/TradeActionsTab'
 import AuditTab from '../components/logs/AuditTab'
@@ -77,6 +82,8 @@ export default function LogsPage() {
   const [auditSymbol, setAuditSymbol] = useState('all')
   const [auditSymbols, setAuditSymbols] = useState([])
   const [auditShareOpen, setAuditShareOpen] = useState(false)
+
+  const compact = useCompactToolbar()
 
   // Market-tab state — only loaded when user first opens the Market tab
   const [marketJournals, setMarketJournals] = useState([])
@@ -161,12 +168,14 @@ export default function LogsPage() {
       <div className="flex flex-col h-[calc(100dvh-56px)] overflow-hidden bg-gray-50 dark:bg-gray-950 animate-pulse">
         {/* Toolbar skeleton */}
         <div className="shrink-0 flex items-center gap-1.5 px-3 py-1 border-b border-gray-200 dark:border-gray-800 bg-white dark:bg-gray-900 h-9">
-          <div className="h-6 w-48 bg-gray-100 dark:bg-gray-800 rounded-lg shrink-0" />
-          <div className="w-px h-3.5 bg-gray-200 dark:bg-gray-700 shrink-0" />
-          <div className="h-6 w-44 bg-gray-100 dark:bg-gray-800 rounded-md shrink-0" />
-          <div className="w-px h-3.5 bg-gray-200 dark:bg-gray-700 shrink-0" />
-          <div className="h-6 w-20 bg-gray-100 dark:bg-gray-800 rounded-md shrink-0" />
-          <div className="h-6 w-[140px] bg-gray-100 dark:bg-gray-800 rounded shrink-0" />
+          <div className="h-6 w-32 sm:w-48 bg-gray-100 dark:bg-gray-800 rounded-lg shrink-0" />
+          <div className="hidden sm:block w-px h-3.5 bg-gray-200 dark:bg-gray-700 shrink-0" />
+          <div className="hidden sm:block h-6 w-44 bg-gray-100 dark:bg-gray-800 rounded-md shrink-0" />
+          <div className="hidden sm:block w-px h-3.5 bg-gray-200 dark:bg-gray-700 shrink-0" />
+          <div className="hidden sm:block h-6 w-20 bg-gray-100 dark:bg-gray-800 rounded-md shrink-0" />
+          <div className="hidden sm:block h-6 w-[140px] bg-gray-100 dark:bg-gray-800 rounded shrink-0" />
+          {/* mobile-only ☰ menu placeholder */}
+          <div className="sm:hidden h-6 w-7 bg-gray-100 dark:bg-gray-800 rounded-lg shrink-0" />
           <div className="flex-1" />
           <div className="h-6 w-20 bg-gray-100 dark:bg-gray-800 rounded-md shrink-0" />
         </div>
@@ -199,6 +208,28 @@ export default function LogsPage() {
       </div>
     )
 
+  // Shared view toggle (Database/Gallery) — inline on desktop, inside the ☰ menu on mobile
+  const viewToggle = (
+    <div className="flex items-center gap-0.5 bg-gray-100 dark:bg-gray-800 rounded-md p-0.5">
+      {[
+        { key: 'database', label: 'Database' },
+        { key: 'gallery', label: 'Gallery' },
+      ].map((v) => (
+        <button
+          key={v.key}
+          onClick={() => setView(v.key)}
+          className={`flex-1 px-1.5 py-0.5 rounded text-[10px] font-semibold transition-colors whitespace-nowrap ${
+            view === v.key
+              ? 'bg-white dark:bg-gray-700 text-gray-900 dark:text-white shadow-sm'
+              : 'text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-300'
+          }`}
+        >
+          {v.label}
+        </button>
+      ))}
+    </div>
+  )
+
   return (
     <div className="flex flex-col h-[calc(100dvh-56px)] overflow-hidden bg-gray-50 dark:bg-gray-950">
       {/* ── Sticky toolbar — full-width border-b, DataLab pattern exactly ── */}
@@ -223,108 +254,183 @@ export default function LogsPage() {
         {/* Divider */}
         <div className="w-px h-4 bg-gray-200 dark:bg-gray-700 shrink-0" />
 
-        {/* Middle slot — scrolls horizontally on narrow viewports */}
+        {/* Middle slot — compact ☰ menu on mobile, inline controls on desktop */}
         <div className="flex-1 min-w-0 flex items-center gap-1.5 overflow-x-auto overscroll-x-contain [scrollbar-width:thin] [&::-webkit-scrollbar]:h-1 [&::-webkit-scrollbar-thumb]:bg-gray-300 dark:[&::-webkit-scrollbar-thumb]:bg-gray-700 [&::-webkit-scrollbar-thumb]:rounded-full">
-          {/* Stats: range chips + symbol select */}
-          {activeTab === 'audit' && (
+          {compact ? (
             <>
-              <div className="flex items-center gap-0.5 bg-gray-100 dark:bg-gray-800 rounded-md p-0.5 shrink-0">
-                {PERF_RANGES.map((r) => (
-                  <button
-                    key={r.key}
-                    onClick={() => setAuditRange(r.key)}
-                    className={`px-1.5 py-0.5 rounded text-[10px] font-semibold transition-colors whitespace-nowrap ${
-                      auditRange === r.key
-                        ? 'bg-white dark:bg-gray-700 text-gray-900 dark:text-white shadow-sm'
-                        : 'text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-300'
-                    }`}
-                  >
-                    {r.label}
-                  </button>
-                ))}
-              </div>
-              {auditSymbols.length > 0 && (
-                <>
-                  <div className="w-px h-3.5 bg-gray-200 dark:bg-gray-700 shrink-0" />
-                  <select
-                    value={auditSymbol}
-                    onChange={(e) => setAuditSymbol(e.target.value)}
-                    className="h-6 px-1.5 rounded text-[10px] font-semibold border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 text-gray-700 dark:text-gray-200 focus:outline-none focus:ring-1 focus:ring-blue-400 shrink-0 max-w-[110px]"
-                  >
-                    <option value="all">All Scripts</option>
-                    {auditSymbols.map((s) => (
-                      <option key={s} value={s}>
-                        {s}
-                      </option>
-                    ))}
-                  </select>
-                </>
+              {/* Inline high-frequency control per tab */}
+              {activeTab === 'audit' && (
+                <div className="flex items-center gap-0.5 bg-gray-100 dark:bg-gray-800 rounded-md p-0.5 shrink-0">
+                  {PERF_RANGES.map((r) => (
+                    <button
+                      key={r.key}
+                      onClick={() => setAuditRange(r.key)}
+                      className={`px-1.5 py-0.5 rounded text-[10px] font-semibold transition-colors whitespace-nowrap ${
+                        auditRange === r.key
+                          ? 'bg-white dark:bg-gray-700 text-gray-900 dark:text-white shadow-sm'
+                          : 'text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-300'
+                      }`}
+                    >
+                      {r.label}
+                    </button>
+                  ))}
+                </div>
+              )}
+              {activeTab === 'trades' && (
+                <div className="flex items-center gap-0.5 bg-gray-100 dark:bg-gray-800 rounded-md p-0.5 shrink-0">
+                  {['open', 'all'].map((f) => (
+                    <button
+                      key={f}
+                      onClick={() => setFilter(f)}
+                      className={`px-1.5 py-0.5 rounded text-[10px] font-semibold transition-colors ${
+                        filter === f
+                          ? 'bg-white dark:bg-gray-700 text-gray-900 dark:text-white shadow-sm'
+                          : 'text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-300'
+                      }`}
+                    >
+                      {f === 'open' ? 'Open' : 'All'}
+                    </button>
+                  ))}
+                </div>
+              )}
+              {/* Market: only a View toggle — show it inline, no menu needed */}
+              {activeTab === 'market' && <div className="shrink-0">{viewToggle}</div>}
+
+              {/* ☰ menu holds the rest (Trades only — View + Symbol) */}
+              {activeTab === 'trades' && (
+                <ToolbarMenu ariaLabel="Log options">
+                  <ToolbarMenuSection label="View" divider={false}>
+                    {viewToggle}
+                  </ToolbarMenuSection>
+                  <ToolbarMenuSection label="Symbol">
+                    <div className="relative">
+                      <span className="absolute left-2 top-1/2 -translate-y-1/2 text-gray-400 dark:text-gray-500 text-[10px] pointer-events-none select-none">
+                        ⌕
+                      </span>
+                      <input
+                        type="text"
+                        value={search}
+                        onChange={(e) => setSearch(e.target.value)}
+                        placeholder="Symbol"
+                        list="symbol-datalist"
+                        maxLength={20}
+                        className="pl-5 pr-2 py-1 w-full text-[11px] font-semibold rounded border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-900 text-gray-800 dark:text-gray-200 placeholder-gray-300 dark:placeholder-gray-600 focus:outline-none focus:ring-1 focus:ring-blue-400"
+                      />
+                      <datalist id="symbol-datalist">
+                        {allSymbols.map((s) => (
+                          <option key={s} value={s} />
+                        ))}
+                      </datalist>
+                    </div>
+                  </ToolbarMenuSection>
+                </ToolbarMenu>
+              )}
+              {/* Stats: Script filter — in its own ☰ menu */}
+              {activeTab === 'audit' && auditSymbols.length > 0 && (
+                <ToolbarMenu ariaLabel="Log options">
+                  <ToolbarMenuSection label="Script" divider={false}>
+                    <select
+                      value={auditSymbol}
+                      onChange={(e) => setAuditSymbol(e.target.value)}
+                      className="w-full h-7 px-1.5 rounded text-[11px] font-semibold border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 text-gray-700 dark:text-gray-200 focus:outline-none focus:ring-1 focus:ring-blue-400"
+                    >
+                      <option value="all">All Scripts</option>
+                      {auditSymbols.map((s) => (
+                        <option key={s} value={s}>
+                          {s}
+                        </option>
+                      ))}
+                    </select>
+                  </ToolbarMenuSection>
+                </ToolbarMenu>
               )}
             </>
-          )}
-
-          {/* Trades + Market: view toggle */}
-          {(activeTab === 'trades' || activeTab === 'market') && (
+          ) : (
             <>
-              <div className="flex items-center gap-0.5 bg-gray-100 dark:bg-gray-800 rounded-md p-0.5 shrink-0">
-                {[
-                  { key: 'database', label: 'Database' },
-                  { key: 'gallery', label: 'Gallery' },
-                ].map((v) => (
-                  <button
-                    key={v.key}
-                    onClick={() => setView(v.key)}
-                    className={`px-1.5 py-0.5 rounded text-[10px] font-semibold transition-colors whitespace-nowrap ${
-                      view === v.key
-                        ? 'bg-white dark:bg-gray-700 text-gray-900 dark:text-white shadow-sm'
-                        : 'text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-300'
-                    }`}
-                  >
-                    {v.label}
-                  </button>
-                ))}
-              </div>
-
-              {/* Trades only: open/all filter + symbol search */}
-              {activeTab === 'trades' && (
+              {/* Stats: range chips + symbol select */}
+              {activeTab === 'audit' && (
                 <>
-                  <div className="w-px h-3.5 bg-gray-200 dark:bg-gray-700 shrink-0" />
-
                   <div className="flex items-center gap-0.5 bg-gray-100 dark:bg-gray-800 rounded-md p-0.5 shrink-0">
-                    {['open', 'all'].map((f) => (
+                    {PERF_RANGES.map((r) => (
                       <button
-                        key={f}
-                        onClick={() => setFilter(f)}
-                        className={`px-1.5 py-0.5 rounded text-[10px] font-semibold transition-colors ${
-                          filter === f
+                        key={r.key}
+                        onClick={() => setAuditRange(r.key)}
+                        className={`px-1.5 py-0.5 rounded text-[10px] font-semibold transition-colors whitespace-nowrap ${
+                          auditRange === r.key
                             ? 'bg-white dark:bg-gray-700 text-gray-900 dark:text-white shadow-sm'
                             : 'text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-300'
                         }`}
                       >
-                        {f === 'open' ? 'Open' : 'All'}
+                        {r.label}
                       </button>
                     ))}
                   </div>
+                  {auditSymbols.length > 0 && (
+                    <>
+                      <div className="w-px h-3.5 bg-gray-200 dark:bg-gray-700 shrink-0" />
+                      <select
+                        value={auditSymbol}
+                        onChange={(e) => setAuditSymbol(e.target.value)}
+                        className="h-6 px-1.5 rounded text-[10px] font-semibold border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 text-gray-700 dark:text-gray-200 focus:outline-none focus:ring-1 focus:ring-blue-400 shrink-0 max-w-[110px]"
+                      >
+                        <option value="all">All Scripts</option>
+                        {auditSymbols.map((s) => (
+                          <option key={s} value={s}>
+                            {s}
+                          </option>
+                        ))}
+                      </select>
+                    </>
+                  )}
+                </>
+              )}
 
-                  <div className="relative shrink-0 w-[140px]">
-                    <span className="absolute left-2 top-1/2 -translate-y-1/2 text-gray-400 dark:text-gray-500 text-[10px] pointer-events-none select-none">
-                      ⌕
-                    </span>
-                    <input
-                      type="text"
-                      value={search}
-                      onChange={(e) => setSearch(e.target.value)}
-                      placeholder="Symbol"
-                      list="symbol-datalist"
-                      maxLength={20}
-                      className="pl-5 pr-2 py-0.5 w-full h-6 text-[10px] font-semibold rounded border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-900 text-gray-800 dark:text-gray-200 placeholder-gray-300 dark:placeholder-gray-600 focus:outline-none focus:ring-1 focus:ring-blue-400 transition-all"
-                    />
-                    <datalist id="symbol-datalist">
-                      {allSymbols.map((s) => (
-                        <option key={s} value={s} />
-                      ))}
-                    </datalist>
-                  </div>
+              {/* Trades + Market: view toggle */}
+              {(activeTab === 'trades' || activeTab === 'market') && (
+                <>
+                  <div className="shrink-0">{viewToggle}</div>
+
+                  {activeTab === 'trades' && (
+                    <>
+                      <div className="w-px h-3.5 bg-gray-200 dark:bg-gray-700 shrink-0" />
+
+                      <div className="flex items-center gap-0.5 bg-gray-100 dark:bg-gray-800 rounded-md p-0.5 shrink-0">
+                        {['open', 'all'].map((f) => (
+                          <button
+                            key={f}
+                            onClick={() => setFilter(f)}
+                            className={`px-1.5 py-0.5 rounded text-[10px] font-semibold transition-colors ${
+                              filter === f
+                                ? 'bg-white dark:bg-gray-700 text-gray-900 dark:text-white shadow-sm'
+                                : 'text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-300'
+                            }`}
+                          >
+                            {f === 'open' ? 'Open' : 'All'}
+                          </button>
+                        ))}
+                      </div>
+
+                      <div className="relative shrink-0 w-[140px]">
+                        <span className="absolute left-2 top-1/2 -translate-y-1/2 text-gray-400 dark:text-gray-500 text-[10px] pointer-events-none select-none">
+                          ⌕
+                        </span>
+                        <input
+                          type="text"
+                          value={search}
+                          onChange={(e) => setSearch(e.target.value)}
+                          placeholder="Symbol"
+                          list="symbol-datalist"
+                          maxLength={20}
+                          className="pl-5 pr-2 py-0.5 w-full h-6 text-[10px] font-semibold rounded border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-900 text-gray-800 dark:text-gray-200 placeholder-gray-300 dark:placeholder-gray-600 focus:outline-none focus:ring-1 focus:ring-blue-400 transition-all"
+                        />
+                        <datalist id="symbol-datalist">
+                          {allSymbols.map((s) => (
+                            <option key={s} value={s} />
+                          ))}
+                        </datalist>
+                      </div>
+                    </>
+                  )}
                 </>
               )}
             </>

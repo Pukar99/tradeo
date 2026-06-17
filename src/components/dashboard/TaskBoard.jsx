@@ -832,11 +832,6 @@ function TaskBoard({ initData, mindsetContent }) {
           {/* Ring — fixed, never scrolls */}
           <div className="flex flex-col items-center gap-1 flex-shrink-0 pt-1">
             <Ring pct={fixedProgress} completed={totalDone} total={totalTasks} />
-            <span className="text-[9px] text-gray-400 text-center leading-tight">
-              daily
-              <br />
-              progress
-            </span>
           </div>
 
           {/* Task list — scrolls when overflow */}

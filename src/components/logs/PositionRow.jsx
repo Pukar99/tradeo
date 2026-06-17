@@ -149,42 +149,6 @@ export default function PositionRow({
             </div>
           </div>
 
-          {/* mobile stats + P&L — shown only on xs/sm when full stats bar is hidden */}
-          <div className="sm:hidden flex items-center gap-2 flex-shrink-0">
-            <div className="text-right">
-              <div className="text-[10px] uppercase tracking-wide font-semibold text-gray-400 dark:text-gray-500">
-                Qty
-              </div>
-              <div className="text-[11px] font-bold font-mono text-gray-700 dark:text-gray-300">
-                {totalQty}
-              </div>
-            </div>
-            <div className="text-right">
-              <div className="text-[10px] uppercase tracking-wide font-semibold text-gray-400 dark:text-gray-500">
-                WACC
-              </div>
-              <div className="text-[11px] font-bold font-mono text-gray-700 dark:text-gray-300">
-                Rs.{fmt(wacc)}
-              </div>
-            </div>
-            {hasPnl && (
-              <div
-                className={`flex-shrink-0 px-2 py-1 rounded-lg text-right ${
-                  pnlPos ? 'bg-emerald-50 dark:bg-emerald-500/10' : 'bg-red-50 dark:bg-red-500/10'
-                }`}
-              >
-                <div className="text-[10px] uppercase tracking-wide font-semibold text-gray-400 dark:text-gray-500">
-                  {pnlLabel}
-                </div>
-                <div
-                  className={`text-[11px] font-bold font-mono ${pnlPos ? 'text-emerald-600 dark:text-emerald-400' : 'text-red-600 dark:text-red-400'}`}
-                >
-                  {pnlPos ? '+' : ''}Rs.{fmt(pnlValue)}
-                </div>
-              </div>
-            )}
-          </div>
-
           {/* stats row — desktop */}
           <div className="hidden sm:flex items-center gap-5 shrink-0">
             <StatCell label="Qty" value={totalQty} mono />
@@ -257,6 +221,31 @@ export default function PositionRow({
           </button>
         </div>
 
+        {/* ── mobile stat strip — second row, sm:hidden ── */}
+        <div
+          className="sm:hidden grid grid-cols-4 gap-2 px-4 pb-3 -mt-1 cursor-pointer select-none"
+          onClick={() => setExpanded((e) => !e)}
+          onContextMenu={onContextMenu(menuItems)}
+        >
+          <MobileStat label="Qty" value={totalQty} />
+          <MobileStat label="WACC" value={`Rs.${fmt(wacc)}`} />
+          <MobileStat
+            label="LTP"
+            value={ltpNum != null && !isClosed ? `Rs.${fmt(ltpNum)}` : '—'}
+          />
+          <MobileStat
+            label={pnlLabel}
+            value={hasPnl ? `${pnlPos ? '+' : ''}Rs.${fmt(pnlValue)}` : '—'}
+            color={
+              !hasPnl
+                ? undefined
+                : pnlPos
+                  ? 'text-emerald-600 dark:text-emerald-400'
+                  : 'text-red-600 dark:text-red-400'
+            }
+          />
+        </div>
+
         {/* ── expanded action history ── */}
         {expanded && (
           <div className="border-t border-gray-100 dark:border-gray-800">
@@ -278,6 +267,21 @@ export default function PositionRow({
         )}
       </div>
     </>
+  )
+}
+
+function MobileStat({ label, value, color }) {
+  return (
+    <div className="min-w-0">
+      <div className="text-[9px] uppercase tracking-wide font-semibold text-gray-400 dark:text-gray-500 mb-0.5">
+        {label}
+      </div>
+      <div
+        className={`text-[11px] font-bold font-mono truncate ${color || 'text-gray-700 dark:text-gray-300'}`}
+      >
+        {value}
+      </div>
+    </div>
   )
 }
 

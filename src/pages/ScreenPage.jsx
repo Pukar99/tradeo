@@ -2,8 +2,8 @@
 import {
   useState,
   useEffect,
-  useLayoutEffect,
   useRef,
+  useLayoutEffect,
   lazy,
   Suspense,
   createContext,
@@ -22,16 +22,31 @@ import ErrorBoundary from '../components/ErrorBoundary'
 import ComingSoon from '../components/ComingSoon'
 import UpgradePrompt from '../components/UpgradePrompt'
 import AuthWall from '../components/AuthWall'
+import PageSkeleton from '../components/PageSkeleton'
 
-// ── Screen toolbar slot — same portal pattern as DataLabPage ─────────────────
+// ── Screen toolbar slot — EXACT same portal pattern as DataLabPage.useToolbarSlot ──
+// Context value is a stable useRef object; the hook forces one re-render after DOM
+// commit via useLayoutEffect+setTick so slotRef.current is read AFTER the slot div
+// attaches. This is the proven, in-production pattern.
+//
+// DO NOT rewrite this to a state-backed callback ref (ref={setState}). That variant
+// re-fires the callback with `null` on every toolbar-strip remount (mode/tab/navbar
+// auto-hide re-render), which strands the portal and silently drops StockChart's
+// symbol-search/timeframe controls. The consumers (StockChart/SMC/PriceAction/
+// MultiChart) were written for THIS ref-based contract — keep them in sync if you
+// ever change it. (Regression history: state-backed rewrite dropped the chart
+// controls; reverted to this. See memory feedback_portal_toolbar.)
 const ScreenToolbarSlotCtx = createContext(null)
 
 export function useScreenToolbarSlot(node) {
   const slotRef = useContext(ScreenToolbarSlotCtx)
+  // useLayoutEffect fires synchronously after DOM commit — slotRef.current is
+  // guaranteed populated before paint, so the toolbar never renders blank.
   const [, setTick] = useState(0)
   useLayoutEffect(() => {
     setTick((t) => t + 1)
   }, [])
+
   if (!slotRef?.current) return null
   return createPortal(node, slotRef.current)
 }
@@ -434,7 +449,7 @@ function ScreenInner() {
     () => localStorage.getItem('tradeo_screen_rightOpen') !== 'false'
   )
   const toolbarSlotRef = useRef(null)
-  const { user } = useAuth()
+  const { user, loading: authLoading } = useAuth()
 
   const toggleLeft = () =>
     setLeftOpen((v) => {
@@ -477,6 +492,20 @@ function ScreenInner() {
 
   const isSimple = mode === 'simple'
 
+  // Whole shell is skeleton while /api/auth/me resolves — gating only the content
+  // body would leave the real tab labels (Simple/Complex/SMC…) + market badge text
+  // visible above the skeleton on reload.
+  if (authLoading) {
+    return (
+      <div
+        className="flex flex-col overflow-hidden bg-white dark:bg-gray-900"
+        style={{ height: '100dvh' }}
+      >
+        <PageSkeleton toolbar />
+      </div>
+    )
+  }
+
   return (
     <ScreenToolbarSlotCtx.Provider value={toolbarSlotRef}>
       <div
@@ -493,17 +522,18 @@ function ScreenInner() {
         {/* NOTE: ChartSymbolSearch uses absolute positioning — toolbar slot must
           never be inside overflow-x-auto or the dropdown clips.
 
-          Layout splits at lg:
-          • Desktop (lg+) — single row: [tabs | divider | sub-tabs | divider | slot | badge].
-          • Mobile (<lg)  — two rows so the chart controls aren't crushed by the
-            tabs: row 1 = tab strips + status dot (h-scrolls if needed), row 2 =
-            the full-width toolbar slot (symbol search + chart controls). */}
+          Single row at every breakpoint: [tabs (scroll) | divider | sub-tabs |
+          divider | slot | badge]. On mobile the chart toolbar is compact
+          (search + menu only — see StockChart compactToolbar), so it fits on the
+          same line as the tabs. The tab group scrolls horizontally if it overflows;
+          the slot stays OUTSIDE that scroll container so the search dropdown never
+          clips. */}
         <div
-          className="flex flex-col lg:flex-row lg:items-center gap-1 lg:gap-2 px-3 py-1 border-b border-gray-100 dark:border-gray-800/80 shrink-0 bg-white/80 dark:bg-gray-900/80 backdrop-blur-sm"
+          className="flex flex-row items-center gap-1.5 lg:gap-2 px-3 py-1 border-b border-gray-100 dark:border-gray-800/80 shrink-0 bg-white/80 dark:bg-gray-900/80 backdrop-blur-sm"
           onMouseEnter={showNavbar}
         >
-          {/* Row 1 — tab strips (+ market badge). On mobile this scrolls
-            horizontally on its own line; on desktop it sits inline. */}
+          {/* Tab strips (+ mobile market dot) — scrolls horizontally if it
+            overflows so it never pushes the toolbar slot off-screen. */}
           <div className="flex items-center gap-2 min-w-0 overflow-x-auto no-scrollbar lg:overflow-visible">
             <TabStrip
               tabs={[
@@ -529,18 +559,16 @@ function ScreenInner() {
                 <TabStrip tabs={COMPLEX_TABS} active={complexTab} onChange={handleComplexTab} />
               )}
             </div>
-
-            {/* Market badge — pinned to the right of row 1 on mobile (dot only),
-              hidden here on desktop where it lives at the far end of the row. */}
-            <div className="ml-auto shrink-0 lg:hidden">
-              <MarketStatusBadge compact />
-            </div>
           </div>
 
           <div className="hidden lg:block w-px h-5 bg-gray-300/80 dark:bg-gray-600/70 shrink-0 mx-0.5" />
 
-          {/* Row 2 (mobile) / inline middle (desktop) — toolbar slot gets the full
-            width on phones instead of fighting the tabs for space. */}
+          {/* Toolbar slot — its own flex child so the symbol-search dropdown
+            (useFixedDropdown → fixed/portal, escapes overflow) never clips even
+            though the slot is overflow-x-auto. flex-1 so it takes the remaining
+            width and scrolls horizontally when a tab's toolbar is wide (SMC/PA
+            inject many controls here); the General tab's compact search+menu just
+            sits flush left with no scroll needed. */}
           <div
             ref={toolbarSlotRef}
             className="flex-1 flex items-center gap-1.5 min-w-0 overflow-x-auto no-scrollbar"

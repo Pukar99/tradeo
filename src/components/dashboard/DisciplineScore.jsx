@@ -162,15 +162,11 @@ function DisciplineScore({ initData }) {
         )}
       </div>
 
-      {/* Ring + bars side by side */}
-      <div className="flex items-start gap-4">
+      {/* Ring + bars side by side — gap-3 to match TaskBoard's ring spacing so the
+          two stacked left/right cards line up. */}
+      <div className="flex items-start gap-3">
         <div className="flex flex-col items-center gap-1">
           <Ring score={score} />
-          <span className="text-[10px] text-gray-400 text-center leading-tight">
-            composite
-            <br />
-            score
-          </span>
         </div>
 
         <div className="flex-1 space-y-2.5 pt-1">

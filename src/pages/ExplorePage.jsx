@@ -5,6 +5,7 @@ import { useParams, useNavigate } from 'react-router-dom'
 import ErrorBoundary from '../components/ErrorBoundary'
 import ComingSoon from '../components/ComingSoon'
 import AuthWall from '../components/AuthWall'
+import PageSkeleton from '../components/PageSkeleton'
 import { useAuth } from '../context/AuthContext'
 
 const IPOPage = lazy(() => import('./IPOPage'))
@@ -107,12 +108,11 @@ const VALID_IDS = new Set(TABS.map((t) => t.id))
 // Tabs that require login — risklab is public
 const AUTH_REQUIRED_IDS = new Set(['ipo', 'aisignal', 'sharemy'])
 
+// Content-shaped skeleton for lazy-tab load — fills the absolute inset-0 swap slot
+// and mirrors the tab's layout (cards + panel + rows) so it matches content size,
+// not a floating spinner (design.md §3: skeletons for in-page loading).
 function TabSpinner() {
-  return (
-    <div className="flex items-center justify-center py-20">
-      <div className="w-6 h-6 border-2 border-blue-600 border-t-transparent rounded-full animate-spin" />
-    </div>
-  )
+  return <PageSkeleton variant="tab" />
 }
 
 // ── ExplorePage ───────────────────────────────────────────────────────────────

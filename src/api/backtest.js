@@ -19,6 +19,8 @@ import { API } from './index'
 // =============================================================================
 
 export const btGetSymbols = () => API.get('/api/backtest/symbols')
+export const btGetSymbolMeta = (symbol) =>
+  API.get('/api/backtest/symbol-meta', { params: { symbol } })
 export const btGetOHLCV = (symbol, from, to) =>
   API.get('/api/backtest/ohlcv', { params: { symbol, from, to } })
 export const btGetSettlementDate = (entry_date) =>
@@ -29,6 +31,9 @@ export const btGetSettlementDate = (entry_date) =>
 // =============================================================================
 
 export const btCreateSession = (data) => API.post('/api/backtest/session', data)
+export const btGetHistory = (limit = 10, offset = 0) =>
+  API.get('/api/backtest/history', { params: { limit, offset } })
+export const btDeleteHistory = (id) => API.delete(`/api/backtest/history/${id}`)
 export const btGetSession = () => API.get('/api/backtest/session')
 export const btUpdateSession = (id, data) => API.put(`/api/backtest/session/${id}`, data)
 export const btEndSession = (id) => API.delete(`/api/backtest/session/${id}`)

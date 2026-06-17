@@ -25,6 +25,30 @@ export function dispatchDebrief({ symbol, debrief }) {
   window.dispatchEvent(new CustomEvent(DEBRIEF_EVENT, { detail: { symbol, debrief } }))
 }
 
+// Fired when a HomePage alert is clicked — tells the matching card (goals,
+// watchlist, …) to scroll its item into view and flash a highlight.
+// `domain`: 'goals' | 'watchlist' | 'positions'  ·  `key`: id or symbol to match.
+export const HIGHLIGHT_EVENT = 'tradeo:highlight-item'
+export function dispatchHighlight({ domain, key }) {
+  window.dispatchEvent(new CustomEvent(HIGHLIGHT_EVENT, { detail: { domain, key } }))
+}
+
+// Subscribe to highlight requests for a given domain. The callback receives the
+// `key` (id/symbol) to highlight. The dispatch may arrive a tick before the target
+// list has rendered (e.g. right after navigating home), so callers debounce the
+// scroll themselves. Returns nothing; cleans up on unmount.
+export function useHighlightListener(domain, onHighlight) {
+  const cbRef = useRef(onHighlight)
+  cbRef.current = onHighlight
+  useEffect(() => {
+    const handler = (e) => {
+      if (e.detail?.domain === domain && e.detail?.key != null) cbRef.current(e.detail.key)
+    }
+    window.addEventListener(HIGHLIGHT_EVENT, handler)
+    return () => window.removeEventListener(HIGHLIGHT_EVENT, handler)
+  }, [domain])
+}
+
 // =============================================================================
 // 2. REFRESH MAP
 // =============================================================================

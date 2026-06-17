@@ -1,9 +1,9 @@
 // === BacktestPage.jsx — backtest page root: session orchestration, modals, chart, keyboard shortcuts ===
 
-import { useState, useCallback, useEffect, useRef } from 'react'
+import { useState, useCallback, useEffect } from 'react'
 import { useBacktestSession } from '../../hooks/useBacktestSession'
 import { useBacktestEngine } from '../../hooks/useBacktestEngine'
-import BacktestSetupPanel from './BacktestSetupPanel'
+import BacktestHome from './BacktestHome'
 import BacktestActivePanel from './BacktestActivePanel'
 import BacktestChart from './BacktestChart'
 import BacktestControls from './BacktestControls'
@@ -25,6 +25,7 @@ export default function BacktestPage() {
     loadSession,
     switchToScript,
     advanceCursor,
+    flushPersist,
     settlePositions,
     addPositionLocal,
     updatePositionLocal,
@@ -43,6 +44,8 @@ export default function BacktestPage() {
   const [speed, setSpeedState] = useState('1')
   // isPlaying is derived from a ref in the engine — we use a React state copy for UI
   const [isPlaying, setIsPlaying] = useState(false)
+  // Exit/action error toast — set by manual exit and by engine auto SL/TP failures
+  const [exitError, setExitError] = useState('')
 
   // Load session on mount (restore if active)
   useEffect(() => {
@@ -50,6 +53,14 @@ export default function BacktestPage() {
   }, [loadSession])
 
   const currentCandle = candles[cursorIndex] || null
+
+  // Step-back is a chart-view rewind only and is disabled once any position exists
+  // (settlements/SL/TP/exits are irreversible — see useBacktestEngine stepBack note).
+  const hasAnyPosition = (currentScript?.positions || []).length > 0
+  const stepBackDisabled = isPlaying || cursorIndex <= 0 || hasAnyPosition
+  const stepBackReason = hasAnyPosition
+    ? 'Step back is unavailable after a position is opened (settlements can’t be undone)'
+    : 'Step back (ArrowLeft)'
 
   // ── SL/TP Breach handlers ─────────────────────────────────────────────────────
   const handleSLBreach = useCallback((data) => {
@@ -67,6 +78,13 @@ export default function BacktestPage() {
     setShowReport(true)
   }, [])
 
+  // Surface engine-side action failures (auto SL/TP exits) and stop the UI play state
+  // so the engine's internal pause is reflected in the controls.
+  const handleActionError = useCallback((msg) => {
+    setIsPlaying(false)
+    setExitError(msg)
+  }, [])
+
   // ── Engine ────────────────────────────────────────────────────────────────────
   // The engine uses internal refs — its play/pause/step callbacks are stable
   const engine = useBacktestEngine({
@@ -79,6 +97,7 @@ export default function BacktestPage() {
     closePositionLocal,
     onSLBreach: handleSLBreach,
     onTPHit: handleTPHit,
+    onActionError: handleActionError,
     onDataEnd: handleDataEnd,
   })
 
@@ -90,7 +109,8 @@ export default function BacktestPage() {
   const handlePause = useCallback(() => {
     setIsPlaying(false)
     engine.pause()
-  }, [engine])
+    flushPersist() // persist the exact paused cursor immediately
+  }, [engine, flushPersist])
 
   const handleStep = useCallback(() => {
     setIsPlaying(false)
@@ -117,8 +137,6 @@ export default function BacktestPage() {
   }, [])
 
   // ── Full exit (from panel button) ─────────────────────────────────────────────
-  const [exitError, setExitError] = useState('')
-
   // Auto-dismiss exit error toast after 4 seconds
   useEffect(() => {
     if (!exitError) return
@@ -222,6 +240,9 @@ export default function BacktestPage() {
     },
   }
 
+  // ── No active session → redesigned home (lifetime KPIs + history + setup) ───────
+  if (!session) return <BacktestHome onSessionStarted={sidePanelSetupProps.onSessionStarted} />
+
   const sidePanelActiveProps = {
     session,
     currentScript,
@@ -247,13 +268,9 @@ export default function BacktestPage() {
   // ── Main layout ───────────────────────────────────────────────────────────────
   return (
     <div className="flex flex-1 overflow-hidden min-h-0">
-      {/* LEFT PANEL — desktop only */}
+      {/* LEFT PANEL — desktop only (session is always active past this point) */}
       <div className="hidden md:flex w-[260px] min-w-[240px] border-r border-gray-100 dark:border-gray-800 bg-white dark:bg-gray-900 flex-col shrink-0 overflow-hidden">
-        {!session ? (
-          <BacktestSetupPanel {...sidePanelSetupProps} />
-        ) : (
-          <BacktestActivePanel {...sidePanelActiveProps} />
-        )}
+        <BacktestActivePanel {...sidePanelActiveProps} />
       </div>
 
       {/* CENTER: Chart + Controls */}
@@ -264,7 +281,7 @@ export default function BacktestPage() {
                         border-b border-gray-100 dark:border-gray-800 bg-white dark:bg-gray-900"
         >
           <span className="text-[11px] font-bold text-gray-700 dark:text-gray-200">
-            {session ? session.strategy_name : 'Backtesting'}
+            {session.strategy_name}
           </span>
           <button
             onClick={() => setMobilePanelOpen(true)}
@@ -272,7 +289,7 @@ export default function BacktestPage() {
                        bg-gray-100 dark:bg-gray-800 text-gray-600 dark:text-gray-300
                        hover:bg-gray-200 dark:hover:bg-gray-700 transition-colors"
           >
-            {session ? 'Positions' : 'Setup'}
+            Positions
             <svg
               className="w-3 h-3"
               viewBox="0 0 16 16"
@@ -289,7 +306,7 @@ export default function BacktestPage() {
           style={{ position: 'relative', flex: 1, minHeight: 0, overflow: 'hidden' }}
           className="bg-white dark:bg-gray-950"
         >
-          {session && candles.length > 0 ? (
+          {candles.length > 0 ? (
             <div style={{ position: 'absolute', inset: 0 }}>
               <BacktestChart
                 candles={candles}
@@ -299,25 +316,25 @@ export default function BacktestPage() {
             </div>
           ) : (
             <div className="w-full h-full flex items-center justify-center text-[12px] text-gray-400">
-              {session ? 'Loading chart data…' : 'Configure and start a backtest to begin'}
+              Loading chart data…
             </div>
           )}
         </div>
 
-        {session && (
-          <BacktestControls
-            playing={isPlaying}
-            speed={speed}
-            cursorIndex={cursorIndex}
-            totalCandles={candles.length}
-            currentDate={currentCandle?.date || currentScript?.current_date_val?.slice(0, 10)}
-            onPlay={handlePlay}
-            onPause={handlePause}
-            onStep={handleStep}
-            onStepBack={handleStepBack}
-            onSpeedChange={handleSpeedChange}
-          />
-        )}
+        <BacktestControls
+          playing={isPlaying}
+          speed={speed}
+          cursorIndex={cursorIndex}
+          totalCandles={candles.length}
+          currentDate={currentCandle?.date || currentScript?.current_date_val?.slice(0, 10)}
+          stepBackDisabled={stepBackDisabled}
+          stepBackReason={stepBackReason}
+          onPlay={handlePlay}
+          onPause={handlePause}
+          onStep={handleStep}
+          onStepBack={handleStepBack}
+          onSpeedChange={handleSpeedChange}
+        />
       </div>
 
       {/* Mobile left panel sheet */}
@@ -338,7 +355,7 @@ export default function BacktestPage() {
             </div>
             <div className="shrink-0 flex items-center justify-between px-4 pb-2.5 border-b border-gray-100 dark:border-gray-800">
               <span className="text-[13px] font-bold text-gray-800 dark:text-gray-100">
-                {session ? 'Active Session' : 'Setup Backtest'}
+                Active Session
               </span>
               <button
                 onClick={() => setMobilePanelOpen(false)}
@@ -348,11 +365,7 @@ export default function BacktestPage() {
               </button>
             </div>
             <div className="flex-1 overflow-y-auto min-h-0">
-              {!session ? (
-                <BacktestSetupPanel {...sidePanelSetupProps} />
-              ) : (
-                <BacktestActivePanel {...sidePanelActiveProps} />
-              )}
+              <BacktestActivePanel {...sidePanelActiveProps} />
             </div>
           </div>
         </>

@@ -697,8 +697,21 @@ const TIMEFRAMES = ['6M', '1Y', '3Y', 'ALL']
 const INDICATORS = ['MA', 'EMA', 'BB', 'RSI', 'MACD', 'ATR']
 
 // ── Indicator + Drawing Tools dropdown ────────────────────────────────────────
-function ChartIndicatorDropdown({ activeTool, setActiveTool, onClearDrawings, drawCount }) {
-  const { activeIndicators: _ai, toggleIndicator } = useScreen() || {}
+function ChartIndicatorDropdown({
+  activeTool,
+  setActiveTool,
+  onClearDrawings,
+  drawCount,
+  compact = false,
+}) {
+  const {
+    activeIndicators: _ai,
+    toggleIndicator,
+    chartType,
+    setChartType,
+    timeframe,
+    setTimeframe,
+  } = useScreen() || {}
   const activeIndicators = Array.isArray(_ai) ? _ai : []
   const { triggerRef, open, setOpen, portal } = useFixedDropdown('right')
 
@@ -741,6 +754,102 @@ function ChartIndicatorDropdown({ activeTool, setActiveTool, onClearDrawings, dr
       {/* Dropdown — portalled to body, fixed position, never clipped */}
       {portal(
         <div className="w-[270px] bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-700 rounded-2xl shadow-2xl overflow-hidden">
+          {/* Timeframe section — mobile only. On mobile the toolbar is just
+            search + this menu, so the timeframes live here. */}
+          {compact && (
+            <>
+              <div className="px-3 pt-3 pb-2.5">
+                <p className="text-[10px] font-semibold text-gray-400 dark:text-gray-500 uppercase tracking-widest mb-2">
+                  Timeframe
+                </p>
+                <div className="flex flex-wrap gap-1">
+                  {TIMEFRAMES.map((tf) => (
+                    <button
+                      key={tf}
+                      onClick={() => setTimeframe(tf)}
+                      className={`px-2.5 py-0.5 rounded-md text-[10px] font-bold border transition-all ${
+                        timeframe === tf
+                          ? 'bg-blue-500 border-blue-500 text-white shadow-sm'
+                          : 'border-gray-200 dark:border-gray-700 text-gray-500 dark:text-gray-400 hover:border-blue-300 hover:text-blue-500 dark:hover:border-blue-600 dark:hover:text-blue-400'
+                      }`}
+                    >
+                      {tf}
+                    </button>
+                  ))}
+                </div>
+              </div>
+              <div className="h-px bg-gray-100 dark:bg-gray-800 mx-3" />
+            </>
+          )}
+
+          {/* Chart type section — mobile only (on desktop it lives inline in the
+            toolbar). Lets the compact toolbar drop the standalone type toggle. */}
+          {compact && (
+            <>
+              <div className="px-3 pt-3 pb-2.5">
+                <p className="text-[10px] font-semibold text-gray-400 dark:text-gray-500 uppercase tracking-widest mb-2">
+                  Chart Type
+                </p>
+                <div className="flex gap-1">
+                  {[
+                    {
+                      type: 'candlestick',
+                      label: 'Candles',
+                      icon: (
+                        <svg
+                          className="w-3.5 h-3.5"
+                          viewBox="0 0 24 24"
+                          fill="none"
+                          stroke="currentColor"
+                          strokeWidth={1.8}
+                          strokeLinecap="round"
+                        >
+                          {/* left candle: wick + body */}
+                          <line x1="8" y1="3" x2="8" y2="21" />
+                          <rect x="5.5" y="7" width="5" height="8" rx="1" fill="currentColor" stroke="none" />
+                          {/* right candle: wick + body */}
+                          <line x1="16" y1="5" x2="16" y2="19" />
+                          <rect x="13.5" y="9" width="5" height="7" rx="1" />
+                        </svg>
+                      ),
+                    },
+                    {
+                      type: 'line',
+                      label: 'Line',
+                      icon: (
+                        <svg
+                          className="w-3.5 h-3.5"
+                          viewBox="0 0 24 24"
+                          fill="none"
+                          stroke="currentColor"
+                          strokeWidth={1.8}
+                          strokeLinecap="round"
+                          strokeLinejoin="round"
+                        >
+                          <polyline points="3 15 9 9 13 13 21 5" />
+                        </svg>
+                      ),
+                    },
+                  ].map(({ type, label, icon }) => (
+                    <button
+                      key={type}
+                      onClick={() => setChartType(type)}
+                      className={`flex items-center gap-1.5 px-2.5 py-1 rounded-md text-[10px] font-semibold border transition-all ${
+                        chartType === type
+                          ? 'bg-blue-500 border-blue-500 text-white shadow-sm'
+                          : 'border-gray-200 dark:border-gray-700 text-gray-500 dark:text-gray-400 hover:border-blue-300 hover:text-blue-500 dark:hover:border-blue-600 dark:hover:text-blue-400'
+                      }`}
+                    >
+                      {icon}
+                      {label}
+                    </button>
+                  ))}
+                </div>
+              </div>
+              <div className="h-px bg-gray-100 dark:bg-gray-800 mx-3" />
+            </>
+          )}
+
           {/* Indicators section */}
           <div className="px-3 pt-3 pb-2.5">
             <p className="text-[10px] font-semibold text-gray-400 dark:text-gray-500 uppercase tracking-widest mb-2">
@@ -809,8 +918,12 @@ function ChartIndicatorDropdown({ activeTool, setActiveTool, onClearDrawings, dr
 }
 
 // Essential controls: chart type + timeframes only
-function ChartHUDControls() {
+function ChartHUDControls({ compact = false }) {
   const { chartType, setChartType, timeframe, setTimeframe } = useScreen() || {}
+
+  // Compact (mobile): the inline toolbar is just search + menu; chart-type and
+  // timeframes both live inside the indicators dropdown, so render nothing here.
+  if (compact) return null
 
   return (
     <div className="flex items-center gap-1 min-w-0" style={{ whiteSpace: 'nowrap' }}>
@@ -1343,6 +1456,19 @@ export default function StockChart({
   const [drawVersion, setDrawVersion] = useState(0) // bump to repaint canvas
   const [chartBuiltVer, setChartBuiltVer] = useState(0) // bumps when chart instance is created
 
+  // Compact toolbar below lg (1024px) — the breakpoint where ScreenPage gives the
+  // toolbar its own row. In compact mode the chart-type toggle folds into the
+  // indicators dropdown so the toolbar stays a single row on phones/tablets.
+  const [compactToolbar, setCompactToolbar] = useState(
+    () => window.matchMedia('(max-width: 1023px)').matches
+  )
+  useEffect(() => {
+    const mq = window.matchMedia('(max-width: 1023px)')
+    const fn = (e) => setCompactToolbar(e.matches)
+    mq.addEventListener('change', fn)
+    return () => mq.removeEventListener('change', fn)
+  }, [])
+
   // SMC overlay series — declared after chartBuiltVer to avoid TDZ in the overlay useEffect
   const smcSeriesRef = useRef([])
 
@@ -1709,15 +1835,23 @@ export default function StockChart({
           The slot container in ScreenPage uses overflow-x-auto for the rest of
           the controls; search is shrink-0 so it anchors at the left. */}
         <ChartSymbolSearch />
-        <div className="w-px h-4 bg-gray-200 dark:bg-gray-700 shrink-0" />
-        {/* Chart type + timeframes — scrollable section */}
-        <div className="flex-1 overflow-x-auto min-w-0 no-scrollbar">
-          <ChartHUDControls />
-        </div>
-        {/* Indicators + drawing tools — always at far right, outside overflow */}
+        {/* Compact (mobile): the row is just search + menu — timeframes/chart-type
+          live inside the menu. Desktop keeps the inline controls + divider. */}
+        {!compactToolbar && (
+          <>
+            <div className="w-px h-4 bg-gray-200 dark:bg-gray-700 shrink-0" />
+            {/* Chart type + timeframes — scrollable section */}
+            <div className="flex-1 overflow-x-auto min-w-0 no-scrollbar">
+              <ChartHUDControls compact={compactToolbar} />
+            </div>
+          </>
+        )}
+        {/* Indicators + drawing tools — always at far right, outside overflow.
+          On compact, also hosts the timeframe + chart-type sections. */}
         <ChartIndicatorDropdown
           activeTool={activeTool}
           setActiveTool={setActiveTool}
+          compact={compactToolbar}
           drawCount={drawingsRef.current.length}
           onClearDrawings={() => {
             drawingsRef.current = []

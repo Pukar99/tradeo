@@ -6,7 +6,7 @@
 //   2. NEPSEChart     — full chart with range selector; fixed=true = dual daily/weekly panels
 // =============================================================================
 
-import { useEffect, useRef, useState } from 'react'
+import { memo, useCallback, useEffect, useRef, useState } from 'react'
 import { getNepseChart as _getNepseChartCached, getNepseWeeklyChart } from '../utils/globalCache'
 import { useTheme } from '../context/ThemeContext'
 
@@ -23,7 +23,7 @@ const ranges = [
 // 1. NEPSE MINI CHART
 // =============================================================================
 
-function NEPSEMiniChart({
+const NEPSEMiniChart = memo(function NEPSEMiniChart({
   data,
   label,
   height = 200,
@@ -268,7 +268,7 @@ function NEPSEMiniChart({
       </div>
     </div>
   )
-}
+})
 
 // =============================================================================
 // 2. NEPSE CHART
@@ -317,24 +317,26 @@ function NEPSEChart({ fixed = false }) {
     setMobileTab(tab)
   }
 
-  if (fixed) {
-    const handleDailyRange = (r) => {
-      if (rangeSyncLockRef.current) return
-      rangeSyncLockRef.current = true
-      setWeeklyRange(r)
-      setTimeout(() => {
-        rangeSyncLockRef.current = false
-      }, 50)
-    }
-    const handleWeeklyRange = (r) => {
-      if (rangeSyncLockRef.current) return
-      rangeSyncLockRef.current = true
-      setDailyRange(r)
-      setTimeout(() => {
-        rangeSyncLockRef.current = false
-      }, 50)
-    }
+  // Stable identities so the memoized NEPSEMiniChart children don't re-render on
+  // every crosshair/range sync state change. Refs + setState are stable → [] deps.
+  const handleDailyRange = useCallback((r) => {
+    if (rangeSyncLockRef.current) return
+    rangeSyncLockRef.current = true
+    setWeeklyRange(r)
+    setTimeout(() => {
+      rangeSyncLockRef.current = false
+    }, 50)
+  }, [])
+  const handleWeeklyRange = useCallback((r) => {
+    if (rangeSyncLockRef.current) return
+    rangeSyncLockRef.current = true
+    setDailyRange(r)
+    setTimeout(() => {
+      rangeSyncLockRef.current = false
+    }, 50)
+  }, [])
 
+  if (fixed) {
     return (
       <div className="hp-card bg-white/70 dark:bg-gray-900/60 backdrop-blur-md rounded-2xl border border-white/60 dark:border-white/10 shadow-sm overflow-hidden">
         {/* Mobile toggle — D / W pill, hidden on desktop */}
@@ -350,6 +352,8 @@ function NEPSEChart({ fixed = false }) {
               <button
                 key={t.id}
                 onClick={() => handleMobileTabSwitch(t.id)}
+                aria-pressed={mobileTab === t.id}
+                aria-label={`Show ${t.label} NEPSE chart`}
                 className={`px-2.5 py-0.5 rounded-md text-[10px] font-semibold transition-all ${
                   mobileTab === t.id
                     ? 'bg-white dark:bg-gray-700 text-gray-900 dark:text-white shadow-sm'
@@ -565,6 +569,8 @@ function NEPSEChart({ fixed = false }) {
             <button
               key={r.value}
               onClick={() => setRange(r.value)}
+              aria-pressed={range === r.value}
+              aria-label={`Show ${r.label} range`}
               className={`px-2 py-1 rounded text-xs font-medium transition-colors ${range === r.value ? 'bg-blue-600 text-white' : 'bg-gray-100 dark:bg-gray-700 text-gray-600 dark:text-gray-300 hover:bg-gray-200 dark:hover:bg-gray-600'}`}
             >
               {r.label}

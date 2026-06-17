@@ -15,6 +15,7 @@ import { ComplexTabProvider } from '../hooks/useComplexTab.jsx'
 import ErrorBoundary from '../components/ErrorBoundary'
 import UpgradePrompt from '../components/UpgradePrompt'
 import AuthWall from '../components/AuthWall'
+import PageSkeleton from '../components/PageSkeleton'
 import { useAuth } from '../context/AuthContext'
 
 // ── Toolbar slot — portal approach ────────────────────────────────────────────
@@ -249,18 +250,18 @@ function InfoButton({ tab }) {
 
 // ── Loading fallback ──────────────────────────────────────────────────────────
 
+// Content-shaped skeleton for lazy-tab load — mirrors the tab's layout (cards +
+// chart panel + rows) so it matches content size instead of a floating spinner
+// (design.md §3: skeletons for in-page loading).
 function TabLoader() {
-  return (
-    <div className="flex-1 flex items-center justify-center">
-      <div className="w-5 h-5 border-2 border-blue-600 border-t-transparent rounded-full animate-spin" />
-    </div>
-  )
+  return <PageSkeleton variant="tab" />
 }
 
 // ── Tab content ───────────────────────────────────────────────────────────────
 
 function TabContent({ activeTab }) {
   const { user } = useAuth()
+  // Auth-resolve is handled by the page-level skeleton gate; here `loading` is false.
   if (!user) return <AuthWall subtitle="Sign in to access Data Lab analytics" />
 
   if (activeTab === 'performance')
@@ -326,7 +327,7 @@ export default function DataLabPage() {
     safeSessionGet('tradeo_datalab_tab', 'performance')
   )
   const slotRef = useRef(null)
-  const { user } = useAuth()
+  const { user, loading: authLoading } = useAuth()
 
   // Opt into navbar auto-hide — activates on mount, restores on unmount
   useNavbarAutoHide()
@@ -335,6 +336,19 @@ export default function DataLabPage() {
   function handleTab(id) {
     setActiveTab(id)
     safeSessionSet('tradeo_datalab_tab', id)
+  }
+
+  // Whole shell is skeleton while /api/auth/me resolves — gating only the content
+  // body would leave the real tab labels visible above the skeleton on reload.
+  if (authLoading) {
+    return (
+      <div
+        className="flex flex-col overflow-hidden bg-white dark:bg-gray-900"
+        style={{ height: '100dvh' }}
+      >
+        <PageSkeleton toolbar />
+      </div>
+    )
   }
 
   return (

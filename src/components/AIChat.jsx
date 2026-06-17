@@ -1691,7 +1691,7 @@ const FOLLOW_UPS = {
 }
 
 // ── Main AIChat component ────────────────────────────────────────────────────
-function AIChat({ isFullPage = false, onClose }) {
+function AIChat({ isFullPage = false, onClose, onDragStart }) {
   const { user } = useAuth()
   const { isDark, toggleTheme } = useTheme()
   const { t, lang } = useLanguage()
@@ -2565,11 +2565,13 @@ function AIChat({ isFullPage = false, onClose }) {
     <div
       className={`flex flex-col h-full ${isFloat ? 'bg-transparent' : 'bg-white dark:bg-gray-950'}`}
     >
-      {/* ── Header ── */}
+      {/* ── Header ── (floating: doubles as the drag handle) */}
       <div
+        onMouseDown={isFloat ? onDragStart : undefined}
+        onTouchStart={isFloat ? onDragStart : undefined}
         className={`flex items-center justify-between px-3 py-2.5 shrink-0 border-b ${
           isFloat
-            ? 'bg-white/20 dark:bg-black/20 border-white/20 dark:border-white/8'
+            ? 'bg-white/20 dark:bg-black/20 border-white/20 dark:border-white/8 cursor-move select-none'
             : 'bg-white dark:bg-gray-950 border-gray-100 dark:border-gray-800'
         }`}
       >
@@ -2585,7 +2587,12 @@ function AIChat({ isFullPage = false, onClose }) {
             </div>
           </div>
         </div>
-        <div className="flex items-center gap-1">
+        {/* stopPropagation so clicking an action doesn't begin a header drag */}
+        <div
+          className="flex items-center gap-1"
+          onMouseDown={isFloat ? (e) => e.stopPropagation() : undefined}
+          onTouchStart={isFloat ? (e) => e.stopPropagation() : undefined}
+        >
           {/* History / sessions button */}
           {user && (
             <button
@@ -2624,6 +2631,24 @@ function AIChat({ isFullPage = false, onClose }) {
                   strokeLinejoin="round"
                   strokeWidth={2}
                   d="M4 8V4m0 0h4M4 4l5 5m11-1V4m0 0h-4m4 0l-5 5M4 16v4m0 0h4m-4 0l5-5m11 5l-5-5m5 5v-4m0 4h-4"
+                />
+              </svg>
+            </button>
+          )}
+          {/* Close — floating only (the full page has its own nav) */}
+          {isFloat && onClose && (
+            <button
+              onClick={onClose}
+              aria-label="Close chat"
+              className="text-gray-400 hover:text-gray-600 dark:hover:text-gray-300 w-6 h-6 rounded-lg hover:bg-black/5 dark:hover:bg-white/5 flex items-center justify-center transition-colors"
+              title="Close chat"
+            >
+              <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  strokeWidth={2}
+                  d="M6 18L18 6M6 6l12 12"
                 />
               </svg>
             </button>
@@ -2687,46 +2712,9 @@ function AIChat({ isFullPage = false, onClose }) {
         </div>
       )}
 
-      {/* ── Quick action chips ── */}
-      {user && (
-        <div
-          className={`flex gap-1.5 px-3 py-2 shrink-0 border-b overflow-x-auto no-scrollbar ${
-            isFloat
-              ? 'bg-white/10 dark:bg-black/10 border-white/15 dark:border-white/6'
-              : 'bg-white dark:bg-gray-950 border-gray-100 dark:border-gray-800'
-          }`}
-        >
-          {QUICK_CHIPS.map((chip) =>
-            chip.id === 'brief' ? (
-              <button
-                key={chip.id}
-                onClick={handleBriefChip}
-                className={`flex items-center gap-1 px-2.5 py-1 rounded-full border text-[10px] font-semibold whitespace-nowrap transition-all flex-shrink-0 ${
-                  isFloat
-                    ? 'bg-white/30 dark:bg-white/8 border-white/40 dark:border-white/12'
-                    : 'bg-white dark:bg-gray-900'
-                } ${chip.color}`}
-              >
-                <span>{chip.icon}</span>
-                <span>{chip.label}</span>
-              </button>
-            ) : (
-              <button
-                key={chip.id}
-                onClick={() => setActiveForm(activeForm === chip.id ? null : chip.id)}
-                className={`flex items-center gap-1 px-2.5 py-1 rounded-full border text-[10px] font-semibold whitespace-nowrap transition-all flex-shrink-0 ${
-                  activeForm === chip.id
-                    ? 'bg-gray-900 dark:bg-white text-white dark:text-gray-900 border-gray-900 dark:border-white'
-                    : `${isFloat ? 'bg-white/30 dark:bg-white/8 border-white/40 dark:border-white/12' : 'bg-white dark:bg-gray-900'} ${chip.color}`
-                }`}
-              >
-                <span>{chip.icon}</span>
-                <span>{chip.label}</span>
-              </button>
-            )
-          )}
-        </div>
-      )}
+      {/* ── Quick action chips: REMOVED — these actions move to `/` slash commands
+            (next session). The QuickForm machinery (setActiveForm/'buy'/'sell'/etc.)
+            is intentionally kept below so the `/` handler can reuse it. ── */}
 
       {/* ── Messages area ── */}
       <div className="flex-1 relative overflow-hidden">

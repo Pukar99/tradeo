@@ -19,13 +19,13 @@ function StatCard({ label, value, sub, color, hint }) {
   return (
     <div className="bg-white dark:bg-gray-900 rounded-xl border border-gray-100 dark:border-gray-800 p-3 flex flex-col gap-0.5">
       <div className="flex items-center gap-1">
-        <div className="text-[10px] text-gray-400 uppercase tracking-widest font-semibold">
+        <div className="text-[10px] text-gray-400 dark:text-gray-500 uppercase tracking-widest font-semibold">
           {label}
         </div>
         {hint && (
           <div className="relative group">
-            <span className="text-[10px] text-gray-300 dark:text-gray-600 cursor-default">ⓘ</span>
-            <div className="absolute bottom-4 left-0 z-10 bg-gray-800 text-white text-[10px] rounded px-2 py-1 w-40 opacity-0 group-hover:opacity-100 pointer-events-none transition-opacity leading-tight">
+            <span className="flex items-center justify-center w-3 h-3 rounded-full border border-gray-300 dark:border-gray-600 text-[8px] font-bold text-gray-400 dark:text-gray-500 cursor-default">i</span>
+            <div className="absolute bottom-5 left-0 z-20 bg-gray-900 dark:bg-gray-700 text-white text-[10px] rounded-md shadow-lg px-2 py-1 w-40 opacity-0 group-hover:opacity-100 pointer-events-none transition-opacity leading-tight">
               {hint}
             </div>
           </div>
@@ -44,19 +44,19 @@ const BEHAVIOR_LABELS = {
     label: 'SL Ignored',
     color: 'text-red-500',
     bg: 'bg-red-50 dark:bg-red-900/20',
-    icon: '🚫',
+    dot: 'bg-red-500',
   },
   EARLY_EXIT: {
     label: 'Early Exit',
     color: 'text-orange-500',
     bg: 'bg-orange-50 dark:bg-orange-900/20',
-    icon: '⚡',
+    dot: 'bg-orange-500',
   },
   MANUAL_EXIT: {
     label: 'Manual Exit',
     color: 'text-blue-500',
     bg: 'bg-blue-50 dark:bg-blue-900/20',
-    icon: '👋',
+    dot: 'bg-blue-500',
   },
 }
 
@@ -65,7 +65,7 @@ function BehaviorEntry({ e }) {
     label: e.event_type,
     color: 'text-gray-500',
     bg: 'bg-gray-50 dark:bg-gray-800',
-    icon: '•',
+    dot: 'bg-gray-400',
   }
   const detail = e.detail || {}
   let desc = ''
@@ -81,7 +81,7 @@ function BehaviorEntry({ e }) {
 
   return (
     <div className={`flex items-start gap-2 rounded-lg px-2.5 py-1.5 text-[10px] ${meta.bg}`}>
-      <span className="text-[12px] shrink-0">{meta.icon}</span>
+      <span className={`shrink-0 mt-1 w-1.5 h-1.5 rounded-full ${meta.dot}`} />
       <div className="min-w-0">
         <div className="flex items-center gap-2 flex-wrap">
           <span className={`font-bold ${meta.color}`}>{meta.label}</span>
@@ -220,7 +220,9 @@ export default function BacktestReport({ sessionId, onClose }) {
       {/* Header */}
       <div className="flex items-start justify-between mb-4">
         <div>
-          <h2 className="text-[16px] font-bold dark:text-white">{report.strategy_name}</h2>
+          <h2 className="text-[20px] font-black tracking-tight text-gray-900 dark:text-white">
+            {report.strategy_name}
+          </h2>
           <div className="text-[11px] text-gray-400 mt-0.5">
             {report.trades?.[0]?.entry_date?.slice(0, 10) || '—'} →{' '}
             {report.trades?.[report.trades.length - 1]?.exit_date?.slice(0, 10) || '—'}
@@ -317,8 +319,8 @@ export default function BacktestReport({ sessionId, onClose }) {
 
       {/* Equity curve */}
       {equityData.length > 1 && (
-        <div className="bg-white dark:bg-gray-900 rounded-xl border border-gray-100 dark:border-gray-800 p-3 mb-4">
-          <div className="text-[10px] font-semibold text-gray-400 uppercase tracking-widest mb-2">
+        <div className="bg-white dark:bg-gray-900 rounded-2xl border border-gray-100 dark:border-gray-800 p-3 mb-4">
+          <div className="text-[10px] font-semibold text-gray-400 dark:text-gray-500 uppercase tracking-widest mb-2">
             Equity Curve
           </div>
           <ResponsiveContainer width="100%" height={120}>
@@ -372,7 +374,7 @@ export default function BacktestReport({ sessionId, onClose }) {
       {(s.best_trade || s.worst_trade) && (
         <div className="grid grid-cols-2 gap-2 mb-4">
           {s.best_trade && (
-            <div className="bg-white dark:bg-gray-900 rounded-xl border border-green-200 dark:border-green-900 p-3">
+            <div className="bg-white dark:bg-gray-900 rounded-2xl border border-green-200 dark:border-green-900 p-3">
               <div className="text-[10px] text-green-500 font-bold uppercase mb-1">Best Trade</div>
               <div className="font-bold dark:text-white">{s.best_trade.symbol}</div>
               <div className="text-green-600 font-bold">+Rs.{fmt(s.best_trade.pnl)}</div>
@@ -380,7 +382,7 @@ export default function BacktestReport({ sessionId, onClose }) {
             </div>
           )}
           {s.worst_trade && (
-            <div className="bg-white dark:bg-gray-900 rounded-xl border border-red-200 dark:border-red-900 p-3">
+            <div className="bg-white dark:bg-gray-900 rounded-2xl border border-red-200 dark:border-red-900 p-3">
               <div className="text-[10px] text-red-500 font-bold uppercase mb-1">Worst Trade</div>
               <div className="font-bold dark:text-white">{s.worst_trade.symbol}</div>
               <div className="text-red-500 font-bold">Rs.{fmt(s.worst_trade.pnl)}</div>
@@ -391,8 +393,8 @@ export default function BacktestReport({ sessionId, onClose }) {
       )}
 
       {/* Trade log */}
-      <div className="bg-white dark:bg-gray-900 rounded-xl border border-gray-100 dark:border-gray-800 p-3 mb-4">
-        <div className="text-[10px] font-semibold text-gray-400 uppercase tracking-widest mb-2">
+      <div className="bg-white dark:bg-gray-900 rounded-2xl border border-gray-100 dark:border-gray-800 p-3 mb-4">
+        <div className="text-[10px] font-semibold text-gray-400 dark:text-gray-500 uppercase tracking-widest mb-2">
           Trade Log ({report.trades?.length || 0} trades)
         </div>
         {report.trades?.length === 0 ? (
@@ -489,7 +491,7 @@ export default function BacktestReport({ sessionId, onClose }) {
 
       {/* Behavior log */}
       {report.behavior_log?.length > 0 && (
-        <div className="bg-white dark:bg-gray-900 rounded-xl border border-orange-200 dark:border-orange-900 p-3 mb-4">
+        <div className="bg-white dark:bg-gray-900 rounded-2xl border border-orange-200 dark:border-orange-900 p-3 mb-4">
           <div className="text-[10px] font-semibold text-orange-500 uppercase tracking-widest mb-2">
             Behavior Log ({report.behavior_log.length} events)
           </div>
@@ -500,7 +502,7 @@ export default function BacktestReport({ sessionId, onClose }) {
           </div>
           {report.behavior_log.some((e) => e.event_type === 'SL_IGNORED') && (
             <div className="mt-2 text-[10px] text-orange-500 bg-orange-50 dark:bg-orange-900/10 rounded px-2 py-1 leading-tight">
-              ⚠ SL ignored trades are logged but not penalized. Review your discipline score on the
+              SL ignored trades are logged but not penalized. Review your discipline score on the
               Home page.
             </div>
           )}

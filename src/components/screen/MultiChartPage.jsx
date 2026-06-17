@@ -446,26 +446,40 @@ const ChartPanelWrapper = memo(function ChartPanelWrapper({
 })
 
 // ── Toolbar ───────────────────────────────────────────────────────────────────
-function MultiChartToolbar({ layout, setLayout, syncData, setSyncData, syncCross, setSyncCross }) {
+// On mobile the layout is fixed at 2 stacked charts, so the 2/3/4 layout switcher
+// is hidden — only the Sync + Crosshair toggles render (they wire panel 0 ↔ 1).
+function MultiChartToolbar({
+  layout,
+  setLayout,
+  syncData,
+  setSyncData,
+  syncCross,
+  setSyncCross,
+  isMobile,
+}) {
   return useScreenToolbarSlot(
     <div className="flex items-center gap-1.5 min-w-0">
-      <div className="flex items-center gap-0.5 bg-gray-100 dark:bg-gray-800 rounded-md p-0.5 shrink-0">
-        {[2, 3, 4].map((n) => (
-          <button
-            key={n}
-            onClick={() => setLayout(n)}
-            className={`flex items-center justify-center w-7 h-5 rounded transition-all ${
-              layout === n
-                ? 'bg-white dark:bg-gray-700 shadow-sm text-gray-800 dark:text-white'
-                : 'text-gray-400 dark:text-gray-500 hover:text-gray-600 dark:hover:text-gray-300'
-            }`}
-          >
-            <LayoutIcon layout={n} />
-          </button>
-        ))}
-      </div>
+      {!isMobile && (
+        <>
+          <div className="flex items-center gap-0.5 bg-gray-100 dark:bg-gray-800 rounded-md p-0.5 shrink-0">
+            {[2, 3, 4].map((n) => (
+              <button
+                key={n}
+                onClick={() => setLayout(n)}
+                className={`flex items-center justify-center w-7 h-5 rounded transition-all ${
+                  layout === n
+                    ? 'bg-white dark:bg-gray-700 shadow-sm text-gray-800 dark:text-white'
+                    : 'text-gray-400 dark:text-gray-500 hover:text-gray-600 dark:hover:text-gray-300'
+                }`}
+              >
+                <LayoutIcon layout={n} />
+              </button>
+            ))}
+          </div>
+          <ToolbarDivider />
+        </>
+      )}
 
-      <ToolbarDivider />
       <ToolbarToggleChip
         label={syncData ? 'Sync ON' : 'Sync'}
         active={syncData}
@@ -489,6 +503,17 @@ export default function MultiChartPage() {
   const [syncData, setSyncData] = useState(() => loadState()?.syncData ?? false)
   const [syncCross, setSyncCross] = useState(() => loadState()?.syncCross ?? false)
   const [activePanel, setActivePanel] = useState(0)
+
+  // Mount only ONE of the mobile/desktop subtrees (declared early so panelCount can
+  // depend on it). With CSS-only hiding both were always mounted: desktop built a 5th
+  // hidden panel-0 chart, and mobile built all 2–4 desktop charts behind display:none.
+  const [isMobile, setIsMobile] = useState(() => window.matchMedia('(max-width: 767px)').matches)
+  useEffect(() => {
+    const mq = window.matchMedia('(max-width: 767px)')
+    const fn = (e) => setIsMobile(e.matches)
+    mq.addEventListener('change', fn)
+    return () => mq.removeEventListener('change', fn)
+  }, [])
 
   const [panels, setPanels] = useState(() => {
     // saveState persists only the active panels (1–4 entries, FIX MC09) — accept any
@@ -523,7 +548,10 @@ export default function MultiChartPage() {
     syncDataRef.current = syncData
   }, [syncData])
 
-  const panelCount = layout
+  // Mobile is locked to 2 stacked charts regardless of the desktop `layout` choice.
+  // Driving panelCount this way means the crosshair/data-sync engine, saveState, and
+  // grid all operate on exactly the two visible panels with no engine changes.
+  const panelCount = isMobile ? 2 : layout
   useEffect(() => {
     panelCountRef.current = panelCount
   }, [panelCount])
@@ -733,20 +761,6 @@ export default function MultiChartPage() {
     return parts.join(' ')
   }
 
-  // Stable no-op — mobile panel must not write to chartRefs/seriesRefs
-  const noopChartReady = useCallback(() => {}, [])
-
-  // Mount only ONE of the mobile/desktop subtrees. With CSS-only hiding both were
-  // always mounted: desktop built a 5th hidden panel-0 chart, and mobile built all
-  // 2–4 desktop charts behind display:none (up to 5 chart instances for 1 visible).
-  const [isMobile, setIsMobile] = useState(() => window.matchMedia('(max-width: 767px)').matches)
-  useEffect(() => {
-    const mq = window.matchMedia('(max-width: 767px)')
-    const fn = (e) => setIsMobile(e.matches)
-    mq.addEventListener('change', fn)
-    return () => mq.removeEventListener('change', fn)
-  }, [])
-
   return (
     <div className="flex-1 overflow-hidden min-h-0 flex flex-col">
       <MultiChartToolbar
@@ -756,27 +770,35 @@ export default function MultiChartPage() {
         setSyncData={setSyncData}
         syncCross={syncCross}
         setSyncCross={setSyncCross}
+        isMobile={isMobile}
       />
 
       {isMobile ? (
-        /* Mobile: single panel — uses a no-op onChartReady so it never writes to
-           chartRefs/seriesRefs (those are for the desktop grid only). */
-        <div className="flex-1 flex flex-col min-h-0">
-          <ChartPanelWrapper
-            panelIdx={0}
-            panelState={panels[0]}
-            isActive={true}
-            onActivate={() => {}}
-            onExternalSymbolChange={handleExternalSymbolChange}
-            onExternalTimeframeChange={handleExternalTimeframeChange}
-            onChartReady={noopChartReady}
-            onSelectSymbolReady={handleSelectSymbolReady}
-            onSetTimeframeReady={handleSetTimeframeReady}
-            allSymbols={allSymbols}
-          />
-          <p className="shrink-0 text-center text-[10px] text-gray-400 py-1 border-t border-gray-100 dark:border-gray-800">
-            MultiChart shows all panels on wider screens
-          </p>
+        /* Mobile: exactly two charts stacked 50/50 (panelCount is forced to 2 above).
+           Real handleChartReady is wired for both panels so the Sync + Crosshair
+           toggles actually link panel 0 ↔ panel 1 — same engine the desktop grid uses. */
+        <div className="flex flex-col flex-1 min-h-0">
+          {[0, 1].map((idx) => (
+            <div
+              key={idx}
+              className={`flex flex-col flex-1 min-h-0 overflow-hidden ${
+                idx === 0 ? 'border-b border-gray-100 dark:border-gray-800' : ''
+              }`}
+            >
+              <ChartPanelWrapper
+                panelIdx={idx}
+                panelState={panels[idx]}
+                isActive={activePanel === idx}
+                onActivate={setActivePanel}
+                onExternalSymbolChange={handleExternalSymbolChange}
+                onExternalTimeframeChange={handleExternalTimeframeChange}
+                onChartReady={handleChartReady}
+                onSelectSymbolReady={handleSelectSymbolReady}
+                onSetTimeframeReady={handleSetTimeframeReady}
+                allSymbols={allSymbols}
+              />
+            </div>
+          ))}
         </div>
       ) : (
         /* Desktop grid — FIX MC02: ChartPanelWrapper is memo'd, stable parent handlers

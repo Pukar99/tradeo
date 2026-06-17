@@ -90,7 +90,7 @@ function InlineConfirm({ label, onConfirm, onCancel, danger = true, disabled = f
 // ── Field Label ───────────────────────────────────────────────────────────────
 function FieldLabel({ children }) {
   return (
-    <label className="block text-[10px] font-semibold text-gray-400 uppercase tracking-widest mb-1.5">
+    <label className="block text-[10px] font-semibold text-gray-400 dark:text-gray-500 uppercase tracking-widest mb-1.5">
       {children}
     </label>
   )
@@ -145,10 +145,17 @@ function ErrorBox({ children }) {
 }
 
 // ── Spinner ───────────────────────────────────────────────────────────────────
+// size keys map to FULL static class strings — never interpolate `w-${size}`,
+// the Tailwind JIT can't see interpolated class names and purges them.
+const SPINNER_SIZES = {
+  3: 'w-3 h-3',
+  3.5: 'w-3.5 h-3.5',
+}
 function Spinner({ size = 3 }) {
+  const dims = SPINNER_SIZES[size] || SPINNER_SIZES[3]
   return (
     <span
-      className={`w-${size} h-${size} border-2 border-white/40 border-t-white rounded-full animate-spin flex-shrink-0`}
+      className={`${dims} border-2 border-white/40 border-t-white rounded-full animate-spin flex-shrink-0`}
     />
   )
 }
@@ -279,7 +286,8 @@ function AddAccountModal({ dpList, onClose, onAdded }) {
           {!busy && (
             <button
               onClick={handleClose}
-              title="Close"
+              aria-label="Close"
+            title="Close"
               className="w-7 h-7 flex items-center justify-center rounded-lg text-gray-400 hover:text-gray-600 hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors text-lg leading-none"
             >
               ×
@@ -611,6 +619,7 @@ function EditAccountModal({ account, dpList, onClose, onUpdated }) {
           <button
             onClick={onClose}
             disabled={saving}
+            aria-label="Close"
             title="Close"
             className="w-7 h-7 flex items-center justify-center rounded-lg text-gray-400 hover:text-gray-600 hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors text-lg"
           >
@@ -621,7 +630,7 @@ function EditAccountModal({ account, dpList, onClose, onUpdated }) {
         <div className="overflow-y-auto flex-1 p-5 space-y-4">
           {/* ── Login Details ── */}
           <div>
-            <p className="text-[10px] font-semibold uppercase tracking-widest text-gray-400 mb-2.5">
+            <p className="text-[10px] font-semibold uppercase tracking-widest text-gray-400 dark:text-gray-500 mb-2.5">
               Login Details
             </p>
             <div className="space-y-3">
@@ -674,7 +683,7 @@ function EditAccountModal({ account, dpList, onClose, onUpdated }) {
           {/* ── ASBA Bank ── */}
           <div>
             <div className="flex items-center justify-between mb-2.5">
-              <p className="text-[10px] font-semibold uppercase tracking-widest text-gray-400">
+              <p className="text-[10px] font-semibold uppercase tracking-widest text-gray-400 dark:text-gray-500">
                 ASBA Bank
               </p>
               <button
@@ -774,7 +783,7 @@ function EditAccountModal({ account, dpList, onClose, onUpdated }) {
 
           {/* ── Apply Settings ── */}
           <div>
-            <p className="text-[10px] font-semibold uppercase tracking-widest text-gray-400 mb-2.5">
+            <p className="text-[10px] font-semibold uppercase tracking-widest text-gray-400 dark:text-gray-500 mb-2.5">
               Apply Settings
             </p>
             <div className="space-y-3">
@@ -992,6 +1001,7 @@ function ApplyModal({ ipo, accounts, activeAccountId, onClose, onApplied }) {
           </div>
           <button
             onClick={onClose}
+            aria-label="Close"
             title="Close"
             className="w-7 h-7 flex items-center justify-center rounded-lg text-gray-400 hover:text-gray-600 hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors text-lg"
           >
@@ -1031,7 +1041,7 @@ function ApplyModal({ ipo, accounts, activeAccountId, onClose, onApplied }) {
             {/* Account selector — only shown when multiple accounts */}
             {accounts.length > 1 && (
               <div>
-                <p className="text-[10px] font-semibold text-gray-400 uppercase tracking-widest mb-2">
+                <p className="text-[10px] font-semibold text-gray-400 dark:text-gray-500 uppercase tracking-widest mb-2">
                   Apply With
                 </p>
                 <div className="space-y-1.5">
@@ -1081,7 +1091,7 @@ function ApplyModal({ ipo, accounts, activeAccountId, onClose, onApplied }) {
             {selectedAccount && hasBank && (
               <div className="bg-gray-50 dark:bg-gray-800 rounded-xl px-4 py-3 space-y-1">
                 <div className="flex items-center justify-between mb-1">
-                  <p className="text-[10px] font-semibold text-gray-400 uppercase tracking-widest">
+                  <p className="text-[10px] font-semibold text-gray-400 dark:text-gray-500 uppercase tracking-widest">
                     ASBA Details
                   </p>
                   {hasSavedPin && (
@@ -1296,7 +1306,8 @@ function BulkApplyModal({ ipo, accounts, inFlightRef, onClose, onApplied }) {
           {!applying && (
             <button
               onClick={handleClose}
-              title="Close"
+              aria-label="Close"
+            title="Close"
               className="w-7 h-7 flex items-center justify-center rounded-lg text-gray-400 hover:text-gray-600 hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors text-lg"
             >
               ×
@@ -1360,7 +1371,7 @@ function BulkApplyModal({ ipo, accounts, inFlightRef, onClose, onApplied }) {
             </div>
 
             <div className="space-y-2">
-              <p className="text-[10px] font-semibold text-gray-400 uppercase tracking-widest">
+              <p className="text-[10px] font-semibold text-gray-400 dark:text-gray-500 uppercase tracking-widest">
                 {readyAccounts.length} Account{readyAccounts.length !== 1 ? 's' : ''} Ready
               </p>
               {readyAccounts.map((a) => (
@@ -2021,7 +2032,7 @@ function IPOPage({ isActive = true }) {
   )
 
   const thCls =
-    'px-4 py-2.5 text-[10px] font-semibold uppercase tracking-widest text-gray-400 select-none'
+    'px-4 py-2.5 text-[10px] font-semibold uppercase tracking-widest text-gray-400 dark:text-gray-500 select-none'
   const sortThCls =
     thCls + ' cursor-pointer hover:text-gray-600 dark:hover:text-gray-200 transition-colors'
 
@@ -2130,12 +2141,20 @@ function IPOPage({ isActive = true }) {
 
                 {/* Auto-apply toggle */}
                 <div className="flex items-center gap-2 flex-shrink-0">
-                  <div
+                  <button
+                    type="button"
+                    role="switch"
+                    aria-checked={!!activeAccount.auto_apply}
+                    aria-label={
+                      activeAccount.auto_apply
+                        ? 'Auto-apply ON — activate to disable'
+                        : 'Auto-apply OFF — activate to enable'
+                    }
+                    disabled={togglingAutoApply}
                     onClick={() =>
-                      !togglingAutoApply &&
                       handleToggleAutoApply(activeAccount, !activeAccount.auto_apply)
                     }
-                    className={`relative w-8 h-4 rounded-full transition-colors duration-200 flex-shrink-0 ${togglingAutoApply ? 'opacity-50 cursor-wait' : 'cursor-pointer'} ${activeAccount.auto_apply ? 'bg-emerald-500' : 'bg-gray-300 dark:bg-gray-600'}`}
+                    className={`relative w-8 h-4 rounded-full transition-colors duration-200 flex-shrink-0 focus-visible:ring-2 focus-visible:ring-emerald-500/40 focus-visible:outline-none ${togglingAutoApply ? 'opacity-50 cursor-wait' : 'cursor-pointer'} ${activeAccount.auto_apply ? 'bg-emerald-500' : 'bg-gray-300 dark:bg-gray-600'}`}
                     title={
                       activeAccount.auto_apply
                         ? 'Auto-apply ON — click to disable'
@@ -2145,7 +2164,7 @@ function IPOPage({ isActive = true }) {
                     <span
                       className={`absolute top-0.5 left-0.5 w-3 h-3 rounded-full bg-white shadow transition-transform duration-200 ${activeAccount.auto_apply ? 'translate-x-4' : 'translate-x-0'}`}
                     />
-                  </div>
+                  </button>
                   <span
                     className={`text-[10px] font-semibold ${activeAccount.auto_apply ? 'text-emerald-600 dark:text-emerald-400' : 'text-gray-400'}`}
                   >
@@ -2206,11 +2225,13 @@ function IPOPage({ isActive = true }) {
             {autoApplyResults && (
               <div className="bg-white dark:bg-gray-900 rounded-xl border border-gray-100 dark:border-gray-800 px-4 py-3">
                 <div className="flex items-center justify-between mb-2">
-                  <p className="text-[10px] font-semibold text-gray-400 uppercase tracking-widest">
+                  <p className="text-[10px] font-semibold text-gray-400 dark:text-gray-500 uppercase tracking-widest">
                     Auto-Apply Results
                   </p>
                   <button
                     onClick={() => setAutoApplyResults(null)}
+                    aria-label="Dismiss auto-apply results"
+                    title="Dismiss"
                     className="text-gray-300 dark:text-gray-600 hover:text-gray-500 text-sm leading-none"
                   >
                     ×
@@ -2405,26 +2426,53 @@ function IPOPage({ isActive = true }) {
                                     </span>
                                   )}
                                 </div>
-                                {/* Cross-account applied status pills — visible regardless of selected account */}
+                                {/* Cross-account applied status pills — visible regardless of selected account.
+                                    GET /ipos is single-account, so an account's applied state is only
+                                    KNOWN once it's been fetched (tabCache holds its ipos). For unfetched
+                                    accounts we show a neutral "tap to check" pill — NOT a false
+                                    "not applied" — and tapping selects the account, which lazy-loads it. */}
                                 {hasMultipleAcc && (
                                   <div className="flex flex-wrap gap-1.5 mt-2">
                                     {accounts.map((a) => {
                                       const applied = appliedMap[ipo.companyShareId]?.has(a.id)
+                                      // Known = this account's IPO list has been fetched (or it's the
+                                      // selected account, whose data is live in state).
+                                      const known =
+                                        a.id === selectedAcc || !!tabCache.current[`${a.id}:ipos`]
+                                      const unknown = !applied && !known
                                       return (
-                                        <span
+                                        <button
                                           key={a.id}
-                                          className={`inline-flex items-center gap-1 text-[10px] font-semibold px-2 py-0.5 rounded-full border ${
+                                          type="button"
+                                          onClick={() => unknown && handleSelectAccount(a.id)}
+                                          disabled={!unknown}
+                                          title={
+                                            applied
+                                              ? `${a.label} — applied`
+                                              : known
+                                                ? `${a.label} — not applied`
+                                                : `${a.label} — tap to check`
+                                          }
+                                          className={`inline-flex items-center gap-1 text-[10px] font-semibold px-2 py-0.5 rounded-full border transition-colors ${
                                             applied
                                               ? 'bg-emerald-50 dark:bg-emerald-900/20 border-emerald-200 dark:border-emerald-800/40 text-emerald-600 dark:text-emerald-400'
-                                              : 'bg-gray-50 dark:bg-gray-800/60 border-gray-200 dark:border-gray-700 text-gray-400 dark:text-gray-500'
+                                              : unknown
+                                                ? 'border-dashed border-gray-300 dark:border-gray-600 text-gray-400 dark:text-gray-500 hover:bg-gray-50 dark:hover:bg-gray-800/60 cursor-pointer'
+                                                : 'bg-gray-50 dark:bg-gray-800/60 border-gray-200 dark:border-gray-700 text-gray-400 dark:text-gray-500'
                                           }`}
                                         >
                                           <span
-                                            className={`w-1.5 h-1.5 rounded-full flex-shrink-0 ${applied ? 'bg-emerald-500' : 'bg-gray-300 dark:bg-gray-600'}`}
+                                            className={`w-1.5 h-1.5 rounded-full flex-shrink-0 ${
+                                              applied
+                                                ? 'bg-emerald-500'
+                                                : unknown
+                                                  ? 'bg-gray-300 dark:bg-gray-600 opacity-50'
+                                                  : 'bg-gray-300 dark:bg-gray-600'
+                                            }`}
                                           />
                                           {a.label}
-                                          {applied ? ' ✓' : ''}
-                                        </span>
+                                          {applied ? ' ✓' : unknown ? ' ?' : ''}
+                                        </button>
                                       )
                                     })}
                                   </div>
@@ -2750,7 +2798,7 @@ function IPOPage({ isActive = true }) {
                     </div>
                     {totalValue && (
                       <div className="text-right flex-shrink-0">
-                        <p className="text-[10px] text-gray-400 uppercase tracking-widest">
+                        <p className="text-[10px] font-semibold text-gray-400 dark:text-gray-500 uppercase tracking-widest">
                           Total Value
                         </p>
                         <p className="text-[15px] font-bold text-gray-900 dark:text-white font-mono tabular-nums">

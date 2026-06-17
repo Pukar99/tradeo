@@ -1,28 +1,17 @@
-// === PortfolioPage.jsx — portfolio page: allocation donut, equity curve, monthly P&L, holdings table, trade history ===
+// === PortfolioPage.jsx — portfolio page: allocation donut, stat cards, recent trades, holdings, trade history ===
 import { useState, useEffect, useCallback, useMemo } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { useAuth } from '../context/AuthContext'
-import { useLanguage } from '../context/LanguageContext'
 import { getPositions, getTradeActions, getBatchPrices } from '../utils/globalCache'
 import { useChatRefresh } from '../utils/chatEvents'
 import { fmtRs, fmtPct } from '../utils/format'
+import { PieChart, Pie, Cell, Tooltip, ResponsiveContainer } from 'recharts'
+// Shared compact-toolbar atoms (cross-folder import sanctioned — see pm/docs/design.md #7)
 import {
-  PieChart,
-  Pie,
-  Cell,
-  Tooltip,
-  ResponsiveContainer,
-  BarChart,
-  Bar,
-  XAxis,
-  YAxis,
-  ReferenceLine,
-  AreaChart,
-  Area,
-  LineChart,
-  Line,
-  CartesianGrid,
-} from 'recharts'
+  useCompactToolbar,
+  ToolbarMenu,
+  ToolbarMenuSection,
+} from '../components/screen/ScreenToolbarAtoms'
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
 
@@ -95,6 +84,27 @@ function EmptySlate({ icon, title, action, onAction }) {
           {action}
         </button>
       )}
+    </div>
+  )
+}
+
+// ── Mobile card primitives ─────────────────────────────────────────────────────
+// Two-row mobile card (identity row + 4-up stat strip), matching the LogsPage
+// PositionRow pattern (see pm/docs/design.md #6). Used by all three mobile lists
+// below; desktop keeps its <table> (hidden sm:block). MobileStat: label-above-value
+// cell with `truncate min-w-0` so long rupee values never break the 4-col grid.
+
+function MobileStat({ label, value, color }) {
+  return (
+    <div className="min-w-0">
+      <div className="text-[9px] uppercase tracking-wide font-semibold text-gray-400 dark:text-gray-500 mb-0.5">
+        {label}
+      </div>
+      <div
+        className={`text-[11px] font-bold font-mono truncate ${color || 'text-gray-700 dark:text-gray-300'}`}
+      >
+        {value}
+      </div>
     </div>
   )
 }
@@ -296,198 +306,6 @@ function AllocationDonut({ openPositions }) {
   )
 }
 
-// ── Monthly P&L bar chart ─────────────────────────────────────────────────────
-
-function MonthlyPnlChart({ closedTrades }) {
-  const fx = false
-  const months = []
-  const now = new Date()
-  for (let i = 11; i >= 0; i--) {
-    const d = new Date(now.getFullYear(), now.getMonth() - i, 1)
-    months.push({
-      key: `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`,
-      label: d.toLocaleString('default', { month: 'short' }),
-      value: 0,
-    })
-  }
-  closedTrades.forEach((t) => {
-    if (t.realized_pnl == null) return
-    const closeDate = t.date?.slice(0, 7)
-    if (!closeDate) return
-    const m = months.find((m) => m.key === closeDate)
-    if (m) m.value += parseFloat(t.realized_pnl) || 0
-  })
-  months.forEach((m) => {
-    m.value = Math.round(m.value)
-  })
-  const hasData = months.some((m) => m.value !== 0)
-  const maxAbs = Math.max(...months.map((m) => Math.abs(m.value)), 1)
-  const totalYear = months.reduce((s, m) => s + m.value, 0)
-  const posMonths = months.filter((m) => m.value > 0).length
-  const negMonths = months.filter((m) => m.value < 0).length
-
-  return (
-    <div>
-      <div className="flex items-center justify-between mb-2">
-        <div>
-          <p className="text-[10px] font-semibold uppercase tracking-widest text-gray-400">
-            Monthly P&L
-          </p>
-          <p className="text-[10px] text-gray-400 mt-0.5">
-            <span className="text-emerald-500 font-semibold">{posMonths}↑</span>{' '}
-            <span className="text-red-400 font-semibold">{negMonths}↓</span> over 12 months
-          </p>
-        </div>
-        <span className={`text-[13px] font-bold ${signCls(totalYear)}`}>
-          {totalYear >= 0 ? '+' : ''}
-          {fmtRs(totalYear, fx)}
-        </span>
-      </div>
-      {!hasData ? (
-        <div className="h-[110px] flex items-center justify-center">
-          <p className="text-[10px] text-gray-300 dark:text-gray-700">No closed trades yet</p>
-        </div>
-      ) : (
-        <ResponsiveContainer width="100%" height={110}>
-          <BarChart data={months} barSize={14} margin={{ top: 4, right: 0, left: 0, bottom: 0 }}>
-            <XAxis
-              dataKey="label"
-              axisLine={false}
-              tickLine={false}
-              tick={{ fontSize: 9, fill: '#9ca3af' }}
-              dy={4}
-            />
-            <YAxis hide domain={[-maxAbs * 1.2, maxAbs * 1.2]} />
-            <ReferenceLine y={0} stroke="#e5e7eb" strokeWidth={1} />
-            <Tooltip
-              content={({ active, payload, label }) => {
-                if (!active || !payload?.length) return null
-                const val = payload[0].value
-                return (
-                  <div className="bg-white dark:bg-gray-900 border border-gray-100 dark:border-gray-800 rounded-lg px-2.5 py-1.5 shadow-lg">
-                    <p className="text-[10px] text-gray-400">{label}</p>
-                    <p
-                      className={`text-[11px] font-bold ${val >= 0 ? 'text-emerald-500' : 'text-red-400'}`}
-                    >
-                      {val >= 0 ? '+' : ''}
-                      {fmtRs(val, fx)}
-                    </p>
-                  </div>
-                )
-              }}
-              cursor={{ fill: 'transparent' }}
-            />
-            <Bar dataKey="value" radius={[3, 3, 0, 0]}>
-              {months.map((m, i) => (
-                <Cell key={i} fill={m.value >= 0 ? '#10b981' : '#f87171'} opacity={0.85} />
-              ))}
-            </Bar>
-          </BarChart>
-        </ResponsiveContainer>
-      )}
-    </div>
-  )
-}
-
-// ── Equity Curve ──────────────────────────────────────────────────────────────
-
-function EquityCurve({ closedTrades }) {
-  const fx = false
-  if (closedTrades.length === 0) return null
-  const sorted = [...closedTrades]
-    .filter((t) => t.realized_pnl != null)
-    .map((t) => ({ ...t, _closeDate: (t.date || '').slice(0, 10) }))
-    .filter((t) => t._closeDate)
-    .sort((a, b) => a._closeDate.localeCompare(b._closeDate))
-  if (sorted.length < 2) return null
-
-  let cumulative = 0
-  const data = sorted.map((t, i) => {
-    const pnl = parseFloat(t.realized_pnl) || 0
-    cumulative += pnl
-    return {
-      tradeNum: i + 1,
-      date: t._closeDate,
-      symbol: t.symbol,
-      pnl,
-      cumulative: Math.round(cumulative),
-    }
-  })
-
-  const finalPnl = data[data.length - 1].cumulative
-  const isPositive = finalPnl >= 0
-  let maxDD = 0,
-    runningPeak = data[0].cumulative
-  for (const d of data) {
-    if (d.cumulative > runningPeak) runningPeak = d.cumulative
-    const dd = runningPeak - d.cumulative
-    if (dd > maxDD) maxDD = dd
-  }
-
-  const gradId = `eqGrad_${isPositive ? 'p' : 'n'}_${sorted.length}`
-  const lineColor = isPositive ? '#10b981' : '#f87171'
-
-  return (
-    <div>
-      <div className="flex items-center justify-between mb-2">
-        <div>
-          <p className="text-[10px] font-semibold uppercase tracking-widest text-gray-400">
-            Equity Curve
-          </p>
-          <p className="text-[10px] text-gray-400 mt-0.5">
-            {sorted.length} closed trades · max DD:{' '}
-            <span className="text-amber-500 font-medium">{fmtRs(maxDD, fx)}</span>
-          </p>
-        </div>
-        <span className={`text-[13px] font-bold ${signCls(finalPnl)}`}>
-          {finalPnl >= 0 ? '+' : ''}
-          {fmtRs(finalPnl, fx)}
-        </span>
-      </div>
-      <ResponsiveContainer width="100%" height={110}>
-        <AreaChart data={data} margin={{ top: 4, right: 0, left: 0, bottom: 0 }}>
-          <defs>
-            <linearGradient id={gradId} x1="0" y1="0" x2="0" y2="1">
-              <stop offset="5%" stopColor={lineColor} stopOpacity={0.25} />
-              <stop offset="95%" stopColor={lineColor} stopOpacity={0.02} />
-            </linearGradient>
-          </defs>
-          <XAxis dataKey="tradeNum" hide />
-          <YAxis hide domain={['auto', 'auto']} />
-          <ReferenceLine y={0} stroke="#e5e7eb" strokeWidth={1} strokeDasharray="3 3" />
-          <Tooltip
-            content={({ active, payload }) => {
-              if (!active || !payload?.length) return null
-              const d = payload[0].payload
-              return (
-                <div className="bg-white dark:bg-gray-900 border border-gray-100 dark:border-gray-800 rounded-lg px-2.5 py-1.5 shadow-lg">
-                  <p className="text-[10px] text-gray-400">
-                    Trade #{d.tradeNum} · {d.date}
-                  </p>
-                  <p className={`text-[11px] font-bold ${signCls(d.cumulative)}`}>
-                    {d.cumulative >= 0 ? '+' : ''}
-                    {fmtRs(d.cumulative, fx)}
-                  </p>
-                </div>
-              )
-            }}
-            cursor={{ stroke: '#9ca3af', strokeWidth: 1, strokeDasharray: '3 3' }}
-          />
-          <Area
-            type="monotone"
-            dataKey="cumulative"
-            stroke={lineColor}
-            strokeWidth={1.5}
-            fill={`url(#${gradId})`}
-            dot={false}
-            activeDot={{ r: 3, fill: lineColor, strokeWidth: 0 }}
-          />
-        </AreaChart>
-      </ResponsiveContainer>
-    </div>
-  )
-}
-
 // ── Main Page ─────────────────────────────────────────────────────────────────
 
 function PortfolioPage() {
@@ -500,9 +318,12 @@ function PortfolioPage() {
   const [filterStatus, setFilterStatus] = useState('ALL')
   const [search, setSearch] = useState('')
   const [sort, setSort] = useState({ col: 'last_action_at', dir: 'desc' })
+  // Mobile Holdings card: which trade_id is expanded (shows SL/TP/Invested/Chart)
+  const [expandedHolding, setExpandedHolding] = useState(null)
 
   const { user } = useAuth()
   const navigate = useNavigate()
+  const compactToolbar = useCompactToolbar() // true <lg → Trade-History filters fold into ☰
   const fetchData = useCallback(async () => {
     try {
       const [posRes, actRes] = await Promise.all([
@@ -589,6 +410,9 @@ function PortfolioPage() {
 
   // ── Derived stats ─────────────────────────────────────────────────────────
 
+  // PARTIAL appears in BOTH buckets by design — a partial trade has an open remainder
+  // (→ invested/unrealized) AND realized P&L from the exited portion (→ realized).
+  // This is correct accounting, not a double-count. Do not "dedupe" PARTIAL out.
   const openPositions = positions.filter((p) => p.status === 'OPEN' || p.status === 'PARTIAL')
   const closedPositions = positions.filter((p) => p.status === 'CLOSED' || p.status === 'PARTIAL')
 
@@ -865,8 +689,10 @@ function PortfolioPage() {
           )}
         </div>
 
-        {/* Stat cards: Total P&L · Realized · Unrealized */}
-        <div className="lg:col-span-2 grid grid-cols-1 sm:grid-cols-3 gap-3">
+        {/* Stat cards: Total P&L · Realized · Unrealized.
+            Mobile: 2-up grid — Total P&L spans full width (headline), Realized +
+            Unrealized share the row below. Desktop (sm+): unchanged 3-up. */}
+        <div className="lg:col-span-2 grid grid-cols-2 sm:grid-cols-3 gap-3">
           {[
             {
               label: 'Total P&L',
@@ -935,14 +761,14 @@ function PortfolioPage() {
           ].map((s, i) => (
             <div
               key={i}
-              className={`bg-white dark:bg-gray-900 rounded-2xl border border-gray-100 dark:border-gray-800 border-t-2 ${s.accent} p-4 flex flex-col gap-3 min-h-[120px]`}
+              className={`bg-white dark:bg-gray-900 rounded-2xl border border-gray-100 dark:border-gray-800 border-t-2 ${s.accent} p-4 flex flex-col gap-3 sm:min-h-[120px] ${i === 0 ? 'col-span-2 sm:col-span-1' : ''}`}
             >
               <div>
                 <p className="text-[10px] font-semibold uppercase tracking-widest text-gray-400 mb-1.5">
                   {s.label}
                 </p>
                 <p
-                  className={`text-[22px] font-black tracking-tight leading-none tabular-nums ${s.cls}`}
+                  className={`text-[20px] sm:text-[22px] font-black tracking-tight leading-none tabular-nums ${s.cls}`}
                 >
                   {s.value}
                 </p>
@@ -997,7 +823,58 @@ function PortfolioPage() {
             onAction={() => navigate('/logs')}
           />
         ) : (
-          <div className="overflow-x-auto">
+          <>
+          {/* ── mobile cards (sm:hidden) — two-row: identity + 4-up strip ── */}
+          <div className="sm:hidden divide-y divide-gray-50 dark:divide-gray-800/60">
+            {top10Recent.map((row) => {
+              const isClose =
+                row.action_type === 'Close Position' || row.action_type === 'Reversal'
+              const isNew = row.action_type === 'New Position'
+              const pnl = parseFloat(row.realized_pnl) || 0
+              return (
+                <div key={row.id} className="px-4 py-3">
+                  {/* row 1 — identity */}
+                  <div className="flex items-center gap-2">
+                    <SymAvatar symbol={row.symbol} size="w-6 h-6" text="text-[10px]" />
+                    <span className="text-[13px] font-bold text-gray-900 dark:text-white">
+                      {row.symbol}
+                    </span>
+                    <span
+                      className={`text-[9px] font-semibold px-1.5 py-0.5 rounded-full ${
+                        isNew
+                          ? 'text-blue-600 bg-blue-50 dark:bg-blue-900/20'
+                          : isClose
+                            ? 'text-gray-500 bg-gray-100 dark:bg-gray-800'
+                            : 'text-amber-500 bg-amber-50 dark:bg-amber-900/20'
+                      }`}
+                    >
+                      {row.action_type}
+                    </span>
+                    <span className="ml-auto text-[10px] text-gray-400 tabular-nums">
+                      {row.date}
+                    </span>
+                  </div>
+                  {/* row 2 — 4-up stat strip */}
+                  <div className="grid grid-cols-4 gap-2 mt-2">
+                    <MobileStat label="Qty" value={row.quantity} />
+                    <MobileStat
+                      label="Price"
+                      value={fmtRs(parseFloat(row.entry_price || row.exit_price) || 0)}
+                    />
+                    <MobileStat
+                      label="P&L"
+                      value={isClose && pnl !== 0 ? `${pnl >= 0 ? '+' : ''}${fmtRs(pnl)}` : '—'}
+                      color={isClose && pnl !== 0 ? signCls(pnl) : undefined}
+                    />
+                    <MobileStat label="Setup" value={row.setup_type || '—'} />
+                  </div>
+                </div>
+              )
+            })}
+          </div>
+
+          {/* ── desktop table (hidden sm:block) ── */}
+          <div className="hidden sm:block overflow-x-auto">
             <table className="w-full min-w-[520px]">
               <thead>
                 <tr className="border-b border-gray-50 dark:border-gray-800/60 bg-gray-50/30 dark:bg-gray-800/10">
@@ -1071,6 +948,7 @@ function PortfolioPage() {
               </tbody>
             </table>
           </div>
+          </>
         )}
       </div>
 
@@ -1116,7 +994,108 @@ function PortfolioPage() {
           />
         ) : (
           <>
-            <div className="overflow-x-auto">
+            {/* ── mobile cards (sm:hidden) — two-row + tap-to-expand SL/TP/Invested/Chart ── */}
+            <div className="sm:hidden divide-y divide-gray-50 dark:divide-gray-800/60">
+              {openPositions.map((p) => {
+                const dir = (p.direction || 'LONG').toUpperCase()
+                const qty = parseFloat(p.total_qty) || 0
+                const wacc = parseFloat(p.wacc) || 0
+                const invested = wacc * qty
+                const pnl = p.unrealizedPnl ?? 0
+                const hasPnl = p.unrealizedPnl != null
+                const isOpen = expandedHolding === p.trade_id
+                return (
+                  <div key={p.trade_id} className="px-4 py-3">
+                    {/* row 1 — identity (tap toggles expand) */}
+                    <div
+                      className="flex items-center gap-2 cursor-pointer select-none"
+                      onClick={() => setExpandedHolding(isOpen ? null : p.trade_id)}
+                    >
+                      <SymAvatar symbol={p.symbol} size="w-6 h-6" text="text-[10px]" />
+                      <span className="text-[13px] font-bold text-gray-900 dark:text-white">
+                        {p.symbol}
+                      </span>
+                      <span
+                        className={`text-[9px] font-semibold px-1.5 py-0.5 rounded-full ${
+                          dir === 'LONG'
+                            ? 'text-emerald-600 bg-emerald-50 dark:bg-emerald-900/20'
+                            : 'text-red-500 bg-red-50 dark:bg-red-900/20'
+                        }`}
+                      >
+                        {dir === 'LONG' ? '↑ L' : '↓ S'}
+                      </span>
+                      {p.status === 'PARTIAL' && (
+                        <span className="text-[9px] font-semibold px-1.5 py-0.5 rounded-full text-amber-500 bg-amber-50 dark:bg-amber-900/20">
+                          Partial
+                        </span>
+                      )}
+                      <span className="ml-auto flex items-center gap-1.5 text-[10px] text-gray-400 tabular-nums">
+                        {p.last_action_at?.slice(0, 10)}
+                        <span
+                          className={`text-gray-300 dark:text-gray-600 transition-transform text-[9px] ${isOpen ? 'rotate-90' : ''}`}
+                        >
+                          ▶
+                        </span>
+                      </span>
+                    </div>
+                    {/* row 2 — 4-up stat strip */}
+                    <div
+                      className="grid grid-cols-4 gap-2 mt-2 cursor-pointer select-none"
+                      onClick={() => setExpandedHolding(isOpen ? null : p.trade_id)}
+                    >
+                      <MobileStat label="Qty" value={qty} />
+                      <MobileStat label="WACC" value={`Rs.${wacc.toFixed(2)}`} />
+                      <MobileStat
+                        label="LTP"
+                        value={
+                          p.currentPrice != null
+                            ? `Rs.${Number(p.currentPrice).toLocaleString()}`
+                            : '—'
+                        }
+                      />
+                      <MobileStat
+                        label="P&L"
+                        value={hasPnl ? `${pnl >= 0 ? '+' : ''}${fmtRs(pnl)}` : '—'}
+                        color={hasPnl ? signCls(pnl) : undefined}
+                      />
+                    </div>
+                    {/* expanded detail — SL/TP/Invested + Chart */}
+                    {isOpen && (
+                      <div className="mt-3 pt-3 border-t border-gray-50 dark:border-gray-800/60 flex items-center gap-4">
+                        <div className="text-[10px] space-y-0.5">
+                          {p.sl ? (
+                            <p className="text-red-400">SL {p.sl}</p>
+                          ) : (
+                            <p className="text-gray-300 dark:text-gray-700">No SL</p>
+                          )}
+                          {p.tp ? <p className="text-emerald-500">TP {p.tp}</p> : null}
+                        </div>
+                        <div className="text-[10px]">
+                          <p className="text-gray-400 uppercase tracking-wide font-semibold text-[9px]">
+                            Invested
+                          </p>
+                          <p className="text-gray-600 dark:text-gray-300 tabular-nums">
+                            {fmtRs(invested)}
+                          </p>
+                        </div>
+                        <button
+                          onClick={(e) => {
+                            e.stopPropagation()
+                            handleGoToChart(p)
+                          }}
+                          className="ml-auto text-[11px] text-blue-500 hover:text-blue-400 font-semibold"
+                        >
+                          Chart →
+                        </button>
+                      </div>
+                    )}
+                  </div>
+                )
+              })}
+            </div>
+
+            {/* ── desktop table (hidden sm:block) ── */}
+            <div className="hidden sm:block overflow-x-auto">
               <table className="w-full min-w-[600px]">
                 <thead>
                   <tr className="border-b border-gray-100 dark:border-gray-800">
@@ -1253,7 +1232,8 @@ function PortfolioPage() {
           <p className="text-[10px] font-semibold uppercase tracking-widest text-gray-400">
             Trade History
           </p>
-          <div className="ml-auto flex items-center gap-2 flex-wrap">
+          <div className="ml-auto flex items-center gap-2">
+            {/* Search — always inline (high-frequency control) */}
             <div className="relative">
               <svg
                 className="w-3 h-3 text-gray-400 absolute left-2 top-1/2 -translate-y-1/2"
@@ -1275,24 +1255,58 @@ function PortfolioPage() {
                 className="pl-6 pr-2.5 py-1 text-[10px] bg-gray-50 dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg text-gray-700 dark:text-gray-300 placeholder-gray-400 focus:outline-none focus:border-blue-400 w-20 transition-all"
               />
             </div>
-            <div className="flex gap-1">
-              {['ALL', 'OPEN', 'PARTIAL', 'CLOSED'].map((s) => (
-                <button
-                  key={s}
-                  onClick={() => setFilterStatus(s)}
-                  className={`px-2 py-1 rounded-lg text-[10px] font-semibold transition-colors ${
-                    filterStatus === s
-                      ? 'bg-blue-600 text-white'
-                      : 'text-gray-400 hover:bg-gray-100 dark:hover:bg-gray-800'
-                  }`}
-                >
-                  {s}
-                </button>
-              ))}
-            </div>
-            <span className="text-[10px] text-gray-400">
-              {histPositions.length}/{positions.length}
-            </span>
+
+            {/* Filters + count: inline on lg+, folded into ☰ on <lg */}
+            {compactToolbar ? (
+              <ToolbarMenu
+                ariaLabel="Filter options"
+                activeCount={filterStatus !== 'ALL' ? 1 : 0}
+              >
+                <ToolbarMenuSection label="Status" divider={false}>
+                  <div className="grid grid-cols-2 gap-1">
+                    {['ALL', 'OPEN', 'PARTIAL', 'CLOSED'].map((s) => (
+                      <button
+                        key={s}
+                        onClick={() => setFilterStatus(s)}
+                        className={`px-2 py-1 rounded-lg text-[10px] font-semibold transition-colors ${
+                          filterStatus === s
+                            ? 'bg-blue-600 text-white'
+                            : 'text-gray-500 dark:text-gray-400 bg-gray-100 dark:bg-gray-800 hover:bg-gray-200 dark:hover:bg-gray-700'
+                        }`}
+                      >
+                        {s}
+                      </button>
+                    ))}
+                  </div>
+                </ToolbarMenuSection>
+                <ToolbarMenuSection label="Showing">
+                  <span className="text-[11px] text-gray-500 dark:text-gray-400 tabular-nums">
+                    {histPositions.length} of {positions.length} trades
+                  </span>
+                </ToolbarMenuSection>
+              </ToolbarMenu>
+            ) : (
+              <>
+                <div className="flex gap-1">
+                  {['ALL', 'OPEN', 'PARTIAL', 'CLOSED'].map((s) => (
+                    <button
+                      key={s}
+                      onClick={() => setFilterStatus(s)}
+                      className={`px-2 py-1 rounded-lg text-[10px] font-semibold transition-colors ${
+                        filterStatus === s
+                          ? 'bg-blue-600 text-white'
+                          : 'text-gray-400 hover:bg-gray-100 dark:hover:bg-gray-800'
+                      }`}
+                    >
+                      {s}
+                    </button>
+                  ))}
+                </div>
+                <span className="text-[10px] text-gray-400">
+                  {histPositions.length}/{positions.length}
+                </span>
+              </>
+            )}
           </div>
         </div>
 
@@ -1342,7 +1356,70 @@ function PortfolioPage() {
             }}
           />
         ) : (
-          <div className="overflow-x-auto">
+          <>
+          {/* ── mobile cards (sm:hidden) — two-row; tap navigates to chart ── */}
+          <div className="sm:hidden divide-y divide-gray-50 dark:divide-gray-800/60">
+            {histPositions.map((p) => {
+              const pnl = closedPnlByTrade[p.trade_id] ?? 0
+              const dir = (p.direction || 'LONG').toUpperCase()
+              const hasPnl = p.status === 'CLOSED' || p.status === 'PARTIAL'
+              const sltp = [p.sl ? `SL ${p.sl}` : null, p.tp ? `TP ${p.tp}` : null]
+                .filter(Boolean)
+                .join(' · ')
+              return (
+                <div
+                  key={p.trade_id}
+                  className="px-4 py-3 cursor-pointer select-none"
+                  onClick={() => handleGoToChart(p)}
+                >
+                  {/* row 1 — identity */}
+                  <div className="flex items-center gap-2">
+                    <SymAvatar symbol={p.symbol} size="w-6 h-6" text="text-[10px]" />
+                    <span className="text-[13px] font-bold text-gray-900 dark:text-white">
+                      {p.symbol}
+                    </span>
+                    <span
+                      className={`text-[9px] font-semibold px-1.5 py-0.5 rounded-full ${
+                        dir === 'LONG'
+                          ? 'text-emerald-600 bg-emerald-50 dark:bg-emerald-900/20'
+                          : 'text-red-500 bg-red-50 dark:bg-red-900/20'
+                      }`}
+                    >
+                      {dir === 'LONG' ? '↑ L' : '↓ S'}
+                    </span>
+                    <span
+                      className={`text-[9px] font-semibold px-1.5 py-0.5 rounded-full ${
+                        p.status === 'OPEN'
+                          ? 'text-blue-500 bg-blue-50 dark:bg-blue-900/20'
+                          : p.status === 'PARTIAL'
+                            ? 'text-amber-500 bg-amber-50 dark:bg-amber-900/20'
+                            : 'text-gray-400 bg-gray-100 dark:bg-gray-800'
+                      }`}
+                    >
+                      {p.status}
+                    </span>
+                    <span className="ml-auto text-[10px] text-gray-400 tabular-nums">
+                      {p.last_action_at?.slice(0, 10)}
+                    </span>
+                  </div>
+                  {/* row 2 — 4-up stat strip */}
+                  <div className="grid grid-cols-4 gap-2 mt-2">
+                    <MobileStat label="Qty" value={p.total_qty} />
+                    <MobileStat label="WACC" value={fmtRs(parseFloat(p.wacc) || 0)} />
+                    <MobileStat
+                      label="Realized"
+                      value={hasPnl ? `${pnl >= 0 ? '+' : ''}${fmtRs(pnl)}` : '—'}
+                      color={hasPnl ? signCls(pnl) : undefined}
+                    />
+                    <MobileStat label="SL / TP" value={sltp || '—'} />
+                  </div>
+                </div>
+              )
+            })}
+          </div>
+
+          {/* ── desktop table (hidden sm:block) ── */}
+          <div className="hidden sm:block overflow-x-auto">
             <table className="w-full">
               <thead>
                 <tr className="border-b border-gray-100 dark:border-gray-800 bg-gray-50/40 dark:bg-gray-800/20">
@@ -1443,6 +1520,7 @@ function PortfolioPage() {
               </tbody>
             </table>
           </div>
+          </>
         )}
       </div>
     </div>
