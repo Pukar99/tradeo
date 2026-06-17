@@ -322,6 +322,43 @@ function ActionCard({ type, result }) {
   )
 }
 
+// ── Confirm card — gated money action awaiting [Confirm]/[Cancel] (#3b) ──
+function ConfirmCard({ pending, onConfirm, onCancel, done }) {
+  if (!pending?.token) return null
+  const risk =
+    { CLOSE_TRADE: 'red', DELETE_TRADE: 'red', PARTIAL_CLOSE: 'red', UPDATE_SL_TP: 'amber', ADD_TRADE: 'emerald' }[
+      pending.action
+    ] || 'amber'
+  const confirmColor = {
+    red: 'bg-red-600 hover:bg-red-700 text-white',
+    amber: 'bg-amber-500 hover:bg-amber-600 text-white',
+    emerald: 'bg-emerald-600 hover:bg-emerald-700 text-white',
+  }[risk]
+  return (
+    <div className="border-l-2 border-gray-300 dark:border-gray-700 bg-gray-50 dark:bg-gray-900/40 rounded-xl px-3 py-2 mb-1.5 w-full">
+      <p className="text-[11px] text-gray-700 dark:text-gray-200 mb-2 leading-snug" translate="no">
+        {pending.preview?.human}
+      </p>
+      <div className="flex gap-2">
+        <button
+          disabled={done}
+          onClick={() => onConfirm(pending.token)}
+          className={`flex-1 px-3 py-2 rounded-lg text-[12px] font-semibold disabled:opacity-50 transition-colors ${confirmColor}`}
+        >
+          {done ? '…' : 'Confirm'}
+        </button>
+        <button
+          disabled={done}
+          onClick={() => onCancel(pending.token)}
+          className="flex-1 px-3 py-2 rounded-lg text-[12px] font-semibold bg-gray-200 dark:bg-gray-800 text-gray-700 dark:text-gray-200 hover:bg-gray-300 dark:hover:bg-gray-700 disabled:opacity-50 transition-colors"
+        >
+          Cancel
+        </button>
+      </div>
+    </div>
+  )
+}
+
 // ── Disambiguation card — shown when multiple open entries exist for a symbol ──
 function DisambiguationCard({ result, onPick }) {
   if (!result?.entries?.length) return null
@@ -2013,6 +2050,89 @@ function AIChat({ isFullPage = false, onClose, onDragStart }) {
     recordTickRef.current = setInterval(() => setVoiceSeconds((s) => s + 1), 1000)
   }
 
+  // ── Shared non-stream response handler ──────────────────────────────────────
+  // Called by both handleSend (JSON branch) and handleAction (confirm/cancel).
+  const handleAgentResponse = (data) => {
+    // Frontend-only: theme toggle
+    if (data.type === 'action' && data.action === 'TOGGLE_THEME') {
+      const wantDark = data.result.mode === 'dark'
+      if (wantDark !== isDark) toggleTheme()
+    }
+
+    // Journal draft — show interactive card instead of plain bubble
+    if (data.type === 'action' && data.action === 'DRAFT_JOURNAL' && data.result?.draft) {
+      setJournalDraft(data.result.draft)
+    }
+
+    // Dispatch event so other components re-fetch instantly
+    if (data.type === 'action' && data.action) {
+      dispatchChatAction(data.action)
+    }
+
+    // Keep lastAction alive for follow-ups
+    // DELETE_TRADE removed — it now arrives as type:'pending' (covered by that clause below)
+    const keepAliveActions = ['ADD_TRADE', 'CLOSE_TRADE', 'DRAFT_JOURNAL', 'NEEDS_DISAMBIGUATION']
+    if (data.type === 'pending' || (data.type === 'action' && keepAliveActions.includes(data.action))) {
+      setLastAction({ action: data.action, result: data.result })
+    } else {
+      setLastAction(null)
+    }
+
+    setMessages((prev) => [
+      ...prev,
+      {
+        id: Date.now(),
+        role: 'assistant',
+        content: data.reply,
+        time: new Date(),
+        actionType: data.type === 'action' ? data.action : (data.type === 'pending' ? '__PENDING__' : null),
+        actionResult: (data.type === 'action' || data.type === 'pending') ? data.result : null,
+        pending: data.type === 'pending'
+          ? { token: data.result?.token, action: data.action, preview: data.result?.preview }
+          : null,
+      },
+    ])
+  }
+
+  // ── Structured action dispatch — bypasses the LLM intent-parse ───────────────
+  // Used by ConfirmCard [Confirm]/[Cancel] today; phase-2 Y action-card buttons
+  // reuse this same seam. Posts { action, ...payload } to the same agent endpoint.
+  const handleAction = async (payload) => {
+    setLoading(true)
+    try {
+      const stored = localStorage.getItem('auth_token')
+      const res = await fetch(`${BASE_URL}/api/chat/agent`, {
+        method: 'POST',
+        credentials: 'include',
+        headers: {
+          'Content-Type': 'application/json',
+          ...(stored ? { Authorization: `Bearer ${stored}` } : {}),
+        },
+        body: JSON.stringify(payload),
+      })
+      const data = await res.json()
+      handleAgentResponse(data)
+    } catch (err) {
+      setMessages((prev) => [
+        ...prev,
+        {
+          id: Date.now(),
+          role: 'assistant',
+          content: 'Something went wrong. Please try again.',
+          time: new Date(),
+          isError: true,
+        },
+      ])
+    } finally {
+      setLoading(false)
+      inputRef.current?.focus()
+    }
+  }
+
+  // ── Mark a confirm card as done (disables buttons to prevent double-fire) ────
+  const markConfirmDone = (id) =>
+    setMessages((prev) => prev.map((m) => (m.id === id ? { ...m, confirmDone: true } : m)))
+
   // Handles sending any message (from input or quick actions)
   const handleSend = async (messageText) => {
     const text = messageText || input.trim()
@@ -2137,51 +2257,7 @@ function AIChat({ isFullPage = false, onClose, onDragStart }) {
 
       // ── JSON action / non-streaming response ─────────────────────────────────
       const data = await response.json()
-
-      // Frontend-only: theme toggle
-      if (data.type === 'action' && data.action === 'TOGGLE_THEME') {
-        const wantDark = data.result.mode === 'dark'
-        if (wantDark !== isDark) toggleTheme()
-      }
-
-      // Journal draft — show interactive card instead of plain bubble
-      if (data.type === 'action' && data.action === 'DRAFT_JOURNAL' && data.result?.draft) {
-        setJournalDraft(data.result.draft)
-      }
-
-      // Dispatch event so other components re-fetch instantly
-      if (data.type === 'action' && data.action) {
-        dispatchChatAction(data.action)
-      }
-
-      // Keep lastAction alive for follow-ups
-      const keepAliveActions = [
-        'ADD_TRADE',
-        'CLOSE_TRADE',
-        'DELETE_TRADE',
-        'DRAFT_JOURNAL',
-        'NEEDS_DISAMBIGUATION',
-      ]
-      if (
-        data.type === 'pending' ||
-        (data.type === 'action' && keepAliveActions.includes(data.action))
-      ) {
-        setLastAction({ action: data.action, result: data.result })
-      } else {
-        setLastAction(null)
-      }
-
-      setMessages((prev) => [
-        ...prev,
-        {
-          id: Date.now(),
-          role: 'assistant',
-          content: data.reply,
-          time: new Date(),
-          actionType: data.type === 'action' ? data.action : null,
-          actionResult: data.type === 'action' ? data.result : null,
-        },
-      ])
+      handleAgentResponse(data)
     } catch (err) {
       if (err?.name === 'AbortError') return // intentional cancel — no error message
       console.error('AIChat handleSend error:', err)
@@ -2405,8 +2481,9 @@ function AIChat({ isFullPage = false, onClose, onDragStart }) {
     const showRiskSummary = msg.actionType === 'SHOW_RISK_SUMMARY' && msg.actionResult?.positions
     const showWeekly = msg.actionType === 'WEEKLY_SUMMARY' && msg.actionResult
     // TOGGLE_THEME: handled inline, no card needed
-    // DELETE_TRADE: pending confirmation — no action card yet, text reply is the prompt
     // DRAFT_JOURNAL: shown as interactive JournalDraftCard (not inline here, added to messages area separately)
+    // __PENDING__: shown as ConfirmCard below (DELETE_TRADE and other money actions via confirm-gate)
+    const showConfirm = msg.pending?.token
     const showStandardCard =
       msg.actionType &&
       msg.actionResult &&
@@ -2419,7 +2496,8 @@ function AIChat({ isFullPage = false, onClose, onDragStart }) {
       !showTradePlan &&
       !showRiskSummary &&
       !showWeekly &&
-      !['DRAFT_JOURNAL', 'TOGGLE_THEME', 'DELETE_TRADE'].includes(msg.actionType)
+      !showConfirm &&
+      !['DRAFT_JOURNAL', 'TOGGLE_THEME', '__PENDING__'].includes(msg.actionType)
 
     return (
       <div
@@ -2438,6 +2516,21 @@ function AIChat({ isFullPage = false, onClose, onDragStart }) {
           {/* Disambiguation picker */}
           {showDisambiguation && (
             <DisambiguationCard result={msg.actionResult} onPick={handleDisambiguationPick} />
+          )}
+          {/* Confirm gate card — gated money actions awaiting [Confirm]/[Cancel] */}
+          {showConfirm && (
+            <ConfirmCard
+              pending={msg.pending}
+              done={msg.confirmDone}
+              onConfirm={(token) => {
+                markConfirmDone(msg.id)
+                handleAction({ action: 'CONFIRM_ACTION', token })
+              }}
+              onCancel={(token) => {
+                markConfirmDone(msg.id)
+                handleAction({ action: 'CANCEL_ACTION', token })
+              }}
+            />
           )}
           {/* Standard action card */}
           {showStandardCard && <ActionCard type={msg.actionType} result={msg.actionResult} />}
