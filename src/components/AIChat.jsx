@@ -2039,11 +2039,17 @@ function AIChat({ isFullPage = false, onClose, onDragStart }) {
       const ctrl = new AbortController()
       abortCtrlRef.current = ctrl
 
+      // Cookie preferred; Bearer fallback for Safari ITP (mobile blocks the cross-site
+      // cookie — mirrors the axios interceptor in api/index.js). Temporary until custom domain.
+      const stored = localStorage.getItem('auth_token')
       const response = await fetch(`${BASE_URL}/api/chat/agent`, {
         method: 'POST',
         signal: ctrl.signal,
-        credentials: 'include', // send httpOnly cookie (SEC-001 — no localStorage token)
-        headers: { 'Content-Type': 'application/json' },
+        credentials: 'include', // send httpOnly cookie when the browser allows it
+        headers: {
+          'Content-Type': 'application/json',
+          ...(stored ? { Authorization: `Bearer ${stored}` } : {}),
+        },
         body: JSON.stringify({
           message: text,
           // Exclude streaming/incomplete messages from history — they have empty content
