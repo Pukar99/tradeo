@@ -57,6 +57,7 @@ export function useHighlightListener(domain, onHighlight) {
 export const REFRESH_MAP = {
   trades: [
     'ADD_TRADE',
+    'ADD_TO_POSITION',
     'CLOSE_TRADE',
     'UPDATE_SL_TP',
     'CONFIRM_DELETE',

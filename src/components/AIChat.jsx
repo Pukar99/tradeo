@@ -2157,7 +2157,7 @@ function AIChat({ isFullPage = false, onClose, onDragStart }) {
 
     // Keep lastAction alive for follow-ups
     // DELETE_TRADE removed — it now arrives as type:'pending' (covered by that clause below)
-    const keepAliveActions = ['ADD_TRADE', 'CLOSE_TRADE', 'DRAFT_JOURNAL', 'NEEDS_DISAMBIGUATION']
+    const keepAliveActions = ['ADD_TRADE', 'ADD_TO_POSITION', 'CLOSE_TRADE', 'DRAFT_JOURNAL', 'NEEDS_DISAMBIGUATION']
     if (
       data.type === 'pending' ||
       data.type === 'slotfill' ||
