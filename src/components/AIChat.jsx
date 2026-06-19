@@ -2620,7 +2620,7 @@ function AIChat({ isFullPage = false, onClose, onDragStart }) {
           </div>
         )}
         <div
-          className={`max-w-[85%] flex flex-col ${msg.role === 'user' ? 'items-end' : 'items-start'}`}
+          className={`flex flex-col ${showChartCard ? 'w-[90%] max-w-[90%]' : 'max-w-[85%]'} ${msg.role === 'user' ? 'items-end' : 'items-start'}`}
         >
           {/* Disambiguation picker */}
           {showDisambiguation && (
@@ -2670,7 +2670,7 @@ function AIChat({ isFullPage = false, onClose, onDragStart }) {
           {showWeekly && <WeeklySummaryCard result={msg.actionResult} />}
           {/* Card protocol — structured card reply (candlestick chart, etc.) */}
           {showChartCard && (
-            <div className="mb-1 w-full max-w-[320px]">
+            <div className="mb-1 w-full">
               <CardRenderer card={msg.card} />
             </div>
           )}
