@@ -17,6 +17,7 @@ import {
 import { getChatSuggestions } from '../utils/globalCache'
 import { dispatchChatAction, DEBRIEF_EVENT } from '../utils/chatEvents'
 import { useNavigate } from 'react-router-dom'
+import CardRenderer from './chat/CardRenderer'
 
 // ── Tradeo logo SVG (reused everywhere in chat) ──────────────────────────────
 const TradeoLogo = ({ size = 22 }) => (
@@ -2192,6 +2193,8 @@ function AIChat({ isFullPage = false, onClose, onDragStart }) {
               suggestion: data.suggestion || null,
             }
           : null,
+        // card protocol: a structured card reply (e.g. candlestick chart) rendered by CardRenderer
+        card: data.type === 'card' ? data.card : null,
       },
     ])
   }
@@ -2588,6 +2591,8 @@ function AIChat({ isFullPage = false, onClose, onDragStart }) {
     const showConfirm = msg.pending?.token
     // multi-turn: inline slot-fill form, dismissed once filled/cancelled (reuses confirmDone)
     const showSlotfill = msg.slotfill && !msg.confirmDone
+    // card protocol: a structured card reply (e.g. candlestick chart) rendered by CardRenderer
+    const showChartCard = !!msg.card
     const showStandardCard =
       msg.actionType &&
       msg.actionResult &&
@@ -2663,6 +2668,12 @@ function AIChat({ isFullPage = false, onClose, onDragStart }) {
           {showTradePlan && <TradePlanCard plan={msg.actionResult.plan} />}
           {showRiskSummary && <RiskSummaryCard result={msg.actionResult} />}
           {showWeekly && <WeeklySummaryCard result={msg.actionResult} />}
+          {/* Card protocol — structured card reply (candlestick chart, etc.) */}
+          {showChartCard && (
+            <div className="mb-1 w-full max-w-[320px]">
+              <CardRenderer card={msg.card} />
+            </div>
+          )}
           {/* Text bubble */}
           <div
             className={`px-3 py-2 rounded-2xl text-xs leading-relaxed ${
