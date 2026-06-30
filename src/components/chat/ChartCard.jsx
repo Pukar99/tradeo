@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from 'react'
 import { getStockChart } from '../../api'
+import { buildPriceLines } from './chartMarkers'
 
 // Timeframe pills shown on a chat chart card (subset of the endpoint's supported set).
 const TIMEFRAMES = ['1M', '3M', '6M', '1Y', 'ALL']
@@ -68,6 +69,12 @@ export default function ChartCard({ card }) {
         chart.timeScale().setVisibleLogicalRange({ from: total - DEFAULT_VISIBLE_CANDLES, to: total + 2 })
       } else {
         chart.timeScale().fitContent()
+      }
+      // Entry/SL/TP price lines (Scenario 2). Drawn here (not a separate effect) because the
+      // series instance is recreated on every redraw (timeframe switch) — a ref change doesn't
+      // re-trigger effects, so the lines must be added in the same effect that owns the series.
+      for (const opts of buildPriceLines(card.markers)) {
+        series.createPriceLine(opts)
       }
       chartRef.current = chart
       seriesRef.current = series
