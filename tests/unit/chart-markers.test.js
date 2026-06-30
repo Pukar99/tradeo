@@ -31,4 +31,17 @@ describe('card protocol Scenario 2 — buildPriceLines', () => {
     expect(lines).toHaveLength(1)
     expect(lines[0].color).toBe(MARKER_COLORS.default)
   })
+
+  test('smc_entry/smc_sl markers use the SMC order-block color', () => {
+    const markers = [
+      { type: 'smc_entry', price: 712, label: 'OB Entry 712.00' },
+      { type: 'smc_sl', price: 698.5, label: 'OB SL 698.50' },
+    ]
+    const lines = buildPriceLines(markers)
+    expect(lines).toHaveLength(2)
+    expect(lines[0].color).toBe(MARKER_COLORS.smc_entry)
+    expect(lines[1].color).toBe(MARKER_COLORS.smc_sl)
+    expect(MARKER_COLORS.smc_entry).toBe('#22c55e')
+    expect(MARKER_COLORS.smc_sl).toBe('#22c55e')
+  })
 })
