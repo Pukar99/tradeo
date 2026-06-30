@@ -1,4 +1,4 @@
-// === ChatPage.jsx — chat page: AI trading assistant with TraderProfile sidebar (desktop), auth wall for guests ===
+// === ChatPage.jsx — maximized AI chat: edge-to-edge, sticky header, sidebar always open ===
 import AIChat from '../components/AIChat'
 import TraderProfile from '../components/TraderProfile'
 import { useAuth } from '../context/AuthContext'
@@ -9,16 +9,18 @@ function ChatPage() {
 
   if (!user) {
     return (
-      <div className="min-h-screen bg-gray-100 dark:bg-gray-900 flex items-center justify-center">
-        <div className="bg-white dark:bg-gray-800 rounded-2xl p-8 text-center max-w-md shadow-sm">
-          <span className="text-4xl mb-4 block">🤖</span>
-          <h2 className="text-xl font-bold text-gray-900 dark:text-white mb-2">Tradeo AI</h2>
-          <p className="text-gray-500 dark:text-gray-400 text-sm mb-6">
-            Login to chat with your AI trading assistant
-          </p>
+      <div className="min-h-screen bg-gray-100 dark:bg-gray-950 flex items-center justify-center">
+        <div className="bg-white dark:bg-gray-900 rounded-2xl p-8 text-center max-w-md border border-gray-100 dark:border-gray-800">
+          <div className="w-12 h-12 rounded-2xl bg-green-50 dark:bg-green-900/20 flex items-center justify-center mx-auto mb-4">
+            <svg className="w-6 h-6 text-green-500" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.8}>
+              <path strokeLinecap="round" strokeLinejoin="round" d="M8 10h.01M12 10h.01M16 10h.01M9 16H5a2 2 0 01-2-2V6a2 2 0 012-2h14a2 2 0 012 2v8a2 2 0 01-2 2h-5l-5 5v-5z" />
+            </svg>
+          </div>
+          <h2 className="text-lg font-bold text-gray-900 dark:text-white mb-1">Tradeo AI</h2>
+          <p className="text-gray-400 text-sm mb-6">Login to chat with your AI trading assistant</p>
           <Link
             to="/login"
-            className="bg-blue-600 text-white px-6 py-2 rounded-xl text-sm font-medium hover:bg-blue-700"
+            className="bg-green-500 text-white px-6 py-2.5 rounded-xl text-sm font-semibold hover:bg-green-600 transition-colors"
           >
             Login to Access
           </Link>
@@ -28,34 +30,31 @@ function ChatPage() {
   }
 
   return (
-    <div className="min-h-screen bg-gray-100 dark:bg-gray-900">
-      {/* 56px/80px = approximate navbar height (mobile/desktop) — update if Navbar height changes */}
-      <div className="max-w-6xl mx-auto px-3 sm:px-4 py-4 sm:py-6 flex gap-4 h-[calc(100dvh-56px)] sm:h-[calc(100dvh-80px)]">
-        {/* Left — Trader Profile sidebar (desktop only) */}
-        <div className="hidden lg:flex flex-col w-64 xl:w-72 flex-shrink-0 gap-4 overflow-y-auto pb-2">
-          <div>
-            <h2 className="text-[13px] font-bold text-gray-900 dark:text-white mb-0.5">
-              AI Trading Assistant
-            </h2>
-            <p className="text-[10px] text-gray-400">Powered by Groq · NEPSE-aware</p>
-          </div>
-          <TraderProfile />
-        </div>
+    // Edge-to-edge: no max-width cap, fills full viewport height minus the navbar.
+    // 56px mobile navbar / 64px desktop — kept as data-comment; update if Navbar height changes.
+    <div className="bg-gray-100 dark:bg-gray-950 h-[calc(100dvh-56px)] sm:h-[calc(100dvh-64px)] flex gap-3 p-3 sm:p-4">
 
-        {/* Right — Chat */}
-        <div className="flex-1 flex flex-col min-w-0">
-          {/* Mobile/tablet header (hidden on lg) */}
-          <div className="lg:hidden mb-3">
-            <h1 className="text-[15px] font-bold text-gray-900 dark:text-white">
-              AI Trading Assistant
-            </h1>
-            <p className="text-[10px] text-gray-400 mt-0.5">
-              Powered by Groq · Knows your portfolio & NEPSE data
-            </p>
-          </div>
-          <div className="flex-1 bg-white dark:bg-gray-800 rounded-2xl shadow-sm overflow-hidden flex flex-col min-h-0">
-            <AIChat isFullPage={true} />
-          </div>
+      {/* ── Left sidebar: Trader Profile (desktop only, always open) ── */}
+      <aside className="hidden lg:flex flex-col w-72 xl:w-80 flex-shrink-0 min-h-0 overflow-y-auto gap-3">
+        {/* Sidebar header */}
+        <div className="bg-white dark:bg-gray-900 rounded-2xl border border-gray-100 dark:border-gray-800 px-4 py-3">
+          <p className="text-sm font-bold text-gray-900 dark:text-white leading-none">AI Trading Assistant</p>
+          <p className="text-[11px] text-gray-400 mt-0.5">Powered by Groq · NEPSE-aware</p>
+        </div>
+        {/* TraderProfile — opened by default in ChatPage (full profile always visible) */}
+        <TraderProfile defaultOpen />
+      </aside>
+
+      {/* ── Right: chat panel, fills remaining space, never overflows ── */}
+      <div className="flex-1 min-w-0 flex flex-col">
+        {/* Mobile page label (hidden lg+, the chat header already says "Tradeo AI") */}
+        <div className="lg:hidden mb-2 px-1">
+          <p className="text-[13px] font-bold text-gray-900 dark:text-white">AI Trading Assistant</p>
+          <p className="text-[10px] text-gray-400">Powered by Groq · NEPSE-aware</p>
+        </div>
+        {/* Chat container: rounded card, strict height so only the message list scrolls */}
+        <div className="flex-1 min-h-0 bg-white dark:bg-gray-900 rounded-2xl border border-gray-100 dark:border-gray-800 overflow-hidden flex flex-col">
+          <AIChat isFullPage={true} />
         </div>
       </div>
     </div>

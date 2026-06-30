@@ -2287,6 +2287,40 @@ function AIChat({ isFullPage = false, onClose, onDragStart }) {
         }),
       })
 
+      // 503 = Render cold start (free-tier sleeps after 15 min idle, proxy times out before
+      // the backend finishes booting). Show a specific retry message instead of a generic error.
+      if (response.status === 503) {
+        setMessages((prev) => [
+          ...prev,
+          {
+            id: Date.now(),
+            role: 'assistant',
+            content: 'The server is waking up — it goes to sleep after 15 min idle. Wait ~30 seconds and try again.',
+            time: new Date(),
+            isError: true,
+            retryText: text,
+          },
+        ])
+        setLoading(false)
+        return
+      }
+
+      if (!response.ok) {
+        setMessages((prev) => [
+          ...prev,
+          {
+            id: Date.now(),
+            role: 'assistant',
+            content: `Server error (${response.status}) — please try again.`,
+            time: new Date(),
+            isError: true,
+            retryText: text,
+          },
+        ])
+        setLoading(false)
+        return
+      }
+
       const contentType = response.headers.get('content-type') || ''
 
       // ── Streaming chat response ──────────────────────────────────────────────
@@ -2466,7 +2500,7 @@ function AIChat({ isFullPage = false, onClose, onDragStart }) {
     }
     if (e.key === 'Enter' && !e.shiftKey) {
       e.preventDefault()
-      handleSend()
+      if (!busy) handleSend()
     }
   }
 
@@ -2690,7 +2724,7 @@ function AIChat({ isFullPage = false, onClose, onDragStart }) {
           >
             {msg.role === 'assistant' && !msg.isError ? (
               <>
-                <MarkdownLite text={msg.content} />
+                <MarkdownLite text={msg.content || ''} />
                 {msg.streaming && (
                   <span className="inline-block w-0.5 h-3 bg-green-500 ml-0.5 animate-pulse align-middle" />
                 )}
@@ -2796,21 +2830,21 @@ function AIChat({ isFullPage = false, onClose, onDragStart }) {
       <div
         onMouseDown={isFloat ? onDragStart : undefined}
         onTouchStart={isFloat ? onDragStart : undefined}
-        className={`flex items-center justify-between px-3 py-2.5 shrink-0 border-b ${
+        className={`flex items-center justify-between shrink-0 border-b ${
           isFloat
-            ? 'bg-white/20 dark:bg-black/20 border-white/20 dark:border-white/8 cursor-move select-none'
-            : 'bg-white dark:bg-gray-950 border-gray-100 dark:border-gray-800'
+            ? 'px-3 py-2.5 bg-white/20 dark:bg-black/20 border-white/20 dark:border-white/8 cursor-move select-none'
+            : 'px-4 py-3 bg-white dark:bg-gray-900 border-gray-100 dark:border-gray-800'
         }`}
       >
-        <div className="flex items-center gap-2">
-          <TradeoLogo size={22} />
+        <div className="flex items-center gap-2.5">
+          <TradeoLogo size={isFloat ? 22 : 26} />
           <div>
-            <p className="text-xs font-bold tracking-tight text-gray-900 dark:text-white leading-none">
+            <p className={`font-bold tracking-tight text-gray-900 dark:text-white leading-none ${isFloat ? 'text-xs' : 'text-sm'}`}>
               Tradeo AI
             </p>
             <div className="flex items-center gap-1 mt-0.5">
               <div className="w-1.5 h-1.5 bg-green-400 rounded-full animate-pulse" />
-              <span className="text-[10px] text-gray-400">Agent · NEPSE</span>
+              <span className={`text-gray-400 ${isFloat ? 'text-[10px]' : 'text-[11px]'}`}>Agent · NEPSE</span>
             </div>
           </div>
         </div>

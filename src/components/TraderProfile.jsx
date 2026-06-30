@@ -31,6 +31,57 @@ function BulletList({ text }) {
   )
 }
 
+// Single pill toggle switching between Strengths and Weaknesses — minimal, no two boxes.
+function StrengthsWeaknessesToggle({ strengths, weaknesses }) {
+  const [tab, setTab] = useState('strengths')
+  const toLines = (text) =>
+    (text || '').split('\n').map((l) => l.replace(/^[•\-*]\s*/, '').trim()).filter(Boolean)
+  const lines = tab === 'strengths' ? toLines(strengths) : toLines(weaknesses)
+  const isStrengths = tab === 'strengths'
+  return (
+    <div className="bg-gray-50 dark:bg-gray-800/60 rounded-xl border border-gray-100 dark:border-gray-700 overflow-hidden">
+      {/* Toggle pill */}
+      <div className="flex border-b border-gray-100 dark:border-gray-700">
+        <button
+          onClick={() => setTab('strengths')}
+          className={`flex-1 py-2 text-[10px] font-bold uppercase tracking-widest transition-colors ${
+            isStrengths
+              ? 'bg-emerald-50 dark:bg-emerald-900/20 text-emerald-600 dark:text-emerald-400'
+              : 'text-gray-400 hover:text-gray-600 dark:hover:text-gray-300'
+          }`}
+        >
+          ↑ Strengths
+        </button>
+        <div className="w-px bg-gray-100 dark:bg-gray-700" />
+        <button
+          onClick={() => setTab('weaknesses')}
+          className={`flex-1 py-2 text-[10px] font-bold uppercase tracking-widest transition-colors ${
+            !isStrengths
+              ? 'bg-red-50 dark:bg-red-900/20 text-red-600 dark:text-red-400'
+              : 'text-gray-400 hover:text-gray-600 dark:hover:text-gray-300'
+          }`}
+        >
+          ↓ Weaknesses
+        </button>
+      </div>
+      {/* Content */}
+      <ul className="px-3 py-2.5 space-y-1.5">
+        {lines.length === 0 && (
+          <li className="text-[11px] text-gray-400">No data</li>
+        )}
+        {lines.map((line, i) => (
+          <li key={i} className={`flex items-start gap-2 text-[11px] leading-relaxed ${
+            isStrengths ? 'text-emerald-700 dark:text-emerald-300' : 'text-red-700 dark:text-red-300'
+          }`}>
+            <span className="mt-1 w-1.5 h-1.5 rounded-full bg-current flex-shrink-0 opacity-60" />
+            {line}
+          </li>
+        ))}
+      </ul>
+    </div>
+  )
+}
+
 function StatPill({ label, value, color = 'text-gray-700 dark:text-gray-200' }) {
   return (
     <div className="flex flex-col items-center bg-gray-50 dark:bg-gray-800/60 rounded-xl px-3 py-2 border border-gray-100 dark:border-gray-800">
@@ -42,11 +93,11 @@ function StatPill({ label, value, color = 'text-gray-700 dark:text-gray-200' }) 
   )
 }
 
-export default function TraderProfile() {
+export default function TraderProfile({ defaultOpen = false }) {
   const [profile, setProfile] = useState(null)
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState(null)
-  const [open, setOpen] = useState(false)
+  const [open, setOpen] = useState(defaultOpen)
   const [reason, setReason] = useState(null)
 
   const loadProfile = useCallback(async () => {
@@ -75,7 +126,7 @@ export default function TraderProfile() {
   const s = profile?.stats
 
   return (
-    <div className="border border-gray-100 dark:border-gray-800 rounded-2xl overflow-hidden bg-white dark:bg-gray-900">
+    <div className="border border-gray-100 dark:border-gray-800 rounded-2xl bg-white dark:bg-gray-900">
       <button
         onClick={() => setOpen((o) => !o)}
         className="w-full flex items-center justify-between px-4 py-3 hover:bg-gray-50 dark:hover:bg-gray-800/50 transition-colors"
@@ -178,25 +229,10 @@ export default function TraderProfile() {
                 </div>
               )}
 
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                <div className="bg-emerald-50 dark:bg-emerald-900/20 border border-emerald-200 dark:border-emerald-800/50 rounded-xl px-3 py-3">
-                  <p className="text-[10px] font-bold uppercase tracking-widest text-emerald-600 dark:text-emerald-400">
-                    Strengths
-                  </p>
-                  <div className="text-emerald-700 dark:text-emerald-300">
-                    <BulletList text={profile.strengths} />
-                  </div>
-                </div>
-
-                <div className="bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800/50 rounded-xl px-3 py-3">
-                  <p className="text-[10px] font-bold uppercase tracking-widest text-red-600 dark:text-red-400">
-                    Weaknesses
-                  </p>
-                  <div className="text-red-700 dark:text-red-300">
-                    <BulletList text={profile.weaknesses} />
-                  </div>
-                </div>
-              </div>
+              <StrengthsWeaknessesToggle
+                strengths={profile.strengths}
+                weaknesses={profile.weaknesses}
+              />
 
               {profile.bestConditions && (
                 <div className="bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800/50 rounded-xl px-3 py-3">
