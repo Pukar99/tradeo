@@ -1,8 +1,9 @@
 // === BacktestSetupPanel.jsx — session setup form (symbol, date, capital, mode, SL) ===
 
-import { useState, useEffect, useCallback, useRef } from 'react'
+import { useState, useCallback } from 'react'
 import { btGetSymbols, btGetSymbolMeta, btCreateSession } from '../../api/backtest'
 import { isNepseWeekend } from '../../utils/nepseCalendar'
+import SymbolSearch from '../common/SymbolSearch'
 
 const SPEEDS = ['0.5', '1', '2', '5', '10']
 const DEFAULT_CAPITAL = '100000' // Rs. 1 lakh
@@ -45,11 +46,7 @@ function computeDefaultStart(meta, years = DEFAULT_LOOKBACK_YEARS) {
 }
 
 export default function BacktestSetupPanel({ onSessionStarted }) {
-  const [symbols, setSymbols] = useState([])
   const [symbol, setSymbol] = useState('') // confirmed selection
-  const [query, setQuery] = useState('') // live search text
-  const [open, setOpen] = useState(false)
-  const [cursor, setCursor] = useState(-1) // keyboard-highlighted row
   const [meta, setMeta] = useState(null) // { earliest_date, latest_date, total_days }
   const [metaLoading, setMetaLoading] = useState(false)
   const [startDate, setStartDate] = useState('')
@@ -61,48 +58,10 @@ export default function BacktestSetupPanel({ onSessionStarted }) {
   const [slMode, setSlMode] = useState('MANUAL')
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState('')
-  const [symbolsLoading, setSymbolsLoading] = useState(true)
-  const [symbolsError, setSymbolsError] = useState('')
-  const dropdownRef = useRef(null)
-  const listRef = useRef(null)
-  // Tracks a list click so input blur doesn't close the list before select fires
-  const mouseDownInList = useRef(false)
-
-  useEffect(() => {
-    btGetSymbols()
-      .then((r) => setSymbols(r.data.symbols || []))
-      .catch(() => setSymbolsError('Failed to load symbols — check server'))
-      .finally(() => setSymbolsLoading(false))
-  }, [])
-
-  // Close dropdown on outside click
-  useEffect(() => {
-    const h = (e) => {
-      if (dropdownRef.current && !dropdownRef.current.contains(e.target)) setOpen(false)
-    }
-    document.addEventListener('mousedown', h)
-    return () => document.removeEventListener('mousedown', h)
-  }, [])
-
-  // Live filter: empty query shows the first 20; otherwise substring match.
-  const filteredSymbols =
-    query.length < 1
-      ? symbols.slice(0, 20)
-      : symbols.filter((s) => s.symbol.toLowerCase().includes(query.toLowerCase())).slice(0, 30)
-
-  // Keep the highlighted row scrolled into view
-  useEffect(() => {
-    if (cursor >= 0 && listRef.current) {
-      listRef.current.children[cursor]?.scrollIntoView({ block: 'nearest' })
-    }
-  }, [cursor])
 
   // ── On symbol pick: fetch its date range, auto-fill a sensible 2yr default ──────
   const handleSelectSymbol = useCallback(async (sym) => {
     setSymbol(sym)
-    setQuery('')
-    setOpen(false)
-    setCursor(-1)
     setError('')
     setDateNotice('')
     setMeta(null)
@@ -128,38 +87,6 @@ export default function BacktestSetupPanel({ onSessionStarted }) {
       setMetaLoading(false)
     }
   }, [])
-
-  // ── Keyboard navigation in the symbol search (matches the Screen page search) ───
-  const handleSymbolKey = useCallback(
-    (e) => {
-      if (!open) {
-        if (e.key === 'ArrowDown' || e.key === 'ArrowUp') setOpen(true)
-        return
-      }
-      if (e.key === 'ArrowDown') {
-        e.preventDefault()
-        setCursor((c) => Math.min(c + 1, filteredSymbols.length - 1))
-      } else if (e.key === 'ArrowUp') {
-        e.preventDefault()
-        setCursor((c) => Math.max(c - 1, 0))
-      } else if (e.key === 'Enter') {
-        e.preventDefault()
-        const pick = cursor >= 0 ? filteredSymbols[cursor] : filteredSymbols[0]
-        if (pick) handleSelectSymbol(pick.symbol)
-      } else if (e.key === 'Escape') {
-        setOpen(false)
-        setCursor(-1)
-      }
-    },
-    [open, cursor, filteredSymbols, handleSelectSymbol]
-  )
-
-  // ── Default-select NABIL once symbols are loaded (if user hasn't picked yet) ─────
-  useEffect(() => {
-    if (symbol || !symbols.length) return
-    const nabil = symbols.find((s) => s.symbol === 'NABIL')
-    if (nabil) handleSelectSymbol('NABIL')
-  }, [symbols, symbol, handleSelectSymbol])
 
   // ── Manual date change: validate against the known range + weekends ─────────────
   const handleDateChange = useCallback(
@@ -221,84 +148,18 @@ export default function BacktestSetupPanel({ onSessionStarted }) {
     <div className="flex flex-col gap-3 p-3 h-full overflow-y-auto">
       <div className={LABEL}>Backtest Setup</div>
 
-      {/* Symbol load error */}
-      {symbolsError && (
-        <div className="text-[10px] text-red-500 bg-red-50 dark:bg-red-900/20 rounded-md px-2 py-1.5">
-          {symbolsError}
-        </div>
-      )}
-
-      {/* Script — type-ahead search (matches the Screen page symbol search) */}
-      <div className="relative" ref={dropdownRef}>
+      {/* Script — type-ahead search (shared SymbolSearch; stocks-only, backtest API) */}
+      <div className="relative">
         <label className={LABEL}>Script</label>
-        <div className="mt-0.5 flex items-center gap-2 bg-gray-50 dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-md px-2.5 py-1.5">
-          <svg
-            className="w-3.5 h-3.5 text-gray-400 shrink-0"
-            fill="none"
-            viewBox="0 0 24 24"
-            stroke="currentColor"
-          >
-            <path
-              strokeLinecap="round"
-              strokeLinejoin="round"
-              strokeWidth={2}
-              d="M21 21l-4.35-4.35M17 11A6 6 0 1 1 5 11a6 6 0 0 1 12 0z"
-            />
-          </svg>
-          <input
-            value={open ? query : symbol || query}
-            onChange={(e) => {
-              setQuery(e.target.value)
-              setOpen(true)
-              setCursor(-1)
-            }}
-            onFocus={() => {
-              setOpen(true)
-              setQuery('')
-            }}
-            onBlur={() => {
-              if (!mouseDownInList.current) setOpen(false)
-            }}
-            onKeyDown={handleSymbolKey}
-            placeholder={symbolsLoading ? 'Loading…' : symbol || 'Search symbol…'}
-            className="bg-transparent text-[12px] text-gray-700 dark:text-gray-200 placeholder-gray-400 outline-none w-full"
+        <div className="mt-0.5 w-full px-2 py-1.5 rounded-md border border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-800">
+          <SymbolSearch
+            value={symbol}
+            stocksOnly
+            defaultValue="NABIL"
+            fetchSymbols={() => btGetSymbols().then((r) => ({ stocks: r.data.symbols || [], indexes: [] }))}
+            onSelect={(sym) => handleSelectSymbol(sym)}
           />
         </div>
-
-        {open && filteredSymbols.length > 0 && (
-          <div className="absolute z-50 top-full left-0 right-0 mt-1 bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-700 rounded-md shadow-lg max-h-56 overflow-y-auto">
-            <ul ref={listRef}>
-              {filteredSymbols.map((s, i) => (
-                <li
-                  key={s.symbol}
-                  onMouseDown={() => {
-                    mouseDownInList.current = true
-                    handleSelectSymbol(s.symbol)
-                    mouseDownInList.current = false
-                  }}
-                  className={`flex items-center justify-between px-3 py-1.5 cursor-pointer transition-colors ${
-                    i === cursor
-                      ? 'bg-blue-50 dark:bg-blue-950'
-                      : 'hover:bg-gray-50 dark:hover:bg-gray-800'
-                  }`}
-                >
-                  <span className="text-[12px] font-semibold text-gray-800 dark:text-gray-100">
-                    {s.symbol}
-                  </span>
-                  <span className="shrink-0 ml-2 text-[10px] font-medium px-1.5 py-0.5 rounded-md bg-gray-100 dark:bg-gray-800 text-gray-500">
-                    Stock
-                  </span>
-                </li>
-              ))}
-            </ul>
-          </div>
-        )}
-
-        {open && filteredSymbols.length === 0 && query.length > 0 && (
-          <div className="absolute z-50 top-full left-0 right-0 mt-1 bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-700 rounded-md shadow-lg px-3 py-3 text-[11px] text-gray-400">
-            {symbolsError ? symbolsError : `No results for "${query}"`}
-          </div>
-        )}
       </div>
 
       {/* Start Date */}
