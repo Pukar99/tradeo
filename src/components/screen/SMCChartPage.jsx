@@ -72,7 +72,7 @@ const SMC_TOGGLES = [
 // ── SMC Toolbar ───────────────────────────────────────────────────────────────
 function SMCToolbar({ toggles, setToggles, config, setConfig, symbols }) {
   const compact = useCompactToolbar()
-  const { selectSymbol } = useScreen() || {}
+  const { selectSymbol, selectedSymbol } = useScreen() || {}
   const toggle = (key) => setToggles((prev) => ({ ...prev, [key]: !prev[key] }))
   const updateConfig = (key, val) => {
     const next = { ...config, [key]: val }
@@ -195,6 +195,7 @@ function SMCToolbar({ toggles, setToggles, config, setConfig, symbols }) {
         <SymbolSearch
           symbols={symbols}
           stocksOnly
+          value={selectedSymbol}
           onSelect={(symbol, indexId, companyName) => selectSymbol(symbol, indexId, null, companyName)}
         />
         <div className="flex-1 min-w-0" />
@@ -214,6 +215,7 @@ function SMCToolbar({ toggles, setToggles, config, setConfig, symbols }) {
         <SymbolSearch
           symbols={symbols}
           stocksOnly
+          value={selectedSymbol}
           onSelect={(symbol, indexId, companyName) => selectSymbol(symbol, indexId, null, companyName)}
         />
         <ToolbarDivider />
