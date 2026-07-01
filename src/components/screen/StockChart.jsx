@@ -1,5 +1,5 @@
 // === StockChart.jsx — core chart component: candlestick/line, indicators (MA/EMA/BB/RSI/MACD/ATR), drawing tools, SMC + PA overlays, position lines ===
-import { useEffect, useRef, useState, useCallback, useMemo } from 'react'
+import { useEffect, useRef, useState, useCallback } from 'react'
 import { createPortal } from 'react-dom'
 import { useTheme } from '../../context/ThemeContext'
 import { useScreen } from '../../context/ScreenContext'

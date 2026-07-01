@@ -1,6 +1,6 @@
 // === ScreenToolbarAtoms.jsx — shared compact toolbar primitives for all Screen tabs ===
 // Used by: SMCChartPage, PriceActionPage, MultiChartPage (and any future tab).
-// General tab uses StockChart's own ChartSymbolSearch + ChartHUDControls instead.
+// Symbol search lives in components/common/SymbolSearch.jsx (shared across all tabs).
 import { useState, useEffect, useCallback } from 'react'
 import { useScreen } from '../../context/ScreenContext'
 import { useNavbarState } from '../../App'

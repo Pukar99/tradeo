@@ -519,15 +519,11 @@ function ScreenInner() {
         }}
       >
         {/* ── Toolbar strip ── */}
-        {/* NOTE: ChartSymbolSearch uses absolute positioning — toolbar slot must
-          never be inside overflow-x-auto or the dropdown clips.
-
-          Single row at every breakpoint: [tabs (scroll) | divider | sub-tabs |
+        {/* Single row at every breakpoint: [tabs (scroll) | divider | sub-tabs |
           divider | slot | badge]. On mobile the chart toolbar is compact
           (search + menu only — see StockChart compactToolbar), so it fits on the
-          same line as the tabs. The tab group scrolls horizontally if it overflows;
-          the slot stays OUTSIDE that scroll container so the search dropdown never
-          clips. */}
+          same line as the tabs. The tab group scrolls horizontally if it
+          overflows; the toolbar slot stays OUTSIDE that scroll container. */}
         <div
           className="flex flex-row items-center gap-1.5 lg:gap-2 px-3 py-1 border-b border-gray-100 dark:border-gray-800/80 shrink-0 bg-white/80 dark:bg-gray-900/80 backdrop-blur-sm"
           onMouseEnter={showNavbar}
