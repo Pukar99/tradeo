@@ -2,140 +2,9 @@
 
 import { useState, useCallback, useRef, useEffect } from 'react'
 import { btGetOHLCV } from '../../api/backtest'
-import { getMarketSymbols } from '../../utils/globalCache'
 import BacktestChart from '../backtest/BacktestChart'
 import BacktestControls from '../backtest/BacktestControls'
-
-// ── Symbol search (stock-only, standalone) ───────────────────────────────────
-
-function ReplaySymbolSearch({ value, onChange }) {
-  const [query, setQuery] = useState(value || '')
-  const [open, setOpen] = useState(false)
-  const [items, setItems] = useState([])
-  const [cursor, setCursor] = useState(-1)
-  const mouseDownInList = useRef(false)
-  const listRef = useRef(null)
-
-  useEffect(() => {
-    getMarketSymbols()
-      .then((r) =>
-        setItems(
-          r.data.stocks.map((s) => ({ symbol: s.symbol, company_name: s.company_name || null }))
-        )
-      )
-      .catch(() => {})
-  }, [])
-
-  const q = query.toLowerCase()
-  const filtered =
-    query.length < 1
-      ? items.slice(0, 20)
-      : items
-          .filter(
-            (s) =>
-              s.symbol.toLowerCase().includes(q) ||
-              (s.company_name && s.company_name.toLowerCase().includes(q))
-          )
-          .slice(0, 30)
-
-  function select(item) {
-    setQuery(item.symbol)
-    setOpen(false)
-    setCursor(-1)
-    onChange(item.symbol)
-  }
-
-  function handleKey(e) {
-    if (!open) {
-      setOpen(true)
-      return
-    }
-    if (e.key === 'ArrowDown') {
-      e.preventDefault()
-      setCursor((c) => Math.min(c + 1, filtered.length - 1))
-    }
-    if (e.key === 'ArrowUp') {
-      e.preventDefault()
-      setCursor((c) => Math.max(c - 1, 0))
-    }
-    if (e.key === 'Enter' && cursor >= 0) select(filtered[cursor])
-    if (e.key === 'Escape') {
-      setOpen(false)
-      setCursor(-1)
-    }
-  }
-
-  useEffect(() => {
-    if (cursor >= 0 && listRef.current) {
-      listRef.current.children[cursor]?.scrollIntoView({ block: 'nearest' })
-    }
-  }, [cursor])
-
-  return (
-    <div className="relative">
-      <div className="flex items-center gap-2 bg-gray-50 dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg px-3 py-1.5">
-        <svg
-          className="w-3.5 h-3.5 text-gray-400 shrink-0"
-          fill="none"
-          viewBox="0 0 24 24"
-          stroke="currentColor"
-        >
-          <path
-            strokeLinecap="round"
-            strokeLinejoin="round"
-            strokeWidth={2}
-            d="M21 21l-4.35-4.35M17 11A6 6 0 1 1 5 11a6 6 0 0 1 12 0z"
-          />
-        </svg>
-        <input
-          value={query}
-          onChange={(e) => {
-            setQuery(e.target.value)
-            setOpen(true)
-            setCursor(-1)
-          }}
-          onFocus={() => setOpen(true)}
-          onBlur={() => {
-            if (!mouseDownInList.current) setOpen(false)
-          }}
-          onKeyDown={handleKey}
-          placeholder="Symbol (e.g. NABIL)"
-          className="bg-transparent text-[12px] text-gray-700 dark:text-gray-200 placeholder-gray-400 outline-none w-40"
-        />
-      </div>
-      {open && filtered.length > 0 && (
-        <div className="absolute top-full mt-1 left-0 z-50 bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-700 rounded-lg shadow-lg max-h-52 overflow-y-auto w-48">
-          <ul ref={listRef}>
-            {filtered.map((s, i) => (
-              <li
-                key={s.symbol}
-                onMouseDown={() => {
-                  mouseDownInList.current = true
-                  select(s)
-                  mouseDownInList.current = false
-                }}
-                className={`px-3 py-1.5 cursor-pointer transition-colors ${
-                  i === cursor
-                    ? 'bg-blue-50 dark:bg-blue-950'
-                    : 'hover:bg-gray-50 dark:hover:bg-gray-800'
-                }`}
-              >
-                <div className="text-[12px] font-semibold text-gray-800 dark:text-gray-100 leading-tight">
-                  {s.symbol}
-                </div>
-                {s.company_name && (
-                  <div className="text-[10px] text-gray-400 dark:text-gray-500 leading-tight truncate">
-                    {s.company_name}
-                  </div>
-                )}
-              </li>
-            ))}
-          </ul>
-        </div>
-      )}
-    </div>
-  )
-}
+import SymbolSearch from '../common/SymbolSearch'
 
 // ── Minimal replay engine (no session, no orders) ────────────────────────────
 // Replicates the play/pause/step/speed logic from useBacktestEngine without
@@ -385,7 +254,13 @@ export default function ReplayPage() {
               <label className="block text-[10px] font-semibold text-gray-400 dark:text-gray-500 uppercase tracking-widest mb-1">
                 Symbol
               </label>
-              <ReplaySymbolSearch value={symbol} onChange={setSymbol} />
+              <SymbolSearch
+                value={symbol}
+                stocksOnly
+                placeholder="Symbol (e.g. NABIL)"
+                inputClassName="w-40"
+                onSelect={(sym) => setSymbol(sym)}
+              />
             </div>
 
             <div>
