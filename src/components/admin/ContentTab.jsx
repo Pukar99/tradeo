@@ -2,6 +2,7 @@
 import { useState, useEffect, useCallback } from 'react'
 import { getAdminPosts } from '@api/admin'
 import PostListRow from './PostListRow'
+import AdminSearchInput from '../common/AdminSearchInput'
 
 function SkeletonRow() {
   return (
@@ -27,17 +28,7 @@ export default function ContentTab() {
   const [page, setPage] = useState(1)
   const [pages, setPages] = useState(1)
   const [loading, setLoading] = useState(true)
-  const [search, setSearch] = useState('')
   const [query, setQuery] = useState('')
-
-  // Debounce search
-  useEffect(() => {
-    const t = setTimeout(() => {
-      setQuery(search)
-      setPage(1)
-    }, 350)
-    return () => clearTimeout(t)
-  }, [search])
 
   const fetchPosts = useCallback(async () => {
     setLoading(true)
@@ -63,12 +54,12 @@ export default function ContentTab() {
     <div className="flex flex-col gap-0">
       {/* Toolbar */}
       <div className="flex items-center gap-2 px-4 py-2 border-b border-gray-200 dark:border-gray-800">
-        <input
-          type="text"
-          value={search}
-          onChange={(e) => setSearch(e.target.value)}
+        <AdminSearchInput
+          onSearch={(q) => {
+            setQuery(q)
+            setPage(1)
+          }}
           placeholder="Search by title…"
-          className="flex-1 h-8 px-3 text-xs bg-gray-100 dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg text-gray-900 dark:text-white placeholder-gray-400 dark:placeholder-gray-500 focus:outline-none focus:ring-1 focus:ring-green-500"
         />
         <span className="text-xs text-gray-400 dark:text-gray-500 whitespace-nowrap">
           {total} posts
