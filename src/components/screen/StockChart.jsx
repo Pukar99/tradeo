@@ -1943,17 +1943,7 @@ export default function StockChart({
         const bar = param.seriesData?.get(priceSeries)
         if (!bar) return
         setTooltip({ ...bar, time: param.time, change: changeMap[param.time] })
-
-        if (!isIndex?.() || disableMovers) return
-        if (pendingHover.current) {
-          clearTimeout(pendingHover.current)
-          pendingHover.current = null
-        }
-        lastFetchedDate.current = param.time
-        const movers = await getMovers(param.time)
-        if (cancelled) return
-        setOverlayData({ date: param.time, movers, pinned: true })
-        onPin(param.time, movers)
+        // Day-data (movers) load moved to right-click — see onContextMenu below.
       })
 
       // ── Sub-pane sync — one-way only (main → sub) prevents feedback loop.
@@ -2403,8 +2393,13 @@ export default function StockChart({
         ps = getPs()
       const hitIdx = chart && ps ? hitTestDrawing(mx, my, drawingsRef.current, chart, ps) : -1
 
+      // Resolve which candle's date is under the cursor — feeds "Load Day Data"
+      // (index charts only, same restriction the old left-click handler had).
+      const candleTime =
+        isIndex?.() && !disableMovers ? chart?.timeScale().coordinateToTime(mx) : null
+
       // Show context menu at cursor position
-      setCtxMenu({ x: e.clientX, y: e.clientY, hitIdx })
+      setCtxMenu({ x: e.clientX, y: e.clientY, hitIdx, candleTime })
     }
 
     function onMouseLeave() {
@@ -2490,7 +2485,11 @@ export default function StockChart({
               className="fixed z-[9999] min-w-[160px] bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-700 rounded-xl shadow-2xl overflow-hidden py-1 animate-menu-in"
               style={{
                 left: Math.min(ctxMenu.x, window.innerWidth - 176),
-                top: Math.min(ctxMenu.y, window.innerHeight - (ctxMenu.hitIdx >= 0 ? 108 : 52)),
+                top: Math.min(
+                  ctxMenu.y,
+                  window.innerHeight -
+                    (52 + (ctxMenu.candleTime ? 45 : 0) + (ctxMenu.hitIdx >= 0 ? 45 : 0))
+                ),
               }}
             >
               {/* Refresh */}
@@ -2517,6 +2516,40 @@ export default function StockChart({
                 </svg>
                 Refresh Chart
               </button>
+
+              {/* Load Day Data — only when the right-click landed on a candle
+                  (index charts only, matches the movers-fetch restriction) */}
+              {ctxMenu.candleTime && (
+                <button
+                  onClick={async () => {
+                    const date = ctxMenu.candleTime
+                    setCtxMenu(null)
+                    if (pendingHover.current) {
+                      clearTimeout(pendingHover.current)
+                      pendingHover.current = null
+                    }
+                    lastFetchedDate.current = date
+                    const movers = await getMovers(date)
+                    setOverlayData({ date, movers, pinned: true })
+                    onPin(date, movers)
+                  }}
+                  className="w-full flex items-center gap-2.5 px-3 py-2 text-[11px] font-semibold text-gray-700 dark:text-gray-200 hover:bg-blue-50 dark:hover:bg-blue-950/40 hover:text-blue-600 transition-colors text-left"
+                >
+                  <svg
+                    className="w-3.5 h-3.5 shrink-0"
+                    viewBox="0 0 24 24"
+                    fill="none"
+                    stroke="currentColor"
+                    strokeWidth={2}
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                  >
+                    <path d="M3 3v18h18" />
+                    <path d="M18.7 8l-5.1 5.1-2.5-2.5L7 14.7" />
+                  </svg>
+                  Load Day Data
+                </button>
+              )}
 
               {/* Delete drawing — only when a drawing was hit */}
               {ctxMenu.hitIdx >= 0 && (
