@@ -2,6 +2,7 @@
 import { useState, useEffect, useCallback } from 'react'
 import { getAdminUsers } from '@api/admin'
 import UserListRow from './UserListRow'
+import AdminSearchInput from '../common/AdminSearchInput'
 
 const TIER_FILTERS = ['all', 'basic', 'pro', 'premium']
 
@@ -26,18 +27,8 @@ export default function UsersTab() {
   const [page, setPage] = useState(1)
   const [pages, setPages] = useState(1)
   const [loading, setLoading] = useState(true)
-  const [search, setSearch] = useState('')
   const [tier, setTier] = useState('all')
   const [query, setQuery] = useState('') // debounced search
-
-  // Debounce search input
-  useEffect(() => {
-    const t = setTimeout(() => {
-      setQuery(search)
-      setPage(1)
-    }, 350)
-    return () => clearTimeout(t)
-  }, [search])
 
   const fetchUsers = useCallback(async () => {
     setLoading(true)
@@ -64,12 +55,12 @@ export default function UsersTab() {
     <div className="flex flex-col gap-0">
       {/* Toolbar row: search + tier filter */}
       <div className="flex items-center gap-2 px-4 py-2 border-b border-gray-200 dark:border-gray-800">
-        <input
-          type="text"
-          value={search}
-          onChange={(e) => setSearch(e.target.value)}
+        <AdminSearchInput
+          onSearch={(q) => {
+            setQuery(q)
+            setPage(1)
+          }}
           placeholder="Search name or email…"
-          className="flex-1 h-8 px-3 text-xs bg-gray-100 dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg text-gray-900 dark:text-white placeholder-gray-400 dark:placeholder-gray-500 focus:outline-none focus:ring-1 focus:ring-green-500"
         />
         <div className="flex items-center gap-1">
           {TIER_FILTERS.map((f) => (
