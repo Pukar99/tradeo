@@ -31,7 +31,7 @@ import LeftInsightPanel from './insight/LeftInsightPanel'
 import InlineRightPanel from './insight/InlineRightPanel'
 import InspectOverlay from './insight/InspectOverlay'
 import MonthProfilePanel from './insight/MonthProfilePanel'
-import StockSearch from './insight/StockSearch'
+import SymbolSearch from '../common/SymbolSearch'
 
 // ─── Main ─────────────────────────────────────────────────────────────────────
 export default function InsightPage() {
@@ -431,11 +431,24 @@ export default function InsightPage() {
       <div className="w-px h-3.5 bg-gray-200 dark:bg-gray-700 shrink-0 hidden sm:block" />
 
       {/* Stock search — swaps the heatmap to a single stock's monthly seasonality */}
-      <StockSearch
-        activeSymbol={stock?.symbol || null}
-        onSelect={handleStockSelect}
-        onClear={handleStockClear}
+      <SymbolSearch
+        value={stock?.symbol || ''}
+        activeValue={stock?.symbol || null}
+        lazyLoad
+        stocksOnly
+        onSelect={(symbol, indexId, companyName) => handleStockSelect(symbol, companyName)}
+        placeholder="Search a stock…"
       />
+      {stock?.symbol && (
+        <button
+          onClick={handleStockClear}
+          title="Back to index view"
+          aria-label="Clear stock"
+          className="w-5 h-5 flex items-center justify-center rounded text-gray-400 hover:text-gray-700 dark:hover:text-gray-200 hover:bg-gray-100 dark:hover:bg-gray-800 text-[13px] leading-none shrink-0"
+        >
+          ×
+        </button>
+      )}
 
       {/* Year filter */}
       <div className="flex rounded overflow-hidden border border-gray-200 dark:border-gray-700 text-[10px] font-bold">
