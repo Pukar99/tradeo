@@ -58,6 +58,7 @@ export default function BacktestSetupPanel({ onSessionStarted }) {
   const [slMode, setSlMode] = useState('MANUAL')
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState('')
+  const [symbolsError, setSymbolsError] = useState('') // page-level banner for symbol-load failure
 
   // ── On symbol pick: fetch its date range, auto-fill a sensible 2yr default ──────
   const handleSelectSymbol = useCallback(async (sym) => {
@@ -151,15 +152,21 @@ export default function BacktestSetupPanel({ onSessionStarted }) {
       {/* Script — type-ahead search (shared SymbolSearch; stocks-only, backtest API) */}
       <div className="relative">
         <label className={LABEL}>Script</label>
-        <div className="mt-0.5 w-full px-2 py-1.5 rounded-md border border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-800">
-          <SymbolSearch
-            value={symbol}
-            stocksOnly
-            defaultValue="NABIL"
-            fetchSymbols={() => btGetSymbols().then((r) => ({ stocks: r.data.symbols || [], indexes: [] }))}
-            onSelect={(sym) => handleSelectSymbol(sym)}
-          />
-        </div>
+        <SymbolSearch
+          value={symbol}
+          stocksOnly
+          defaultValue="NABIL"
+          fetchSymbols={() => btGetSymbols().then((r) => ({ stocks: r.data.symbols || [], indexes: [] }))}
+          onSelect={(sym) => handleSelectSymbol(sym)}
+          onLoadError={() => setSymbolsError('Failed to load symbols — check server')}
+          className="mt-0.5 w-full"
+          inputClassName="w-full"
+        />
+        {symbolsError && (
+          <div className="text-[10px] text-red-500 bg-red-50 dark:bg-red-900/20 rounded-md px-2 py-1.5 mt-1">
+            {symbolsError}
+          </div>
+        )}
       </div>
 
       {/* Start Date */}

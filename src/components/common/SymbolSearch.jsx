@@ -17,6 +17,15 @@ export default function SymbolSearch({
   defaultValue = null,
   globalTypeToSearch = false,
   placeholder,
+  onLoadError, // optional: (message: string) => void — fires when fetchSymbols() rejects, so
+  // page-level callers (e.g. a form with its own error banner) can surface the failure
+  // outside the dropdown, in addition to the built-in inline `loadErr` shown on open.
+  className = '', // optional: extra classes appended to the outer wrapper — lets callers
+  // opt into full-width layouts (e.g. a form field) without touching the default
+  // toolbar-pill sizing used by chart headers.
+  inputClassName = 'w-[56px]', // optional: overrides just the input's width class; every
+  // other input class (font size, uppercase, color, etc.) stays fixed so callers can't
+  // accidentally break the compact toolbar look — only width is meant to be swapped.
 }) {
   const [query, setQuery] = useState('')
   const [cursor, setCursor] = useState(-1)
@@ -43,8 +52,11 @@ export default function SymbolSearch({
         setFetched({ stocks: data?.stocks ?? [], indexes: data?.indexes ?? [] })
         setLoadErr(null)
       })
-      .catch(() => setLoadErr('Failed to load symbols'))
-  }, [symbols, fetchSymbols, lazyLoad, open, fetched])
+      .catch(() => {
+        setLoadErr('Failed to load symbols')
+        onLoadError?.('Failed to load symbols')
+      })
+  }, [symbols, fetchSymbols, lazyLoad, open, fetched, onLoadError])
 
   const allItems = useMemo(() => {
     const src = fetched ?? { stocks: [], indexes: [] }
@@ -162,7 +174,7 @@ export default function SymbolSearch({
 
   return (
     <div
-      className="shrink-0"
+      className={`shrink-0 ${className}`}
       ref={triggerRef}
       onClick={() => {
         setOpen(true)
@@ -204,7 +216,7 @@ export default function SymbolSearch({
           placeholder={value || placeholder || ''}
           autoComplete="off"
           spellCheck={false}
-          className="bg-transparent text-[10px] font-bold text-gray-700 dark:text-gray-200 placeholder-gray-500 dark:placeholder-gray-400 outline-none w-[56px] uppercase"
+          className={`bg-transparent text-[10px] font-bold text-gray-700 dark:text-gray-200 placeholder-gray-500 dark:placeholder-gray-400 outline-none uppercase ${inputClassName}`}
         />
       </div>
 
