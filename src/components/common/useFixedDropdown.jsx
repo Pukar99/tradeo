@@ -69,7 +69,7 @@ export function useFixedDropdown(align = 'left') {
       )
     },
     [open, rect, dropStyle]
-  ) // eslint-disable-line react-hooks/exhaustive-deps
+  ) // eslint-disable-line react-hooks/exhaustive-deps -- dropStyle is rebuilt from rect each render; listing it alone (not its parts) keeps the portal stable per open/rect change
 
   return { triggerRef, open, setOpen, portal, updateRect }
 }

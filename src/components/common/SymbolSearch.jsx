@@ -96,7 +96,7 @@ export default function SymbolSearch({
             )
             .slice(0, 30),
     [allItems, q, query.length]
-  ) // eslint-disable-line react-hooks/exhaustive-deps
+  ) // eslint-disable-line react-hooks/exhaustive-deps -- q derives from query, so `query` itself is intentionally omitted; deps cover every real input
 
   const handleSelect = useCallback(
     (item) => {
