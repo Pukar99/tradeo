@@ -5,9 +5,9 @@ import StockChart from './StockChart'
 import { useScreenToolbarSlot } from '../../pages/ScreenPage'
 import { getPriceActionScan } from '../../api'
 import { getMarketSymbols } from '../../utils/globalCache'
+import SymbolSearch from '../common/SymbolSearch'
 import {
   ToolbarDivider,
-  ToolbarSymbolSearch,
   ToolbarTimeframes,
   ToolbarToggleChip,
   ToolbarConfigButton,
@@ -69,6 +69,7 @@ const PA_TOGGLES = [
 // ── PA Toolbar ────────────────────────────────────────────────────────────────
 function PAToolbar({ toggles, setToggles, config, setConfig, symbols }) {
   const compact = useCompactToolbar()
+  const { selectSymbol } = useScreen() || {}
   const toggle = (key) => setToggles((prev) => ({ ...prev, [key]: !prev[key] }))
   const updateConfig = (key, val) => {
     const next = { ...config, [key]: val }
@@ -138,7 +139,11 @@ function PAToolbar({ toggles, setToggles, config, setConfig, symbols }) {
     compact ? (
       // Mobile: search + a single menu holding timeframe, overlay toggles, config.
       <div className="flex items-center gap-1.5 min-w-0">
-        <ToolbarSymbolSearch symbols={symbols} stocksOnly />
+        <SymbolSearch
+          symbols={symbols}
+          stocksOnly
+          onSelect={(symbol, indexId, companyName) => selectSymbol(symbol, indexId, null, companyName)}
+        />
         <div className="flex-1 min-w-0" />
         <ToolbarMenu activeCount={activeCount}>
           <ToolbarMenuSection label="Timeframe" divider={false}>
@@ -153,7 +158,11 @@ function PAToolbar({ toggles, setToggles, config, setConfig, symbols }) {
     ) : (
       // Desktop: full inline toolbar.
       <div className="flex items-center gap-1.5 min-w-0">
-        <ToolbarSymbolSearch symbols={symbols} stocksOnly />
+        <SymbolSearch
+          symbols={symbols}
+          stocksOnly
+          onSelect={(symbol, indexId, companyName) => selectSymbol(symbol, indexId, null, companyName)}
+        />
         <ToolbarDivider />
         <ToolbarTimeframes frames={PA_TIMEFRAMES} />
         <ToolbarDivider />
