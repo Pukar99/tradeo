@@ -4,10 +4,11 @@ import { createPortal } from 'react-dom'
 import { useTheme } from '../../context/ThemeContext'
 import { useScreen } from '../../context/ScreenContext'
 import { getIndexChart, getStockChart, triggerBackfill } from '../../api'
-import { getMarketSymbols, getTradeHistory, getTopMovers } from '../../utils/globalCache'
+import { getTradeHistory, getTopMovers } from '../../utils/globalCache'
 import { nptNow, expectedLatestTradingDate } from '../../utils/nepseCalendar'
 import { useScreenToolbarSlot } from '../../pages/ScreenPage'
 import { useFixedDropdown } from '../common/useFixedDropdown'
+import SymbolSearch from '../common/SymbolSearch'
 
 // ── Module-level caches (survive re-renders, shared across StockChart instances) ─
 const _chartCache = new Map() // `sym:tf` or `idx:id:tf` → { data, latest, ts }
@@ -373,248 +374,6 @@ function calcATR(data, period = 14) {
 
 async function loadLC() {
   return import('lightweight-charts')
-}
-
-// ── Embedded Symbol Search ─────────────────────────────────────────────────────
-
-function ChartSymbolSearch() {
-  const { selectedSymbol, selectSymbol } = useScreen()
-  const [query, setQuery] = useState('')
-  const [symbols, setSymbols] = useState({ stocks: [], indexes: [] })
-  const [cursor, setCursor] = useState(-1)
-  const [loadErr, setLoadErr] = useState(null)
-  const inputRef = useRef(null)
-  const listRef = useRef(null)
-  const mouseDownInList = useRef(false)
-
-  // useFixedDropdown handles open state, positioning, outside-click, and portal
-  const { triggerRef, open, setOpen, portal, updateRect } = useFixedDropdown('left')
-
-  // TradingView-style: any printable key typed anywhere (not in another input) → focus search
-  useEffect(() => {
-    const handler = (e) => {
-      // Ignore if already inside any input / textarea / contenteditable
-      const tag = document.activeElement?.tagName
-      if (tag === 'INPUT' || tag === 'TEXTAREA' || document.activeElement?.isContentEditable) return
-      // Ignore modifier-only combos (Ctrl+C, Alt+Tab etc.) and special keys
-      if (e.ctrlKey || e.metaKey || e.altKey) return
-      if (e.key.length !== 1) return // only single printable characters
-      // Focus the search input and seed the query with the typed character.
-      // Clear native value first so the browser doesn't also insert the char
-      // after focus (double-char bug on some browsers).
-      const inp = inputRef.current
-      if (!inp) return
-      e.preventDefault()
-      inp.value = ''
-      inp.focus()
-      setQuery(e.key.toUpperCase())
-      setOpen(true)
-      updateRect()
-      setCursor(-1)
-    }
-    window.addEventListener('keydown', handler)
-    return () => window.removeEventListener('keydown', handler)
-  }, [setOpen, updateRect])
-
-  useEffect(() => {
-    getMarketSymbols()
-      .then((r) => {
-        if (r.data?.stocks?.length) {
-          setSymbols(r.data)
-          setLoadErr(null)
-        }
-      })
-      .catch(() => setLoadErr('Symbols unavailable'))
-  }, [])
-
-  const allItems = useMemo(
-    () => [
-      ...symbols.indexes.map((i) => ({
-        label: i.name,
-        sub: 'Index',
-        indexId: i.index_id,
-        company_name: null,
-      })),
-      ...symbols.stocks.map((s) => ({
-        label: s.symbol,
-        sub: 'Stock',
-        company_name: s.company_name || null,
-      })),
-    ],
-    [symbols]
-  )
-
-  const filtered = useMemo(() => {
-    const q = query.toLowerCase()
-    if (query.length < 1) return allItems.slice(0, 20)
-    return allItems
-      .filter(
-        (i) =>
-          i.label.toLowerCase().startsWith(q) ||
-          i.label.toLowerCase().includes(q) ||
-          (i.company_name && i.company_name.toLowerCase().includes(q))
-      )
-      .sort(
-        (a, b) =>
-          (a.label.toLowerCase().startsWith(q) ? 0 : 1) -
-          (b.label.toLowerCase().startsWith(q) ? 0 : 1)
-      )
-      .slice(0, 30)
-  }, [query, allItems])
-
-  const handleSelect = useCallback(
-    (item) => {
-      selectSymbol(item.label, item.indexId || null, null, item.company_name || null)
-      setQuery('')
-      setOpen(false)
-      setCursor(-1)
-    },
-    [selectSymbol, setOpen]
-  )
-
-  function handleKey(e) {
-    if (!open) {
-      setOpen(true)
-      updateRect()
-      return
-    }
-    if (e.key === 'ArrowDown') {
-      e.preventDefault()
-      setCursor((c) => Math.min(c + 1, filtered.length - 1))
-    }
-    if (e.key === 'ArrowUp') {
-      e.preventDefault()
-      setCursor((c) => Math.max(c - 1, 0))
-    }
-    if (e.key === 'Enter') {
-      const target = cursor >= 0 ? filtered[cursor] : filtered[0]
-      if (target) handleSelect(target)
-    }
-    if (e.key === 'Escape') {
-      setOpen(false)
-      setCursor(-1)
-    }
-  }
-
-  useEffect(() => {
-    if (cursor >= 0 && listRef.current)
-      listRef.current.children[cursor]?.scrollIntoView({ block: 'nearest' })
-  }, [cursor])
-
-  const showList = filtered.length > 0
-  const showEmpty = filtered.length === 0 && query.length > 0
-
-  return (
-    <div className="w-[88px] sm:w-full sm:max-w-[200px] shrink-0">
-      <div
-        ref={triggerRef}
-        className="flex items-center gap-1 bg-gray-50 dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg px-1.5 py-1 cursor-pointer"
-        onClick={() => {
-          setOpen(true)
-          updateRect()
-          setTimeout(() => inputRef.current?.focus(), 40)
-        }}
-      >
-        <svg
-          className="w-3 h-3 text-gray-400 shrink-0"
-          fill="none"
-          viewBox="0 0 24 24"
-          stroke="currentColor"
-        >
-          <path
-            strokeLinecap="round"
-            strokeLinejoin="round"
-            strokeWidth={2}
-            d="M21 21l-4.35-4.35M17 11A6 6 0 1 1 5 11a6 6 0 0 1 12 0z"
-          />
-        </svg>
-        <input
-          ref={inputRef}
-          data-chart-search
-          value={query}
-          onChange={(e) => {
-            setQuery(e.target.value.toUpperCase())
-            setOpen(true)
-            updateRect()
-            setCursor(-1)
-          }}
-          onFocus={() => {
-            setOpen(true)
-            updateRect()
-          }}
-          onBlur={() => {
-            if (!mouseDownInList.current) setOpen(false)
-          }}
-          onKeyDown={handleKey}
-          placeholder={selectedSymbol}
-          autoComplete="off"
-          autoCapitalize="characters"
-          spellCheck={false}
-          className="bg-transparent text-[10px] font-bold text-gray-700 dark:text-gray-200 placeholder-gray-600 dark:placeholder-gray-300 outline-none w-full min-w-0 uppercase"
-        />
-      </div>
-
-      {/* Dropdown — portalled to body via useFixedDropdown */}
-      {portal(
-        <div
-          className="bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-700 rounded-xl shadow-2xl max-h-64 overflow-y-auto"
-          style={{ minWidth: 240 }}
-        >
-          {loadErr ? (
-            <div className="px-3 py-3 text-center">
-              <p className="text-[10px] text-red-400 font-medium">{loadErr}</p>
-              <p className="text-[9px] text-gray-400 mt-0.5">Check your connection</p>
-            </div>
-          ) : showList ? (
-            <ul ref={listRef}>
-              {filtered.map((item, i) => {
-                const isActive = i === cursor || (cursor === -1 && i === 0 && query.length > 0)
-                return (
-                  <li
-                    key={item.label}
-                    onMouseDown={() => {
-                      mouseDownInList.current = true
-                      handleSelect(item)
-                      mouseDownInList.current = false
-                    }}
-                    className={`flex items-center justify-between px-3 py-1.5 cursor-pointer transition-colors ${
-                      isActive
-                        ? 'bg-blue-50 dark:bg-blue-950/60'
-                        : 'hover:bg-gray-50 dark:hover:bg-gray-800'
-                    }`}
-                  >
-                    <div className="flex flex-col min-w-0">
-                      <span className="text-[11px] font-semibold text-gray-800 dark:text-gray-100 leading-tight">
-                        {item.label}
-                      </span>
-                      {item.company_name && (
-                        <span className="text-[10px] text-gray-400 dark:text-gray-500 truncate leading-tight">
-                          {item.company_name}
-                        </span>
-                      )}
-                    </div>
-                    <span
-                      className={`shrink-0 ml-2 text-[10px] font-medium px-1.5 py-0.5 rounded ${
-                        item.sub === 'Index'
-                          ? 'bg-blue-100 dark:bg-blue-900 text-blue-600 dark:text-blue-300'
-                          : 'bg-gray-100 dark:bg-gray-800 text-gray-500'
-                      }`}
-                    >
-                      {item.sub}
-                    </span>
-                  </li>
-                )
-              })}
-            </ul>
-          ) : showEmpty ? (
-            <div className="px-3 py-2 text-[10px] text-gray-400">
-              No results for &quot;{query}&quot;
-            </div>
-          ) : null}
-        </div>
-      )}
-    </div>
-  )
 }
 
 // ── HUD Controls — timeframe, chart type, indicators ──────────────────────────
@@ -1258,6 +1017,7 @@ export default function StockChart({
   const {
     selectedSymbol,
     selectedIndexId,
+    selectSymbol,
     chartType,
     timeframe,
     activeIndicators: _activeIndicators,
@@ -1760,7 +1520,11 @@ export default function StockChart({
         {/* Symbol search — must NOT sit inside overflow-x-auto (clips dropdown).
           The slot container in ScreenPage uses overflow-x-auto for the rest of
           the controls; search is shrink-0 so it anchors at the left. */}
-        <ChartSymbolSearch />
+        <SymbolSearch
+          value={selectedSymbol}
+          onSelect={(symbol, indexId, companyName) => selectSymbol(symbol, indexId, null, companyName)}
+          globalTypeToSearch
+        />
         {/* Compact (mobile): the row is just search + menu — timeframes/chart-type
           live inside the menu. Desktop keeps the inline controls + divider. */}
         {!compactToolbar && (
