@@ -4,7 +4,8 @@ import { ScreenProvider, useScreen } from '../../context/ScreenContext'
 import StockChart from './StockChart'
 import { useScreenToolbarSlot } from '../../pages/ScreenPage'
 import { getMarketSymbols } from '../../utils/globalCache'
-import { useFixedDropdown, ToolbarDivider, ToolbarToggleChip } from './ScreenToolbarAtoms'
+import { ToolbarDivider, ToolbarToggleChip } from './ScreenToolbarAtoms'
+import { useFixedDropdown } from '../common/useFixedDropdown'
 
 // ── Constants ─────────────────────────────────────────────────────────────────
 const DEFAULT_PANEL = {
