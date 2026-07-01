@@ -13,9 +13,10 @@ import {
 import { useTheme } from '../../context/ThemeContext'
 import { getPerformance } from '../../api'
 import { isCanceled } from '../../utils/format'
-import { getMarketSymbols, registerCacheCleaner } from '../../utils/globalCache'
+import { registerCacheCleaner } from '../../utils/globalCache'
 import { useToolbarSlot, safeSessionGet, safeSessionSet } from '../../pages/DataLabPage'
 import { CARD, LABEL, STITLE, SVAL, Skeleton, fmtPct } from './shared'
+import SymbolSearch from '../common/SymbolSearch'
 
 // ── Cache — capped at 20 entries (LRU eviction) ───────────────────────────────
 const CACHE_VER = 'v4' // v4: NEPSE history held once in _nepseCache, not per key
@@ -121,232 +122,6 @@ function nameSwings(raw) {
 
 // Design tokens, Skeleton and fmtPct come from ./shared (single source for all
 // three DataLab tabs).
-
-// ── Symbol Search ─────────────────────────────────────────────────────────────
-function SymbolSearch({ value, onChange }) {
-  const [q, setQ] = useState(value || '')
-  const [open, setOpen] = useState(false)
-  const [items, setItems] = useState([])
-  const [cursor, setCursor] = useState(-1)
-  const [rect, setRect] = useState(null)
-  const wrapRef = useRef(null)
-  const ml = useRef(false)
-  const list = useRef(null)
-
-  useEffect(() => {
-    getMarketSymbols()
-      .then((r) => setItems(r.data.stocks || []))
-      .catch(() => {})
-  }, [])
-
-  const lq = q.toLowerCase()
-  const flt =
-    q.length < 1
-      ? items.slice(0, 20)
-      : items
-          .filter(
-            (s) =>
-              s.symbol.toLowerCase().startsWith(lq) ||
-              s.symbol.toLowerCase().includes(lq) ||
-              (s.company_name && s.company_name.toLowerCase().includes(lq))
-          )
-          // symbols that start with the query float to top
-          .sort((a, b) => {
-            const as = a.symbol.toLowerCase().startsWith(lq) ? 0 : 1
-            const bs = b.symbol.toLowerCase().startsWith(lq) ? 0 : 1
-            return as - bs
-          })
-          .slice(0, 30)
-
-  function openDropdown() {
-    if (wrapRef.current) setRect(wrapRef.current.getBoundingClientRect())
-    setOpen(true)
-  }
-  function pick(s) {
-    setQ(s.symbol)
-    setOpen(false)
-    setCursor(-1)
-    onChange(s.symbol, s.company_name || null)
-  }
-  function clear() {
-    setQ('')
-    setOpen(false)
-    onChange('', null)
-  }
-  function onKey(e) {
-    if (e.key === 'ArrowDown') {
-      e.preventDefault()
-      openDropdown()
-      setCursor((c) => Math.min(c + 1, flt.length - 1))
-      return
-    }
-    if (e.key === 'ArrowUp') {
-      e.preventDefault()
-      setCursor((c) => Math.max(c - 1, 0))
-      return
-    }
-    if (e.key === 'Enter') {
-      e.preventDefault()
-      // Pick highlighted result first. If no highlight, only auto-pick when the
-      // top result is an EXACT prefix match — otherwise user may be mid-typing
-      // and we'd silently swap symbols on them.
-      if (cursor >= 0 && flt[cursor]) {
-        pick(flt[cursor])
-      } else if (flt[0]?.symbol?.toLowerCase() === q.toLowerCase()) {
-        pick(flt[0])
-      }
-      return
-    }
-    if (e.key === 'Escape') {
-      setOpen(false)
-      setCursor(-1)
-    }
-  }
-
-  useEffect(() => {
-    if (cursor >= 0 && list.current)
-      list.current.children[cursor]?.scrollIntoView({ block: 'nearest' })
-  }, [cursor])
-
-  // Reposition the dropdown when the page scrolls / resizes — without this,
-  // any wheel scroll outside the search detaches the dropdown from its input.
-  useEffect(() => {
-    if (!open) return
-    function reposition() {
-      if (wrapRef.current) setRect(wrapRef.current.getBoundingClientRect())
-    }
-    window.addEventListener('scroll', reposition, true)
-    window.addEventListener('resize', reposition)
-    return () => {
-      window.removeEventListener('scroll', reposition, true)
-      window.removeEventListener('resize', reposition)
-    }
-  }, [open])
-
-  // Highlight matched portion of text
-  function highlight(text, query) {
-    if (!query || !text) return text
-    const idx = text.toLowerCase().indexOf(query.toLowerCase())
-    if (idx === -1) return text
-    return (
-      <>
-        {text.slice(0, idx)}
-        <mark className="bg-blue-100 dark:bg-blue-900/60 text-blue-700 dark:text-blue-300 rounded-sm px-px">
-          {text.slice(idx, idx + query.length)}
-        </mark>
-        {text.slice(idx + query.length)}
-      </>
-    )
-  }
-
-  return (
-    <>
-      {/* Input */}
-      <div
-        ref={wrapRef}
-        className="flex items-center gap-1.5 px-2 py-0.5 rounded-lg border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-900 w-[160px] focus-within:border-blue-400 dark:focus-within:border-blue-600 focus-within:ring-1 focus-within:ring-blue-200 dark:focus-within:ring-blue-900 transition-all"
-      >
-        <svg
-          className="w-3 h-3 text-gray-400 shrink-0"
-          fill="none"
-          viewBox="0 0 24 24"
-          stroke="currentColor"
-        >
-          <path
-            strokeLinecap="round"
-            strokeLinejoin="round"
-            strokeWidth={2}
-            d="M21 21l-4.35-4.35M17 11A6 6 0 1 1 5 11a6 6 0 0 1 12 0z"
-          />
-        </svg>
-        <input
-          value={q}
-          onChange={(e) => {
-            setQ(e.target.value)
-            openDropdown()
-            setCursor(-1)
-          }}
-          onFocus={openDropdown}
-          onBlur={() => {
-            if (!ml.current) setOpen(false)
-          }}
-          onKeyDown={onKey}
-          placeholder="Symbol / company…"
-          maxLength={20}
-          className="bg-transparent text-[10px] font-semibold text-gray-800 dark:text-gray-100 placeholder-gray-300 dark:placeholder-gray-600 outline-none w-full"
-        />
-        {q && (
-          <button
-            onClick={clear}
-            className="text-gray-300 hover:text-gray-500 dark:hover:text-gray-300 text-[14px] leading-none shrink-0"
-          >
-            ×
-          </button>
-        )}
-      </div>
-
-      {/* Dropdown — fixed so it escapes overflow:hidden parents */}
-      {open && flt.length > 0 && rect && (
-        <div
-          className="fixed z-[999] bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-700 rounded-xl shadow-2xl overflow-hidden"
-          style={{ top: rect.bottom + 6, left: rect.left, width: 260 }}
-          onMouseEnter={() => {
-            ml.current = true
-          }}
-          onMouseLeave={() => {
-            ml.current = false
-          }}
-        >
-          {/* Header hint */}
-          <div className="px-3 py-1.5 border-b border-gray-100 dark:border-gray-800 flex items-center justify-between">
-            <span className="text-[10px] text-gray-400 font-medium">
-              {flt.length} result{flt.length !== 1 ? 's' : ''}
-            </span>
-            <span className="text-[10px] text-gray-300 dark:text-gray-700">
-              ↑↓ navigate · Enter select
-            </span>
-          </div>
-          <ul
-            ref={list}
-            className="max-h-56 overflow-y-auto overscroll-contain bg-white dark:bg-gray-900 [scrollbar-width:thin] [&::-webkit-scrollbar]:w-1 [&::-webkit-scrollbar-thumb]:bg-gray-300 dark:[&::-webkit-scrollbar-thumb]:bg-gray-700 [&::-webkit-scrollbar-thumb]:rounded-full"
-          >
-            {flt.map((s, i) => (
-              <li
-                key={s.symbol}
-                // onPointerDown unifies mouse + touch + pen.
-                // preventDefault() stops the input's onBlur from firing first,
-                // which would close the dropdown before pick() registers.
-                onPointerDown={(e) => {
-                  e.preventDefault()
-                  ml.current = true
-                  pick(s)
-                  ml.current = false
-                }}
-                className={`flex items-center gap-2.5 px-3 py-2 cursor-pointer transition-colors ${
-                  i === cursor
-                    ? 'bg-blue-50 dark:bg-blue-950/50'
-                    : 'hover:bg-gray-50 dark:hover:bg-gray-800/60'
-                }`}
-              >
-                <div className="w-1.5 h-1.5 rounded-full bg-blue-400 shrink-0 opacity-60" />
-                <div className="min-w-0">
-                  <div className="text-[11px] font-bold text-gray-800 dark:text-gray-100 leading-tight">
-                    {highlight(s.symbol, q)}
-                  </div>
-                  {s.company_name && (
-                    <div className="text-[10px] text-gray-400 truncate leading-tight">
-                      {highlight(s.company_name, q)}
-                    </div>
-                  )}
-                </div>
-              </li>
-            ))}
-          </ul>
-        </div>
-      )}
-    </>
-  )
-}
 
 // ── Inline candlestick chart — exposes chart instance via ref for cursor sync ──
 const MiniCandle = forwardRef(function MiniCandle({ data, height = 360 }, fwdRef) {
@@ -1487,7 +1262,8 @@ export default function PerformanceChart() {
     <div className="flex items-center gap-2 flex-nowrap whitespace-nowrap">
       <SymbolSearch
         value={symbol}
-        onChange={(sym) => {
+        stocksOnly
+        onSelect={(sym) => {
           setSymbol(sym)
           setExpanded(null)
         }}
