@@ -1,15 +1,22 @@
 // === AdminSearchInput.jsx — shared debounced search input for admin list tabs ===
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useRef } from 'react'
 
 export default function AdminSearchInput({ onSearch, placeholder = 'Search…' }) {
   const [search, setSearch] = useState('')
+  // Latest-callback ref so the debounce timer arms only on actual typing.
+  // Callers pass inline arrows (new identity every render); if onSearch were an
+  // effect dependency, any parent re-render (e.g. loading flips after a page
+  // change) would re-arm the timer and fire a stale onSearch('') → setPage(1),
+  // silently bouncing a user off page 2+.
+  const onSearchRef = useRef(onSearch)
+  onSearchRef.current = onSearch
 
   useEffect(() => {
     const t = setTimeout(() => {
-      onSearch(search)
+      onSearchRef.current(search)
     }, 350)
     return () => clearTimeout(t)
-  }, [search, onSearch])
+  }, [search])
 
   return (
     <input
