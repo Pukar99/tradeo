@@ -1275,6 +1275,17 @@ export default function PerformanceChart() {
           <span className="text-[10px] font-semibold text-gray-800 dark:text-gray-100">
             {symbol}
           </span>
+          <button
+            onClick={() => {
+              setSymbol('')
+              setExpanded(null)
+            }}
+            title="Back to index view"
+            aria-label="Clear stock"
+            className="w-4 h-4 flex items-center justify-center rounded text-gray-400 hover:text-gray-700 dark:hover:text-gray-200 hover:bg-amber-100 dark:hover:bg-amber-900/40 text-[11px] leading-none"
+          >
+            ×
+          </button>
         </div>
       )}
 
