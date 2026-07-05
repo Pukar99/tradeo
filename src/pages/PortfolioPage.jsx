@@ -4,7 +4,7 @@ import { useNavigate } from 'react-router-dom'
 import { useAuth } from '../context/AuthContext'
 import { getPositions, getTradeActions, getBatchPrices } from '../utils/globalCache'
 import { useChatRefresh } from '../utils/chatEvents'
-import { fmtRs, fmtPct } from '../utils/format'
+import { fmtRs, fmtPct, pnlClass } from '../utils/format'
 import { PieChart, Pie, Cell, Tooltip, ResponsiveContainer } from 'recharts'
 // Shared compact-toolbar atoms (cross-folder import sanctioned — see pm/docs/design.md #7)
 import {
@@ -14,10 +14,6 @@ import {
 } from '../components/screen/ScreenToolbarAtoms'
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
-
-const signCls = (n) => (n >= 0 ? 'text-emerald-500' : 'text-red-400')
-const signBg = (n) =>
-  n >= 0 ? 'bg-emerald-50 dark:bg-emerald-900/20' : 'bg-red-50 dark:bg-red-900/20'
 
 function stockInitials(symbol) {
   return symbol?.slice(0, 2) || '??'
@@ -171,7 +167,7 @@ function RiskGauge({ entry, sl, tp, ltp, position, pnlPct }) {
     <div className="mt-2 h-[3px] bg-gray-200 dark:bg-gray-700 rounded-full overflow-hidden relative">
       <div className="absolute inset-y-0 left-1/2 w-px bg-gray-300 dark:bg-gray-600" />
       <div
-        className={`absolute h-full rounded-full transition-all duration-700 ${pct >= 0 ? 'bg-emerald-400' : 'bg-red-400'}`}
+        className={`absolute h-full rounded-full transition-all duration-700 ${pnlClass(pct, 'bg-emerald-400', 'bg-red-400')}`}
         style={
           pct >= 0 ? { left: '50%', width: `${width}%` } : { right: '50%', width: `${width}%` }
         }
@@ -697,9 +693,9 @@ function PortfolioPage() {
             {
               label: 'Total P&L',
               value: `${totalPnl >= 0 ? '+' : ''}${fmtRs(totalPnl)}`,
-              cls: signCls(totalPnl),
+              cls: pnlClass(totalPnl),
               sub: 'realized + unrealized',
-              accent: totalPnl >= 0 ? 'border-t-emerald-400' : 'border-t-red-400',
+              accent: pnlClass(totalPnl, 'border-t-emerald-400', 'border-t-red-400'),
               detail: [
                 {
                   label: 'Win Rate',
@@ -725,7 +721,7 @@ function PortfolioPage() {
             {
               label: 'Realized',
               value: `${totalRealized >= 0 ? '+' : ''}${fmtRs(totalRealized)}`,
-              cls: signCls(totalRealized),
+              cls: pnlClass(totalRealized),
               sub: `${closedTrades.length} closed trades`,
               accent: 'border-t-blue-400',
               detail: [
@@ -744,7 +740,7 @@ function PortfolioPage() {
             {
               label: 'Unrealized',
               value: `${totalUnrealized >= 0 ? '+' : ''}${fmtRs(totalUnrealized)}`,
-              cls: signCls(totalUnrealized),
+              cls: pnlClass(totalUnrealized),
               sub: `${openPositions.length} open${ltpLoading ? ' · updating…' : ''}`,
               accent: 'border-t-violet-400',
               detail: [
@@ -864,7 +860,7 @@ function PortfolioPage() {
                     <MobileStat
                       label="P&L"
                       value={isClose && pnl !== 0 ? `${pnl >= 0 ? '+' : ''}${fmtRs(pnl)}` : '—'}
-                      color={isClose && pnl !== 0 ? signCls(pnl) : undefined}
+                      color={isClose && pnl !== 0 ? pnlClass(pnl) : undefined}
                     />
                     <MobileStat label="Setup" value={row.setup_type || '—'} />
                   </div>
@@ -931,7 +927,7 @@ function PortfolioPage() {
                       </td>
                       <td className="px-4 py-2.5">
                         {isClose && pnl !== 0 ? (
-                          <span className={`text-[11px] font-bold tabular-nums ${signCls(pnl)}`}>
+                          <span className={`text-[11px] font-bold tabular-nums ${pnlClass(pnl)}`}>
                             {pnl >= 0 ? '+' : ''}
                             {fmtRs(pnl)}
                           </span>
@@ -1056,7 +1052,7 @@ function PortfolioPage() {
                       <MobileStat
                         label="P&L"
                         value={hasPnl ? `${pnl >= 0 ? '+' : ''}${fmtRs(pnl)}` : '—'}
-                        color={hasPnl ? signCls(pnl) : undefined}
+                        color={hasPnl ? pnlClass(pnl) : undefined}
                       />
                     </div>
                     {/* expanded detail — SL/TP/Invested + Chart */}
@@ -1171,11 +1167,11 @@ function PortfolioPage() {
                         <td className="px-3 py-3">
                           {p.unrealizedPnl != null ? (
                             <div>
-                              <p className={`text-[11px] font-bold tabular-nums ${signCls(pnl)}`}>
+                              <p className={`text-[11px] font-bold tabular-nums ${pnlClass(pnl)}`}>
                                 {pnl >= 0 ? '+' : ''}
                                 {fmtRs(pnl)}
                               </p>
-                              <p className={`text-[10px] font-medium ${signCls(pnlPct)}`}>
+                              <p className={`text-[10px] font-medium ${pnlClass(pnlPct)}`}>
                                 {fmtPct(pnlPct)}
                               </p>
                             </div>
@@ -1217,7 +1213,7 @@ function PortfolioPage() {
                   {fmtRs(totalInvested)}
                 </span>
               </span>
-              <span className={`text-[11px] font-bold ${signCls(totalUnrealized)}`}>
+              <span className={`text-[11px] font-bold ${pnlClass(totalUnrealized)}`}>
                 {totalUnrealized >= 0 ? '+' : ''}
                 {fmtRs(totalUnrealized)} unrealized
               </span>
@@ -1409,7 +1405,7 @@ function PortfolioPage() {
                     <MobileStat
                       label="Realized"
                       value={hasPnl ? `${pnl >= 0 ? '+' : ''}${fmtRs(pnl)}` : '—'}
-                      color={hasPnl ? signCls(pnl) : undefined}
+                      color={hasPnl ? pnlClass(pnl) : undefined}
                     />
                     <MobileStat label="SL / TP" value={sltp || '—'} />
                   </div>
@@ -1493,7 +1489,7 @@ function PortfolioPage() {
                       </td>
                       <td className="px-4 py-3 whitespace-nowrap">
                         {p.status === 'CLOSED' || p.status === 'PARTIAL' ? (
-                          <span className={`text-[11px] font-bold tabular-nums ${signCls(pnl)}`}>
+                          <span className={`text-[11px] font-bold tabular-nums ${pnlClass(pnl)}`}>
                             {pnl >= 0 ? '+' : ''}
                             {fmtRs(pnl)}
                           </span>
