@@ -1,6 +1,7 @@
 // === PriceActionPage.jsx — Price Action chart tab: swings (HH/HL/LH/LL), S/R, demand/supply zones, volume spikes, patterns ===
 import { useState, useEffect, useCallback, useMemo } from 'react'
 import { ScreenProvider, useScreen } from '../../context/ScreenContext'
+import { useLocalStorage } from '../../hooks/useLocalStorage'
 import StockChart from './StockChart'
 import { useScreenToolbarSlot } from '../../pages/ScreenPage'
 import { getPriceActionScan } from '../../api'
@@ -717,22 +718,10 @@ function computePAKPIs(paData, chartData) {
 // ── PA Inner ──────────────────────────────────────────────────────────────────
 function PAInner() {
   const { selectedSymbol, timeframe, isIndex } = useScreen() || {}
-  const [leftOpen, setLeftOpen] = useState(
-    () => localStorage.getItem('tradeo_pa_leftOpen') !== 'false'
-  )
-  const [rightOpen, setRightOpen] = useState(
-    () => localStorage.getItem('tradeo_pa_rightOpen') !== 'false'
-  )
-  const toggleLeft = () =>
-    setLeftOpen((v) => {
-      localStorage.setItem('tradeo_pa_leftOpen', String(!v))
-      return !v
-    })
-  const toggleRight = () =>
-    setRightOpen((v) => {
-      localStorage.setItem('tradeo_pa_rightOpen', String(!v))
-      return !v
-    })
+  const [leftOpen, setLeftOpen] = useLocalStorage('tradeo_pa_leftOpen', true)
+  const [rightOpen, setRightOpen] = useLocalStorage('tradeo_pa_rightOpen', true)
+  const toggleLeft = () => setLeftOpen((v) => !v)
+  const toggleRight = () => setRightOpen((v) => !v)
 
   const [paData, setPaData] = useState(null)
   const [loading, setLoading] = useState(false)

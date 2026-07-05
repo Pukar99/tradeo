@@ -4,6 +4,7 @@ import { createPortal } from 'react-dom'
 import { useTheme } from '../../context/ThemeContext'
 import { useScreen } from '../../context/ScreenContext'
 import { getIndexChart, getStockChart, triggerBackfill } from '../../api'
+import { fmtRsSigned, pnlClass } from '../../utils/format'
 import { getTradeHistory, getTopMovers } from '../../utils/globalCache'
 import { nptNow, expectedLatestTradingDate } from '../../utils/nepseCalendar'
 import { useScreenToolbarSlot } from '../../pages/ScreenPage'
@@ -794,7 +795,7 @@ function PositionBadge({ positions, latestClose }) {
               <p
                 className={`text-[10px] font-semibold tabular-nums ${isPos ? 'text-emerald-500' : 'text-red-400'}`}
               >
-                {isPos ? '+' : '−'}Rs.{Math.abs(Math.round(totalUnreal)).toLocaleString()}
+                {fmtRsSigned(totalUnreal)}
               </p>
             </div>
           )}
@@ -835,7 +836,7 @@ function PositionBadge({ positions, latestClose }) {
                     <div>
                       <p className="text-[9px] text-gray-400 uppercase tracking-widest">P&L</p>
                       <p
-                        className={`text-[10px] font-semibold tabular-nums ${u >= 0 ? 'text-emerald-500' : 'text-red-400'}`}
+                        className={`text-[10px] font-semibold tabular-nums ${pnlClass(u)}`}
                       >
                         {u >= 0 ? '+' : '−'}
                         {Math.abs(Math.round(u)).toLocaleString()}
@@ -933,7 +934,7 @@ function OHLCTooltip({ bar, change }) {
               </span>
               {change != null && (
                 <span
-                  className={`text-[10px] font-semibold ${change >= 0 ? 'text-emerald-500' : 'text-red-400'}`}
+                  className={`text-[10px] font-semibold ${pnlClass(change)}`}
                 >
                   {change >= 0 ? '▲' : '▼'} {Math.abs(change).toFixed(2)}%
                 </span>
@@ -2002,7 +2003,7 @@ export default function StockChart({
             signal
           )
           mc.addHistogramSeries({ priceLineVisible: false }).setData(
-            hist.map((d) => ({ ...d, color: d.value >= 0 ? C.up + '99' : C.down + '99' }))
+            hist.map((d) => ({ ...d, color: pnlClass(d.value, C.up + '99', C.down + '99') }))
           )
           let macdSyncing = false
           const unsubMainMacd = main.timeScale().subscribeVisibleLogicalRangeChange((r) => {

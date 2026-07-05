@@ -1,6 +1,7 @@
 // === SMCChartPage.jsx — SMC chart tab: StockChart + SMC overlays (BOS/CHoCH/OB/FVG/Sweeps/Entry), left/right panels, toolbar ===
 import { useState, useEffect, useCallback, useMemo } from 'react'
 import { ScreenProvider, useScreen } from '../../context/ScreenContext'
+import { useLocalStorage } from '../../hooks/useLocalStorage'
 import StockChart from './StockChart'
 import { useScreenToolbarSlot } from '../../pages/ScreenPage'
 import { getSMCScan } from '../../api'
@@ -639,22 +640,10 @@ function computeSignals(smcData, config, chartData) {
 // ── SMC Inner — reads ScreenContext ──────────────────────────────────────────
 function SMCInner() {
   const { selectedSymbol, timeframe, isIndex } = useScreen() || {}
-  const [leftOpen, setLeftOpen] = useState(
-    () => localStorage.getItem('tradeo_smc_leftOpen') !== 'false'
-  )
-  const [rightOpen, setRightOpen] = useState(
-    () => localStorage.getItem('tradeo_smc_rightOpen') !== 'false'
-  )
-  const toggleLeft = () =>
-    setLeftOpen((v) => {
-      localStorage.setItem('tradeo_smc_leftOpen', String(!v))
-      return !v
-    })
-  const toggleRight = () =>
-    setRightOpen((v) => {
-      localStorage.setItem('tradeo_smc_rightOpen', String(!v))
-      return !v
-    })
+  const [leftOpen, setLeftOpen] = useLocalStorage('tradeo_smc_leftOpen', true)
+  const [rightOpen, setRightOpen] = useLocalStorage('tradeo_smc_rightOpen', true)
+  const toggleLeft = () => setLeftOpen((v) => !v)
+  const toggleRight = () => setRightOpen((v) => !v)
 
   const [smcData, setSmcData] = useState(null)
   const [loading, setLoading] = useState(false)

@@ -13,6 +13,7 @@ import { createPortal } from 'react-dom'
 import { useNavbarAutoHide, useNavbarState } from '../App'
 import { ScreenProvider } from '../context/ScreenContext'
 import { ComplexTabProvider } from '../hooks/useComplexTab.jsx'
+import { useLocalStorage } from '../hooks/useLocalStorage'
 import { useAuth } from '../context/AuthContext'
 import StockChart from '../components/screen/StockChart'
 import MarketStatusBadge from '../components/screen/MarketStatusBadge'
@@ -442,25 +443,13 @@ function ScreenInner() {
     return COMPLEX_TABS.some((t) => t.id === stored) ? stored : 'Backtesting'
   })
   const [mobilePanel, setMobilePanel] = useState(null)
-  const [leftOpen, setLeftOpen] = useState(
-    () => localStorage.getItem('tradeo_screen_leftOpen') !== 'false'
-  )
-  const [rightOpen, setRightOpen] = useState(
-    () => localStorage.getItem('tradeo_screen_rightOpen') !== 'false'
-  )
+  const [leftOpen, setLeftOpen] = useLocalStorage('tradeo_screen_leftOpen', true)
+  const [rightOpen, setRightOpen] = useLocalStorage('tradeo_screen_rightOpen', true)
   const toolbarSlotRef = useRef(null)
   const { user, loading: authLoading } = useAuth()
 
-  const toggleLeft = () =>
-    setLeftOpen((v) => {
-      localStorage.setItem('tradeo_screen_leftOpen', String(!v))
-      return !v
-    })
-  const toggleRight = () =>
-    setRightOpen((v) => {
-      localStorage.setItem('tradeo_screen_rightOpen', String(!v))
-      return !v
-    })
+  const toggleLeft = () => setLeftOpen((v) => !v)
+  const toggleRight = () => setRightOpen((v) => !v)
 
   // Opt into navbar auto-hide — activates on mount, restores on unmount
   useNavbarAutoHide()
