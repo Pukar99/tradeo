@@ -110,6 +110,15 @@ export const fmtCr = (v, dec = 2) => {
   return `${(n / 1e7).toFixed(dec)} Cr`
 }
 
+// P&L conditional color — the one shared home for the `v >= 0 ? green : red` pattern.
+// Color pairs intentionally vary by feature today (chat/profile green-500/red-400,
+// backtest green-600/red-500, screen/datalab emerald-500/red-400), so callers pass their
+// feature's exact pair and adoption stays pixel-identical. Unifying every feature onto the
+// default pair is a separate owner design decision — do not "fix" pairs during adoption.
+// Coercion matches the inline ternary exactly (`NaN >= 0` → neg class).
+export const pnlClass = (v, pos = 'text-emerald-500', neg = 'text-red-400') =>
+  v >= 0 ? pos : neg
+
 // =============================================================================
 // 3. SAFE PARSERS
 // =============================================================================
