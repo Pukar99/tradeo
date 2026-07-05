@@ -14,19 +14,11 @@ import {
 import { useCreateBlockNote } from '@blocknote/react'
 import { BlockNoteView } from '@blocknote/mantine'
 import { safeUrl } from '../utils/format'
+import Avatar, { formatDate } from '../components/research/Avatar'
 import '@blocknote/core/fonts/inter.css'
 import '@blocknote/mantine/style.css'
 
 const ADMIN_USER_ID = 1
-
-const formatDate = (dateStr) => {
-  if (!dateStr) return ''
-  return new Date(dateStr).toLocaleDateString('en-US', {
-    year: 'numeric',
-    month: 'short',
-    day: 'numeric',
-  })
-}
 
 const formatDateTime = (dateStr) => {
   if (!dateStr) return ''
@@ -37,28 +29,6 @@ const formatDateTime = (dateStr) => {
     hour: '2-digit',
     minute: '2-digit',
   })
-}
-
-function Avatar({ person, size = 'w-8 h-8' }) {
-  const [imgError, setImgError] = useState(false)
-  return (
-    <div
-      className={`${size} rounded-full bg-gradient-to-br from-blue-400 to-indigo-500 flex items-center justify-center flex-shrink-0 overflow-hidden`}
-    >
-      {person?.avatar_url && !imgError ? (
-        <img
-          src={person.avatar_url}
-          alt={person.name}
-          className="w-full h-full object-cover"
-          onError={() => setImgError(true)}
-        />
-      ) : (
-        <span className="text-white text-[10px] font-bold">
-          {person?.name?.[0]?.toUpperCase() || '?'}
-        </span>
-      )}
-    </div>
-  )
 }
 
 function ResearchViewPage() {
