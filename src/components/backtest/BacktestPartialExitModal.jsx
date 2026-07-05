@@ -1,4 +1,5 @@
-// === PartialExitModal.jsx — partial exit modal (exit qty, price, reason, P&L preview) ===
+// === BacktestPartialExitModal.jsx — backtest partial exit modal (exit qty, price, reason, P&L preview) ===
+// Renamed from PartialExitModal 2026-07-05 — logs/PartialExitModal.jsx is a DIFFERENT modal (live trades).
 
 import { useState, useEffect, useCallback } from 'react'
 import { btPartialExit } from '../../api/backtest'
@@ -18,7 +19,7 @@ function fmt(n) {
 
 const REASONS = ['MANUAL', 'TP_HIT', 'SL_HIT', 'OTHER']
 
-export default function PartialExitModal({ session, order, candle, onClose, onExited }) {
+export default function BacktestPartialExitModal({ session, order, candle, onClose, onExited }) {
   const ep = parseFloat(order.entry_price)
   const remQty = parseFloat(order.remaining_quantity ?? order.quantity)
   const [exitQty, setExitQty] = useState(String(Math.floor(remQty / 2)))

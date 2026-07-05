@@ -11,7 +11,7 @@ import BacktestReport from './BacktestReport'
 import BuyOrderModal from './BuyOrderModal'
 import SLTPUpdateModal from './SLTPUpdateModal'
 import SLValidationPrompt from './SLValidationPrompt'
-import PartialExitModal from './PartialExitModal'
+import BacktestPartialExitModal from './BacktestPartialExitModal'
 import { btExitOrder } from '../../api/backtest'
 
 export default function BacktestPage() {
@@ -411,7 +411,7 @@ export default function BacktestPage() {
       )}
 
       {showPartial && session && currentCandle && (
-        <PartialExitModal
+        <BacktestPartialExitModal
           session={session}
           order={showPartial}
           candle={currentCandle}
