@@ -5,6 +5,7 @@ import { getIndexChart } from '../../api'
 import MarketJournalModal from './MarketJournalModal'
 import EmptyState from './EmptyState'
 import { safeUrl } from '../../utils/format'
+import { candleSeriesOptions } from '../../utils/chartTheme'
 
 // ── Module-level chart cache (shared across all cards, 5-min TTL) ─────────────
 const _chartCache = new Map()
@@ -113,16 +114,9 @@ function NepseThumbnail({ entryDate, onOHLC }) {
       })
       chartRef.current = chart
 
-      const series = chart.addCandlestickSeries({
-        upColor: up,
-        downColor: down,
-        borderUpColor: up,
-        borderDownColor: down,
-        wickUpColor: up,
-        wickDownColor: down,
-        priceLineVisible: false,
-        lastValueVisible: false,
-      })
+      const series = chart.addCandlestickSeries(
+        candleSeriesOptions(up, down, { priceLineVisible: false, lastValueVisible: false })
+      )
 
       const candleData = slice
         .map((r) => ({

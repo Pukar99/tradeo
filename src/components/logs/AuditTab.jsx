@@ -6,7 +6,13 @@ import { getTradeActions } from '../../utils/globalCache'
 import TraderCard from './TraderCard'
 import EmptyState from './EmptyState'
 import { rangeToFromTo } from './tradeConstants'
-import { nepseCharges, nepseCGT, fmtRs as fmtAbs, fmtRsSigned as fmtPnl } from '../../utils/format'
+import {
+  nepseCharges,
+  nepseCGT,
+  fmtRs as fmtAbs,
+  fmtRsSigned as fmtPnl,
+  pnlClass,
+} from '../../utils/format'
 
 const EXIT_TYPES = ['Close Position', 'Partial Exit']
 const LABEL = 'text-[10px] uppercase tracking-widest font-semibold text-gray-400'
@@ -107,7 +113,7 @@ function ShareModal({ onClose, kpis, trades, entryDateMap, dateLabel, user }) {
           <td>${parseFloat(t.quantity) || 0}</td>
           <td>${parseFloat(t.entry_price || 0).toFixed(2)}</td>
           <td>${t.exit_price ? parseFloat(t.exit_price).toFixed(2) : '—'}</td>
-          <td style="color:${pnl >= 0 ? '#059669' : '#dc2626'};font-weight:600">${pnl >= 0 ? '+' : '−'}Rs.${Math.abs(Math.round(pnl)).toLocaleString()}</td>
+          <td style="color:${pnlClass(pnl, '#059669', '#dc2626')};font-weight:600">${fmtPnl(pnl)}</td>
           <td>${days}d</td>
         </tr>`
         })
@@ -135,14 +141,14 @@ function ShareModal({ onClose, kpis, trades, entryDateMap, dateLabel, user }) {
 <p class="sub">${dateLabel} · Generated ${new Date().toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' })} · tradeo-seven.vercel.app</p>
 ${cardDataUrl ? `<img src="${cardDataUrl}" class="card-img" alt="Trader Card"/>` : ''}
 <div class="grid">
-  <div class="kpi"><div class="kpi-label">Net P&L</div><div class="kpi-value ${kpis.netPnl >= 0 ? 'pos' : 'neg'}">${kpis.netPnl >= 0 ? '+' : '−'}Rs.${Math.abs(Math.round(kpis.netPnl)).toLocaleString()}</div></div>
+  <div class="kpi"><div class="kpi-label">Net P&L</div><div class="kpi-value ${pnlClass(kpis.netPnl, 'pos', 'neg')}">${fmtPnl(kpis.netPnl)}</div></div>
   <div class="kpi"><div class="kpi-label">Win Rate</div><div class="kpi-value neu">${kpis.winRate !== null ? kpis.winRate.toFixed(1) + '%' : '—'}</div></div>
   <div class="kpi"><div class="kpi-label">Profit Factor</div><div class="kpi-value neu">${kpis.profitFactor !== null ? (kpis.profitFactor === Infinity ? '∞' : kpis.profitFactor.toFixed(2)) : '—'}</div></div>
   <div class="kpi"><div class="kpi-label">Total Trades</div><div class="kpi-value neu">${kpis.totalTrades}</div></div>
-  <div class="kpi"><div class="kpi-label">Gross Profit</div><div class="kpi-value pos">Rs.${Math.round(kpis.grossProfit).toLocaleString()}</div></div>
-  <div class="kpi"><div class="kpi-label">Gross Loss</div><div class="kpi-value neg">Rs.${Math.round(kpis.grossLoss).toLocaleString()}</div></div>
-  <div class="kpi"><div class="kpi-label">Est. Broker Fees</div><div class="kpi-value pur">Rs.${Math.round(kpis.brokerFees).toLocaleString()}</div></div>
-  <div class="kpi"><div class="kpi-label">Est. CGT</div><div class="kpi-value pur">Rs.${Math.round(kpis.cgt).toLocaleString()}</div></div>
+  <div class="kpi"><div class="kpi-label">Gross Profit</div><div class="kpi-value pos">${fmtAbs(kpis.grossProfit)}</div></div>
+  <div class="kpi"><div class="kpi-label">Gross Loss</div><div class="kpi-value neg">${fmtAbs(kpis.grossLoss)}</div></div>
+  <div class="kpi"><div class="kpi-label">Est. Broker Fees</div><div class="kpi-value pur">${fmtAbs(kpis.brokerFees)}</div></div>
+  <div class="kpi"><div class="kpi-label">Est. CGT</div><div class="kpi-value pur">${fmtAbs(kpis.cgt)}</div></div>
 </div>
 <table>
   <thead><tr><th>Entry Date</th><th>Exit Date</th><th>Symbol</th><th>Dir</th><th>Qty</th><th>Entry</th><th>Exit</th><th>P&L</th><th>Hold</th></tr></thead>
@@ -602,7 +608,7 @@ export default function AuditTab({
                 <div className="text-right">
                   <p className={LABEL}>Net P&L</p>
                   <p
-                    className={`text-[13px] font-bold tabular-nums ${scriptKpis.total >= 0 ? 'text-emerald-500' : 'text-red-400'}`}
+                    className={`text-[13px] font-bold tabular-nums ${pnlClass(scriptKpis.total)}`}
                   >
                     {fmtPnl(scriptKpis.total)}
                   </p>
@@ -664,9 +670,9 @@ export default function AuditTab({
                           {holdDays !== null ? `${holdDays}d` : '—'}
                         </td>
                         <td
-                          className={`px-4 py-2 tabular-nums font-bold whitespace-nowrap ${pnl >= 0 ? 'text-emerald-500' : 'text-red-400'}`}
+                          className={`px-4 py-2 tabular-nums font-bold whitespace-nowrap ${pnlClass(pnl)}`}
                         >
-                          {pnl >= 0 ? '+' : '−'}Rs.{Math.abs(Math.round(pnl)).toLocaleString()}
+                          {fmtPnl(pnl)}
                         </td>
                       </tr>
                     )
@@ -779,13 +785,13 @@ export default function AuditTab({
             <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
               <KpiCard
                 label="Est. Broker Fees"
-                value={`Rs.${Math.round(kpis.brokerFees).toLocaleString()}`}
+                value={fmtAbs(kpis.brokerFees)}
                 valueClass="text-violet-500"
                 sub="SEBON tiers (0.36%–0.24%)"
               />
               <KpiCard
                 label="Est. CGT Tax"
-                value={`Rs.${Math.round(kpis.cgt).toLocaleString()}`}
+                value={fmtAbs(kpis.cgt)}
                 valueClass="text-violet-500"
                 sub="7.5% ST · 5% LT, net of fees"
               />
@@ -991,7 +997,7 @@ export default function AuditTab({
                   const points = pts.map((v, i) => `${i * step},${toY(v)}`).join(' ')
                   const lastY = toY(pts[pts.length - 1])
                   const endPnl = pts[pts.length - 1]
-                  const col = endPnl >= 0 ? '#10b981' : '#f87171'
+                  const col = pnlClass(endPnl, '#10b981', '#f87171')
                   return (
                     <svg viewBox={`0 0 ${w} ${h + 4}`} className="w-full" style={{ height: 88 }}>
                       <defs>
