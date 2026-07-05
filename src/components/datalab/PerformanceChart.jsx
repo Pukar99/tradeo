@@ -12,7 +12,8 @@ import {
 } from 'react'
 import { useTheme } from '../../context/ThemeContext'
 import { getPerformance } from '../../api'
-import { isCanceled } from '../../utils/format'
+import { isCanceled, pnlClass } from '../../utils/format'
+import { candleSeriesOptions } from '../../utils/chartTheme'
 import { registerCacheCleaner } from '../../utils/globalCache'
 import { useToolbarSlot, safeSessionGet, safeSessionSet } from '../../pages/DataLabPage'
 import { CARD, LABEL, STITLE, SVAL, Skeleton, fmtPct } from './shared'
@@ -189,15 +190,13 @@ const MiniCandle = forwardRef(function MiniCandle({ data, height = 360 }, fwdRef
       chartR.current = chart
 
       if (data?.length) {
-        const s = chart.addCandlestickSeries({
-          upColor: UP,
-          downColor: DOWN,
-          borderUpColor: UP,
-          borderDownColor: DOWN,
-          wickUpColor: UP + 'cc',
-          wickDownColor: DOWN + 'cc',
-          priceLineVisible: false,
-        })
+        const s = chart.addCandlestickSeries(
+          candleSeriesOptions(UP, DOWN, {
+            wickUpColor: UP + 'cc',
+            wickDownColor: DOWN + 'cc',
+            priceLineVisible: false,
+          })
+        )
         s.setData(
           data.map((d) => ({
             time: d.date,
@@ -332,7 +331,7 @@ function CycleItem({ swing, precomp, symbol, isActive, onClick, index }) {
           )}
         </div>
         <span
-          className={`text-[10px] font-bold tabular-nums ${(st.nRet ?? 0) >= 0 ? 'text-emerald-600 dark:text-emerald-400' : 'text-red-500'}`}
+          className={`text-[10px] font-bold tabular-nums ${pnlClass(st.nRet ?? 0, 'text-emerald-600 dark:text-emerald-400', 'text-red-500')}`}
         >
           {fmtPct(st.nRet)}
         </span>
@@ -364,7 +363,7 @@ function CycleItem({ swing, precomp, symbol, isActive, onClick, index }) {
                     </div>
                     {[
                       ['Open', open?.toFixed(0), null],
-                      ['Close', close?.toFixed(0), (st.nRet ?? 0) >= 0 ? '#22c55e' : '#ef4444'],
+                      ['Close', close?.toFixed(0), pnlClass(st.nRet ?? 0, '#22c55e', '#ef4444')],
                       ['High', high?.toFixed(0), '#22c55e'],
                       ['Low', low?.toFixed(0), '#ef4444'],
                       ['Max DD', st.nepseDD != null ? fmtPct(st.nepseDD, 1) : null, '#ef4444'],
@@ -404,10 +403,10 @@ function CycleItem({ swing, precomp, symbol, isActive, onClick, index }) {
                     </div>
                     {[
                       ['Open', open?.toFixed(0), null],
-                      ['Close', close?.toFixed(0), (st.sRet ?? 0) >= 0 ? '#22c55e' : '#ef4444'],
+                      ['Close', close?.toFixed(0), pnlClass(st.sRet ?? 0, '#22c55e', '#ef4444')],
                       ['High', high?.toFixed(0), '#22c55e'],
                       ['Low', low?.toFixed(0), '#ef4444'],
-                      ['Ret', fmtPct(st.sRet), (st.sRet ?? 0) >= 0 ? '#22c55e' : '#ef4444'],
+                      ['Ret', fmtPct(st.sRet), pnlClass(st.sRet ?? 0, '#22c55e', '#ef4444')],
                     ].map(
                       ([l, v, c]) =>
                         v != null && (
@@ -572,7 +571,7 @@ function CycleDetail({ swing, precomp, nepse, stock, symbol }) {
             </span>
           </div>
           <span
-            className={`${SVAL} shrink-0 ${(st.nRet ?? 0) >= 0 ? 'text-emerald-500' : 'text-red-500'}`}
+            className={`${SVAL} shrink-0 ${pnlClass(st.nRet ?? 0, 'text-emerald-500', 'text-red-500')}`}
           >
             {fmtPct(st.nRet, 2)}
           </span>
@@ -597,7 +596,7 @@ function CycleDetail({ swing, precomp, nepse, stock, symbol }) {
             </div>
             <div className="flex items-center gap-2 shrink-0">
               {st.sRet != null && (
-                <span className={`${SVAL} ${st.sRet >= 0 ? 'text-emerald-500' : 'text-red-500'}`}>
+                <span className={`${SVAL} ${pnlClass(st.sRet, 'text-emerald-500', 'text-red-500')}`}>
                   {fmtPct(st.sRet, 2)}
                 </span>
               )}
@@ -725,7 +724,7 @@ function CycleRow({ cycle, nRet, sRet, symbol, max, isActive, isStart, partial, 
   const barFor = (v) => {
     if (v == null) return { w: 0, color: '#9ca3af', left: 50 }
     const w = Math.min((Math.abs(v) / max) * 50, 50)
-    const color = v >= 0 ? '#10b981' : '#ef4444'
+    const color = pnlClass(v, '#10b981', '#ef4444')
     return { w, color, left: v >= 0 ? 50 : 50 - w }
   }
   const nBar = barFor(nRet)
@@ -783,9 +782,9 @@ function CycleRow({ cycle, nRet, sRet, symbol, max, isActive, isStart, partial, 
               />
             </div>
             <span
-              className={`w-12 shrink-0 text-right text-[10px] font-bold tabular-nums ${(nRet ?? 0) >= 0 ? 'text-emerald-500' : 'text-red-500'}`}
+              className={`w-12 shrink-0 text-right text-[10px] font-bold tabular-nums ${pnlClass(nRet ?? 0, 'text-emerald-500', 'text-red-500')}`}
             >
-              {nRet == null ? '—' : `${nRet >= 0 ? '+' : ''}${nRet.toFixed(1)}%`}
+              {fmtPct(nRet)}
             </span>
           </div>
           {/* Stock row */}
@@ -810,9 +809,9 @@ function CycleRow({ cycle, nRet, sRet, symbol, max, isActive, isStart, partial, 
                 />
               </div>
               <span
-                className={`w-12 shrink-0 text-right text-[10px] font-bold tabular-nums ${(sRet ?? 0) >= 0 ? 'text-emerald-500' : 'text-red-500'}`}
+                className={`w-12 shrink-0 text-right text-[10px] font-bold tabular-nums ${pnlClass(sRet ?? 0, 'text-emerald-500', 'text-red-500')}`}
               >
-                {sRet == null ? '—' : `${sRet >= 0 ? '+' : ''}${sRet.toFixed(1)}%`}
+                {fmtPct(sRet)}
               </span>
             </div>
           )}
@@ -923,7 +922,7 @@ function CompareRightPanel({
           <div>
             <p className={`${LABEL} mb-0.5`}>Avg α</p>
             <p
-              className={`text-[13px] font-bold tabular-nums ${avgAlpha >= 0 ? 'text-emerald-500' : 'text-red-500'}`}
+              className={`text-[13px] font-bold tabular-nums ${pnlClass(avgAlpha, 'text-emerald-500', 'text-red-500')}`}
             >
               {avgAlpha >= 0 ? '+' : ''}
               {avgAlpha.toFixed(1)}pp
@@ -932,7 +931,7 @@ function CompareRightPanel({
           <div>
             <p className={`${LABEL} mb-0.5`}>Total α</p>
             <p
-              className={`text-[13px] font-bold tabular-nums ${totalAlpha >= 0 ? 'text-emerald-500' : 'text-red-500'}`}
+              className={`text-[13px] font-bold tabular-nums ${pnlClass(totalAlpha, 'text-emerald-500', 'text-red-500')}`}
             >
               {totalAlpha >= 0 ? '+' : ''}
               {totalAlpha.toFixed(1)}pp
@@ -1068,7 +1067,7 @@ function CompareRightPanel({
                 </span>
                 <div className="text-right tabular-nums">
                   <span
-                    className={`text-[10px] block ${row.nRet >= 0 ? 'text-emerald-500' : 'text-red-500'}`}
+                    className={`text-[10px] block ${pnlClass(row.nRet, 'text-emerald-500', 'text-red-500')}`}
                   >
                     {row.nRet >= 0 ? '+' : ''}
                     {row.nRet.toFixed(1)}%
@@ -1079,7 +1078,7 @@ function CompareRightPanel({
                 </div>
                 <div className="text-right tabular-nums">
                   <span
-                    className={`text-[10px] block ${row.sRet >= 0 ? 'text-emerald-500' : 'text-red-500'}`}
+                    className={`text-[10px] block ${pnlClass(row.sRet, 'text-emerald-500', 'text-red-500')}`}
                   >
                     {row.sRet >= 0 ? '+' : ''}
                     {row.sRet.toFixed(1)}%
@@ -1102,7 +1101,7 @@ function CompareRightPanel({
               </span>
               <div className="text-right">
                 <p
-                  className={`text-[11px] font-black tabular-nums ${finalNepsePct >= 0 ? 'text-emerald-500' : 'text-red-500'}`}
+                  className={`text-[11px] font-black tabular-nums ${pnlClass(finalNepsePct, 'text-emerald-500', 'text-red-500')}`}
                 >
                   {finalNepsePct >= 0 ? '+' : ''}
                   {finalNepsePct.toFixed(1)}%
@@ -1111,7 +1110,7 @@ function CompareRightPanel({
               </div>
               <div className="text-right">
                 <p
-                  className={`text-[11px] font-black tabular-nums ${finalStockPct >= 0 ? 'text-emerald-500' : 'text-red-500'}`}
+                  className={`text-[11px] font-black tabular-nums ${pnlClass(finalStockPct, 'text-emerald-500', 'text-red-500')}`}
                 >
                   {finalStockPct >= 0 ? '+' : ''}
                   {finalStockPct.toFixed(1)}%
@@ -1122,7 +1121,7 @@ function CompareRightPanel({
             <div className="mt-1.5 text-center text-[10px] text-gray-500 dark:text-gray-400">
               {symbol} alpha vs NEPSE:{' '}
               <span
-                className={`font-bold tabular-nums ${finalAlphaPct >= 0 ? 'text-emerald-500' : 'text-red-500'}`}
+                className={`font-bold tabular-nums ${pnlClass(finalAlphaPct, 'text-emerald-500', 'text-red-500')}`}
               >
                 {finalAlphaPct >= 0 ? '+' : ''}
                 {finalAlphaPct.toFixed(1)}pp

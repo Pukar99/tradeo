@@ -8,7 +8,7 @@ import {
   getStockPriceRange,
   getSectorCycles,
 } from '../../api'
-import { apiError, isCanceled } from '../../utils/format'
+import { apiError, isCanceled, pnlClass } from '../../utils/format'
 import { INDEX_OPTIONS } from '../../utils/constants'
 import { useToolbarSlot, safeSessionGet, safeSessionSet } from '../../pages/DataLabPage'
 // Design tokens, scrollbars and Skeleton come from the shared DataLab module
@@ -898,11 +898,11 @@ function SectorMatrix({
                 {s.vs_nepse != null ? (
                   <span
                     className={`inline-flex px-1.5 py-0.5 rounded text-[10px] font-semibold tabular-nums
-                    ${
-                      s.vs_nepse >= 0
-                        ? 'bg-emerald-50 dark:bg-emerald-950/30 text-emerald-600 dark:text-emerald-400'
-                        : 'bg-red-50 dark:bg-red-950/30 text-red-500 dark:text-red-400'
-                    }`}
+                    ${pnlClass(
+                      s.vs_nepse,
+                      'bg-emerald-50 dark:bg-emerald-950/30 text-emerald-600 dark:text-emerald-400',
+                      'bg-red-50 dark:bg-red-950/30 text-red-500 dark:text-red-400'
+                    )}`}
                   >
                     {s.vs_nepse >= 0 ? '+' : ''}
                     {s.vs_nepse.toFixed(1)}%
