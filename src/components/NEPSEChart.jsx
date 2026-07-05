@@ -9,6 +9,8 @@
 import { memo, useCallback, useEffect, useRef, useState } from 'react'
 import { getNepseChart as _getNepseChartCached, getNepseWeeklyChart } from '../utils/globalCache'
 import { useTheme } from '../context/ThemeContext'
+import { useLightweightChart } from '../hooks/useLightweightChart'
+import { candleSeriesOptions } from '../utils/chartTheme'
 
 const ranges = [
   { label: '1M', value: '1m' },
@@ -33,12 +35,10 @@ const NEPSEMiniChart = memo(function NEPSEMiniChart({
   syncRange,
 }) {
   const chartContainerRef = useRef(null)
-  const chartRef = useRef(null)
   const seriesRef = useRef(null)
   const dataRef = useRef(data)
   const { isDark } = useTheme()
   const [hovered, setHovered] = useState(null) // { date, o, h, l, c } from crosshair
-  const [chartReady, setChartReady] = useState(false)
 
   // Keep dataRef always current without triggering chart reinit
   useEffect(() => {
@@ -55,6 +55,58 @@ const NEPSEMiniChart = memo(function NEPSEMiniChart({
     timeScale: { borderColor: dark ? '#1f2937' : '#e5e7eb' },
   })
 
+  // Init chart once — never destroyed on theme change (theme effect below updates colors)
+  const { chartRef, ready: chartReady } = useLightweightChart({
+    containerRef: chartContainerRef,
+    delayMs: 80,
+    fallbackWidth: 400,
+    buildOptions: () => ({
+      height,
+      ...getThemeOptions(isDark),
+      grid: { vertLines: { visible: false }, horzLines: { visible: false } },
+      rightPriceScale: {
+        borderColor: isDark ? '#1f2937' : '#e5e7eb',
+        scaleMargins: { top: 0.1, bottom: 0.1 },
+      },
+      timeScale: {
+        borderColor: isDark ? '#1f2937' : '#e5e7eb',
+        timeVisible: true,
+        fixLeftEdge: false,
+        fixRightEdge: false,
+      },
+      crosshair: { mode: 1 },
+      handleScroll: { mouseWheel: true, pressedMouseMove: true, horzTouchDrag: true },
+      handleScale: { mouseWheel: true, pinch: true, axisPressedMouseMove: true },
+      watermark: { visible: false },
+    }),
+    setup: (chart) => {
+      const series = chart.addCandlestickSeries(
+        candleSeriesOptions(undefined, undefined, { priceLineVisible: false })
+      )
+
+      chart.subscribeCrosshairMove((param) => {
+        if (!param.time) {
+          setHovered(null)
+          onCrosshairMove?.(null)
+          return
+        }
+        const d = param.seriesData?.get(series)
+        if (!d) return
+        setHovered({ date: param.time, o: d.open, h: d.high, l: d.low, c: d.close })
+        onCrosshairMove?.(param.time)
+      })
+
+      chart.timeScale().subscribeVisibleTimeRangeChange((range) => {
+        if (range) onRangeChange?.(range)
+      })
+
+      seriesRef.current = series
+      return () => {
+        seriesRef.current = null
+      }
+    },
+  })
+
   const applyData = (d) => {
     if (!d || d.length === 0 || !seriesRef.current || !chartRef.current) return
     seriesRef.current.setData(d)
@@ -65,101 +117,11 @@ const NEPSEMiniChart = memo(function NEPSEMiniChart({
     chartRef.current.timeScale().scrollToPosition(2, false)
   }
 
-  // Init chart once — never destroyed on theme change
-  useEffect(() => {
-    let cancelled = false
-
-    const initChart = async () => {
-      try {
-        await new Promise((r) => setTimeout(r, 80))
-        if (cancelled || !chartContainerRef.current) return
-
-        const { createChart } = await import('lightweight-charts')
-        if (cancelled || !chartContainerRef.current) return
-
-        const chart = createChart(chartContainerRef.current, {
-          width: chartContainerRef.current.clientWidth || 400,
-          height,
-          ...getThemeOptions(isDark),
-          grid: { vertLines: { visible: false }, horzLines: { visible: false } },
-          rightPriceScale: {
-            borderColor: isDark ? '#1f2937' : '#e5e7eb',
-            scaleMargins: { top: 0.1, bottom: 0.1 },
-          },
-          timeScale: {
-            borderColor: isDark ? '#1f2937' : '#e5e7eb',
-            timeVisible: true,
-            fixLeftEdge: false,
-            fixRightEdge: false,
-          },
-          crosshair: { mode: 1 },
-          handleScroll: { mouseWheel: true, pressedMouseMove: true, horzTouchDrag: true },
-          handleScale: { mouseWheel: true, pinch: true, axisPressedMouseMove: true },
-          watermark: { visible: false },
-        })
-
-        const series = chart.addCandlestickSeries({
-          upColor: '#22c55e',
-          downColor: '#ef4444',
-          borderUpColor: '#22c55e',
-          borderDownColor: '#ef4444',
-          wickUpColor: '#22c55e',
-          wickDownColor: '#ef4444',
-          priceLineVisible: false,
-        })
-
-        chart.subscribeCrosshairMove((param) => {
-          if (!param.time) {
-            setHovered(null)
-            onCrosshairMove?.(null)
-            return
-          }
-          const d = param.seriesData?.get(series)
-          if (!d) return
-          setHovered({ date: param.time, o: d.open, h: d.high, l: d.low, c: d.close })
-          onCrosshairMove?.(param.time)
-        })
-
-        chart.timeScale().subscribeVisibleTimeRangeChange((range) => {
-          if (range) onRangeChange?.(range)
-        })
-
-        const onResize = () => {
-          if (chartContainerRef.current && chart)
-            chart.applyOptions({ width: chartContainerRef.current.clientWidth || 400 })
-        }
-        window.addEventListener('resize', onResize)
-        chartRef.current = chart
-        seriesRef.current = series
-
-        if (!cancelled) {
-          setChartReady(true)
-          // Load any data that arrived before chart was ready
-          applyData(dataRef.current)
-        }
-
-        return () => window.removeEventListener('resize', onResize)
-      } catch (err) {
-        console.error('Chart init error:', err)
-      }
-    }
-
-    initChart()
-    return () => {
-      cancelled = true
-      if (chartRef.current) {
-        chartRef.current.remove()
-        chartRef.current = null
-        seriesRef.current = null
-      }
-    }
-  }, []) // eslint-disable-line react-hooks/exhaustive-deps
-
   // Theme change — update colors only, keep data intact, no refetch
   useEffect(() => {
     if (!chartRef.current) return
     chartRef.current.applyOptions(getThemeOptions(isDark))
-  }, [isDark])
+  }, [isDark, chartRef]) // chartRef is a stable ref from useLightweightChart
 
   // Load data when it arrives or updates
   useEffect(() => {
@@ -175,7 +137,7 @@ const NEPSEMiniChart = memo(function NEPSEMiniChart({
     } else {
       chartRef.current.setCrosshairPosition(0, syncTime, seriesRef.current)
     }
-  }, [syncTime])
+  }, [syncTime, chartRef])
 
   // Sync visible time range from sibling chart — guard null values and empty data
   useEffect(() => {
@@ -185,7 +147,7 @@ const NEPSEMiniChart = memo(function NEPSEMiniChart({
     try {
       chartRef.current.timeScale().setVisibleRange(syncRange)
     } catch (_) {}
-  }, [syncRange])
+  }, [syncRange, chartRef])
 
   const last = data?.[data.length - 1]
   const prev = data?.[data.length - 2]
@@ -281,12 +243,59 @@ function NEPSEChart({ fixed = false }) {
   const [stats, setStats] = useState(null)
   const [tooltip, setTooltip] = useState(null)
   const [hoveredMovers, setHoveredMovers] = useState(null)
-  const [chartReady, setChartReady] = useState(false)
   const [latestDate, setLatestDate] = useState('')
   const chartContainerRef = useRef(null)
-  const chartRef = useRef(null)
   const seriesRef = useRef(null)
   const moversRef = useRef({})
+
+  // Normal (single) mode chart — enabled:false in fixed mode (container never rendered).
+  // Hook lives BEFORE the fixed-mode early return so hooks stay unconditional.
+  const { chartRef, ready: chartReady } = useLightweightChart({
+    containerRef: chartContainerRef,
+    delayMs: 100,
+    fallbackWidth: 800,
+    enabled: !fixed,
+    buildOptions: () => ({
+      height: 350,
+      layout: {
+        background: { color: isDark ? '#111827' : '#ffffff' },
+        textColor: isDark ? '#d1d5db' : '#374151',
+      },
+      grid: {
+        vertLines: { color: 'transparent' },
+        horzLines: { color: 'transparent' },
+      },
+      rightPriceScale: { borderColor: isDark ? '#4b5563' : '#e5e7eb' },
+      timeScale: { borderColor: isDark ? '#4b5563' : '#e5e7eb' },
+    }),
+    setup: (chart) => {
+      const candleSeries = chart.addCandlestickSeries(candleSeriesOptions())
+
+      chart.subscribeCrosshairMove((param) => {
+        if (!param.time) {
+          setTooltip(null)
+          setHoveredMovers(null)
+          return
+        }
+        const data = param.seriesData?.get(candleSeries)
+        if (!data) return
+        setTooltip({
+          date: param.time,
+          open: data.open,
+          high: data.high,
+          low: data.low,
+          close: data.close,
+          change: (((data.close - data.open) / data.open) * 100).toFixed(2),
+        })
+        setHoveredMovers(moversRef.current[param.time] || null)
+      })
+
+      seriesRef.current = candleSeries
+      return () => {
+        seriesRef.current = null
+      }
+    },
+  })
 
   // Fixed mode — daily + weekly side-by-side, auto-loads on mount, crosshair synced
   const [dailyData, setDailyData] = useState(null)
@@ -414,87 +423,8 @@ function NEPSEChart({ fixed = false }) {
     )
   }
 
-  // Normal (single) mode — full chart with range selector
-  // eslint-disable-next-line react-hooks/rules-of-hooks
-  useEffect(() => {
-    let cancelled = false
-
-    const initChart = async () => {
-      try {
-        await new Promise((resolve) => setTimeout(resolve, 100))
-        if (cancelled || !chartContainerRef.current) return
-
-        const { createChart } = await import('lightweight-charts')
-        if (cancelled || !chartContainerRef.current) return
-
-        const chart = createChart(chartContainerRef.current, {
-          width: chartContainerRef.current.clientWidth || 800,
-          height: 350,
-          layout: {
-            background: { color: isDark ? '#111827' : '#ffffff' },
-            textColor: isDark ? '#d1d5db' : '#374151',
-          },
-          grid: {
-            vertLines: { color: 'transparent' },
-            horzLines: { color: 'transparent' },
-          },
-          rightPriceScale: { borderColor: isDark ? '#4b5563' : '#e5e7eb' },
-          timeScale: { borderColor: isDark ? '#4b5563' : '#e5e7eb' },
-        })
-
-        const candleSeries = chart.addCandlestickSeries({
-          upColor: '#22c55e',
-          downColor: '#ef4444',
-          borderUpColor: '#22c55e',
-          borderDownColor: '#ef4444',
-          wickUpColor: '#22c55e',
-          wickDownColor: '#ef4444',
-        })
-
-        chart.subscribeCrosshairMove((param) => {
-          if (!param.time) {
-            setTooltip(null)
-            setHoveredMovers(null)
-            return
-          }
-          const data = param.seriesData?.get(candleSeries)
-          if (!data) return
-          setTooltip({
-            date: param.time,
-            open: data.open,
-            high: data.high,
-            low: data.low,
-            close: data.close,
-            change: (((data.close - data.open) / data.open) * 100).toFixed(2),
-          })
-          setHoveredMovers(moversRef.current[param.time] || null)
-        })
-
-        const handleResize = () => {
-          if (chartContainerRef.current && chart)
-            chart.applyOptions({ width: chartContainerRef.current.clientWidth || 800 })
-        }
-        window.addEventListener('resize', handleResize)
-        chartRef.current = chart
-        seriesRef.current = candleSeries
-        if (!cancelled) setChartReady(true)
-        return () => window.removeEventListener('resize', handleResize)
-      } catch (err) {
-        console.error('Chart init error:', err)
-      }
-    }
-
-    initChart()
-    return () => {
-      cancelled = true
-      if (chartRef.current) {
-        chartRef.current.remove()
-        chartRef.current = null
-        seriesRef.current = null
-      }
-    }
-  }, []) // eslint-disable-line react-hooks/exhaustive-deps
-
+  // Normal (single) mode — data load per range (chart itself is created by the
+  // useLightweightChart call above, which runs unconditionally with enabled=!fixed)
   // eslint-disable-next-line react-hooks/rules-of-hooks
   useEffect(() => {
     if (!chartReady) return
@@ -527,7 +457,7 @@ function NEPSEChart({ fixed = false }) {
         setLoading(false)
       })
       .catch(() => setLoading(false))
-  }, [range, chartReady])
+  }, [range, chartReady, chartRef])
 
   const isPositive = parseFloat(stats?.change) >= 0
   const isPeriodPositive = parseFloat(stats?.periodChange) >= 0
