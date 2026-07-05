@@ -105,77 +105,6 @@ function MobileStat({ label, value, color }) {
   )
 }
 
-// ── Risk gauge ────────────────────────────────────────────────────────────────
-
-function RiskGauge({ entry, sl, tp, ltp, position, pnlPct }) {
-  const hasFull = sl != null && tp != null && ltp != null
-
-  if (hasFull) {
-    const e = Number(entry),
-      s = Number(sl),
-      tp_ = Number(tp),
-      l = Number(ltp)
-    const lo = position === 'LONG' ? Math.min(s, e) : Math.min(tp_, e)
-    const hi = position === 'LONG' ? Math.max(tp_, e) : Math.max(s, e)
-    const range = hi - lo
-    if (range <= 0) return null
-    const ltpPct = Math.max(0, Math.min(100, ((l - lo) / range) * 100))
-    const entryPct = Math.max(0, Math.min(100, ((e - lo) / range) * 100))
-    const distToSl =
-      position === 'LONG' ? ((l - s) / (e - s || 1)) * 100 : ((s - l) / (s - e || 1)) * 100
-    const danger = distToSl < 15 && distToSl >= 0
-    const dotColor = danger
-      ? 'bg-red-500 ring-2 ring-red-300 dark:ring-red-800'
-      : ltpPct > entryPct
-        ? position === 'LONG'
-          ? 'bg-emerald-400'
-          : 'bg-red-400'
-        : position === 'LONG'
-          ? 'bg-red-400'
-          : 'bg-emerald-400'
-
-    return (
-      <div className="mt-2 space-y-0.5">
-        <div
-          className="relative h-[4px] rounded-full overflow-visible"
-          style={{ background: 'linear-gradient(to right, #fca5a5, #fef3c7, #6ee7b7)' }}
-        >
-          <div
-            className="absolute top-1/2 -translate-y-1/2 w-px h-3 bg-gray-400 dark:bg-gray-500"
-            style={{ left: `${entryPct}%` }}
-          />
-          <div
-            className={`absolute top-1/2 -translate-y-1/2 w-2.5 h-2.5 rounded-full shadow-sm transition-all duration-500 ${dotColor}`}
-            style={{ left: `calc(${ltpPct}% - 5px)` }}
-          />
-        </div>
-        <div className="flex justify-between">
-          <span className="text-[10px] text-red-400">SL {sl}</span>
-          {danger && (
-            <span className="text-[10px] text-red-400 font-semibold animate-pulse">⚠ Near SL</span>
-          )}
-          <span className="text-[10px] text-emerald-500">TP {tp}</span>
-        </div>
-      </div>
-    )
-  }
-
-  if (pnlPct == null) return null
-  const pct = parseFloat(pnlPct)
-  const width = Math.min(Math.abs(pct) * 4, 50)
-  return (
-    <div className="mt-2 h-[3px] bg-gray-200 dark:bg-gray-700 rounded-full overflow-hidden relative">
-      <div className="absolute inset-y-0 left-1/2 w-px bg-gray-300 dark:bg-gray-600" />
-      <div
-        className={`absolute h-full rounded-full transition-all duration-700 ${pnlClass(pct, 'bg-emerald-400', 'bg-red-400')}`}
-        style={
-          pct >= 0 ? { left: '50%', width: `${width}%` } : { right: '50%', width: `${width}%` }
-        }
-      />
-    </div>
-  )
-}
-
 // ── Allocation donut ──────────────────────────────────────────────────────────
 
 function AllocationDonut({ openPositions }) {
@@ -483,22 +412,6 @@ function PortfolioPage() {
 
   const currentDrawdown = equityCurve.length > 0 ? equityCurve[equityCurve.length - 1].drawdown : 0
   const maxDrawdown = equityCurve.length > 0 ? Math.max(...equityCurve.map((p) => p.drawdown)) : 0
-  const peakEquity = equityCurve.length > 0 ? Math.max(...equityCurve.map((p) => p.equity)) : 0
-  const currentEquity = equityCurve.length > 0 ? equityCurve[equityCurve.length - 1].equity : 0
-
-  const dailyStreak = useMemo(() => {
-    const byDate = {}
-    closedTrades.forEach((t) => {
-      const d = t.last_action_at?.slice(0, 10)
-      if (!d) return
-      byDate[d] = (byDate[d] || 0) + t.realized_pnl
-    })
-    return Object.entries(byDate)
-      .sort((a, b) => (a[0] > b[0] ? 1 : -1))
-      .slice(-14)
-      .map(([date, pnl]) => ({ date, pnl: Math.round(pnl), win: pnl > 0 }))
-  }, [closedTrades])
-
   // Top 10 recent action rows (New Position / Close Position only for "recent trades" display)
   const top10Recent = useMemo(
     () =>
