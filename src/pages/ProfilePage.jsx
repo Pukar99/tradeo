@@ -4,6 +4,7 @@ import { useAuth } from '../context/AuthContext'
 import { useNavigate } from 'react-router-dom'
 import { updateProfile, uploadAvatar, changePassword, deleteAccount } from '../api'
 import { getProfile, clearProfileCache } from '../utils/globalCache'
+import { pnlClass } from '../utils/format'
 
 const MAX_AVATAR_SIZE = 5 * 1024 * 1024 // 5 MB
 const ALLOWED_IMAGE_TYPES = ['image/jpeg', 'image/jpg', 'image/png', 'image/gif', 'image/webp']
@@ -807,7 +808,7 @@ function ProfilePage() {
               <div className="flex justify-between">
                 <span className="text-xs text-gray-500 dark:text-gray-400">Realized P&L</span>
                 <span
-                  className={`text-sm font-bold ${profile.stats.totalRealizedPnl >= 0 ? 'text-green-500' : 'text-red-400'}`}
+                  className={`text-sm font-bold ${pnlClass(profile.stats.totalRealizedPnl, 'text-green-500', 'text-red-400')}`}
                 >
                   {profile.stats.totalRealizedPnl >= 0 ? '+' : ''}Rs.
                   {Math.abs(profile.stats.totalRealizedPnl).toLocaleString()}
@@ -960,7 +961,7 @@ function ProfilePage() {
           <StatCard
             label="Realized P&L"
             value={`${profile.stats.totalRealizedPnl >= 0 ? '+' : ''}Rs.${Math.abs(profile.stats.totalRealizedPnl).toLocaleString()}`}
-            color={profile.stats.totalRealizedPnl >= 0 ? 'text-green-500' : 'text-red-400'}
+            color={pnlClass(profile.stats.totalRealizedPnl, 'text-green-500', 'text-red-400')}
           />
           <StatCard
             label="Capital at Risk"
