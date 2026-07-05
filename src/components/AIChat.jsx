@@ -14,6 +14,7 @@ import {
   loadChatSession,
   deleteChatSession,
 } from '../api'
+import { fmtRs, pnlClass } from '../utils/format'
 import { getChatSuggestions } from '../utils/globalCache'
 import { dispatchChatAction, DEBRIEF_EVENT } from '../utils/chatEvents'
 import { useNavigate } from 'react-router-dom'
@@ -593,7 +594,7 @@ function JournalDraftCard({ draft, onSave, onDiscard }) {
         </div>
         {draft.pnl !== null && (
           <span
-            className={`text-[10px] font-semibold px-1.5 py-0.5 rounded-full ${draft.pnl >= 0 ? 'bg-green-100 dark:bg-green-900/40 text-green-600' : 'bg-red-100 dark:bg-red-900/40 text-red-500'}`}
+            className={`text-[10px] font-semibold px-1.5 py-0.5 rounded-full ${pnlClass(draft.pnl, 'bg-green-100 dark:bg-green-900/40 text-green-600', 'bg-red-100 dark:bg-red-900/40 text-red-500')}`}
           >
             {draft.pnl >= 0 ? '+' : ''}Rs.{Math.abs(draft.pnl).toLocaleString()} P&L
           </span>
@@ -681,7 +682,7 @@ function ShowTradesCard({ result }) {
                 </div>
                 {pnl !== null && (
                   <span
-                    className={`text-[10px] font-semibold ${pnl >= 0 ? 'text-green-500' : 'text-red-400'}`}
+                    className={`text-[10px] font-semibold ${pnlClass(pnl, 'text-green-500', 'text-red-400')}`}
                     translate="no"
                   >
                     {pnl >= 0 ? '+' : ''}Rs.{Math.round(pnl).toLocaleString()}
@@ -914,16 +915,16 @@ function RiskSummaryCard({ result }) {
         </span>
       </div>
       <div className="grid grid-cols-3 gap-1 mb-2">
-        <PlanStat label="Invested" value={`Rs.${Math.round(totalInvested).toLocaleString()}`} />
+        <PlanStat label="Invested" value={fmtRs(totalInvested)} />
         <PlanStat
           label="At Risk"
-          value={`Rs.${Math.round(totalRisk).toLocaleString()}`}
+          value={fmtRs(totalRisk)}
           accent="text-red-500"
         />
         <PlanStat
           label="Unrealized"
           value={`${totalUnrealized >= 0 ? '+' : ''}Rs.${Math.round(totalUnrealized).toLocaleString()}`}
-          accent={totalUnrealized >= 0 ? 'text-green-500' : 'text-red-400'}
+          accent={pnlClass(totalUnrealized, 'text-green-500', 'text-red-400')}
         />
       </div>
       {positions.length > 0 && (
@@ -943,7 +944,7 @@ function RiskSummaryCard({ result }) {
               </div>
               {p.riskAmount != null ? (
                 <span className="font-semibold text-red-400" translate="no">
-                  −Rs.{Math.round(p.riskAmount).toLocaleString()} max
+                  −{fmtRs(p.riskAmount)} max
                 </span>
               ) : (
                 <span className="font-semibold px-1.5 py-0.5 rounded-full bg-red-100 dark:bg-red-900/40 text-red-500">
@@ -990,7 +991,7 @@ function WeeklySummaryCard({ result }) {
         <PlanStat
           label="Net P&L"
           value={`${totalPnl >= 0 ? '+' : ''}Rs.${Math.round(totalPnl).toLocaleString()}`}
-          accent={totalPnl >= 0 ? 'text-green-500' : 'text-red-400'}
+          accent={pnlClass(totalPnl, 'text-green-500', 'text-red-400')}
         />
         <PlanStat
           label="Win Rate"
@@ -1176,7 +1177,7 @@ function MorningBriefCard({ brief }) {
                     {t.qty}@{t.entry}
                   </span>
                   {unrealized !== null && (
-                    <span className={unrealized >= 0 ? 'text-green-500' : 'text-red-400'}>
+                    <span className={pnlClass(unrealized, 'text-green-500', 'text-red-400')}>
                       {unrealized >= 0 ? '+' : ''}Rs.{Math.round(unrealized).toLocaleString()}
                     </span>
                   )}
