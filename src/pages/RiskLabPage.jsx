@@ -15,7 +15,7 @@ import {
   Bar,
   Legend,
 } from 'recharts'
-import { nepseCommission, sebonFee, dpCharge, nepseCGTByTerm } from '../utils/format'
+import { nepseCommission, sebonFee, dpCharge, nepseCGTByTerm, fmtRs } from '../utils/format'
 
 const getBrokerCommission = nepseCommission
 const getSEBON = sebonFee
@@ -382,11 +382,11 @@ function NEPSECalculator() {
               </div>
               <div className="grid grid-cols-3 gap-2">
                 {[
-                  { label: 'Buy', value: `Rs.${Math.round(result.buyAmount).toLocaleString()}` },
-                  { label: 'Sell', value: `Rs.${Math.round(result.sellAmount).toLocaleString()}` },
+                  { label: 'Buy', value: fmtRs(result.buyAmount) },
+                  { label: 'Sell', value: fmtRs(result.sellAmount) },
                   {
                     label: 'Charges',
-                    value: `Rs.${Math.round(result.totalCharges).toLocaleString()}`,
+                    value: fmtRs(result.totalCharges),
                     red: true,
                   },
                 ].map((s, i) => (
@@ -650,7 +650,7 @@ function PositionCalculator() {
               />
               <StatCard
                 label="Position Value"
-                value={`Rs.${Math.round(result.positionValue).toLocaleString()}`}
+                value={fmtRs(result.positionValue)}
               />
               <StatCard
                 label="Max Risk"
@@ -659,7 +659,7 @@ function PositionCalculator() {
               />
               <StatCard
                 label="Risk Amount"
-                value={`Rs.${Math.round(result.riskAmount).toLocaleString()}`}
+                value={fmtRs(result.riskAmount)}
                 color="text-amber-500"
               />
               <StatCard label="Risk per Share" value={`Rs.${result.riskPerShare.toFixed(2)}`} />
@@ -838,12 +838,12 @@ function SIPCalculator() {
             <div className="grid grid-cols-2 gap-2">
               <StatCard
                 label="Total Value"
-                value={`Rs.${Math.round(result.totalValue).toLocaleString()}`}
+                value={fmtRs(result.totalValue)}
                 color="text-emerald-500"
               />
               <StatCard
                 label="Total Invested"
-                value={`Rs.${Math.round(result.totalInvested).toLocaleString()}`}
+                value={fmtRs(result.totalInvested)}
                 color="text-blue-500"
               />
               <StatCard
