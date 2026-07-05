@@ -2,6 +2,7 @@
 
 import { useEffect, useRef, useState } from 'react'
 import { useTheme } from '../../context/ThemeContext'
+import { candleSeriesOptions } from '../../utils/chartTheme'
 
 async function loadLC() {
   return import('lightweight-charts')
@@ -187,14 +188,7 @@ export default function BacktestChart({ candles, cursorIndex, positions }) {
         },
       })
 
-      const candleSer = chart.addCandlestickSeries({
-        upColor: '#22c55e',
-        downColor: '#ef4444',
-        borderUpColor: '#22c55e',
-        borderDownColor: '#ef4444',
-        wickUpColor: '#22c55e',
-        wickDownColor: '#ef4444',
-      })
+      const candleSer = chart.addCandlestickSeries(candleSeriesOptions())
 
       const volSer = chart.addHistogramSeries({
         priceFormat: { type: 'volume' },

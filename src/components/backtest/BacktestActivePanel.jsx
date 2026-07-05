@@ -2,6 +2,7 @@
 
 import { useState, useCallback } from 'react'
 import { btAddScript, btEndSession } from '../../api/backtest'
+import { pnlClass } from '../../utils/format'
 
 function fmt(n) {
   return n == null ? '—' : Number(n).toLocaleString('en-IN', { maximumFractionDigits: 0 })
@@ -51,7 +52,7 @@ function PositionCard({ pos, currentCandle, onEditSLTP, onExit, onPartial }) {
       </div>
 
       <div
-        className={`font-bold text-[11px] ${unrealized >= 0 ? 'text-green-600' : 'text-red-500'}`}
+        className={`font-bold text-[11px] ${pnlClass(unrealized, 'text-green-600', 'text-red-500')}`}
       >
         {unrealized >= 0 ? '+' : ''}Rs.{fmt(unrealized)}{' '}
         <span className="text-[10px] font-semibold">({fmtPct(unrealizedPct)})</span>
@@ -262,18 +263,18 @@ export default function BacktestActivePanel({
 
         {/* Total Equity Banner */}
         <div
-          className={`rounded-lg px-2.5 py-2 border ${totalEquityPct >= 0 ? 'border-green-200 dark:border-green-900 bg-green-50 dark:bg-green-900/10' : 'border-red-200 dark:border-red-900 bg-red-50 dark:bg-red-900/10'}`}
+          className={`rounded-lg px-2.5 py-2 border ${pnlClass(totalEquityPct, 'border-green-200 dark:border-green-900 bg-green-50 dark:bg-green-900/10', 'border-red-200 dark:border-red-900 bg-red-50 dark:bg-red-900/10')}`}
         >
           <div className="text-[10px] font-semibold text-gray-400 uppercase tracking-widest mb-0.5">
             Session Equity
           </div>
           <div
-            className={`text-[14px] font-bold ${totalEquityPct >= 0 ? 'text-green-600' : 'text-red-500'}`}
+            className={`text-[14px] font-bold ${pnlClass(totalEquityPct, 'text-green-600', 'text-red-500')}`}
           >
             Rs.{fmt(totalEquity)}
           </div>
           <div
-            className={`text-[10px] font-semibold ${totalEquityPct >= 0 ? 'text-green-600' : 'text-red-500'}`}
+            className={`text-[10px] font-semibold ${pnlClass(totalEquityPct, 'text-green-600', 'text-red-500')}`}
           >
             {totalEquityPct >= 0 ? '+' : ''}
             {totalEquityPct.toFixed(2)}% vs initial Rs.{fmt(initCap)}
@@ -292,7 +293,7 @@ export default function BacktestActivePanel({
             <span className="text-right font-semibold dark:text-gray-300">Rs.{fmt(inCapital)}</span>
             <span>Unrealized</span>
             <span
-              className={`text-right font-semibold ${unrealizedTotal >= 0 ? 'text-green-600' : 'text-red-500'}`}
+              className={`text-right font-semibold ${pnlClass(unrealizedTotal, 'text-green-600', 'text-red-500')}`}
             >
               {unrealizedTotal >= 0 ? '+' : ''}Rs.{fmt(unrealizedTotal)}
             </span>

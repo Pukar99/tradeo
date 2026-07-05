@@ -2,6 +2,7 @@
 
 import { useState, useEffect, useCallback } from 'react'
 import { btGetReport, btEndSession } from '../../api/backtest'
+import { pnlClass } from '../../utils/format'
 import { AreaChart, Area, XAxis, YAxis, Tooltip, ResponsiveContainer } from 'recharts'
 import { useTheme } from '../../context/ThemeContext'
 
@@ -250,7 +251,7 @@ export default function BacktestReport({ sessionId, onClose }) {
           label="Total P&L"
           value={`Rs.${fmt(report.total_pnl)}`}
           sub={fmtPct(report.total_return_pct)}
-          color={parseFloat(report.total_pnl) >= 0 ? 'text-green-600' : 'text-red-500'}
+          color={pnlClass(parseFloat(report.total_pnl), 'text-green-600', 'text-red-500')}
         />
         <StatCard
           label="Win Rate"
@@ -280,7 +281,7 @@ export default function BacktestReport({ sessionId, onClose }) {
             label="Expectancy"
             value={`Rs.${fmt(extraStats.expectancy)}`}
             sub="per trade"
-            color={extraStats.expectancy >= 0 ? 'text-green-600' : 'text-red-500'}
+            color={pnlClass(extraStats.expectancy, 'text-green-600', 'text-red-500')}
             hint="(Win% × Avg Win) − (Loss% × Avg Loss). Positive = edge."
           />
           <StatCard
@@ -451,12 +452,12 @@ export default function BacktestReport({ sessionId, onClose }) {
                         Rs.{fmt(t.exit_price)}
                       </td>
                       <td
-                        className={`py-1 px-1 font-bold whitespace-nowrap ${pnl >= 0 ? 'text-green-600' : 'text-red-500'}`}
+                        className={`py-1 px-1 font-bold whitespace-nowrap ${pnlClass(pnl, 'text-green-600', 'text-red-500')}`}
                       >
                         {pnl >= 0 ? '+' : ''}Rs.{fmt(pnl)}
                       </td>
                       <td
-                        className={`py-1 px-1 whitespace-nowrap ${parseFloat(t.return_pct) >= 0 ? 'text-green-600' : 'text-red-500'}`}
+                        className={`py-1 px-1 whitespace-nowrap ${pnlClass(parseFloat(t.return_pct), 'text-green-600', 'text-red-500')}`}
                       >
                         {fmtPct(t.return_pct)}
                       </td>

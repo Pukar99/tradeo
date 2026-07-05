@@ -4,6 +4,7 @@
 
 import { useState, useEffect, useCallback } from 'react'
 import { btGetHistory, btDeleteHistory } from '../../api/backtest'
+import { pnlClass } from '../../utils/format'
 import BacktestSetupPanel from './BacktestSetupPanel'
 
 // Design tokens (copied per-file per pm/docs/design.md — no shared ui.js)
@@ -221,7 +222,7 @@ export default function BacktestHome({ onSessionStarted }) {
               <Kpi
                 label="Total P&L"
                 value={fmtRs(summary?.total_pnl)}
-                accent={(summary?.total_pnl || 0) >= 0 ? 'pos' : 'neg'}
+                accent={pnlClass(summary?.total_pnl || 0, 'pos', 'neg')}
                 sub={`${summary?.total_sessions || 0} backtests`}
               />
               <Kpi

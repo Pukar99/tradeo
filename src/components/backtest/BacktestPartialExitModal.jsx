@@ -3,7 +3,7 @@
 
 import { useState, useEffect, useCallback } from 'react'
 import { btPartialExit } from '../../api/backtest'
-import { nepseCommission, sebonFee, dpCharge } from '../../utils/format'
+import { nepseCommission, sebonFee, dpCharge, pnlClass } from '../../utils/format'
 
 // Canonical NEPSE sell fee (Rule 36) — single source in utils/format.js, mirroring the
 // server's calcBrokerFee. Replaces a stale local copy with wrong commission rates.
@@ -192,7 +192,7 @@ export default function BacktestPartialExitModal({ session, order, candle, onClo
           <div className="flex justify-between">
             <span className="text-gray-500 dark:text-gray-400">Partial P&L</span>
             <span
-              className={`font-semibold ${partialPnl >= 0 ? 'text-green-600' : 'text-red-500'}`}
+              className={`font-semibold ${pnlClass(partialPnl, 'text-green-600', 'text-red-500')}`}
             >
               {partialPnl >= 0 ? '+' : ''}Rs.{fmt(partialPnl)}
             </span>
