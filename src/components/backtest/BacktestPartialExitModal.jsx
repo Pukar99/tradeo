@@ -4,6 +4,7 @@
 import { useState, useEffect, useCallback } from 'react'
 import { btPartialExit } from '../../api/backtest'
 import { nepseCommission, sebonFee, dpCharge, pnlClass } from '../../utils/format'
+import { fmt } from './format'
 
 // Canonical NEPSE sell fee (Rule 36) — single source in utils/format.js, mirroring the
 // server's calcBrokerFee. Replaces a stale local copy with wrong commission rates.
@@ -11,10 +12,6 @@ import { nepseCommission, sebonFee, dpCharge, pnlClass } from '../../utils/forma
 function calcFee(value) {
   if (!value || value <= 0) return 0
   return +(nepseCommission(value) + sebonFee(value) + dpCharge()).toFixed(2)
-}
-
-function fmt(n) {
-  return n == null ? '—' : Number(n).toLocaleString('en-IN', { maximumFractionDigits: 0 })
 }
 
 const REASONS = ['MANUAL', 'TP_HIT', 'SL_HIT', 'OTHER']

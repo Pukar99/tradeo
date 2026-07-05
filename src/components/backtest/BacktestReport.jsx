@@ -5,13 +5,8 @@ import { btGetReport, btEndSession } from '../../api/backtest'
 import { pnlClass } from '../../utils/format'
 import { AreaChart, Area, XAxis, YAxis, Tooltip, ResponsiveContainer } from 'recharts'
 import { useTheme } from '../../context/ThemeContext'
+import { fmt, fmtPct } from './format'
 
-function fmt(n) {
-  return n == null ? '—' : Number(n).toLocaleString('en-IN', { maximumFractionDigits: 0 })
-}
-function fmtPct(n) {
-  return n == null ? '—' : (n >= 0 ? '+' : '') + Number(n).toFixed(2) + '%'
-}
 function fmtDec(n, d = 2) {
   return n == null ? '—' : Number(n).toFixed(d)
 }

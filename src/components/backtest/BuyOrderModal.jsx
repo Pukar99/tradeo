@@ -3,6 +3,7 @@
 import { useState, useEffect, useCallback } from 'react'
 import { btPlaceOrder, btGetSettlementDate } from '../../api/backtest'
 import { nepseCommission, sebonFee, dpCharge } from '../../utils/format'
+import { fmt } from './format'
 
 // Design token (copied per-file per pm/docs/design.md — no shared ui.js)
 const LABEL =
@@ -15,10 +16,6 @@ const LABEL =
 function calcFee(value, isSell = false) {
   if (!value || value <= 0) return 0
   return +(nepseCommission(value) + sebonFee(value) + (isSell ? dpCharge() : 0)).toFixed(2)
-}
-
-function fmt(n) {
-  return n == null ? '—' : Number(n).toLocaleString('en-IN', { maximumFractionDigits: 0 })
 }
 
 export default function BuyOrderModal({ session, script, candle, onClose, onOrderPlaced }) {

@@ -3,13 +3,7 @@
 import { useState, useCallback } from 'react'
 import { btAddScript, btEndSession } from '../../api/backtest'
 import { pnlClass } from '../../utils/format'
-
-function fmt(n) {
-  return n == null ? '—' : Number(n).toLocaleString('en-IN', { maximumFractionDigits: 0 })
-}
-function fmtPct(n) {
-  return n == null ? '—' : (n >= 0 ? '+' : '') + Number(n).toFixed(2) + '%'
-}
+import { fmt, fmtPct } from './format'
 
 function PositionCard({ pos, currentCandle, onEditSLTP, onExit, onPartial }) {
   const ep = parseFloat(pos.entry_price) || 0

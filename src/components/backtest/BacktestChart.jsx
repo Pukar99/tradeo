@@ -3,6 +3,7 @@
 import { useEffect, useRef, useState } from 'react'
 import { useTheme } from '../../context/ThemeContext'
 import { candleSeriesOptions } from '../../utils/chartTheme'
+import { fmt2 as fmt } from './format'
 
 async function loadLC() {
   return import('lightweight-charts')
@@ -14,9 +15,6 @@ const LINE_COLORS = {
   tp: '#22c55e',
 }
 
-function fmt(n) {
-  return n == null ? '—' : Number(n).toLocaleString('en-IN', { maximumFractionDigits: 2 })
-}
 function fmtVol(n) {
   if (n == null) return '—'
   if (n >= 1_000_000) return (n / 1_000_000).toFixed(2) + 'M'
