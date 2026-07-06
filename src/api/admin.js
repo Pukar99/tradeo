@@ -43,3 +43,6 @@ export const deleteAdminAnnouncement = (id) => API.delete(`/api/admin/announceme
 
 // ── Audit Log ─────────────────────────────────────────────────────────────────
 export const getAdminAuditLog = (params = {}) => API.get('/api/admin/audit-log', { params })
+
+// ── AI Usage ──────────────────────────────────────────────────────────────────
+export const getAiUsage = (params = {}) => API.get('/api/admin/ai-usage', { params })
