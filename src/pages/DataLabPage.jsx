@@ -17,6 +17,7 @@ import UpgradePrompt from '../components/UpgradePrompt'
 import AuthWall from '../components/AuthWall'
 import PageSkeleton from '../components/PageSkeleton'
 import { useAuth } from '../context/AuthContext'
+import { safeSessionGet, safeSessionSet } from '../utils/safeSession'
 
 // ── Toolbar slot — portal approach ────────────────────────────────────────────
 // Parent passes a ref to the slot DOM node via context.
@@ -304,23 +305,9 @@ function TabContent({ activeTab }) {
 
 // ── DataLabPage ───────────────────────────────────────────────────────────────
 
-// Safe sessionStorage access — incognito / iframe / strict CSP throws SecurityError.
-// Wrap in try/catch so a single denial doesn't crash the whole DataLab tree.
-// Exported: the tab components persist their own controls (index, threshold, symbol).
-export function safeSessionGet(key, fallback) {
-  try {
-    return sessionStorage.getItem(key) ?? fallback
-  } catch {
-    return fallback
-  }
-}
-export function safeSessionSet(key, value) {
-  try {
-    sessionStorage.setItem(key, value)
-  } catch {
-    /* fail silently — feature degrades to no persistence */
-  }
-}
+// Safe sessionStorage access moved to utils/safeSession (S1) — re-exported here
+// because the tab components historically import it from this page.
+export { safeSessionGet, safeSessionSet } from '../utils/safeSession'
 
 export default function DataLabPage() {
   const [activeTab, setActiveTab] = useState(() =>
