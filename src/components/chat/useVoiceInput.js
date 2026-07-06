@@ -3,12 +3,9 @@
 // its own unmount cleanup. The ONLY textual change from the source: the
 // transcribeAndSend auto-send call `handleSend(…)` becomes `onSend(…)`.
 import { useState, useRef, useEffect } from 'react'
-import { useLanguage } from '../../context/LanguageContext'
 import { transcribeAudio } from '../../api'
 
 export default function useVoiceInput({ input, setInput, inputRef, onSend }) {
-  const { t } = useLanguage()
-
   // ── Voice input state ──────────────────────────────────────────────────────
   // 'idle' | 'listening' | 'processing' | 'error'
   const [voiceState, setVoiceState] = useState('idle')

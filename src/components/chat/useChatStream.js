@@ -12,7 +12,7 @@ import { dispatchChatAction } from '../../utils/chatEvents'
 
 export default function useChatStream({
   input, setInput, loading, setLoading, messages, setMessages,
-  lastAction, setLastAction, lastActionRef, setActiveForm, setJournalDraft,
+  setLastAction, lastActionRef, setActiveForm, setJournalDraft,
   setDisciplineNudge, setAtBottom, atBottomRef, inputRef,
 }) {
   const { user } = useAuth()

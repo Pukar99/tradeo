@@ -3,7 +3,6 @@
 // =============================================================================
 import { useState, useEffect, useRef } from 'react'
 import { useAuth } from '../context/AuthContext'
-import { useTheme } from '../context/ThemeContext'
 import { useLanguage } from '../context/LanguageContext'
 import {
   sendAgentMessage,
@@ -34,8 +33,7 @@ import useChatStream from './chat/useChatStream'
 // ── Main AIChat component ────────────────────────────────────────────────────
 function AIChat({ isFullPage = false, onClose, onDragStart }) {
   const { user } = useAuth()
-  const { isDark, toggleTheme } = useTheme()
-  const { t, lang } = useLanguage()
+  const { t } = useLanguage()
   const navigate = useNavigate()
 
   const [messages, setMessages] = useState(() => {
@@ -195,7 +193,7 @@ function AIChat({ isFullPage = false, onClose, onDragStart }) {
 
   const { handleSend, handleAction, markConfirmDone, handleStop } = useChatStream({
     input, setInput, loading, setLoading, messages, setMessages,
-    lastAction, setLastAction, lastActionRef, setActiveForm, setJournalDraft,
+    setLastAction, lastActionRef, setActiveForm, setJournalDraft,
     setDisciplineNudge, setAtBottom, atBottomRef, inputRef,
   })
 
