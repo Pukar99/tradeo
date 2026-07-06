@@ -32,7 +32,7 @@ export default function AdminPage() {
 
         {/* Tab strip */}
         <div className="bg-white dark:bg-gray-900 rounded-2xl border border-gray-100 dark:border-gray-800 overflow-hidden">
-          <div className="px-3 py-1 border-b border-gray-100 dark:border-gray-800 overflow-x-auto overscroll-x-contain [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
+          <div className="px-3 py-1 border-b border-gray-100 dark:border-gray-800 overflow-x-auto overscroll-x-contain">
             <div className="flex items-center gap-0.5 bg-gray-100 dark:bg-gray-800 rounded-lg p-0.5 w-fit">
               {TABS.map((t) => (
                 <button

@@ -154,9 +154,9 @@ export default function InlineRightPanel({
       </div>
 
       {/* ── Body — single scroll on a subdued surface so cards pop.
-          overscroll-contain prevents wheel-scroll leaks. Thin styled scrollbar
-          makes the affordance visible (default browser hides until scroll). */}
-      <div className="flex-1 min-h-0 overflow-y-auto overscroll-contain bg-gray-50 dark:bg-gray-950/70 [scrollbar-width:thin] [&::-webkit-scrollbar]:w-1.5 [&::-webkit-scrollbar-track]:bg-transparent [&::-webkit-scrollbar-thumb]:bg-gray-300 dark:[&::-webkit-scrollbar-thumb]:bg-gray-700 [&::-webkit-scrollbar-thumb]:rounded-full">
+          overscroll-contain prevents wheel-scroll leaks. Scrollbar is hidden
+          app-wide (index.css global rule). */}
+      <div className="flex-1 min-h-0 overflow-y-auto overscroll-contain bg-gray-50 dark:bg-gray-950/70">
         {loading && (
           <div className="flex h-32 items-center justify-center">
             <div className="w-5 h-5 border-2 border-blue-500 border-t-transparent rounded-full animate-spin" />

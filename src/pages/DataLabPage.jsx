@@ -366,8 +366,8 @@ export default function DataLabPage() {
         {/* ── Tab bar + inline toolbar ──
             Strategy: ONLY the slot scrolls horizontally. The outer row is a
             simple flex with hard shrink-0 on the chips and info button so they
-            never compress. Mobile (< 480px) gets a thin horizontal scrollbar
-            inside the slot, which is exactly where the user expects it.       */}
+            never compress. Mobile (< 480px) scrolls the slot horizontally,
+            which is exactly where the user expects it.       */}
         {/* Toolbar strip — onMouseEnter as fast path; global mousemove listener
             in App.jsx handles portalled controls (portal breaks React bubbling) */}
         <div
@@ -416,10 +416,10 @@ export default function DataLabPage() {
 
           {/* Slot — single source of horizontal overflow.
               `overscroll-x-contain` prevents the swipe from leaking to the page.
-              The thin scrollbar style makes the affordance visible without dominating. */}
+              Scrollbar is hidden app-wide (index.css global rule). */}
           <div
             ref={slotRef}
-            className="flex-1 min-w-0 flex items-center gap-2 overflow-x-auto overscroll-x-contain [scrollbar-width:thin] [&::-webkit-scrollbar]:h-1 [&::-webkit-scrollbar-thumb]:bg-gray-300 dark:[&::-webkit-scrollbar-thumb]:bg-gray-700 [&::-webkit-scrollbar-thumb]:rounded-full"
+            className="flex-1 min-w-0 flex items-center gap-2 overflow-x-auto overscroll-x-contain"
           />
 
           {/* Info button — never compress */}

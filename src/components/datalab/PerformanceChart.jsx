@@ -1452,7 +1452,7 @@ export default function PerformanceChart() {
         )}
 
         {/* Cycle list */}
-        <div className="flex-1 overflow-y-auto min-h-0 bg-white dark:bg-gray-900 [scrollbar-width:thin] [&::-webkit-scrollbar]:w-1.5 [&::-webkit-scrollbar-thumb]:bg-gray-300 dark:[&::-webkit-scrollbar-thumb]:bg-gray-700 [&::-webkit-scrollbar-thumb]:rounded-full">
+        <div className="flex-1 overflow-y-auto min-h-0 bg-white dark:bg-gray-900">
           {filteredSwings.map((sw, i) => (
             <CycleItem
               key={sw.id}
@@ -1477,7 +1477,7 @@ export default function PerformanceChart() {
         {/* Mobile cycle strip — the left rail is hidden below md and ↑↓ keys need
             a keyboard, so phones get a horizontal chip strip to switch cycles */}
         {swings.length > 0 && (
-          <div className="md:hidden shrink-0 flex items-center gap-1.5 px-3 pt-2 overflow-x-auto overscroll-x-contain [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
+          <div className="md:hidden shrink-0 flex items-center gap-1.5 px-3 pt-2 overflow-x-auto overscroll-x-contain">
             {filteredSwings.map((sw) => {
               const isBull = sw.type === 'bull'
               const isActive = expanded === sw.id
@@ -1595,7 +1595,7 @@ export default function PerformanceChart() {
 
       {/* ── RIGHT PANEL — 420px (≥ lg only; below lg, charts use full width) ── */}
       <div className="hidden lg:flex w-[420px] shrink-0 border-l border-gray-100 dark:border-gray-800 flex-col min-h-0 bg-white dark:bg-gray-900">
-        <div className="flex-1 min-h-0 overflow-y-auto bg-white dark:bg-gray-900 p-3 [scrollbar-width:thin] [&::-webkit-scrollbar]:w-1.5 [&::-webkit-scrollbar-thumb]:bg-gray-300 dark:[&::-webkit-scrollbar-thumb]:bg-gray-700 [&::-webkit-scrollbar-thumb]:rounded-full">
+        <div className="flex-1 min-h-0 overflow-y-auto bg-white dark:bg-gray-900 p-3">
           <CompareRightPanel
             symbol={symbol}
             swings={swings}

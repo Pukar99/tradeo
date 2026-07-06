@@ -255,7 +255,7 @@ export default function LogsPage() {
         <div className="w-px h-4 bg-gray-200 dark:bg-gray-700 shrink-0" />
 
         {/* Middle slot — compact ☰ menu on mobile, inline controls on desktop */}
-        <div className="flex-1 min-w-0 flex items-center gap-1.5 overflow-x-auto overscroll-x-contain [scrollbar-width:thin] [&::-webkit-scrollbar]:h-1 [&::-webkit-scrollbar-thumb]:bg-gray-300 dark:[&::-webkit-scrollbar-thumb]:bg-gray-700 [&::-webkit-scrollbar-thumb]:rounded-full">
+        <div className="flex-1 min-w-0 flex items-center gap-1.5 overflow-x-auto overscroll-x-contain">
           {compact ? (
             <>
               {/* Inline high-frequency control per tab */}

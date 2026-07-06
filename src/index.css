@@ -59,7 +59,12 @@ html {
   stroke: #374151;
 }
 
-/* ── Hide scrollbars globally — scroll still works via mouse/touch ───────── */
+/* ── Hidden scrollbars, app-wide ─────────────────────────────────────────────
+   Owner decision 2026-07-06 (DataLab redesign spec §4.7): every scroll area in
+   Tradeo scrolls by wheel/touch with NO visible bar. Scrolling behavior is
+   unchanged — only the bar is hidden. Do NOT add per-component scrollbar
+   styling anymore; this rule owns it. Record in design.md when S1 ships.
+   ─────────────────────────────────────────────────────────────────────────── */
 * {
   -ms-overflow-style: none;
   scrollbar-width: none;

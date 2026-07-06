@@ -534,7 +534,7 @@ export default function InsightPage() {
 
       {/* ── Center — Heatmap + Annual strip ────────────────────────────────── */}
       <div className="flex-1 flex flex-col min-h-0 min-w-0 bg-gray-50/40 dark:bg-gray-900/40">
-        <div className="flex-1 min-h-0 overflow-y-auto overflow-x-hidden sm:overflow-x-auto p-3 relative bg-gray-50/40 dark:bg-gray-900/40 [scrollbar-width:thin] [&::-webkit-scrollbar]:w-1.5 [&::-webkit-scrollbar]:h-1.5 [&::-webkit-scrollbar-thumb]:bg-gray-300 dark:[&::-webkit-scrollbar-thumb]:bg-gray-700 [&::-webkit-scrollbar-thumb]:rounded-full">
+        <div className="flex-1 min-h-0 overflow-y-auto overflow-x-hidden sm:overflow-x-auto p-3 relative bg-gray-50/40 dark:bg-gray-900/40">
           {/* Heatmap card: fills the column width so there's no empty band on the
               right of the heatmap. minWidth keeps it readable when the column is narrow
               (outer overflow-x-auto provides horizontal scroll in that case). */}
@@ -628,7 +628,7 @@ export default function InsightPage() {
                     The relative wrapper anchors the right-edge fade, which sits OUTSIDE the
                     scroll container so it stays pinned to the visible edge (doesn't scroll away). */}
                 <div className="relative">
-                <div className="overflow-x-auto sm:overflow-x-visible [scrollbar-width:thin] [&::-webkit-scrollbar]:h-1.5 [&::-webkit-scrollbar-thumb]:bg-gray-300 dark:[&::-webkit-scrollbar-thumb]:bg-gray-700 [&::-webkit-scrollbar-thumb]:rounded-full">
+                <div className="overflow-x-auto sm:overflow-x-visible">
                 <table className="w-full border-separate border-spacing-0">
                   {/* Sticky header: top-0 keeps month labels visible while scrolling
                       years; the Year corner cell needs both left+top and higher z. */}

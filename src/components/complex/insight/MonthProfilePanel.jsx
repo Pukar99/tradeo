@@ -69,7 +69,7 @@ export default function MonthProfilePanel({
       </div>
 
       {/* Body */}
-      <div className="flex-1 min-h-0 overflow-y-auto overscroll-contain bg-gray-50 dark:bg-gray-950/70 p-3 space-y-2.5 [scrollbar-width:thin] [&::-webkit-scrollbar]:w-1.5 [&::-webkit-scrollbar-thumb]:bg-gray-300 dark:[&::-webkit-scrollbar-thumb]:bg-gray-700 [&::-webkit-scrollbar-thumb]:rounded-full">
+      <div className="flex-1 min-h-0 overflow-y-auto overscroll-contain bg-gray-50 dark:bg-gray-950/70 p-3 space-y-2.5">
         {!n && (
           <div className="p-4 text-center text-[11px] text-gray-400">
             No data for {MONTHS_FULL[mi]} in the selected year range

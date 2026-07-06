@@ -11,8 +11,8 @@ import {
 import { apiError, isCanceled, pnlClass } from '../../utils/format'
 import { INDEX_OPTIONS } from '../../utils/constants'
 import { useToolbarSlot, safeSessionGet, safeSessionSet } from '../../pages/DataLabPage'
-// Design tokens, scrollbars and Skeleton come from the shared DataLab module
-import { CARD, LABEL, STITLE, SVAL, SCROLL_Y, SCROLL_X, Skeleton } from '../datalab/shared'
+// Design tokens and Skeleton come from the shared DataLab module
+import { CARD, LABEL, STITLE, SVAL, Skeleton } from '../datalab/shared'
 
 // Sector display names arrive as 'Banking Sub-Index' / 'Finance Index' — strip the suffix
 const stripIndexName = (name = '') => name.replace(' Sub-Index', '').replace(' Index', '')
@@ -703,9 +703,9 @@ function SectorCycleMatrix({ cycles, activeCycle, onCycleSelect, dark }) {
 
   return (
     // overscroll-x-contain stops the swipe from chaining to page scroll.
-    // Thin styled scrollbar makes horizontal scroll affordance visible without dominating.
+    // Scrollbar is hidden app-wide (index.css global rule).
     // pb-1 reserves space inside the rounded card so the scrollbar isn't clipped.
-    <div className={`overflow-x-auto overscroll-x-contain pb-1 ${SCROLL_X}`}>
+    <div className="overflow-x-auto overscroll-x-contain pb-1">
       <table className="border-collapse text-[10px]">
         <thead>
           <tr>
@@ -1868,7 +1868,7 @@ export default function BreakdownPage() {
 
           {detecting && <Skeleton minH={120} />}
 
-          <div className={`flex-1 min-h-0 overflow-y-auto bg-white dark:bg-gray-950 ${SCROLL_Y}`}>
+          <div className="flex-1 min-h-0 overflow-y-auto bg-white dark:bg-gray-950">
             {filteredCycles.map((c) => (
               <CyclePill
                 key={`${c.type}-${c.start_date}`}
@@ -2075,7 +2075,7 @@ export default function BreakdownPage() {
         <div className="hidden md:flex w-[360px] lg:w-[420px] shrink-0 border-l border-gray-100 dark:border-gray-800 flex-col min-h-0 bg-white dark:bg-gray-950">
           {!activeCycle ? (
             <div
-              className={`flex-1 min-h-0 overflow-y-auto bg-white dark:bg-gray-950 p-3 ${SCROLL_Y}`}
+              className="flex-1 min-h-0 overflow-y-auto bg-white dark:bg-gray-950 p-3"
             >
               <AggregateStats bearCycles={bearCycles} bullCycles={bullCycles} />
             </div>
@@ -2157,7 +2157,7 @@ export default function BreakdownPage() {
               </div>
 
               <div
-                className={`flex-1 min-h-0 overflow-y-auto bg-white dark:bg-gray-950 p-3 space-y-3 ${SCROLL_Y}`}
+                className="flex-1 min-h-0 overflow-y-auto bg-white dark:bg-gray-950 p-3 space-y-3"
               >
                 {/* Chart: cycle / sector / stock */}
                 <div className={`${CARD} p-2`}>

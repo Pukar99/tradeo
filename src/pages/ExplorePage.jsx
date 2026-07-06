@@ -230,7 +230,7 @@ export default function ExplorePage() {
               Any dropdown inside MUST use useFixedDropdown (Rule 59).          */}
           <div
             ref={slotRef}
-            className="flex-1 min-w-0 flex items-center gap-1.5 overflow-x-auto overscroll-x-contain [scrollbar-width:thin] [&::-webkit-scrollbar]:h-1 [&::-webkit-scrollbar-thumb]:bg-gray-300 dark:[&::-webkit-scrollbar-thumb]:bg-gray-700 [&::-webkit-scrollbar-thumb]:rounded-full"
+            className="flex-1 min-w-0 flex items-center gap-1.5 overflow-x-auto overscroll-x-contain"
           />
         </div>
 

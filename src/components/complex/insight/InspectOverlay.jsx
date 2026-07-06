@@ -78,7 +78,7 @@ function SectorsColumn({ sectors, sectorHistory, activeSector, onSectorClick, ye
       </div>
 
       {/* Sector list — all sectors, scrolls */}
-      <div className="flex-1 overflow-y-auto min-h-0 overscroll-contain bg-white dark:bg-gray-900 [scrollbar-width:thin] [&::-webkit-scrollbar]:w-1.5 [&::-webkit-scrollbar-thumb]:bg-gray-300 dark:[&::-webkit-scrollbar-thumb]:bg-gray-700 [&::-webkit-scrollbar-thumb]:rounded-full">
+      <div className="flex-1 overflow-y-auto min-h-0 overscroll-contain bg-white dark:bg-gray-900">
         {sectors.map((s, i) => (
           <SectorRow
             key={s.index_id}
@@ -264,7 +264,7 @@ function StocksColumn({ sector, year, month, onStockClick, activeStockSymbol }) 
       </div>
 
       {/* Stock rows */}
-      <div className="flex-1 overflow-y-auto min-h-0 overscroll-contain bg-white dark:bg-gray-900 [scrollbar-width:thin] [&::-webkit-scrollbar]:w-1.5 [&::-webkit-scrollbar-thumb]:bg-gray-300 dark:[&::-webkit-scrollbar-thumb]:bg-gray-700 [&::-webkit-scrollbar-thumb]:rounded-full">
+      <div className="flex-1 overflow-y-auto min-h-0 overscroll-contain bg-white dark:bg-gray-900">
         {loading && (
           <div className="flex items-center justify-center py-6">
             <div className="w-4 h-4 border-2 border-blue-400 border-t-transparent rounded-full animate-spin" />
