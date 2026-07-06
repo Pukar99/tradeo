@@ -6,6 +6,7 @@ import SystemTab from '../components/admin/SystemTab'
 import FeatureFlagsTab from '../components/admin/FeatureFlagsTab'
 import BroadcastTab from '../components/admin/BroadcastTab'
 import AuditLogTab from '../components/admin/AuditLogTab'
+import AIUsageTab from '../components/admin/AIUsageTab'
 
 const TABS = [
   { id: 'users', label: 'Users' },
@@ -16,15 +17,6 @@ const TABS = [
   { id: 'ai', label: 'AI Usage' },
   { id: 'audit', label: 'Audit Log' },
 ]
-
-function ComingSoon({ label }) {
-  return (
-    <div className="flex flex-col items-center justify-center py-24 gap-2">
-      <p className="text-sm font-semibold text-gray-400 dark:text-gray-500">{label}</p>
-      <p className="text-xs text-gray-400 dark:text-gray-600">Coming in a future session</p>
-    </div>
-  )
-}
 
 export default function AdminPage() {
   const [tab, setTab] = useState('users')
@@ -64,7 +56,7 @@ export default function AdminPage() {
           {tab === 'system' && <SystemTab />}
           {tab === 'flags' && <FeatureFlagsTab />}
           {tab === 'broadcast' && <BroadcastTab />}
-          {tab === 'ai' && <ComingSoon label="AI Usage" />}
+          {tab === 'ai' && <AIUsageTab />}
           {tab === 'audit' && <AuditLogTab />}
         </div>
       </div>
