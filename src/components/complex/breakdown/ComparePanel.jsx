@@ -50,12 +50,6 @@ const SECTIONS = [
   { id: 'ladder', label: 'Compound ladder' },
 ]
 
-// Compact cycle chip — "▲/▼ + start year" — this table's rows are API rows
-// (start_date/end_date/type), not named cycles.
-function rowChip(r) {
-  return `${r.type === 'bull' ? '▲' : '▼'} ${r.start_date?.slice(0, 4) || ''}`
-}
-
 // One COMBINED box per side (owner eyeball 2026-07-07 — the earlier select+search
 // pair read as two duplicated controls). stocksOnly={false} makes SymbolSearch's
 // dropdown list indices (NEPSE + sector sub-indices) alongside stocks; its
@@ -78,8 +72,9 @@ function SidePicker({ tag, side, onChange }) {
 
 // Dual diverging bars per cycle — transplant of the retired Performance tab's
 // CycleRow, generalized for A/B labels instead of NEPSE/stock. Clicking a
-// row anchors the Compound Ladder (amber left border = investment start).
-function CompareRow({ r, aLbl, bLbl, max, isStart, onClick }) {
+// row FOCUSES the cycle (drives the right-panel mini charts); the amber
+// left border is a passive indicator of the Compound Ladder's anchor only.
+function CompareRow({ r, aLbl, bLbl, max, isStart, chipLabel, chipTitle, onClick }) {
   const isBull = r.type === 'bull'
   const barFor = (v) => {
     if (v == null) return { w: 0, color: '#9ca3af', left: 50 }
@@ -93,7 +88,7 @@ function CompareRow({ r, aLbl, bLbl, max, isStart, onClick }) {
   return (
     <button
       onClick={onClick}
-      title={`${r.start_date} → ${r.end_date}`}
+      title={chipTitle}
       className={`w-full text-left px-2 py-1.5 border-b border-gray-50 dark:border-gray-800/60 last:border-b-0 transition-colors border-l-2
         ${isStart ? 'border-l-amber-500' : 'border-l-transparent'}
         hover:bg-gray-50 dark:hover:bg-gray-900/50`}
@@ -107,7 +102,7 @@ function CompareRow({ r, aLbl, bLbl, max, isStart, onClick }) {
               : 'bg-red-100   dark:bg-red-900/40   text-red-500   dark:text-red-400'
           }`}
         >
-          {rowChip(r)}
+          {chipLabel}
           {isStart && (
             <span
               className="absolute -top-1 -right-1 text-[9px] font-black px-1 rounded-sm bg-amber-500 text-white leading-tight"
@@ -161,7 +156,7 @@ function CompareRow({ r, aLbl, bLbl, max, isStart, onClick }) {
 
 const fmtRs = (v) => (v == null ? '—' : `Rs.${v >= 1000 ? Math.round(v).toLocaleString() : v.toFixed(1)}`)
 
-export default function ComparePanel({ cycles, a, b, onChangeA, onChangeB }) {
+export default function ComparePanel({ cycles, a, b, onChangeA, onChangeB, onFocusRow }) {
   const [data, setData] = useState(null)
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState('')
@@ -209,6 +204,9 @@ export default function ComparePanel({ cycles, a, b, onChangeA, onChangeB }) {
   const aLbl = sideLabel(a)
   const bLbl = sideLabel(b)
   const maxAbs = Math.max(...rows.flatMap((r) => [Math.abs(r.a_ret ?? 0), Math.abs(r.b_ret ?? 0)]), 1)
+  // Real Bull/Bear names for the Cycle Returns rows (owner eyeball) — cycles
+  // prop carries the injected `name` (e.g. 'Bull 3'); compacted to fit the chip.
+  const nameByKey = useMemo(() => new Map(cycles.map((c) => [cycleKey(c), c.name])), [cycles])
 
   return (
     <div className="flex-1 min-h-0 overflow-y-auto px-3 py-2 space-y-3">
@@ -267,17 +265,27 @@ export default function ComparePanel({ cycles, a, b, onChangeA, onChangeB }) {
               </p>
             </div>
             <div className="max-h-[280px] overflow-y-auto bg-white dark:bg-gray-900">
-              {rows.map((r) => (
-                <CompareRow
-                  key={rowKey(r)}
-                  r={r}
-                  aLbl={aLbl}
-                  bLbl={bLbl}
-                  max={maxAbs}
-                  isStart={startKey === rowKey(r)}
-                  onClick={() => setStartKey((prev) => (prev === rowKey(r) ? null : rowKey(r)))}
-                />
-              ))}
+              {rows.map((r) => {
+                const fullName = nameByKey.get(rowKey(r))
+                const compactName = fullName
+                  ? fullName.replace('Bull ', 'B').replace('Bear ', 'Br')
+                  : r.start_date?.slice(0, 4)
+                const chipLabel = `${r.type === 'bull' ? '▲' : '▼'} ${compactName}`
+                const chipTitle = `${fullName || (r.type === 'bull' ? 'Bull' : 'Bear')} · ${r.start_date} → ${r.end_date}`
+                return (
+                  <CompareRow
+                    key={rowKey(r)}
+                    r={r}
+                    aLbl={aLbl}
+                    bLbl={bLbl}
+                    max={maxAbs}
+                    isStart={startKey === rowKey(r)}
+                    chipLabel={chipLabel}
+                    chipTitle={chipTitle}
+                    onClick={() => onFocusRow?.(r)}
+                  />
+                )
+              })}
             </div>
           </div>
           )}

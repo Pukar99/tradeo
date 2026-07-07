@@ -43,7 +43,7 @@ function corrWord(corr) {
   return 'opposite'
 }
 
-function ConsistencyRow({ s }) {
+function ConsistencyRow({ s, onOpen }) {
   const dotted = s.n_covered <= 8
   const allUp = s.up_count === s.n_covered && s.n_covered > 0
   const allDown = s.up_count === 0
@@ -55,7 +55,11 @@ function ConsistencyRow({ s }) {
   const word = corrWord(s.corr)
 
   return (
-    <div className={`${CONSISTENCY_GRID} items-center py-0.5 tabular-nums`}>
+    <button
+      type="button"
+      onClick={() => onOpen({ symbol: s.symbol, drop_pct: s.avg_ret })}
+      className={`${CONSISTENCY_GRID} w-full text-left items-center py-0.5 tabular-nums hover:bg-gray-50 dark:hover:bg-gray-900/50 transition-colors`}
+    >
       <span className="text-[11px] font-bold truncate text-gray-800 dark:text-gray-100">
         {s.symbol}
       </span>
@@ -91,7 +95,7 @@ function ConsistencyRow({ s }) {
           '—'
         )}
       </span>
-    </div>
+    </button>
   )
 }
 
@@ -103,10 +107,14 @@ function EmptyState() {
   )
 }
 
-function MoverRow({ s, max, up }) {
+function MoverRow({ s, max, up, onOpen }) {
   const w = max > 0 ? Math.round((Math.abs(s.avg_ret) / max) * 100) : 0
   return (
-    <div className="flex items-center gap-2 py-0.5">
+    <button
+      type="button"
+      onClick={() => onOpen({ symbol: s.symbol, drop_pct: s.avg_ret })}
+      className="w-full text-left flex items-center gap-2 py-0.5 hover:bg-gray-50 dark:hover:bg-gray-900/50 transition-colors"
+    >
       <span className="text-[11px] font-bold w-14 truncate text-gray-800 dark:text-gray-100">
         {s.symbol}
       </span>
@@ -121,18 +129,27 @@ function MoverRow({ s, max, up }) {
       >
         {fmtPct(s.avg_ret)}
       </span>
-    </div>
+    </button>
   )
 }
 
-export default function CycleAnalyticsCards({ selectedCycles, view, onViewChange, compare }) {
+export default function CycleAnalyticsCards({
+  selectedCycles,
+  view,
+  onViewChange,
+  indexId,
+  sectorIndex,
+  indexLbl,
+  onStockOpen,
+  compare,
+}) {
   const [movers, setMovers] = useState(null)
   const [consistency, setConsistency] = useState(null)
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState('')
   const ctrlRef = useRef(null)
 
-  const sig = selectedCycles.map(cycleKey).join(',')
+  const sig = `${selectedCycles.map(cycleKey).join(',')}|${indexId}|${sectorIndex || ''}`
 
   useEffect(() => {
     if (ctrlRef.current) ctrlRef.current.abort()
@@ -154,6 +171,8 @@ export default function CycleAnalyticsCards({ selectedCycles, view, onViewChange
           end_date,
           type,
         })),
+        index_id: indexId,
+        ...(sectorIndex ? { sector_index: sectorIndex } : {}),
       }
       try {
         const [m, c] = await Promise.all([
@@ -182,7 +201,7 @@ export default function CycleAnalyticsCards({ selectedCycles, view, onViewChange
 
   const meta =
     view === 'movers'
-      ? `${selectedCycles.length} cycle${selectedCycles.length === 1 ? '' : 's'} · avg return`
+      ? `${selectedCycles.length} cycle${selectedCycles.length === 1 ? '' : 's'} · avg return · ${sectorIndex ? indexLbl : 'market-wide'}`
       : view === 'compare'
         ? 'over selected cycles · history, not a promise'
         : 'history, not a promise'
@@ -208,6 +227,7 @@ export default function CycleAnalyticsCards({ selectedCycles, view, onViewChange
           b={compare.b}
           onChangeA={compare.onChangeA}
           onChangeB={compare.onChangeB}
+          onFocusRow={compare.onFocusRow}
         />
       ) : !selectedCycles.length ? (
         <EmptyState />
@@ -218,13 +238,13 @@ export default function CycleAnalyticsCards({ selectedCycles, view, onViewChange
           <div className="flex-1 min-w-0">
             <p className={`${LABEL} mb-1`}>Gainers</p>
             {movers.gainers.map((s) => (
-              <MoverRow key={s.symbol} s={s} max={maxAbs} up />
+              <MoverRow key={s.symbol} s={s} max={maxAbs} up onOpen={onStockOpen} />
             ))}
           </div>
           <div className="flex-1 min-w-0">
             <p className={`${LABEL} mb-1`}>Losers</p>
             {movers.losers.map((s) => (
-              <MoverRow key={s.symbol} s={s} max={maxAbs} up={false} />
+              <MoverRow key={s.symbol} s={s} max={maxAbs} up={false} onOpen={onStockOpen} />
             ))}
           </div>
         </div>
@@ -232,16 +252,16 @@ export default function CycleAnalyticsCards({ selectedCycles, view, onViewChange
         <div className="flex-1 min-h-0 overflow-y-auto px-3 py-1">
           <p className={`${LABEL} normal-case mb-1.5 leading-snug`}>
             In your {selectedCycles.length} selected cycle{selectedCycles.length === 1 ? '' : 's'} — how
-            often it rose, its average move, and how closely it follows NEPSE.
+            often it rose, its average move, and how closely it follows {indexLbl}.
           </p>
           <div className={`${CONSISTENCY_GRID} ${LABEL} mb-1`}>
             <span>Stock</span>
             <span>Rose in</span>
             <span className="text-right">Avg move</span>
-            <span className="text-right">Tracks NEPSE</span>
+            <span className="text-right">Tracks {indexLbl}</span>
           </div>
           {consistency.stocks.map((s) => (
-            <ConsistencyRow key={s.symbol} s={s} />
+            <ConsistencyRow key={s.symbol} s={s} onOpen={onStockOpen} />
           ))}
         </div>
       )}

@@ -87,6 +87,10 @@ export default function BreakdownPage() {
   useEffect(() => {
     safeSessionSet('tradeo_breakdown_index', String(indexId))
   }, [indexId])
+  // Owner eyeball: Compare side A mirrors the left-panel index selection.
+  useEffect(() => {
+    setSideA({ index_id: indexId })
+  }, [indexId])
   useEffect(() => {
     safeSessionSet('tradeo_breakdown_threshold', String(ranThreshold))
   }, [ranThreshold])
@@ -259,8 +263,14 @@ export default function BreakdownPage() {
   // Focus drives the right-panel drill-down: focused → run its analysis;
   // unfocused → tear the drill-down down (selection set is untouched).
   useEffect(() => {
-    if (focused) runAnalysis(focused)
-    else clearAnalysis()
+    if (focused) {
+      runAnalysis(focused)
+      if (pendingStockRef.current) {
+        const s = pendingStockRef.current
+        pendingStockRef.current = null
+        loadStockChart(s, focused)
+      }
+    } else clearAnalysis()
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [focused, runAnalysis, clearAnalysis])
 
@@ -315,8 +325,8 @@ export default function BreakdownPage() {
 
   // Stock chart (ctrl ref hoisted above with the others)
   const loadStockChart = useCallback(
-    async (stock) => {
-      if (!focused) return
+    async (stock, cycle = focused) => {
+      if (!cycle) return
       if (stockChartCtrlRef.current) stockChartCtrlRef.current.abort()
       const ctrl = new AbortController()
       stockChartCtrlRef.current = ctrl
@@ -325,9 +335,9 @@ export default function BreakdownPage() {
       setStockLoading(true)
       setStockError('')
       try {
-        const fromStr = addDays(focused.start_date, -20)
+        const fromStr = addDays(cycle.start_date, -20)
         const today = new Date().toISOString().slice(0, 10)
-        const rawTo = addDays(focused.end_date, 120)
+        const rawTo = addDays(cycle.end_date, 120)
         const toStr = rawTo < today ? rawTo : today
         const { data } = await getStockPriceRange(
           { symbol: stock.symbol, from: fromStr, to: toStr },
@@ -345,6 +355,25 @@ export default function BreakdownPage() {
     [focused]
   )
 
+  // Owner eyeball: clicking a mover/consistency row charts that stock in the
+  // right panel for the focused cycle — or the LAST selected cycle when
+  // nothing is focused (focusing runs analysis, which resets stock state, so
+  // the queued symbol loads after the focus effect fires).
+  const pendingStockRef = useRef(null)
+  const handleAnalyticsStockOpen = useCallback(
+    (stock) => {
+      const cycle = focused || sel.selectedCycles[sel.selectedCycles.length - 1]
+      if (!cycle) return
+      if (focused && cycleKey(focused) === cycleKey(cycle)) {
+        loadStockChart(stock)
+      } else {
+        pendingStockRef.current = stock
+        sel.setFocused(cycle)
+      }
+    },
+    [focused, sel, loadStockChart]
+  )
+
   const handleStockSelect = useCallback(
     (stock) => {
       if (!stock || selectedStock?.symbol === stock.symbol) {
@@ -356,6 +385,16 @@ export default function BreakdownPage() {
       }
     },
     [selectedStock, loadStockChart]
+  )
+
+  // Owner eyeball: clicking a Compare "Cycle Returns" row focuses that cycle
+  // (drives the right-panel mini charts) instead of anchoring the ladder.
+  const handleCompareFocusRow = useCallback(
+    (r) => {
+      const c = cycles.find((x) => x.start_date === r.start_date && x.end_date === r.end_date)
+      if (c) sel.setFocused(c)
+    },
+    [cycles, sel]
   )
 
   const toggleSort = useCallback(
@@ -449,6 +488,7 @@ export default function BreakdownPage() {
   )
 
   const selectedIndexLabel = INDEX_OPTIONS.find((o) => o.id === indexId)?.label || 'NEPSE'
+  const sectorIndexName = INDEX_OPTIONS.find((o) => o.id === indexId)?.sector_index || null
   const thresholdDirty =
     cycles.length > 0 && Math.min(50, Math.max(5, parseFloat(threshold) || 10)) !== ranThreshold
   const focusedKey = focused ? cycleKey(focused) : null
@@ -687,7 +727,17 @@ export default function BreakdownPage() {
             selectedCycles={sel.selectedCycles}
             view={analyticsView}
             onViewChange={setAnalyticsView}
-            compare={{ a: sideA, b: sideB, onChangeA: setSideA, onChangeB: setSideB }}
+            indexId={indexId}
+            sectorIndex={sectorIndexName}
+            indexLbl={selectedIndexLabel}
+            onStockOpen={handleAnalyticsStockOpen}
+            compare={{
+              a: sideA,
+              b: sideB,
+              onChangeA: setSideA,
+              onChangeB: setSideB,
+              onFocusRow: handleCompareFocusRow,
+            }}
           />
 
           {/* Mobile-only detail (no right panel below lg) — focused cycle drill-down */}

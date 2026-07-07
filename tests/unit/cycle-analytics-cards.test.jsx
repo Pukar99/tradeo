@@ -16,7 +16,7 @@ const CYCLES = [{ start_date: '2023-01-01', end_date: '2023-06-01', type: 'bull'
 
 // New required props (S3 T6): view is now controlled by the parent (BreakdownPage);
 // compare carries the A/B sides for the Compare view.
-const compareProp = { a: null, b: null, onChangeA() {}, onChangeB() {} }
+const compareProp = { a: null, b: null, onChangeA() {}, onChangeB() {}, onFocusRow() {} }
 
 // Small stateful wrapper so tests can exercise the now-lifted `view` control
 // the same way BreakdownPage does (view state lives in the parent).
@@ -27,6 +27,10 @@ function Harness({ selectedCycles }) {
       selectedCycles={selectedCycles}
       view={view}
       onViewChange={setView}
+      indexId={12}
+      sectorIndex={null}
+      indexLbl="NEPSE"
+      onStockOpen={() => {}}
       compare={compareProp}
     />
   )
@@ -72,9 +76,13 @@ describe('CycleAnalyticsCards', () => {
     expect(screen.getByText('history, not a promise')).toBeInTheDocument()
     expect(screen.queryByText(/probability/i)).toBeNull()
 
-    // payload shape: exactly the 3 fields + bumped n (owner addition: 15 per side)
+    // payload shape: cycles + index_id + bumped n (owner addition: 15 per side)
     expect(movers).toHaveBeenCalledWith(
-      { cycles: [{ start_date: '2023-01-01', end_date: '2023-06-01', type: 'bull' }], n: 15 },
+      {
+        cycles: [{ start_date: '2023-01-01', end_date: '2023-06-01', type: 'bull' }],
+        index_id: 12,
+        n: 15,
+      },
       expect.anything()
     )
     expect(movers).toHaveBeenCalledTimes(1)

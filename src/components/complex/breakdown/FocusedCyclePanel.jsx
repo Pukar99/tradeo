@@ -65,45 +65,16 @@ export default function FocusedCyclePanel(props) {
 
   return (
     <>
-      {/* Slim tinted header — arrow+name · phase · pct · close */}
-      <div
-        className={`shrink-0 px-3 py-2 border-b
-        ${
-          focused.type === 'bull'
-            ? 'bg-emerald-50/70 dark:bg-emerald-950/20 border-emerald-100 dark:border-emerald-900/40'
-            : 'bg-red-50/70 dark:bg-red-950/20 border-red-100 dark:border-red-900/40'
-        }`}
-      >
-        <div className="flex items-center gap-2">
-          <span
-            className={`text-[11px] font-black ${focused.type === 'bull' ? 'text-emerald-700 dark:text-emerald-300' : 'text-red-700 dark:text-red-300'}`}
-          >
-            {focused.type === 'bull' ? '▲' : '▼'}{' '}
-            {focused.name || (focused.type === 'bull' ? 'Bull' : 'Bear')}
-          </span>
-          <span
-            className={`text-[10px] font-bold px-1.5 py-0.5 rounded-full ${phaseCls(focused.phase)}`}
-          >
-            {focused.phase}
-          </span>
-          <span
-            className={`text-[18px] font-black tabular-nums ml-auto
-            ${focused.type === 'bull' ? 'text-emerald-700 dark:text-emerald-300' : 'text-red-700 dark:text-red-300'}`}
-          >
-            {focused.pct >= 0 ? '+' : ''}
-            {focused.pct?.toFixed(1)}%
-          </span>
-          <button
-            onClick={onClose}
-            aria-label="Close cycle detail"
-            className="shrink-0 w-5 h-5 flex items-center justify-center rounded-full text-gray-400 hover:text-gray-600 dark:hover:text-gray-300 hover:bg-black/5 dark:hover:bg-white/10 transition-colors leading-none"
-          >
-            <IconX className="w-3 h-3" />
-          </button>
-        </div>
-      </div>
+      <div className="relative flex-1 min-h-0 overflow-y-auto bg-white/40 dark:bg-gray-950/40 p-3 space-y-3">
+        {/* Floating close button — identity now lives inside General (below) */}
+        <button
+          onClick={onClose}
+          aria-label="Close cycle detail"
+          className="absolute top-2 right-2 z-10 shrink-0 w-5 h-5 flex items-center justify-center rounded-full text-gray-400 hover:text-gray-600 dark:hover:text-gray-300 hover:bg-black/5 dark:hover:bg-white/10 transition-colors leading-none"
+        >
+          <IconX className="w-3 h-3" />
+        </button>
 
-      <div className="flex-1 min-h-0 overflow-y-auto bg-white/40 dark:bg-gray-950/40 p-3 space-y-3">
         {/* Chart: cycle / sector / stock */}
         <div className={`${CARD} p-2`}>
           {selectedStock ? (
@@ -188,6 +159,27 @@ function GeneralView({ focused, summary }) {
   return (
     <div className="space-y-3">
       <div className={`${CARD} p-3 space-y-2`}>
+        {/* Identity row — moved in from the removed slim header (owner eyeball) */}
+        <div className="flex items-center gap-2">
+          <span
+            className={`text-[11px] font-black ${focused.type === 'bull' ? 'text-emerald-700 dark:text-emerald-300' : 'text-red-700 dark:text-red-300'}`}
+          >
+            {focused.type === 'bull' ? '▲' : '▼'}{' '}
+            {focused.name || (focused.type === 'bull' ? 'Bull' : 'Bear')}
+          </span>
+          <span
+            className={`text-[10px] font-bold px-1.5 py-0.5 rounded-full ${phaseCls(focused.phase)}`}
+          >
+            {focused.phase}
+          </span>
+          <span
+            className={`text-[18px] font-black tabular-nums ml-auto
+            ${focused.type === 'bull' ? 'text-emerald-700 dark:text-emerald-300' : 'text-red-700 dark:text-red-300'}`}
+          >
+            {focused.pct >= 0 ? '+' : ''}
+            {focused.pct?.toFixed(1)}%
+          </span>
+        </div>
         <div className="text-[10px] text-gray-500 dark:text-gray-400 font-mono">
           {focused.start_date} → {focused.end_date} · {focused.duration_days}d
         </div>
