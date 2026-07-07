@@ -47,7 +47,9 @@ describe('CycleAnalyticsCards', () => {
 
     // Switching to Consistency must NOT refetch — same debounced fetch stays put.
     fireEvent.click(screen.getByRole('tab', { name: 'Consistency' }))
-    expect(screen.getByText(/up 1\/1/)).toBeInTheDocument()
+    expect(screen.getByText(/selected cycle/)).toBeInTheDocument()
+    expect(screen.getByText(/1 of 1/)).toBeInTheDocument()
+    expect(screen.getByText('—')).toBeInTheDocument() // corr null
     expect(screen.getByText('history, not a promise')).toBeInTheDocument()
     expect(screen.queryByText(/probability/i)).toBeNull()
 

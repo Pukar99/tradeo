@@ -21,6 +21,68 @@ const VIEWS = [
   { id: 'consistency', label: 'Consistency' },
 ]
 
+const CONSISTENCY_GRID = 'grid grid-cols-[3.5rem_1fr_4rem_6.5rem] gap-2'
+
+function corrWord(corr) {
+  if (corr == null) return null
+  if (corr >= 0.7) return 'high'
+  if (corr >= 0.4) return 'medium'
+  if (corr > -0.4) return 'low'
+  return 'opposite'
+}
+
+function ConsistencyRow({ s }) {
+  const dotted = s.n_covered <= 8
+  const allUp = s.up_count === s.n_covered && s.n_covered > 0
+  const allDown = s.up_count === 0
+  const roseColor = allUp
+    ? 'text-emerald-600 dark:text-emerald-400'
+    : allDown
+      ? 'text-red-600 dark:text-red-400'
+      : 'text-gray-700 dark:text-gray-300'
+  const word = corrWord(s.corr)
+
+  return (
+    <div className={`${CONSISTENCY_GRID} items-center py-0.5 tabular-nums`}>
+      <span className="text-[11px] font-bold truncate text-gray-800 dark:text-gray-100">
+        {s.symbol}
+      </span>
+      <span className={`text-[10px] ${roseColor}`}>
+        {dotted ? (
+          <>
+            <span className="tracking-tight">
+              {'●'.repeat(s.up_count)}
+              <span className="text-gray-300 dark:text-gray-600">
+                {'○'.repeat(s.n_covered - s.up_count)}
+              </span>
+            </span>{' '}
+            {s.up_count} of {s.n_covered}
+          </>
+        ) : (
+          `${s.up_count} of ${s.n_covered}`
+        )}
+      </span>
+      <span
+        className={`text-[11px] font-bold text-right ${s.avg_ret >= 0 ? 'text-emerald-600 dark:text-emerald-400' : 'text-red-600 dark:text-red-400'}`}
+      >
+        {fmtPct(s.avg_ret)}
+      </span>
+      <span
+        className="text-[10px] text-gray-400 text-right"
+        title={s.corr == null ? 'needs 30+ trading days of overlap' : undefined}
+      >
+        {word ? (
+          <>
+            <span className="text-gray-500 dark:text-gray-400">{word}</span> ({s.corr.toFixed(2)})
+          </>
+        ) : (
+          '—'
+        )}
+      </span>
+    </div>
+  )
+}
+
 function EmptyState() {
   return (
     <div className="flex-1 flex items-center justify-center py-6 text-[11px] text-gray-400">
@@ -145,23 +207,18 @@ export default function CycleAnalyticsCards({ selectedCycles }) {
         </div>
       ) : (
         <div className="flex-1 min-h-0 overflow-y-auto px-3 py-1">
+          <p className={`${LABEL} normal-case mb-1.5 leading-snug`}>
+            In your {selectedCycles.length} selected cycle{selectedCycles.length === 1 ? '' : 's'} — how
+            often it rose, its average move, and how closely it follows NEPSE.
+          </p>
+          <div className={`${CONSISTENCY_GRID} ${LABEL} mb-1`}>
+            <span>Stock</span>
+            <span>Rose in</span>
+            <span className="text-right">Avg move</span>
+            <span className="text-right">Tracks NEPSE</span>
+          </div>
           {consistency.stocks.map((s) => (
-            <div key={s.symbol} className="flex items-center gap-2 py-0.5 tabular-nums">
-              <span className="text-[11px] font-bold w-14 truncate text-gray-800 dark:text-gray-100">
-                {s.symbol}
-              </span>
-              <span className="text-[10px] text-gray-500 dark:text-gray-400">
-                up {s.up_count}/{s.n_covered}
-              </span>
-              <span
-                className={`text-[11px] font-bold ml-auto ${s.avg_ret >= 0 ? 'text-emerald-600 dark:text-emerald-400' : 'text-red-600 dark:text-red-400'}`}
-              >
-                {fmtPct(s.avg_ret)}
-              </span>
-              <span className="text-[10px] text-gray-400 w-14 text-right">
-                corr {s.corr != null ? s.corr.toFixed(2) : '—'}
-              </span>
-            </div>
+            <ConsistencyRow key={s.symbol} s={s} />
           ))}
         </div>
       )}
