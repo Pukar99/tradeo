@@ -1032,6 +1032,14 @@ export default function BreakdownPage() {
               </button>
             </div>
             <div className="shrink-0 px-4 py-2 border-b border-gray-100 dark:border-gray-800">
+              <IndexSelector
+                options={INDEX_OPTIONS}
+                activeId={indexId}
+                onSelect={handleIndexSelect}
+                wrap
+              />
+            </div>
+            <div className="shrink-0 px-4 py-2 border-b border-gray-100 dark:border-gray-800">
               {quickChips}
             </div>
             {filterTabs('py-2')}

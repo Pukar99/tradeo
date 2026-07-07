@@ -113,7 +113,7 @@ export default function CycleAnalyticsCards({ selectedCycles }) {
       : 'history, not a promise'
 
   return (
-    <div className={`${CARD} flex-1 min-h-0 flex flex-col overflow-hidden`}>
+    <div className={`${CARD} flex-1 min-h-[260px] lg:min-h-0 flex flex-col overflow-hidden`}>
       <div className="shrink-0 flex items-center gap-2 px-3 py-1.5 border-b border-gray-100 dark:border-gray-800">
         <ViewSwitcher views={VIEWS} active={view} onChange={setView} ariaLabel="Cycle analytics view" />
         <span className={`${LABEL} normal-case ml-auto`}>{meta}</span>

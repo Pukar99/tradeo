@@ -115,14 +115,6 @@ export function AggregateStats({ bearCycles, bullCycles }) {
 
   return (
     <div className="space-y-3">
-      <div className={`${CARD} p-3`}>
-        <p className={`${LABEL} text-gray-400 mb-1.5`}>Select a cycle</p>
-        <p className="text-[11px] text-gray-500 dark:text-gray-400 leading-snug">
-          Click a pill on the left or a shaded band on the overview chart to see sector-level
-          breakdown.
-        </p>
-      </div>
-
       {bear && (
         <div className="rounded-2xl border border-red-100 dark:border-red-900/40 bg-red-50 dark:bg-red-950/20 p-3">
           <div className="flex items-baseline justify-between mb-2">

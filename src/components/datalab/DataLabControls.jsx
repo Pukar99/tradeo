@@ -8,7 +8,8 @@
 import { createContext, useContext, useMemo, useState } from 'react'
 import { safeSessionGet, safeSessionSet } from '../../utils/safeSession'
 
-// Mirror of the backend clamp (see BreakdownPage.jsx clampThreshold) — tiny
+// Mirror of the backend clamp — this is the single source of truth for the
+// clamp on the frontend (BreakdownPage.jsx no longer has its own copy); tiny
 // thresholds explode the cycle count.
 const clampThreshold = (t) => Math.min(50, Math.max(5, parseFloat(t) || 10))
 

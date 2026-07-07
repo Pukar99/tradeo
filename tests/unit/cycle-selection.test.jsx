@@ -10,27 +10,36 @@ const CYC = [
 ]
 
 describe('useCycleSelection', () => {
-  test('defaults to all selected, no focus; resets on cycles change', () => {
+  test('defaults to last-3-bulls selected, no focus; resets on cycles change', () => {
     const { result, rerender } = renderHook(({ c }) => useCycleSelection(c), {
       initialProps: { c: CYC },
     })
-    expect(result.current.selectedKeys.size).toBe(3)
+    // CYC has 2 bulls (idx 0, 2) + 1 bear (idx 1). Last-3-bulls of 2 bulls = both bulls.
+    expect(result.current.selectedKeys.size).toBe(2)
+    expect(result.current.isSelected(CYC[0])).toBe(true)
+    expect(result.current.isSelected(CYC[2])).toBe(true)
+    expect(result.current.isSelected(CYC[1])).toBe(false)
     expect(result.current.focused).toBeNull()
     act(() => result.current.toggle(CYC[0]))
-    rerender({ c: CYC.slice(0, 2) }) // new detect run
-    expect(result.current.selectedKeys.size).toBe(2)
+    rerender({ c: CYC.slice(0, 2) }) // new detect run — 1 bull + 1 bear
+    // Default rule re-applied: only the bull's key is selected.
+    expect(result.current.selectedKeys.size).toBe(1)
+    expect(result.current.isSelected(CYC[0])).toBe(true)
     expect(result.current.focused).toBeNull()
   })
 
   test('toggle: deselect; re-select focuses; deselect focused clears focus', () => {
     const { result } = renderHook(() => useCycleSelection(CYC))
-    act(() => result.current.toggle(CYC[1])) // all→deselect bear
+    // Default is last-3-bulls, so the bear (CYC[1]) starts unselected.
     expect(result.current.isSelected(CYC[1])).toBe(false)
-    act(() => result.current.toggle(CYC[1])) // re-select → focused
+    act(() => result.current.toggle(CYC[1])) // select bear → focused
+    expect(result.current.isSelected(CYC[1])).toBe(true)
     expect(result.current.focused).toEqual(CYC[1])
-    act(() => result.current.toggle(CYC[1])) // deselect the focused one
+    act(() => result.current.toggle(CYC[1])) // deselect the focused one → clears focus
     expect(result.current.isSelected(CYC[1])).toBe(false)
     expect(result.current.focused).toBeNull()
+    act(() => result.current.toggle(CYC[1])) // re-select → focused again
+    expect(result.current.focused).toEqual(CYC[1])
   })
 
   test('quick chips: bulls / bears / last bull / clear', () => {
