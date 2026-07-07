@@ -560,7 +560,7 @@ export default function BreakdownPage() {
 
       {cycles.length > 0 && (
         <button
-          className="lg:hidden flex items-center gap-1 px-2 py-0.5 rounded select-none text-[10px] font-semibold border border-gray-200 dark:border-gray-700 text-gray-600 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors"
+          className="lg:hidden flex items-center gap-1 px-2 py-0.5 rounded select-none text-[10px] font-semibold border border-gray-200 dark:border-gray-700 text-gray-600 dark:text-gray-300"
           onClick={() => setMobileCycles(true)}
         >
           {focused
@@ -719,7 +719,7 @@ export default function BreakdownPage() {
                     <div className="flex items-center gap-2 mb-1">
                       <button
                         onClick={() => handleStockSelect(selectedStock)}
-                        className="flex items-center gap-0.5 text-[10px] text-gray-400 hover:text-gray-600 dark:hover:text-gray-300 transition-colors"
+                        className="flex items-center gap-0.5 text-[10px] text-gray-400"
                       >
                         <IconChevronLeft className="w-2.5 h-2.5" />
                         back

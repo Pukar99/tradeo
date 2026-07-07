@@ -21,7 +21,7 @@ const MODES = [
 // variant (badge + centered stroke icon), no new colors.
 function EmptyIcon() {
   return (
-    <div className="w-8 h-8 rounded-full bg-gray-100 dark:bg-gray-800 flex items-center justify-center shrink-0 mx-auto mb-2">
+    <div className="w-8 h-8 flex items-center justify-center shrink-0 mx-auto mb-2">
       <svg className="w-4 h-4 text-gray-400" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={1.8} strokeLinecap="round" strokeLinejoin="round">
         <path d="M3 3v18h18" />
         <path d="M7 14l4-4 4 4 5-5" />
