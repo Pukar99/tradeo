@@ -3,7 +3,7 @@
 // TWO mini charts (side A, side B) over the FOCUSED cycle's window
 // (owner-flippable default) with a `2 lines | Ratio` toggle (idea C).
 // =============================================================================
-import { useEffect, useMemo, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import { getSectorIndexChart, getStockPriceRange } from '../../../api'
 import { apiError, isCanceled } from '../../../utils/format'
 import { CARD, LABEL, STITLE, Skeleton } from '../../datalab/shared'
@@ -108,6 +108,31 @@ function RatioChart({ aC, bC, startDate, endDate, dark, height = 200 }) {
   )
 }
 
+// Fills its parent and reports the measured pixel height, so the fixed-height
+// SVG charts can split the panel 50/50 with no dead gap below (owner eyeball
+// 2026-07-07). Same ResizeObserver pattern as ScreenPage's chart wrappers.
+function FillChart({ children }) {
+  const ref = useRef(null)
+  const [h, setH] = useState(0)
+  useEffect(() => {
+    const el = ref.current
+    if (!el) return
+    const ro = new ResizeObserver(([e]) => {
+      const px = Math.floor(e.contentRect.height)
+      if (px > 0) setH(px)
+    })
+    ro.observe(el)
+    const initial = Math.floor(el.clientHeight)
+    if (initial > 0) setH(initial)
+    return () => ro.disconnect()
+  }, [])
+  return (
+    <div ref={ref} className="flex-1 min-h-0 p-2">
+      {h > 8 && children(h - 8)}
+    </div>
+  )
+}
+
 export default function CompareMiniCharts({ focused, a, b, dark }) {
   const [mode, setMode] = useState('lines')
   const aS = useSideCandles(a, focused)
@@ -133,23 +158,28 @@ export default function CompareMiniCharts({ focused, a, b, dark }) {
     </div>
   )
 
+  // 50/50 fill (owner eyeball 2026-07-07): the panel is a non-scrolling flex
+  // column; each chart card takes an equal share and the SVG height follows
+  // the card via FillChart — no dead gap below the second chart.
   return (
-    <div className="flex-1 min-h-0 overflow-y-auto bg-white/40 dark:bg-gray-950/40 p-3 space-y-3">
-      <div className="flex items-center justify-between">
+    <div className="flex-1 min-h-0 bg-white/40 dark:bg-gray-950/40 p-3 flex flex-col gap-3">
+      <div className="shrink-0 flex items-center justify-between">
         <span className={`${LABEL} normal-case`}>
           {focused.name || focused.start_date} · {focused.start_date} → {focused.end_date}
         </span>
         <ViewSwitcher views={MODES} active={mode} onChange={setMode} ariaLabel="Compare chart mode" />
       </div>
       {mode === 'ratio' ? (
-        <div className={`${CARD} overflow-hidden`}>
+        <div className={`${CARD} overflow-hidden flex-1 min-h-0 flex flex-col`}>
           {header(`${sideLabel(a)} ÷ ${sideLabel(b)}`, { error: aS.error || bS.error })}
           {!aS.candles || !bS.candles ? (
             <Skeleton minH={200} />
           ) : (
-            <div className="p-2">
-              <RatioChart aC={aS.candles} bC={bS.candles} startDate={focused.start_date} endDate={focused.end_date} dark={dark} />
-            </div>
+            <FillChart>
+              {(h) => (
+                <RatioChart aC={aS.candles} bC={bS.candles} startDate={focused.start_date} endDate={focused.end_date} dark={dark} height={h} />
+              )}
+            </FillChart>
           )}
         </div>
       ) : (
@@ -157,14 +187,16 @@ export default function CompareMiniCharts({ focused, a, b, dark }) {
           [sideLabel(a), aS],
           [sideLabel(b), bS],
         ].map(([label, s]) => (
-          <div key={label} className={`${CARD} overflow-hidden`}>
+          <div key={label} className={`${CARD} overflow-hidden flex-1 min-h-0 flex flex-col`}>
             {header(label, s)}
             {!s.candles ? (
-              <Skeleton minH={200} />
+              <Skeleton minH={140} />
             ) : (
-              <div className="p-2">
-                <PriceChart candles={s.candles} startDate={focused.start_date} endDate={focused.end_date} type={focused.type} dark={dark} label={label} height={200} />
-              </div>
+              <FillChart>
+                {(h) => (
+                  <PriceChart candles={s.candles} startDate={focused.start_date} endDate={focused.end_date} type={focused.type} dark={dark} label={label} height={h} />
+                )}
+              </FillChart>
             )}
           </div>
         ))
