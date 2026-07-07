@@ -208,10 +208,12 @@ export default function CompareMiniCharts({ focused, a, b, dark }) {
         </div>
       ) : (
         [
-          [sideLabel(a), aS],
-          [sideLabel(b), bS],
-        ].map(([label, s]) => (
-          <div key={label} className={`${CARD} overflow-hidden flex-1 min-h-0 flex flex-col`}>
+          // Key by side SLOT, not label — NEPSE vs NEPSE is a legal pick and
+          // duplicate keys would break reconciliation (final whole-branch review).
+          ['a', sideLabel(a), aS],
+          ['b', sideLabel(b), bS],
+        ].map(([slot, label, s]) => (
+          <div key={slot} className={`${CARD} overflow-hidden flex-1 min-h-0 flex flex-col`}>
             {header(label, s)}
             {!s.candles ? (
               <Skeleton minH={140} />

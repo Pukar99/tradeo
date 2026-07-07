@@ -174,6 +174,7 @@ export default function FocusedCyclePanel(props) {
           <CycleStocksList
             cycle={focused}
             indexId={props.indexId}
+            indexLbl={idxLabel}
             selected={selectedStock}
             onSelect={onStockSelect}
           />
@@ -429,8 +430,10 @@ function PrecedingBearRecovery({ bear, indexId }) {
 }
 
 // Stocks view (spec §8.4.2): every covered symbol in THIS cycle, sortable
-// gainer ↔ loser, with a NEPSE-comparison column. Click a stock → charts it.
-function CycleStocksList({ cycle, indexId, selected, onSelect }) {
+// gainer ↔ loser, with an index-comparison column (labeled by the SELECTED
+// index — cycles + vs_index both come from it, so "vs NEPSE" would lie when
+// e.g. Banking is selected; final whole-branch review). Click → charts it.
+function CycleStocksList({ cycle, indexId, indexLbl, selected, onSelect }) {
   const [data, setData] = useState(null)
   const [error, setError] = useState('')
   const [desc, setDesc] = useState(true) // true = gainers first
@@ -478,7 +481,7 @@ function CycleStocksList({ cycle, indexId, selected, onSelect }) {
         </button>
       </div>
       <div className={`grid grid-cols-[1fr_4rem_4.5rem] gap-2 px-3 py-1 ${LABEL} border-b border-gray-50 dark:border-gray-800/60`}>
-        <span>Stock</span><span className="text-right">Return</span><span className="text-right">vs NEPSE</span>
+        <span>Stock</span><span className="text-right">Return</span><span className="text-right">vs {indexLbl || 'NEPSE'}</span>
       </div>
       <div className="max-h-[320px] overflow-y-auto">
         {rows.map((s) => (
@@ -493,7 +496,7 @@ function CycleStocksList({ cycle, indexId, selected, onSelect }) {
               <span className="block text-[10px] text-gray-400 truncate">{s.company_name}</span>
             </span>
             <span className={`text-right text-[11px] font-bold tabular-nums ${pctTextCls(s.avg_ret)}`}>{fmtPct(s.avg_ret)}</span>
-            <span className={`text-right text-[10px] font-semibold tabular-nums ${s.vs_index >= 0 ? 'text-emerald-500' : 'text-red-500'}`}>{fmtPct(s.vs_index)}</span>
+            <span className={`text-right text-[10px] font-semibold tabular-nums ${s.vs_index == null ? 'text-gray-400' : s.vs_index >= 0 ? 'text-emerald-500' : 'text-red-500'}`}>{fmtPct(s.vs_index)}</span>
           </button>
         ))}
       </div>

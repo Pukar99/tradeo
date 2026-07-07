@@ -35,6 +35,10 @@ export function computeNow(cycles, candles) {
   return {
     sinceDate: last.end_date,
     sinceName: last.name || null,
+    // The last detected swing is usually the LIVE one (detectSwings appends the
+    // in-progress move), so its end is a running extreme, not a finished cycle.
+    // Copy must say peak/trough, never "ended" (final whole-branch review).
+    sinceType: last.type,
     tradingDays: after.length,
     retPct,
     direction: retPct >= 0 ? 'up' : 'down',
@@ -68,7 +72,8 @@ export default function NowBox({ cycles, candles }) {
         </span>
       </div>
       <p className="text-[10px] text-gray-500 dark:text-gray-400 mt-0.5">
-        since {now.sinceName ? `${now.sinceName} ended` : ''} {now.sinceDate}
+        since {now.sinceName ? `${now.sinceName}'s ` : 'the last '}
+        {now.sinceType === 'bull' ? 'peak' : 'trough'} · {now.sinceDate}
       </p>
       {medPct != null && (
         <p className="text-[10px] text-gray-400 mt-1.5 pt-1.5 border-t border-gray-100 dark:border-gray-800">
