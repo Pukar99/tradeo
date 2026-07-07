@@ -17,11 +17,27 @@ export function PriceChart({
   dark,
   label = '',
   height = 260,
+  // Optional synced crosshair (Compare mini charts, owner 2026-07-07): pass
+  // hoverDate (ISO string | null) to control the crosshair by DATE, and onHover
+  // to broadcast this chart's hover. Omit both → self-contained as before.
+  hoverDate,
+  onHover,
 }) {
   const svgRef = useRef(null)
   const wrapRef = useRef(null)
-  const [hover, setHover] = useState(null)
+  const [localHover, setLocalHover] = useState(null)
   const [w, setW] = useState(600)
+  const controlled = hoverDate !== undefined
+  // Controlled mode maps the shared date to this chart's own candle index —
+  // exact match when the sides share trading days, else the next trading day.
+  let hover = localHover
+  if (controlled) {
+    if (hoverDate == null || !candles?.length) hover = null
+    else {
+      const i = candles.findIndex((c) => c.date >= hoverDate)
+      hover = i >= 0 ? i : null
+    }
+  }
 
   // Measure container width so the viewBox matches the rendered aspect ratio.
   // Without this the viewBox letterboxes inside narrow cards (e.g. the 420px
@@ -52,10 +68,17 @@ export function PriceChart({
       const rect = svgRef.current.getBoundingClientRect()
       const relX = (e.clientX - rect.left) * (VW / rect.width) - PAD.left
       const idx = Math.round((relX / chartW) * (candles.length - 1))
-      setHover(Math.max(0, Math.min(candles.length - 1, idx)))
+      const clamped = Math.max(0, Math.min(candles.length - 1, idx))
+      onHover?.(candles[clamped]?.date ?? null)
+      if (!controlled) setLocalHover(clamped)
     },
-    [candles, chartW]
+    [candles, chartW, onHover, controlled]
   )
+
+  const handleMouseLeave = useCallback(() => {
+    onHover?.(null)
+    if (!controlled) setLocalHover(null)
+  }, [onHover, controlled])
 
   if (!candles?.length)
     return (
@@ -110,7 +133,7 @@ export function PriceChart({
         viewBox={`0 0 ${VW} ${VH}`}
         style={{ display: 'block', overflow: 'visible' }}
         onMouseMove={handleMouseMove}
-        onMouseLeave={() => setHover(null)}
+        onMouseLeave={handleMouseLeave}
       >
         <rect
           x={PAD.left}

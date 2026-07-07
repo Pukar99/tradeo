@@ -135,6 +135,9 @@ function FillChart({ children }) {
 
 export default function CompareMiniCharts({ focused, a, b, dark }) {
   const [mode, setMode] = useState('lines')
+  // Synced crosshair (owner 2026-07-07): hovering either chart drives BOTH by
+  // date, so the same trading day lines up across side A and side B.
+  const [hoverDate, setHoverDate] = useState(null)
   const aS = useSideCandles(a, focused)
   const bS = useSideCandles(b, focused)
 
@@ -194,7 +197,17 @@ export default function CompareMiniCharts({ focused, a, b, dark }) {
             ) : (
               <FillChart>
                 {(h) => (
-                  <PriceChart candles={s.candles} startDate={focused.start_date} endDate={focused.end_date} type={focused.type} dark={dark} label={label} height={h} />
+                  <PriceChart
+                    candles={s.candles}
+                    startDate={focused.start_date}
+                    endDate={focused.end_date}
+                    type={focused.type}
+                    dark={dark}
+                    label={label}
+                    height={h}
+                    hoverDate={hoverDate}
+                    onHover={setHoverDate}
+                  />
                 )}
               </FillChart>
             )}
