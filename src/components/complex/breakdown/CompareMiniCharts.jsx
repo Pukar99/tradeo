@@ -95,7 +95,11 @@ function RatioChart({ aC, bC, startDate, endDate, dark, height = 200 }) {
       {zs >= 0 && ze >= 0 && (
         <rect x={cx(zs)} y={PAD.top} width={Math.max(0, cx(ze) - cx(zs))} height={chartH} fill={last >= 100 ? 'rgba(16,185,129,0.07)' : 'rgba(239,68,68,0.07)'} />
       )}
-      <line x1={PAD.left} y1={cy(100) <= PAD.top + chartH && cy(100) >= PAD.top ? cy(100) : -10} x2={PAD.left + chartW} y2={cy(100)} stroke={dark ? '#475569' : '#cbd5e1'} strokeDasharray="4,3" />
+      {/* 100-reference line only when 100 is inside the value range — a half-
+          clamped line would draw a stray diagonal when all ratios sit one side */}
+      {cy(100) >= PAD.top && cy(100) <= PAD.top + chartH && (
+        <line x1={PAD.left} y1={cy(100)} x2={PAD.left + chartW} y2={cy(100)} stroke={dark ? '#475569' : '#cbd5e1'} strokeDasharray="4,3" />
+      )}
       <path d={path} fill="none" stroke={last >= 100 ? '#10b981' : '#ef4444'} strokeWidth="1.5" />
       <text x={PAD.left + 4} y={PAD.top + 10} fontSize="9" fill={dark ? '#64748b' : '#94a3b8'}>
         100 = start · above 100 → A leads
