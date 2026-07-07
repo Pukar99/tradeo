@@ -506,10 +506,10 @@ export function MiniOverview({
           const isFocused = cycleKey(cyc) === focusedKey
           const hue = cyc.type === 'bull' ? '#10b981' : '#ef4444'
           const base = cyc.type === 'bull' ? 'rgba(16,185,129,' : 'rgba(239,68,68,'
-          // Selected = today's normal band opacity (0.1); unselected = ~35% of
-          // that. Focused adds a 1.5px outline in the band's own hue on top of
-          // the selected fill (focus implies selected).
-          const fill = `${base}${isSelected ? '0.1' : '0.035'})`
+          // S3 §8.4.1a — selection must be unmistakable: unselected bands are
+          // near-invisible (0.03), selected are strong (0.22), focused adds a
+          // bold 2.5px outline in the band's own hue (focus implies selected).
+          const fill = `${base}${isSelected ? '0.22' : '0.03'})`
           const stroke = isFocused ? hue : 'none'
           return (
             <rect
@@ -520,7 +520,7 @@ export function MiniOverview({
               height={chartH}
               fill={fill}
               stroke={stroke}
-              strokeWidth={isFocused ? 1.5 : 0}
+              strokeWidth={isFocused ? 2.5 : 0}
             />
           )
         })}

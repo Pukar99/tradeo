@@ -494,6 +494,8 @@ export default function BreakdownPage() {
         </button>
       </div>
 
+      <ViewSwitcher views={RANGE_VIEWS} active={range} onChange={setRange} ariaLabel="Overview range" />
+
       {cycles.length > 0 && (
         <span className={`${LABEL} normal-case hidden sm:inline`}>
           {bearCycles.length}▼ {bullCycles.length}▲ · {selectedIndexLabel}
@@ -582,21 +584,13 @@ export default function BreakdownPage() {
           <div className={`${CARD} overflow-hidden shrink-0`}>
             <div className="px-3 py-1.5 border-b border-gray-100 dark:border-gray-800 flex items-center justify-between gap-2">
               <span className={STITLE}>{selectedIndexLabel} — Full History</span>
-              <div className="flex items-center gap-2">
-                <span className={`${LABEL} normal-case hidden sm:inline`}>
-                  {detecting
-                    ? 'Detecting…'
-                    : allCandles.length === 0
-                      ? 'No data'
-                      : 'Click a shaded zone'}
-                </span>
-                <ViewSwitcher
-                  views={RANGE_VIEWS}
-                  active={range}
-                  onChange={setRange}
-                  ariaLabel="Overview range"
-                />
-              </div>
+              <span className={`${LABEL} normal-case hidden sm:inline`}>
+                {detecting
+                  ? 'Detecting…'
+                  : allCandles.length === 0
+                    ? 'No data'
+                    : 'Click a shaded zone'}
+              </span>
             </div>
             {detecting && allCandles.length === 0 ? (
               <Skeleton minH={160} />
