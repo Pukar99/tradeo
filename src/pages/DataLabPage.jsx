@@ -18,6 +18,7 @@ import AuthWall from '../components/AuthWall'
 import PageSkeleton from '../components/PageSkeleton'
 import { useAuth } from '../context/AuthContext'
 import { safeSessionGet, safeSessionSet } from '../utils/safeSession'
+import { DataLabControlsProvider } from '../components/datalab/DataLabControls'
 
 // ── Toolbar slot — portal approach ────────────────────────────────────────────
 // Parent passes a ref to the slot DOM node via context.
@@ -340,6 +341,7 @@ export default function DataLabPage() {
 
   return (
     <ToolbarSlotCtx.Provider value={slotRef}>
+      <DataLabControlsProvider>
       <div
         className="flex flex-col overflow-hidden bg-white dark:bg-gray-900"
         style={{
@@ -424,6 +426,7 @@ export default function DataLabPage() {
           <TabContent activeTab={activeTab} />
         </div>
       </div>
+      </DataLabControlsProvider>
     </ToolbarSlotCtx.Provider>
   )
 }

@@ -8,16 +8,25 @@ import {
 } from '../../api'
 import { apiError, isCanceled } from '../../utils/format'
 import { INDEX_OPTIONS } from '../../utils/constants'
-import { useToolbarSlot, safeSessionGet, safeSessionSet } from '../../pages/DataLabPage'
+import { useToolbarSlot } from '../../pages/DataLabPage'
+import { safeSessionGet, safeSessionSet } from '../../utils/safeSession'
 // Design tokens and Skeleton come from the shared DataLab module
 import { CARD, LABEL, STITLE, Skeleton } from '../datalab/shared'
+import { CollapsiblePanel, PanelToggle, usePanelOpen } from '../shared/CollapsiblePanel'
+import ViewSwitcher from '../shared/ViewSwitcher'
+import { useDataLabControls } from '../datalab/DataLabControls'
 import { stripIndexName, pctTextCls, phaseCls } from './breakdown/helpers'
 import { PriceChart, MiniOverview, SectorIndexChart } from './breakdown/charts'
 import { SectorMatrix, StockList } from './breakdown/SectorMatrix'
 import { ResilientTile, AggregateStats, CyclePill, IndexSelector, Stat } from './breakdown/atoms'
+import CycleAnalyticsCards from './breakdown/CycleAnalyticsCards'
+import { useCycleSelection, cycleKey } from './breakdown/useCycleSelection'
 
-// Mirror of the backend clamp — tiny thresholds explode the cycle count
-const clampThreshold = (t) => Math.min(50, Math.max(5, parseFloat(t) || 10))
+const RANGE_VIEWS = [
+  { id: 'all', label: 'All' },
+  { id: '5y', label: '5Y' },
+  { id: '2y', label: '2Y' },
+]
 
 // ─────────────────────────────────────────────────────────────────────────────
 // MAIN PAGE
@@ -25,14 +34,15 @@ const clampThreshold = (t) => Math.min(50, Math.max(5, parseFloat(t) || 10))
 export default function BreakdownPage() {
   const { isDark } = useTheme()
 
-  // Core state — index + threshold survive refresh via sessionStorage
+  // Swing threshold now lives in the shared DataLab toolbar controls (S2b) —
+  // clamped 5–50 + session-persisted inside the provider.
+  const { threshold, setThreshold } = useDataLabControls()
+
+  // Core state — index survives refresh via sessionStorage
   const [indexId, setIndexId] = useState(() => {
     const v = parseInt(safeSessionGet('tradeo_breakdown_index', '12'))
     return INDEX_OPTIONS.some((o) => o.id === v) ? v : 12
   })
-  const [threshold, setThreshold] = useState(() =>
-    clampThreshold(safeSessionGet('tradeo_breakdown_threshold', '10'))
-  ) // raw input value (string while typing)
   const [ranThreshold, setRanThreshold] = useState(threshold) // clamped value of the last Detect run
   useEffect(() => {
     safeSessionSet('tradeo_breakdown_index', String(indexId))
@@ -40,12 +50,26 @@ export default function BreakdownPage() {
   useEffect(() => {
     safeSessionSet('tradeo_breakdown_threshold', String(ranThreshold))
   }, [ranThreshold])
+
+  // Full-history overview range preset (spec §5.3 · pain #5)
+  const [range, setRange] = useState(() => {
+    const v = safeSessionGet('tradeo_breakdown_range', 'all')
+    return RANGE_VIEWS.some((r) => r.id === v) ? v : 'all'
+  })
+  useEffect(() => {
+    safeSessionSet('tradeo_breakdown_range', range)
+  }, [range])
+
   const [cycles, setCycles] = useState([])
   const [allCandles, setAllCandles] = useState([])
   const [detecting, setDetecting] = useState(false)
   const [detectError, setDetectError] = useState('')
 
-  const [activeCycle, setActiveCycle] = useState(null)
+  // Cycle multi-select + focus (spec §5.3). `sel.focused` replaces the old
+  // `activeCycle`; the selection set drives the center analytics cards.
+  const sel = useCycleSelection(cycles)
+  const focused = sel.focused
+
   const [analysis, setAnalysis] = useState(null)
   const [analyzing, setAnalyzing] = useState(false)
   const [analyzeError, setAnalyzeError] = useState('')
@@ -66,6 +90,10 @@ export default function BreakdownPage() {
   const [cycleFilter, setCycleFilter] = useState('all')
   const [mobileCycles, setMobileCycles] = useState(false)
 
+  // Collapsible side panels (S1 — localStorage-persisted, default open)
+  const [leftOpen, toggleLeft] = usePanelOpen('tradeo_datalab_breakdown_leftOpen')
+  const [rightOpen, toggleRight] = usePanelOpen('tradeo_datalab_breakdown_rightOpen')
+
   // Detect cycles (Rule 45 — abort superseded)
   const detectCtrlRef = useRef(null)
   const detectCycles = useCallback(async (thresh, idxId) => {
@@ -74,8 +102,9 @@ export default function BreakdownPage() {
     detectCtrlRef.current = ctrl
     // Normalize whatever is in the input (string, empty, out of range) and
     // reflect the clamped value back so the field shows what actually ran.
-    const t = clampThreshold(thresh)
-    setThreshold(t)
+    // setThreshold clamps 5–50 internally (shared controls).
+    setThreshold(thresh)
+    const t = Math.min(50, Math.max(5, parseFloat(thresh) || 10))
     setRanThreshold(t)
     setDetecting(true)
     setDetectError('')
@@ -95,7 +124,6 @@ export default function BreakdownPage() {
       }))
       setCycles(named)
       setAllCandles(data.candles || [])
-      setActiveCycle(null)
       setAnalysis(null)
       setActiveSector(null)
       setSelectedStock(null)
@@ -108,7 +136,7 @@ export default function BreakdownPage() {
       setDetectError(apiError(e, 'Failed to detect cycles'))
     }
     if (!ctrl.signal.aborted) setDetecting(false)
-  }, [])
+  }, [setThreshold])
 
   const mountedRef = useRef(false)
   useEffect(() => {
@@ -131,7 +159,8 @@ export default function BreakdownPage() {
   const analysisCtrlRef = useRef(null)
   const stockChartCtrlRef = useRef(null)
 
-  // Run analysis for a selected cycle (Rule 45)
+  // Run analysis for the focused cycle (Rule 45). Called from the focus effect
+  // below — no longer sets its own active cycle (the hook owns focus now).
   const runAnalysis = useCallback(
     async (cycle) => {
       if (analysisCtrlRef.current) analysisCtrlRef.current.abort()
@@ -141,7 +170,6 @@ export default function BreakdownPage() {
       if (stockChartCtrlRef.current) stockChartCtrlRef.current.abort()
       const ctrl = new AbortController()
       analysisCtrlRef.current = ctrl
-      setActiveCycle(cycle)
       setAnalysis(null)
       setAnalyzeError('')
       setActiveSector(null)
@@ -170,13 +198,12 @@ export default function BreakdownPage() {
     [indexId]
   )
 
-  // Deselect the active cycle — aborts in-flight work and restores the
-  // aggregate-stats right panel (previously unreachable after first selection).
-  const clearSelection = useCallback(() => {
+  // Tear down the focused-cycle drill-down — aborts in-flight work and clears
+  // analysis/sector/stock state. Does NOT touch the selection set.
+  const clearAnalysis = useCallback(() => {
     analysisCtrlRef.current?.abort()
     sectorStocksCtrlRef.current?.abort()
     stockChartCtrlRef.current?.abort()
-    setActiveCycle(null)
     setAnalysis(null)
     setAnalyzeError('')
     setAnalyzing(false)
@@ -189,15 +216,13 @@ export default function BreakdownPage() {
     setSectorLoading({})
   }, [])
 
-  // Single entry point for cycle clicks (pills, overview bands, matrix columns):
-  // clicking the already-active cycle deselects it.
-  const selectCycle = useCallback(
-    (cycle) => {
-      if (activeCycle?.start_date === cycle.start_date) clearSelection()
-      else runAnalysis(cycle)
-    },
-    [activeCycle, runAnalysis, clearSelection]
-  )
+  // Focus drives the right-panel drill-down: focused → run its analysis;
+  // unfocused → tear the drill-down down (selection set is untouched).
+  useEffect(() => {
+    if (focused) runAnalysis(focused)
+    else clearAnalysis()
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [focused, runAnalysis, clearAnalysis])
 
   // Load sector stocks lazily (Rule 45 — abort last superseded sector fetch)
   const sectorStocksCtrlRef = useRef(null)
@@ -234,7 +259,7 @@ export default function BreakdownPage() {
 
   const handleSectorClick = useCallback(
     (sector) => {
-      if (!activeCycle) return
+      if (!focused) return
       const isNepse = sector.index_name === 'NEPSE'
       const next = activeSector?.index_name === sector.index_name ? null : sector
       setActiveSector(next)
@@ -242,16 +267,16 @@ export default function BreakdownPage() {
       setStockCandles(null)
       setStockError('')
       if (next && !isNepse) {
-        loadSectorStocks(next.index_name, activeCycle.start_date, activeCycle.end_date)
+        loadSectorStocks(next.index_name, focused.start_date, focused.end_date)
       }
     },
-    [activeCycle, activeSector, loadSectorStocks]
+    [focused, activeSector, loadSectorStocks]
   )
 
   // Stock chart (ctrl ref hoisted above with the others)
   const loadStockChart = useCallback(
     async (stock) => {
-      if (!activeCycle) return
+      if (!focused) return
       if (stockChartCtrlRef.current) stockChartCtrlRef.current.abort()
       const ctrl = new AbortController()
       stockChartCtrlRef.current = ctrl
@@ -265,9 +290,9 @@ export default function BreakdownPage() {
           d.setUTCDate(d.getUTCDate() + n)
           return d.toISOString().slice(0, 10)
         }
-        const fromStr = addDays(activeCycle.start_date, -20)
+        const fromStr = addDays(focused.start_date, -20)
         const today = new Date().toISOString().slice(0, 10)
-        const rawTo = addDays(activeCycle.end_date, 120)
+        const rawTo = addDays(focused.end_date, 120)
         const toStr = rawTo < today ? rawTo : today
         const { data } = await getStockPriceRange(
           { symbol: stock.symbol, from: fromStr, to: toStr },
@@ -282,7 +307,7 @@ export default function BreakdownPage() {
       }
       if (!ctrl.signal.aborted) setStockLoading(false)
     },
-    [activeCycle]
+    [focused]
   )
 
   const handleStockSelect = useCallback(
@@ -359,27 +384,86 @@ export default function BreakdownPage() {
     [cycles, cycleFilter]
   )
 
+  // Selected bears/bulls feed the default (no-focus) right-panel aggregate stats.
+  const selectedBears = useMemo(
+    () => sel.selectedCycles.filter((c) => c.type === 'bear'),
+    [sel.selectedCycles]
+  )
+  const selectedBulls = useMemo(
+    () => sel.selectedCycles.filter((c) => c.type === 'bull'),
+    [sel.selectedCycles]
+  )
+
   const selectedIndexLabel = INDEX_OPTIONS.find((o) => o.id === indexId)?.label || 'NEPSE'
-  const thresholdDirty = cycles.length > 0 && clampThreshold(threshold) !== ranThreshold
+  const thresholdDirty =
+    cycles.length > 0 && Math.min(50, Math.max(5, parseFloat(threshold) || 10)) !== ranThreshold
+  const focusedKey = focused ? cycleKey(focused) : null
 
   const cycleCandles = useMemo(() => {
-    if (!activeCycle || !allCandles.length) return []
-    const from = new Date(activeCycle.start_date)
+    if (!focused || !allCandles.length) return []
+    const from = new Date(focused.start_date)
     from.setDate(from.getDate() - 30)
-    const to = new Date(activeCycle.end_date)
+    const to = new Date(focused.end_date)
     to.setDate(to.getDate() + 200)
     const fromStr = from.toISOString().slice(0, 10)
     const toStr = to.toISOString().slice(0, 10)
     return allCandles.filter((c) => c.date >= fromStr && c.date <= toStr)
-  }, [activeCycle, allCandles])
+  }, [focused, allCandles])
 
-  // Toolbar (no view tabs)
+  // Quick-chip row (shared by left panel + mobile sheet)
+  const quickChips = (
+    <div className="flex flex-wrap items-center gap-1">
+      {[
+        ['All', sel.selectAll],
+        ['Bulls', sel.selectBulls],
+        ['Bears', sel.selectBears],
+        ['Last bull', sel.selectLastBull],
+        ['Clear', sel.clear],
+      ].map(([label, fn]) => (
+        <button
+          key={label}
+          onClick={fn}
+          className={`px-1.5 py-0.5 rounded ${LABEL} normal-case border border-gray-200 dark:border-gray-700 text-gray-600 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors`}
+        >
+          {label}
+        </button>
+      ))}
+    </div>
+  )
+
+  // Cycle-filter tabs (shared by left panel + mobile sheet)
+  const filterTabs = (padY) => (
+    <div className="shrink-0 flex border-b border-gray-100 dark:border-gray-800">
+      {[
+        ['all', 'All'],
+        ['bear', 'Bear'],
+        ['bull', 'Bull'],
+      ].map(([v, l]) => (
+        <button
+          key={v}
+          onClick={() => setCycleFilter(v)}
+          className={`flex-1 ${padY} text-[10px] font-semibold transition-colors
+            ${
+              cycleFilter === v
+                ? v === 'bear'
+                  ? 'text-red-500 border-b-2 border-red-500'
+                  : v === 'bull'
+                    ? 'text-emerald-500 border-b-2 border-emerald-500'
+                    : 'text-gray-700 dark:text-gray-200 border-b-2 border-gray-700 dark:border-gray-200'
+                : 'text-gray-400 hover:text-gray-600 dark:hover:text-gray-300'
+            }`}
+        >
+          {l}{' '}
+          {v === 'bear' ? bearCycles.length : v === 'bull' ? bullCycles.length : cycles.length}
+        </button>
+      ))}
+    </div>
+  )
+
+  // Toolbar — index pills moved to the left panel (spec §2.2); threshold +
+  // Detect + counts + mobile cycles button stay here.
   const toolbar = useToolbarSlot(
     <div className="flex items-center gap-2 flex-nowrap whitespace-nowrap">
-      <IndexSelector options={INDEX_OPTIONS} activeId={indexId} onSelect={handleIndexSelect} />
-
-      <div className="w-px h-3.5 bg-gray-200 dark:bg-gray-700 shrink-0" />
-
       <div className="flex items-center gap-1 shrink-0">
         <span className={`${LABEL} normal-case`}>Swing ≥</span>
         <input
@@ -421,12 +505,32 @@ export default function BreakdownPage() {
           className="lg:hidden flex items-center gap-1 px-2 py-0.5 rounded text-[10px] font-semibold border border-gray-200 dark:border-gray-700 text-gray-600 dark:text-gray-300"
           onClick={() => setMobileCycles(true)}
         >
-          {activeCycle
-            ? `${activeCycle.type === 'bear' ? '▼' : '▲'} ${activeCycle.name || activeCycle.start_date?.slice(0, 7)}`
+          {focused
+            ? `${focused.type === 'bear' ? '▼' : '▲'} ${focused.name || focused.start_date?.slice(0, 7)}`
             : `Cycles (${cycles.length})`}
         </button>
       )}
     </div>
+  )
+
+  // Cycle checklist (shared by left panel + mobile sheet). `onRowClick` differs.
+  const cycleChecklist = (onRowClick) => (
+    <>
+      {filteredCycles.map((c) => (
+        <CyclePill
+          key={`${c.type}-${c.start_date}`}
+          cycle={c}
+          active={focusedKey === cycleKey(c)}
+          selected={sel.isSelected(c)}
+          onClick={() => onRowClick(c)}
+        />
+      ))}
+      {!detecting && filteredCycles.length === 0 && (
+        <div className="flex items-center justify-center py-6 text-[10px] text-gray-400">
+          No {cycleFilter !== 'all' ? cycleFilter : ''} cycles detected
+        </div>
+      )}
+    </>
   )
 
   // ───────────────────────────────────────────────────────────────────────────
@@ -447,70 +551,47 @@ export default function BreakdownPage() {
       )}
 
       <div className="flex flex-1 overflow-hidden min-h-0">
-        {/* ── CYCLE RAIL (desktop ≥ lg) ── */}
-        <div className="hidden lg:flex w-[200px] shrink-0 border-r border-gray-100 dark:border-gray-800 flex-col overflow-hidden bg-white dark:bg-gray-950">
-          <div className="shrink-0 flex border-b border-gray-100 dark:border-gray-800">
-            {[
-              ['all', 'All'],
-              ['bear', 'Bear'],
-              ['bull', 'Bull'],
-            ].map(([v, l]) => (
-              <button
-                key={v}
-                onClick={() => setCycleFilter(v)}
-                className={`flex-1 py-1.5 text-[10px] font-semibold transition-colors
-                  ${
-                    cycleFilter === v
-                      ? v === 'bear'
-                        ? 'text-red-500 border-b-2 border-red-500'
-                        : v === 'bull'
-                          ? 'text-emerald-500 border-b-2 border-emerald-500'
-                          : 'text-gray-700 dark:text-gray-200 border-b-2 border-gray-700 dark:border-gray-200'
-                      : 'text-gray-400 hover:text-gray-600 dark:hover:text-gray-300'
-                  }`}
-              >
-                {l}{' '}
-                {v === 'bear'
-                  ? bearCycles.length
-                  : v === 'bull'
-                    ? bullCycles.length
-                    : cycles.length}
-              </button>
-            ))}
+        {/* ── LEFT PANEL (desktop ≥ lg) — index + quick chips + cycle checklist ── */}
+        <CollapsiblePanel
+          side="left"
+          open={leftOpen}
+          widthCls="w-[200px] min-w-[180px] max-w-[220px]"
+        >
+          <div className="shrink-0 px-2 py-2 border-b border-gray-100 dark:border-gray-800 space-y-2">
+            <IndexSelector options={INDEX_OPTIONS} activeId={indexId} onSelect={handleIndexSelect} />
+            {quickChips}
           </div>
-
+          {filterTabs('py-1.5')}
           {detecting && <Skeleton minH={120} />}
-
-          <div className="flex-1 min-h-0 overflow-y-auto bg-white dark:bg-gray-950">
-            {filteredCycles.map((c) => (
-              <CyclePill
-                key={`${c.type}-${c.start_date}`}
-                cycle={c}
-                active={activeCycle?.start_date === c.start_date}
-                onClick={() => selectCycle(c)}
-              />
-            ))}
-            {!detecting && filteredCycles.length === 0 && (
-              <div className="flex items-center justify-center py-6 text-[10px] text-gray-400">
-                No {cycleFilter !== 'all' ? cycleFilter : ''} cycles detected
-              </div>
-            )}
+          <div className="flex-1 min-h-0 overflow-y-auto bg-white/40 dark:bg-gray-950/40">
+            {cycleChecklist((c) => sel.toggle(c))}
           </div>
-        </div>
+        </CollapsiblePanel>
 
         {/* ── CENTER ── */}
-        <div className="flex-1 min-w-0 min-h-0 overflow-y-auto bg-gray-50/50 dark:bg-gray-950/40 px-4 py-3 space-y-3">
+        <main className="relative flex-1 min-w-0 min-h-0 overflow-y-auto lg:overflow-hidden flex flex-col gap-3 p-3 bg-gray-50/50 dark:bg-gray-950/40">
+          <PanelToggle side="left" open={leftOpen} onToggle={toggleLeft} label="cycle list" />
+          <PanelToggle side="right" open={rightOpen} onToggle={toggleRight} label="detail panel" />
+
           {/* Mini overview — explicit detecting/empty/ready states (no ambiguous blank box) */}
-          <div className={`${CARD} overflow-hidden`}>
-            <div className="px-3 py-1.5 border-b border-gray-100 dark:border-gray-800 flex items-center justify-between">
+          <div className={`${CARD} overflow-hidden shrink-0`}>
+            <div className="px-3 py-1.5 border-b border-gray-100 dark:border-gray-800 flex items-center justify-between gap-2">
               <span className={STITLE}>{selectedIndexLabel} — Full History</span>
-              <span className={`${LABEL} normal-case`}>
-                {detecting
-                  ? 'Detecting…'
-                  : allCandles.length === 0
-                    ? 'No data'
-                    : 'Click a shaded zone'}
-              </span>
+              <div className="flex items-center gap-2">
+                <span className={`${LABEL} normal-case hidden sm:inline`}>
+                  {detecting
+                    ? 'Detecting…'
+                    : allCandles.length === 0
+                      ? 'No data'
+                      : 'Click a shaded zone'}
+                </span>
+                <ViewSwitcher
+                  views={RANGE_VIEWS}
+                  active={range}
+                  onChange={setRange}
+                  ariaLabel="Overview range"
+                />
+              </div>
             </div>
             {detecting && allCandles.length === 0 ? (
               <Skeleton minH={160} />
@@ -522,72 +603,40 @@ export default function BreakdownPage() {
               <MiniOverview
                 candles={allCandles}
                 cycles={cycles}
-                activeCycle={activeCycle}
-                onCycleClick={selectCycle}
+                selectedKeys={sel.selectedKeys}
+                focusedKey={focusedKey}
+                onCycleClick={sel.toggle}
                 dark={isDark}
+                range={range}
               />
             )}
           </div>
 
-          {/* Sector matrix */}
-          {activeCycle && (
-            <>
-              {analyzeError && (
-                <div className="px-3 py-2 bg-red-50 dark:bg-red-950/20 border border-red-100 dark:border-red-900/40 rounded-lg text-[11px] text-red-600 dark:text-red-400 flex items-center justify-between">
-                  <span>{analyzeError}</span>
-                  <button onClick={() => setAnalyzeError('')} className="font-bold ml-4">
-                    ×
-                  </button>
-                </div>
-              )}
+          {/* Top Movers + Consistency for the SELECTED cycles — fills the rest */}
+          <CycleAnalyticsCards selectedCycles={sel.selectedCycles} />
 
-              {analyzing ? (
-                <div className={`${CARD}`}>
-                  <Skeleton minH={260} />
-                </div>
-              ) : sectors.length === 0 ? (
-                <div
-                  className={`${CARD} flex items-center justify-center py-6 text-[11px] text-gray-400`}
-                >
-                  No sector data for this cycle
-                </div>
-              ) : (
-                <SectorMatrix
-                  rows={matrixRows}
-                  activeSectorName={activeSector?.index_name}
-                  onRowClick={handleSectorClick}
-                  cycleType={activeCycle.type}
-                  sortBy={sortBy}
-                  sortAsc={sortAsc}
-                  onSort={toggleSort}
-                  maxMoveAbs={maxMoveAbs}
-                />
-              )}
-            </>
-          )}
-
-          {/* Mobile-only detail card (no right panel below md) */}
-          {activeCycle && (
-            <div className="md:hidden space-y-3">
+          {/* Mobile-only detail (no right panel below lg) — focused cycle drill-down */}
+          {focused && (
+            <div className="lg:hidden space-y-3">
               <div className={`${CARD} p-3`}>
                 <div className="flex items-center gap-2 mb-2">
                   <span
-                    className={`text-[11px] font-black ${activeCycle.type === 'bull' ? 'text-emerald-600 dark:text-emerald-400' : 'text-red-600 dark:text-red-400'}`}
+                    className={`text-[11px] font-black ${focused.type === 'bull' ? 'text-emerald-600 dark:text-emerald-400' : 'text-red-600 dark:text-red-400'}`}
                   >
-                    {activeCycle.type === 'bull' ? '▲' : '▼'}{' '}
-                    {activeCycle.name || (activeCycle.type === 'bull' ? 'Bull' : 'Bear')}
+                    {focused.type === 'bull' ? '▲' : '▼'}{' '}
+                    {focused.name || (focused.type === 'bull' ? 'Bull' : 'Bear')}
                   </span>
                   <span
-                    className={`text-[10px] font-bold px-1.5 py-0.5 rounded-full ${phaseCls(activeCycle.phase)}`}
+                    className={`text-[10px] font-bold px-1.5 py-0.5 rounded-full ${phaseCls(focused.phase)}`}
                   >
-                    {activeCycle.phase}
+                    {focused.phase}
                   </span>
                   <span
                     className={`text-[15px] font-black tabular-nums ml-auto
-                    ${activeCycle.type === 'bull' ? 'text-emerald-600 dark:text-emerald-400' : 'text-red-600 dark:text-red-400'}`}
+                    ${focused.type === 'bull' ? 'text-emerald-600 dark:text-emerald-400' : 'text-red-600 dark:text-red-400'}`}
                   >
-                    {activeCycle.pct >= 0 ? '+' : ''}
-                    {activeCycle.pct?.toFixed(1)}%
+                    {focused.pct >= 0 ? '+' : ''}
+                    {focused.pct?.toFixed(1)}%
                   </span>
                 </div>
                 {selectedStock ? (
@@ -608,9 +657,9 @@ export default function BreakdownPage() {
                     ) : (
                       <PriceChart
                         candles={stockCandles}
-                        startDate={activeCycle.start_date}
-                        endDate={activeCycle.end_date}
-                        type={activeCycle.type}
+                        startDate={focused.start_date}
+                        endDate={focused.end_date}
+                        type={focused.type}
                         dark={isDark}
                         label={selectedStock.symbol}
                         height={220}
@@ -618,19 +667,51 @@ export default function BreakdownPage() {
                     )}
                   </>
                 ) : activeSector && activeSector.index_name !== 'NEPSE' ? (
-                  <SectorIndexChart sector={activeSector} cycle={activeCycle} dark={isDark} />
+                  <SectorIndexChart sector={activeSector} cycle={focused} dark={isDark} />
                 ) : (
                   <PriceChart
                     candles={cycleCandles}
-                    startDate={activeCycle.start_date}
-                    endDate={activeCycle.end_date}
-                    type={activeCycle.type}
+                    startDate={focused.start_date}
+                    endDate={focused.end_date}
+                    type={focused.type}
                     dark={isDark}
                     label={selectedIndexLabel}
                     height={220}
                   />
                 )}
               </div>
+
+              {/* Sector matrix (mobile) */}
+              {analyzeError && (
+                <div className="px-3 py-2 bg-red-50 dark:bg-red-950/20 border border-red-100 dark:border-red-900/40 rounded-lg text-[11px] text-red-600 dark:text-red-400 flex items-center justify-between">
+                  <span>{analyzeError}</span>
+                  <button onClick={() => setAnalyzeError('')} className="font-bold ml-4">
+                    ×
+                  </button>
+                </div>
+              )}
+              {analyzing ? (
+                <div className={`${CARD}`}>
+                  <Skeleton minH={260} />
+                </div>
+              ) : sectors.length === 0 ? (
+                <div
+                  className={`${CARD} flex items-center justify-center py-6 text-[11px] text-gray-400`}
+                >
+                  No sector data for this cycle
+                </div>
+              ) : (
+                <SectorMatrix
+                  rows={matrixRows}
+                  activeSectorName={activeSector?.index_name}
+                  onRowClick={handleSectorClick}
+                  cycleType={focused.type}
+                  sortBy={sortBy}
+                  sortAsc={sortAsc}
+                  onSort={toggleSort}
+                  maxMoveAbs={maxMoveAbs}
+                />
+              )}
 
               {activeSector && activeSector.index_name !== 'NEPSE' && (
                 <div className={`${CARD} overflow-hidden`}>
@@ -655,15 +736,26 @@ export default function BreakdownPage() {
               )}
             </div>
           )}
-        </div>
+        </main>
 
-        {/* ── RIGHT PANEL (≥ md) ── */}
-        <div className="hidden md:flex w-[360px] lg:w-[420px] shrink-0 border-l border-gray-100 dark:border-gray-800 flex-col min-h-0 bg-white dark:bg-gray-950">
-          {!activeCycle ? (
-            <div
-              className="flex-1 min-h-0 overflow-y-auto bg-white dark:bg-gray-950 p-3"
-            >
-              <AggregateStats bearCycles={bearCycles} bullCycles={bullCycles} />
+        {/* ── RIGHT PANEL (desktop ≥ lg) — default aggregate stats / focused drill-down ── */}
+        <CollapsiblePanel
+          side="right"
+          open={rightOpen}
+          widthCls="w-[360px] lg:w-[420px] min-w-[300px]"
+        >
+          {!focused ? (
+            <div className="flex-1 min-h-0 overflow-y-auto bg-white/40 dark:bg-gray-950/40 p-3 space-y-3">
+              <div className={`${CARD} p-3`}>
+                <p className={`${LABEL} text-gray-400 mb-1`}>
+                  {sel.selectedCycles.length} cycle{sel.selectedCycles.length === 1 ? '' : 's'}{' '}
+                  selected
+                </p>
+                <p className="text-[11px] text-gray-500 dark:text-gray-400 leading-snug">
+                  Click a zone to drill into sectors.
+                </p>
+              </div>
+              <AggregateStats bearCycles={selectedBears} bullCycles={selectedBulls} />
             </div>
           ) : (
             <>
@@ -671,80 +763,78 @@ export default function BreakdownPage() {
               <div
                 className={`shrink-0 px-3 py-2 border-b
                 ${
-                  activeCycle.type === 'bull'
+                  focused.type === 'bull'
                     ? 'bg-emerald-50/70 dark:bg-emerald-950/20 border-emerald-100 dark:border-emerald-900/40'
                     : 'bg-red-50/70 dark:bg-red-950/20 border-red-100 dark:border-red-900/40'
                 }`}
               >
                 <div className="flex items-center gap-2 mb-1">
                   <span
-                    className={`text-[11px] font-black ${activeCycle.type === 'bull' ? 'text-emerald-700 dark:text-emerald-300' : 'text-red-700 dark:text-red-300'}`}
+                    className={`text-[11px] font-black ${focused.type === 'bull' ? 'text-emerald-700 dark:text-emerald-300' : 'text-red-700 dark:text-red-300'}`}
                   >
-                    {activeCycle.type === 'bull' ? '▲' : '▼'}{' '}
-                    {activeCycle.name || (activeCycle.type === 'bull' ? 'Bull' : 'Bear')}
+                    {focused.type === 'bull' ? '▲' : '▼'}{' '}
+                    {focused.name || (focused.type === 'bull' ? 'Bull' : 'Bear')}
                   </span>
                   <span
-                    className={`text-[10px] font-bold px-1.5 py-0.5 rounded-full ${phaseCls(activeCycle.phase)}`}
+                    className={`text-[10px] font-bold px-1.5 py-0.5 rounded-full ${phaseCls(focused.phase)}`}
                   >
-                    {activeCycle.phase}
+                    {focused.phase}
                   </span>
                   <span
                     className={`text-[18px] font-black tabular-nums ml-auto
-                    ${activeCycle.type === 'bull' ? 'text-emerald-700 dark:text-emerald-300' : 'text-red-700 dark:text-red-300'}`}
+                    ${focused.type === 'bull' ? 'text-emerald-700 dark:text-emerald-300' : 'text-red-700 dark:text-red-300'}`}
                   >
-                    {activeCycle.pct >= 0 ? '+' : ''}
-                    {activeCycle.pct?.toFixed(1)}%
+                    {focused.pct >= 0 ? '+' : ''}
+                    {focused.pct?.toFixed(1)}%
                   </span>
                   <button
-                    onClick={clearSelection}
-                    aria-label="Deselect cycle"
+                    onClick={() => sel.setFocused(null)}
+                    aria-label="Close cycle detail"
                     className="shrink-0 w-5 h-5 flex items-center justify-center rounded-full text-gray-400 hover:text-gray-600 dark:hover:text-gray-300 hover:bg-black/5 dark:hover:bg-white/10 text-[13px] leading-none"
                   >
                     ×
                   </button>
                 </div>
                 <div className="text-[10px] text-gray-500 dark:text-gray-400 font-mono mb-1">
-                  {activeCycle.start_date} → {activeCycle.end_date} · {activeCycle.duration_days}d
+                  {focused.start_date} → {focused.end_date} · {focused.duration_days}d
                 </div>
                 <div className="flex flex-wrap items-center gap-x-3 gap-y-0.5 text-[10px]">
-                  {activeCycle.start_close != null && (
+                  {focused.start_close != null && (
                     <span className="text-gray-500 dark:text-gray-400">
                       <span className={LABEL}>From </span>
                       <span className="font-semibold text-gray-700 dark:text-gray-200 tabular-nums">
-                        {(+activeCycle.start_close).toLocaleString()}
+                        {(+focused.start_close).toLocaleString()}
                       </span>
                     </span>
                   )}
-                  {activeCycle.end_close != null && (
+                  {focused.end_close != null && (
                     <span className="text-gray-500 dark:text-gray-400">
                       <span className={LABEL}>To </span>
                       <span className="font-semibold text-gray-700 dark:text-gray-200 tabular-nums">
-                        {(+activeCycle.end_close).toLocaleString()}
+                        {(+focused.end_close).toLocaleString()}
                       </span>
                     </span>
                   )}
-                  {activeCycle.type === 'bear' && activeCycle.recovery_needed_pct != null && (
+                  {focused.type === 'bear' && focused.recovery_needed_pct != null && (
                     <span className="text-gray-500 dark:text-gray-400">
                       <span className={LABEL}>Need </span>
                       <span className="font-semibold text-emerald-600 dark:text-emerald-400 tabular-nums">
-                        +{activeCycle.recovery_needed_pct.toFixed(1)}%
+                        +{focused.recovery_needed_pct.toFixed(1)}%
                       </span>
                     </span>
                   )}
-                  {activeCycle.type === 'bear' && activeCycle.recovery_date && (
+                  {focused.type === 'bear' && focused.recovery_date && (
                     <span className="text-gray-500 dark:text-gray-400">
                       <span className={LABEL}>Recovered </span>
                       <span className="font-semibold text-emerald-600 dark:text-emerald-400 font-mono">
-                        {activeCycle.recovery_date}
+                        {focused.recovery_date}
                       </span>
                     </span>
                   )}
                 </div>
               </div>
 
-              <div
-                className="flex-1 min-h-0 overflow-y-auto bg-white dark:bg-gray-950 p-3 space-y-3"
-              >
+              <div className="flex-1 min-h-0 overflow-y-auto bg-white/40 dark:bg-gray-950/40 p-3 space-y-3">
                 {/* Chart: cycle / sector / stock */}
                 <div className={`${CARD} p-2`}>
                   {selectedStock ? (
@@ -777,9 +867,9 @@ export default function BreakdownPage() {
                       ) : (
                         <PriceChart
                           candles={stockCandles}
-                          startDate={activeCycle.start_date}
-                          endDate={activeCycle.end_date}
-                          type={activeCycle.type}
+                          startDate={focused.start_date}
+                          endDate={focused.end_date}
+                          type={focused.type}
                           dark={isDark}
                           label={selectedStock.symbol}
                           height={260}
@@ -787,7 +877,7 @@ export default function BreakdownPage() {
                       )}
                     </div>
                   ) : activeSector && activeSector.index_name !== 'NEPSE' ? (
-                    <SectorIndexChart sector={activeSector} cycle={activeCycle} dark={isDark} />
+                    <SectorIndexChart sector={activeSector} cycle={focused} dark={isDark} />
                   ) : (
                     <div>
                       <p className="text-[10px] font-semibold text-gray-500 dark:text-gray-400 mb-1 font-mono">
@@ -795,9 +885,9 @@ export default function BreakdownPage() {
                       </p>
                       <PriceChart
                         candles={cycleCandles}
-                        startDate={activeCycle.start_date}
-                        endDate={activeCycle.end_date}
-                        type={activeCycle.type}
+                        startDate={focused.start_date}
+                        endDate={focused.end_date}
+                        type={focused.type}
                         dark={isDark}
                         label={selectedIndexLabel}
                         height={260}
@@ -813,11 +903,11 @@ export default function BreakdownPage() {
                   >
                     <Stat
                       l="Move"
-                      v={`${activeCycle.pct >= 0 ? '+' : ''}${activeCycle.pct?.toFixed(1)}%`}
-                      tone={activeCycle.type === 'bull' ? 'green' : 'red'}
+                      v={`${focused.pct >= 0 ? '+' : ''}${focused.pct?.toFixed(1)}%`}
+                      tone={focused.type === 'bull' ? 'green' : 'red'}
                     />
-                    <Stat l="Days" v={`${activeCycle.duration_days}`} />
-                    {activeCycle.type === 'bear' && (
+                    <Stat l="Days" v={`${focused.duration_days}`} />
+                    {focused.type === 'bear' && (
                       <>
                         <Stat
                           l="Rec %"
@@ -830,13 +920,47 @@ export default function BreakdownPage() {
                         />
                         <Stat
                           l="Rec d"
-                          v={
-                            activeCycle.recovery_days != null ? `${activeCycle.recovery_days}` : '—'
-                          }
-                          tone={activeCycle.recovery_date ? 'green' : 'amber'}
+                          v={focused.recovery_days != null ? `${focused.recovery_days}` : '—'}
+                          tone={focused.recovery_date ? 'green' : 'amber'}
                         />
                       </>
                     )}
+                  </div>
+                )}
+
+                {/* Sector matrix — moved here from center (drill-down is focus-driven) */}
+                {analyzeError && (
+                  <div className="px-3 py-2 bg-red-50 dark:bg-red-950/20 border border-red-100 dark:border-red-900/40 rounded-lg text-[11px] text-red-600 dark:text-red-400 flex items-center justify-between">
+                    <span>{analyzeError}</span>
+                    <button onClick={() => setAnalyzeError('')} className="font-bold ml-4">
+                      ×
+                    </button>
+                  </div>
+                )}
+                {analyzing ? (
+                  <div className={`${CARD}`}>
+                    <Skeleton minH={200} />
+                  </div>
+                ) : sectors.length === 0 ? (
+                  <div
+                    className={`${CARD} flex items-center justify-center py-6 text-[11px] text-gray-400`}
+                  >
+                    No sector data for this cycle
+                  </div>
+                ) : (
+                  <div className={`${CARD} overflow-hidden`}>
+                    <div className="max-h-[320px] overflow-y-auto">
+                      <SectorMatrix
+                        rows={matrixRows}
+                        activeSectorName={activeSector?.index_name}
+                        onRowClick={handleSectorClick}
+                        cycleType={focused.type}
+                        sortBy={sortBy}
+                        sortAsc={sortAsc}
+                        onSort={toggleSort}
+                        maxMoveAbs={maxMoveAbs}
+                      />
+                    </div>
                   </div>
                 )}
 
@@ -865,13 +989,13 @@ export default function BreakdownPage() {
                 )}
 
                 {/* Resilience tile (bear only, after analysis) */}
-                {activeCycle.type === 'bear' && !analyzing && sectors.length > 0 && (
+                {focused.type === 'bear' && !analyzing && sectors.length > 0 && (
                   <ResilientTile sectors={[...(nepseRow ? [nepseRow] : []), ...sectors]} />
                 )}
               </div>
             </>
           )}
-        </div>
+        </CollapsiblePanel>
       </div>
 
       {/* Mobile cycles sheet */}
@@ -902,47 +1026,12 @@ export default function BreakdownPage() {
                 ✕
               </button>
             </div>
-            <div className="shrink-0 flex border-b border-gray-100 dark:border-gray-800">
-              {[
-                ['all', 'All'],
-                ['bear', 'Bear'],
-                ['bull', 'Bull'],
-              ].map(([v, l]) => (
-                <button
-                  key={v}
-                  onClick={() => setCycleFilter(v)}
-                  className={`flex-1 py-2 text-[10px] font-semibold transition-colors
-                    ${
-                      cycleFilter === v
-                        ? v === 'bear'
-                          ? 'text-red-500 border-b-2 border-red-500'
-                          : v === 'bull'
-                            ? 'text-emerald-500 border-b-2 border-emerald-500'
-                            : 'text-gray-700 dark:text-gray-200 border-b-2 border-gray-700 dark:border-gray-200'
-                        : 'text-gray-400'
-                    }`}
-                >
-                  {l}{' '}
-                  {v === 'bear'
-                    ? bearCycles.length
-                    : v === 'bull'
-                      ? bullCycles.length
-                      : cycles.length}
-                </button>
-              ))}
+            <div className="shrink-0 px-4 py-2 border-b border-gray-100 dark:border-gray-800">
+              {quickChips}
             </div>
+            {filterTabs('py-2')}
             <div className="flex-1 overflow-y-auto min-h-0 bg-white dark:bg-gray-900">
-              {filteredCycles.map((c) => (
-                <CyclePill
-                  key={`${c.type}-${c.start_date}`}
-                  cycle={c}
-                  active={activeCycle?.start_date === c.start_date}
-                  onClick={() => {
-                    selectCycle(c)
-                    setMobileCycles(false)
-                  }}
-                />
-              ))}
+              {cycleChecklist((c) => sel.toggle(c))}
             </div>
           </div>
         </>
@@ -950,4 +1039,3 @@ export default function BreakdownPage() {
     </div>
   )
 }
-

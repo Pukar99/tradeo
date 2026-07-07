@@ -213,9 +213,12 @@ export function AggregateStats({ bearCycles, bullCycles }) {
 // ─────────────────────────────────────────────────────────────────────────────
 // CYCLE RAIL — compact 2-line pills
 // ─────────────────────────────────────────────────────────────────────────────
-export function CyclePill({ cycle, active, onClick }) {
+export function CyclePill({ cycle, active, onClick, selected }) {
   const isBear = cycle.type === 'bear'
   const phaseTone = phaseCls(cycle.phase)
+  // Optional leading select-mark (multi-select checklist, S2b). When `selected`
+  // is undefined the mark is omitted — the pill looks exactly as before.
+  const mark = selected === undefined ? null : selected ? '✓' : '○'
   return (
     <button
       onClick={onClick}
@@ -231,6 +234,13 @@ export function CyclePill({ cycle, active, onClick }) {
     >
       <div className="flex items-center justify-between mb-0.5">
         <span className={`text-[10px] font-bold ${isBear ? 'text-red-500' : 'text-emerald-500'}`}>
+          {mark && (
+            <span
+              className={`mr-1 ${selected ? (isBear ? 'text-red-500' : 'text-emerald-500') : 'text-gray-300 dark:text-gray-600'}`}
+            >
+              {mark}
+            </span>
+          )}
           {isBear ? '▼' : '▲'} {cycle.name || (isBear ? 'Bear' : 'Bull')}
         </span>
         <span
