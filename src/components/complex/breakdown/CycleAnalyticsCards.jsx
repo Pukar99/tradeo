@@ -8,20 +8,7 @@
 import { useEffect, useRef, useState } from 'react'
 import { getCycleMovers, getCycleConsistency } from '../../../api'
 import { cycleKey } from './useCycleSelection'
-
-const CARD = 'bg-white dark:bg-gray-900 rounded-2xl border border-gray-100 dark:border-gray-800'
-const LABEL = 'text-[10px] font-semibold uppercase tracking-widest text-gray-400 dark:text-gray-500'
-const STITLE = 'text-[11px] font-semibold text-gray-700 dark:text-gray-200'
-
-function Skeleton({ minH = 80 }) {
-  return (
-    <div className="animate-pulse space-y-2 p-3" style={{ minHeight: minH }}>
-      <div className="h-2 bg-gray-100 dark:bg-gray-800 rounded" />
-      <div className="h-2 bg-gray-100 dark:bg-gray-800 rounded w-5/6" />
-      <div className="h-2 bg-gray-100 dark:bg-gray-800 rounded w-4/6" />
-    </div>
-  )
-}
+import { CARD, LABEL, STITLE, Skeleton, fmtPct } from '../../datalab/shared'
 
 function EmptyState() {
   return (
@@ -47,8 +34,7 @@ function MoverRow({ s, max, up }) {
       <span
         className={`text-[11px] font-bold tabular-nums w-14 text-right ${up ? 'text-emerald-600 dark:text-emerald-400' : 'text-red-600 dark:text-red-400'}`}
       >
-        {s.avg_ret >= 0 ? '+' : ''}
-        {s.avg_ret?.toFixed(1)}%
+        {fmtPct(s.avg_ret)}
       </span>
     </div>
   )
@@ -128,7 +114,7 @@ export default function CycleAnalyticsCards({ selectedCycles }) {
         {!selectedCycles.length ? (
           <EmptyState />
         ) : loading || !movers ? (
-          <Skeleton />
+          <Skeleton minH={80} />
         ) : (
           <div className="flex-1 min-h-0 overflow-y-auto px-3 py-2 flex gap-4">
             <div className="flex-1 min-w-0">
@@ -153,10 +139,16 @@ export default function CycleAnalyticsCards({ selectedCycles }) {
           <span className={STITLE}>Consistency</span>
           <span className={`${LABEL} normal-case ml-auto`}>history, not a promise</span>
         </div>
+        {error && (
+          <div className="px-3 py-1.5 text-[10px] text-red-500 flex items-center justify-between">
+            <span>{error}</span>
+            <button onClick={() => setError('')} className="font-bold">×</button>
+          </div>
+        )}
         {!selectedCycles.length ? (
           <EmptyState />
         ) : loading || !consistency ? (
-          <Skeleton />
+          <Skeleton minH={80} />
         ) : (
           <div className="flex-1 min-h-0 overflow-y-auto px-3 py-1">
             {consistency.stocks.map((s) => (
@@ -170,8 +162,7 @@ export default function CycleAnalyticsCards({ selectedCycles }) {
                 <span
                   className={`text-[11px] font-bold ml-auto ${s.avg_ret >= 0 ? 'text-emerald-600 dark:text-emerald-400' : 'text-red-600 dark:text-red-400'}`}
                 >
-                  {s.avg_ret >= 0 ? '+' : ''}
-                  {s.avg_ret?.toFixed(1)}%
+                  {fmtPct(s.avg_ret)}
                 </span>
                 <span className="text-[10px] text-gray-400 w-14 text-right">
                   corr {s.corr != null ? s.corr.toFixed(2) : '—'}
