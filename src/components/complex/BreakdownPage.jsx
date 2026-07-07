@@ -15,11 +15,12 @@ import { CARD, LABEL, STITLE, Skeleton } from '../datalab/shared'
 import { CollapsiblePanel, PanelToggle, usePanelOpen } from '../shared/CollapsiblePanel'
 import ViewSwitcher from '../shared/ViewSwitcher'
 import { useDataLabControls } from '../datalab/DataLabControls'
-import { stripIndexName, pctTextCls, phaseCls } from './breakdown/helpers'
+import { stripIndexName, phaseCls, addDays } from './breakdown/helpers'
 import { PriceChart, MiniOverview, SectorIndexChart } from './breakdown/charts'
 import { SectorMatrix, StockList } from './breakdown/SectorMatrix'
-import { ResilientTile, AggregateStats, CyclePill, IndexSelector, Stat } from './breakdown/atoms'
+import { AggregateStats, CyclePill, IndexSelector } from './breakdown/atoms'
 import CycleAnalyticsCards from './breakdown/CycleAnalyticsCards'
+import FocusedCyclePanel from './breakdown/FocusedCyclePanel'
 import { useCycleSelection, cycleKey } from './breakdown/useCycleSelection'
 
 const RANGE_VIEWS = [
@@ -285,11 +286,6 @@ export default function BreakdownPage() {
       setStockLoading(true)
       setStockError('')
       try {
-        const addDays = (iso, n) => {
-          const d = new Date(iso + 'T00:00:00Z')
-          d.setUTCDate(d.getUTCDate() + n)
-          return d.toISOString().slice(0, 10)
-        }
         const fromStr = addDays(focused.start_date, -20)
         const today = new Date().toISOString().slice(0, 10)
         const rawTo = addDays(focused.end_date, 120)
@@ -757,242 +753,35 @@ export default function BreakdownPage() {
               <AggregateStats bearCycles={selectedBears} bullCycles={selectedBulls} />
             </div>
           ) : (
-            <>
-              {/* Header — text colors bumped to -700/-300 for AA contrast on tinted bg */}
-              <div
-                className={`shrink-0 px-3 py-2 border-b
-                ${
-                  focused.type === 'bull'
-                    ? 'bg-emerald-50/70 dark:bg-emerald-950/20 border-emerald-100 dark:border-emerald-900/40'
-                    : 'bg-red-50/70 dark:bg-red-950/20 border-red-100 dark:border-red-900/40'
-                }`}
-              >
-                <div className="flex items-center gap-2 mb-1">
-                  <span
-                    className={`text-[11px] font-black ${focused.type === 'bull' ? 'text-emerald-700 dark:text-emerald-300' : 'text-red-700 dark:text-red-300'}`}
-                  >
-                    {focused.type === 'bull' ? '▲' : '▼'}{' '}
-                    {focused.name || (focused.type === 'bull' ? 'Bull' : 'Bear')}
-                  </span>
-                  <span
-                    className={`text-[10px] font-bold px-1.5 py-0.5 rounded-full ${phaseCls(focused.phase)}`}
-                  >
-                    {focused.phase}
-                  </span>
-                  <span
-                    className={`text-[18px] font-black tabular-nums ml-auto
-                    ${focused.type === 'bull' ? 'text-emerald-700 dark:text-emerald-300' : 'text-red-700 dark:text-red-300'}`}
-                  >
-                    {focused.pct >= 0 ? '+' : ''}
-                    {focused.pct?.toFixed(1)}%
-                  </span>
-                  <button
-                    onClick={() => sel.setFocused(null)}
-                    aria-label="Close cycle detail"
-                    className="shrink-0 w-5 h-5 flex items-center justify-center rounded-full text-gray-400 hover:text-gray-600 dark:hover:text-gray-300 hover:bg-black/5 dark:hover:bg-white/10 text-[13px] leading-none"
-                  >
-                    ×
-                  </button>
-                </div>
-                <div className="text-[10px] text-gray-500 dark:text-gray-400 font-mono mb-1">
-                  {focused.start_date} → {focused.end_date} · {focused.duration_days}d
-                </div>
-                <div className="flex flex-wrap items-center gap-x-3 gap-y-0.5 text-[10px]">
-                  {focused.start_close != null && (
-                    <span className="text-gray-500 dark:text-gray-400">
-                      <span className={LABEL}>From </span>
-                      <span className="font-semibold text-gray-700 dark:text-gray-200 tabular-nums">
-                        {(+focused.start_close).toLocaleString()}
-                      </span>
-                    </span>
-                  )}
-                  {focused.end_close != null && (
-                    <span className="text-gray-500 dark:text-gray-400">
-                      <span className={LABEL}>To </span>
-                      <span className="font-semibold text-gray-700 dark:text-gray-200 tabular-nums">
-                        {(+focused.end_close).toLocaleString()}
-                      </span>
-                    </span>
-                  )}
-                  {focused.type === 'bear' && focused.recovery_needed_pct != null && (
-                    <span className="text-gray-500 dark:text-gray-400">
-                      <span className={LABEL}>Need </span>
-                      <span className="font-semibold text-emerald-600 dark:text-emerald-400 tabular-nums">
-                        +{focused.recovery_needed_pct.toFixed(1)}%
-                      </span>
-                    </span>
-                  )}
-                  {focused.type === 'bear' && focused.recovery_date && (
-                    <span className="text-gray-500 dark:text-gray-400">
-                      <span className={LABEL}>Recovered </span>
-                      <span className="font-semibold text-emerald-600 dark:text-emerald-400 font-mono">
-                        {focused.recovery_date}
-                      </span>
-                    </span>
-                  )}
-                </div>
-              </div>
-
-              <div className="flex-1 min-h-0 overflow-y-auto bg-white/40 dark:bg-gray-950/40 p-3 space-y-3">
-                {/* Chart: cycle / sector / stock */}
-                <div className={`${CARD} p-2`}>
-                  {selectedStock ? (
-                    <div>
-                      <div className="flex items-center gap-2 mb-1">
-                        <button
-                          onClick={() => handleStockSelect(selectedStock)}
-                          className="text-[10px] text-gray-400 hover:text-gray-600"
-                        >
-                          ← back
-                        </button>
-                        <span className="text-[11px] font-bold text-gray-800 dark:text-gray-100">
-                          {selectedStock.symbol}
-                        </span>
-                        <span
-                          className={`text-[10px] font-bold ml-auto ${pctTextCls(selectedStock.drop_pct)}`}
-                        >
-                          {selectedStock.drop_pct != null
-                            ? `${selectedStock.drop_pct >= 0 ? '+' : ''}${selectedStock.drop_pct.toFixed(1)}%`
-                            : ''}
-                        </span>
-                      </div>
-                      {stockError && (
-                        <div className="text-[10px] text-red-500 px-2 py-1 bg-red-50 dark:bg-red-950/20 rounded mb-1">
-                          {stockError}
-                        </div>
-                      )}
-                      {stockLoading ? (
-                        <Skeleton minH={260} />
-                      ) : (
-                        <PriceChart
-                          candles={stockCandles}
-                          startDate={focused.start_date}
-                          endDate={focused.end_date}
-                          type={focused.type}
-                          dark={isDark}
-                          label={selectedStock.symbol}
-                          height={260}
-                        />
-                      )}
-                    </div>
-                  ) : activeSector && activeSector.index_name !== 'NEPSE' ? (
-                    <SectorIndexChart sector={activeSector} cycle={focused} dark={isDark} />
-                  ) : (
-                    <div>
-                      <p className="text-[10px] font-semibold text-gray-500 dark:text-gray-400 mb-1 font-mono">
-                        {selectedIndexLabel}
-                      </p>
-                      <PriceChart
-                        candles={cycleCandles}
-                        startDate={focused.start_date}
-                        endDate={focused.end_date}
-                        type={focused.type}
-                        dark={isDark}
-                        label={selectedIndexLabel}
-                        height={260}
-                      />
-                    </div>
-                  )}
-                </div>
-
-                {/* Stat strip */}
-                {summary && (
-                  <div
-                    className={`${CARD} px-3 py-2 flex divide-x divide-gray-100 dark:divide-gray-800`}
-                  >
-                    <Stat
-                      l="Move"
-                      v={`${focused.pct >= 0 ? '+' : ''}${focused.pct?.toFixed(1)}%`}
-                      tone={focused.type === 'bull' ? 'green' : 'red'}
-                    />
-                    <Stat l="Days" v={`${focused.duration_days}`} />
-                    {focused.type === 'bear' && (
-                      <>
-                        <Stat
-                          l="Rec %"
-                          v={
-                            summary.recovery_pct != null
-                              ? `${summary.recovery_pct >= 0 ? '+' : ''}${summary.recovery_pct.toFixed(1)}%`
-                              : '—'
-                          }
-                          tone={summary.recovery_pct > 0 ? 'green' : 'gray'}
-                        />
-                        <Stat
-                          l="Rec d"
-                          v={focused.recovery_days != null ? `${focused.recovery_days}` : '—'}
-                          tone={focused.recovery_date ? 'green' : 'amber'}
-                        />
-                      </>
-                    )}
-                  </div>
-                )}
-
-                {/* Sector matrix — moved here from center (drill-down is focus-driven) */}
-                {analyzeError && (
-                  <div className="px-3 py-2 bg-red-50 dark:bg-red-950/20 border border-red-100 dark:border-red-900/40 rounded-lg text-[11px] text-red-600 dark:text-red-400 flex items-center justify-between">
-                    <span>{analyzeError}</span>
-                    <button onClick={() => setAnalyzeError('')} className="font-bold ml-4">
-                      ×
-                    </button>
-                  </div>
-                )}
-                {analyzing ? (
-                  <div className={`${CARD}`}>
-                    <Skeleton minH={200} />
-                  </div>
-                ) : sectors.length === 0 ? (
-                  <div
-                    className={`${CARD} flex items-center justify-center py-6 text-[11px] text-gray-400`}
-                  >
-                    No sector data for this cycle
-                  </div>
-                ) : (
-                  <div className={`${CARD} overflow-hidden`}>
-                    <div className="max-h-[320px] overflow-y-auto">
-                      <SectorMatrix
-                        rows={matrixRows}
-                        activeSectorName={activeSector?.index_name}
-                        onRowClick={handleSectorClick}
-                        cycleType={focused.type}
-                        sortBy={sortBy}
-                        sortAsc={sortAsc}
-                        onSort={toggleSort}
-                        maxMoveAbs={maxMoveAbs}
-                      />
-                    </div>
-                  </div>
-                )}
-
-                {/* Sector zoom: stocks inline */}
-                {activeSector && activeSector.index_name !== 'NEPSE' && (
-                  <div className={`${CARD} overflow-hidden`}>
-                    <div className="flex items-center gap-2 px-3 py-1.5 border-b border-gray-100 dark:border-gray-800 bg-gray-50/60 dark:bg-gray-800/30">
-                      <span className={STITLE}>{stripIndexName(activeSector.index_name)}</span>
-                      <span className="text-[10px] text-gray-400 ml-auto">click to chart</span>
-                      <button
-                        onClick={() => handleSectorClick(activeSector)}
-                        className="text-gray-300 hover:text-gray-500 text-[14px] leading-none"
-                      >
-                        ×
-                      </button>
-                    </div>
-                    <div className="max-h-[320px] overflow-auto">
-                      <StockList
-                        stocks={sectorStocks[activeSector.index_name]}
-                        loading={!!sectorLoading[activeSector.index_name]}
-                        onSelect={handleStockSelect}
-                        selected={selectedStock}
-                      />
-                    </div>
-                  </div>
-                )}
-
-                {/* Resilience tile (bear only, after analysis) */}
-                {focused.type === 'bear' && !analyzing && sectors.length > 0 && (
-                  <ResilientTile sectors={[...(nepseRow ? [nepseRow] : []), ...sectors]} />
-                )}
-              </div>
-            </>
+            <FocusedCyclePanel
+              focused={focused}
+              cycles={cycles}
+              indexId={indexId}
+              indexLabel={selectedIndexLabel}
+              dark={isDark}
+              cycleCandles={cycleCandles}
+              summary={summary}
+              matrixRows={matrixRows}
+              nepseRow={nepseRow}
+              sectors={sectors}
+              maxMoveAbs={maxMoveAbs}
+              sortBy={sortBy}
+              sortAsc={sortAsc}
+              onSort={toggleSort}
+              analyzing={analyzing}
+              analyzeError={analyzeError}
+              onDismissAnalyzeError={() => setAnalyzeError('')}
+              activeSector={activeSector}
+              onSectorClick={handleSectorClick}
+              sectorStocks={sectorStocks}
+              sectorLoading={sectorLoading}
+              selectedStock={selectedStock}
+              stockCandles={stockCandles}
+              stockLoading={stockLoading}
+              stockError={stockError}
+              onStockSelect={handleStockSelect}
+              onClose={() => sel.setFocused(null)}
+            />
           )}
         </CollapsiblePanel>
       </div>

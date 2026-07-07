@@ -3,6 +3,13 @@
 // Sector display names arrive as 'Banking Sub-Index' / 'Finance Index' — strip the suffix
 export const stripIndexName = (name = '') => name.replace(' Sub-Index', '').replace(' Index', '')
 
+// Add n days to an ISO date string (UTC-safe) — chart window padding helper.
+export function addDays(iso, n) {
+  const d = new Date(iso + 'T00:00:00Z')
+  d.setUTCDate(d.getUTCDate() + n)
+  return d.toISOString().slice(0, 10)
+}
+
 // ─────────────────────────────────────────────────────────────────────────────
 // COLOUR HELPERS
 // ─────────────────────────────────────────────────────────────────────────────
