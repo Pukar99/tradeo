@@ -5,209 +5,19 @@ import {
   runDropAnalysis,
   getSectorStocks,
   getStockPriceRange,
-  getSectorCycles,
 } from '../../api'
 import { apiError, isCanceled } from '../../utils/format'
 import { INDEX_OPTIONS } from '../../utils/constants'
 import { useToolbarSlot, safeSessionGet, safeSessionSet } from '../../pages/DataLabPage'
 // Design tokens and Skeleton come from the shared DataLab module
 import { CARD, LABEL, STITLE, Skeleton } from '../datalab/shared'
-import { stripIndexName, pctTextCls, heatColor, phaseCls } from './breakdown/helpers'
+import { stripIndexName, pctTextCls, phaseCls } from './breakdown/helpers'
 import { PriceChart, MiniOverview, SectorIndexChart } from './breakdown/charts'
 import { SectorMatrix, StockList } from './breakdown/SectorMatrix'
 import { ResilientTile, AggregateStats, CyclePill, IndexSelector, Stat } from './breakdown/atoms'
 
 // Mirror of the backend clamp — tiny thresholds explode the cycle count
 const clampThreshold = (t) => Math.min(50, Math.max(5, parseFloat(t) || 10))
-
-// ─────────────────────────────────────────────────────────────────────────────
-// SECTOR × CYCLE MATRIX — rows = sectors, cols = bull/bear cycles
-// Replaces the year-based monthly heatmap. Active cycle column highlighted.
-// ─────────────────────────────────────────────────────────────────────────────
-function SectorCycleMatrix({ cycles, activeCycle, onCycleSelect, dark }) {
-  const [data, setData] = useState(null)
-  const [loading, setLoading] = useState(false)
-  const [error, setError] = useState('')
-
-  // Stable hash of cycles (date pairs) so we don't refetch on object identity churn
-  const cyclesKey = useMemo(
-    () => (cycles || []).map((c) => `${c.start_date}|${c.end_date}|${c.type}`).join(','),
-    [cycles]
-  )
-
-  useEffect(() => {
-    if (!cycles?.length) {
-      setData(null)
-      return
-    }
-    const ctrl = new AbortController()
-    setLoading(true)
-    setError('')
-    setData(null)
-    // Send minimal cycle info — only what backend needs
-    const payload = {
-      cycles: cycles.map((c) => ({ start_date: c.start_date, end_date: c.end_date, type: c.type })),
-    }
-    getSectorCycles(payload, { signal: ctrl.signal })
-      .then((r) => {
-        if (!ctrl.signal.aborted) setData(r.data)
-      })
-      .catch((e) => {
-        if (ctrl.signal.aborted || isCanceled(e)) return
-        // Backend caps at 100 cycles — give the user an actionable suggestion.
-        const status = e?.response?.status
-        const raw = (e?.response?.data?.error || '').toLowerCase()
-        if (status === 400 && raw.includes('too many cycles')) {
-          setError(
-            `${cycles.length} cycles is too many to compare at once — raise the swing threshold to detect fewer, larger cycles.`
-          )
-        } else {
-          setError(apiError(e, 'Failed to load matrix'))
-        }
-      })
-      .finally(() => {
-        if (!ctrl.signal.aborted) setLoading(false)
-      })
-    return () => ctrl.abort()
-  }, [cyclesKey]) // eslint-disable-line react-hooks/exhaustive-deps
-
-  // Explicit states (no ambiguity between "loading", "no cycles yet", "fetch returned empty"):
-  if (!cycles?.length)
-    return (
-      <div className="flex items-center justify-center py-6 text-[11px] text-gray-400">
-        No cycles detected — adjust threshold
-      </div>
-    )
-  if (loading) return <Skeleton minH={140} />
-  if (error)
-    return (
-      <div className="px-3 py-2 text-[11px] text-red-500 bg-red-50 dark:bg-red-950/20 rounded-lg">
-        {error}
-      </div>
-    )
-  if (!data?.sectors?.length)
-    return (
-      <div className="flex items-center justify-center py-6 text-[11px] text-gray-400">
-        Sector index data unavailable for this date range
-      </div>
-    )
-
-  const activeIdx = activeCycle
-    ? cycles.findIndex((c) => c.start_date === activeCycle.start_date)
-    : -1
-
-  // Compute per-sector total compounded return across all cycles for the right summary column
-  const totalReturn = (returns) => {
-    let c = 1,
-      any = false
-    for (const r of returns) {
-      if (r != null) {
-        c *= 1 + r / 100
-        any = true
-      }
-    }
-    return any ? +((c - 1) * 100).toFixed(1) : null
-  }
-
-  return (
-    // overscroll-x-contain stops the swipe from chaining to page scroll.
-    // Scrollbar is hidden app-wide (index.css global rule).
-    // pb-1 reserves space inside the rounded card so the scrollbar isn't clipped.
-    <div className="overflow-x-auto overscroll-x-contain pb-1">
-      <table className="border-collapse text-[10px]">
-        <thead>
-          <tr>
-            {/* Sticky left: Sector name column. z-30 so it covers both the regular cycle cells AND the active-cycle inset rings. */}
-            <th className="px-2 py-1.5 text-left text-[10px] font-semibold text-gray-400 whitespace-nowrap sticky left-0 bg-white dark:bg-gray-900 z-30 shadow-[1px_0_0_0_rgba(0,0,0,0.04)] dark:shadow-[1px_0_0_0_rgba(255,255,255,0.04)]">
-              Sector
-            </th>
-            {cycles.map((c, ci) => {
-              const isBull = c.type === 'bull'
-              const isActive = ci === activeIdx
-              const num = c.name?.match(/\d+/)?.[0] || ''
-              return (
-                <th
-                  key={ci}
-                  onClick={() => onCycleSelect?.(c)}
-                  title={`${c.name || (isBull ? '▲' : '▼')} · ${c.start_date} → ${c.end_date} (${c.pct >= 0 ? '+' : ''}${c.pct?.toFixed(1)}%) · click to load`}
-                  className={`px-1.5 py-1 text-center text-[10px] font-bold tabular-nums cursor-pointer transition-colors min-w-[52px] hover:underline decoration-dotted underline-offset-2
-                    ${
-                      isActive
-                        ? isBull
-                          ? 'bg-emerald-100 dark:bg-emerald-900/40 text-emerald-700 dark:text-emerald-300'
-                          : 'bg-red-100 dark:bg-red-900/40 text-red-700 dark:text-red-300'
-                        : isBull
-                          ? 'text-emerald-500 hover:bg-emerald-50 dark:hover:bg-emerald-950/30'
-                          : 'text-red-400 hover:bg-red-50 dark:hover:bg-red-950/30'
-                    }`}
-                >
-                  <div className="whitespace-nowrap">
-                    {isBull ? '▲' : '▼'} {isBull ? 'Bull' : 'Bear'} {num}
-                  </div>
-                  <div className="text-[9px] font-normal opacity-70">
-                    {c.start_date?.slice(0, 7)}
-                  </div>
-                </th>
-              )
-            })}
-            {/* Sticky right: Total column. Same z-30 so it stays above active rings. */}
-            <th className="px-2 py-1.5 text-center text-[10px] font-semibold text-gray-400 whitespace-nowrap sticky right-0 bg-white dark:bg-gray-900 z-30 border-l border-gray-200 dark:border-gray-700 shadow-[-1px_0_0_0_rgba(0,0,0,0.04)] dark:shadow-[-1px_0_0_0_rgba(255,255,255,0.04)]">
-              Total
-            </th>
-          </tr>
-        </thead>
-        <tbody>
-          {data.sectors.map((s) => {
-            const total = totalReturn(s.returns)
-            const shortName = stripIndexName(s.name)
-            const isNepse = s.index_id === 12
-            return (
-              <tr key={s.index_id} className="border-t border-gray-50 dark:border-gray-900">
-                <td
-                  className={`px-2 py-1 text-[10px] whitespace-nowrap sticky left-0 bg-white dark:bg-gray-900 z-20 max-w-[110px] truncate shadow-[1px_0_0_0_rgba(0,0,0,0.04)] dark:shadow-[1px_0_0_0_rgba(255,255,255,0.04)] ${isNepse ? 'font-bold text-gray-900 dark:text-white' : 'font-medium text-gray-700 dark:text-gray-300'}`}
-                >
-                  {isNepse ? 'NEPSE' : shortName}
-                </td>
-                {s.returns.map((pct, ci) => {
-                  const isActive = ci === activeIdx
-                  return (
-                    <td key={ci} className="px-0.5 py-0.5 text-center">
-                      <div
-                        className="rounded text-[10px] font-semibold tabular-nums py-0.5 mx-0.5"
-                        style={{
-                          background: heatColor(pct, dark),
-                          color:
-                            pct == null
-                              ? dark
-                                ? '#4b5563'
-                                : '#d1d5db'
-                              : dark
-                                ? '#f1f5f9'
-                                : '#1e293b',
-                          minWidth: 36,
-                          boxShadow: isActive
-                            ? `inset 0 0 0 1.5px ${cycles[ci]?.type === 'bull' ? '#10b981' : '#ef4444'}`
-                            : 'none',
-                        }}
-                      >
-                        {pct != null ? `${pct >= 0 ? '+' : ''}${pct.toFixed(1)}` : '—'}
-                      </div>
-                    </td>
-                  )
-                })}
-                <td className="px-2 py-1 text-center sticky right-0 bg-white dark:bg-gray-900 z-20 border-l border-gray-200 dark:border-gray-700 shadow-[-1px_0_0_0_rgba(0,0,0,0.04)] dark:shadow-[-1px_0_0_0_rgba(255,255,255,0.04)]">
-                  <span className={`text-[10px] font-bold tabular-nums ${pctTextCls(total)}`}>
-                    {total != null ? `${total >= 0 ? '+' : ''}${total.toFixed(0)}%` : '—'}
-                  </span>
-                </td>
-              </tr>
-            )
-          })}
-        </tbody>
-      </table>
-    </div>
-  )
-}
 
 // ─────────────────────────────────────────────────────────────────────────────
 // MAIN PAGE
@@ -845,33 +655,6 @@ export default function BreakdownPage() {
               )}
             </div>
           )}
-
-          {/* Sector × Cycle Matrix */}
-          <div className={`${CARD} overflow-hidden`}>
-            <div className="flex items-center px-3 py-1.5 border-b border-gray-100 dark:border-gray-800">
-              <span className={STITLE}>Sector × Cycle Returns</span>
-              <span className={`${LABEL} normal-case ml-2 hidden sm:inline`}>
-                compounded % per cycle · click a column to load it
-              </span>
-              {activeCycle && (
-                <span className={`${LABEL} normal-case ml-auto`}>
-                  Active:{' '}
-                  <span
-                    className={activeCycle.type === 'bull' ? 'text-emerald-500' : 'text-red-400'}
-                  >
-                    {activeCycle.type === 'bull' ? '▲' : '▼'}{' '}
-                    {activeCycle.name || activeCycle.start_date?.slice(0, 7)}
-                  </span>
-                </span>
-              )}
-            </div>
-            <SectorCycleMatrix
-              cycles={cycles}
-              activeCycle={activeCycle}
-              onCycleSelect={selectCycle}
-              dark={isDark}
-            />
-          </div>
         </div>
 
         {/* ── RIGHT PANEL (≥ md) ── */}

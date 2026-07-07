@@ -306,7 +306,10 @@ export const getMonthDetail = (params, cfg) =>
 export const getSectorMonth = (params, cfg) =>
   API.get('/api/insight/sector-month', { params, ...cfg })
 
-export const getSectorCycles = (data, cfg) => API.post('/api/breakdown/sector-cycles', data, cfg)
+export const getCycleMovers = (payload, cfg) =>
+  API.post('/api/breakdown/cycle-movers', payload, cfg)
+export const getCycleConsistency = (payload, cfg) =>
+  API.post('/api/breakdown/cycle-consistency', payload, cfg)
 export const getSectorMonthStocks = (params, cfg) =>
   API.get('/api/breakdown/sector-month-stocks', { params, ...cfg })
 export const getStockReturns = (params, cfg) =>
