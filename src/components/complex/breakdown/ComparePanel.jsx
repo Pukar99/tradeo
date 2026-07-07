@@ -9,8 +9,16 @@ import { getCycleCompare } from '../../../api'
 import { pnlClass } from '../../../utils/format'
 import { CARD, LABEL, STITLE, Skeleton, fmtPct } from '../../datalab/shared'
 import SymbolSearch from '../../common/SymbolSearch'
+import ViewSwitcher from '../../shared/ViewSwitcher'
 import { cycleKey } from './useCycleSelection'
 import { buildLadder, compareSummary, rowKey, sideLabel } from './compareMath'
+
+// Owner addition 2026-07-07: one section at a time inside Compare — a toggle
+// ahead of the side pickers switches between the two tables.
+const SECTIONS = [
+  { id: 'returns', label: 'Cycle returns' },
+  { id: 'ladder', label: 'Compound ladder' },
+]
 
 // Compact cycle chip — "▲/▼ + start year" — mirrors PerformanceChart's cycleChip
 // but this table's rows are API rows (start_date/end_date/type), not named cycles.
@@ -129,6 +137,7 @@ export default function ComparePanel({ cycles, a, b, onChangeA, onChangeB }) {
   const [error, setError] = useState('')
   const [amount, setAmount] = useState(100)
   const [startKey, setStartKey] = useState(null)
+  const [section, setSection] = useState('returns')
   const ctrlRef = useRef(null)
 
   const sig = `${cycles.map(cycleKey).join(',')}|${JSON.stringify(a)}|${JSON.stringify(b)}`
@@ -173,8 +182,14 @@ export default function ComparePanel({ cycles, a, b, onChangeA, onChangeB }) {
 
   return (
     <div className="flex-1 min-h-0 overflow-y-auto px-3 py-2 space-y-3">
-      {/* 1. Picker row */}
+      {/* 1. Section toggle FIRST, then the two side pickers (owner 2026-07-07) */}
       <div className="flex items-center gap-2 flex-wrap">
+        <ViewSwitcher
+          views={SECTIONS}
+          active={section}
+          onChange={setSection}
+          ariaLabel="Compare section"
+        />
         <SidePicker tag="A" side={a} onChange={onChangeA} />
         <span className="text-[10px] text-gray-400 shrink-0">vs</span>
         <SidePicker tag="B" side={b} onChange={onChangeB} />
@@ -212,7 +227,8 @@ export default function ComparePanel({ cycles, a, b, onChangeA, onChangeB }) {
             </span>
           </p>
 
-          {/* 5. Per-cycle returns table */}
+          {/* 5. Per-cycle returns table (section-toggled) */}
+          {section === 'returns' && (
           <div className={`${CARD} overflow-hidden`}>
             <div className="px-3 py-1.5 border-b border-gray-100 dark:border-gray-800 bg-gray-50/60 dark:bg-gray-800/30">
               <p className={STITLE}>Cycle Returns</p>
@@ -231,8 +247,10 @@ export default function ComparePanel({ cycles, a, b, onChangeA, onChangeB }) {
               ))}
             </div>
           </div>
+          )}
 
-          {/* 6. Compound Ladder */}
+          {/* 6. Compound Ladder (section-toggled) */}
+          {section === 'ladder' && (
           <div className={`${CARD} overflow-hidden`}>
             <div className="px-3 py-2 border-b border-gray-100 dark:border-gray-800 bg-gray-50/60 dark:bg-gray-800/30">
               <div className="flex items-center justify-between mb-1.5">
@@ -374,6 +392,7 @@ export default function ComparePanel({ cycles, a, b, onChangeA, onChangeB }) {
               </div>
             )}
           </div>
+          )}
 
           <p className="text-[10px] text-gray-400 text-center">history, not a promise</p>
         </>
