@@ -21,6 +21,7 @@ import { SectorMatrix, StockList } from './breakdown/SectorMatrix'
 import { AggregateStats, CyclePill, IndexSelector } from './breakdown/atoms'
 import CycleAnalyticsCards from './breakdown/CycleAnalyticsCards'
 import FocusedCyclePanel from './breakdown/FocusedCyclePanel'
+import NowBox from './breakdown/NowBox'
 import { useCycleSelection, cycleKey } from './breakdown/useCycleSelection'
 
 const RANGE_VIEWS = [
@@ -750,6 +751,7 @@ export default function BreakdownPage() {
                   Click a zone to drill into sectors.
                 </p>
               </div>
+              <NowBox cycles={cycles} candles={allCandles} />
               <AggregateStats bearCycles={selectedBears} bullCycles={selectedBulls} />
             </div>
           ) : (
