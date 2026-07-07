@@ -22,6 +22,7 @@ import { SectorMatrix, StockList } from './breakdown/SectorMatrix'
 import { AggregateStats, CyclePill, IndexSelector } from './breakdown/atoms'
 import CycleAnalyticsCards from './breakdown/CycleAnalyticsCards'
 import FocusedCyclePanel from './breakdown/FocusedCyclePanel'
+import CompareMiniCharts from './breakdown/CompareMiniCharts'
 import NowBox from './breakdown/NowBox'
 import { useCycleSelection, cycleKey } from './breakdown/useCycleSelection'
 
@@ -784,7 +785,9 @@ export default function BreakdownPage() {
           open={rightOpen}
           widthCls="w-[360px] lg:w-[420px] min-w-[300px]"
         >
-          {!focused ? (
+          {analyticsView === 'compare' ? (
+            <CompareMiniCharts focused={focused} a={sideA} b={sideB} dark={isDark} />
+          ) : !focused ? (
             <div className="flex-1 min-h-0 overflow-y-auto bg-white/40 dark:bg-gray-950/40 p-3 space-y-3">
               <div className={`${CARD} p-3`}>
                 <p className={`${LABEL} text-gray-400 mb-1`}>
