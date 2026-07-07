@@ -16,6 +16,7 @@ import ErrorBoundary from '../components/ErrorBoundary'
 import UpgradePrompt from '../components/UpgradePrompt'
 import AuthWall from '../components/AuthWall'
 import PageSkeleton from '../components/PageSkeleton'
+import ComingSoon from '../components/ComingSoon'
 import { useAuth } from '../context/AuthContext'
 import { safeSessionGet, safeSessionSet } from '../utils/safeSession'
 import { DataLabControlsProvider } from '../components/datalab/DataLabControls'
@@ -42,7 +43,6 @@ export function useToolbarSlot(node) {
 
 // ── Lazy tab components ───────────────────────────────────────────────────────
 
-const PerformanceChart = lazy(() => import('../components/datalab/PerformanceChart'))
 const InsightPage = lazy(() => import('../components/complex/InsightPage'))
 const BreakdownPage = lazy(() => import('../components/complex/BreakdownPage'))
 
@@ -65,13 +65,11 @@ const TABS = [
         <polyline points="22 12 18 12 15 21 9 3 6 12 2 12" />
       </svg>
     ),
-    hint: 'Stock vs NEPSE cycle comparison',
+    hint: 'New Performance experience — coming soon',
     steps: [
-      'Search a stock symbol or leave empty for NEPSE only',
-      'Set swing threshold — higher = fewer, larger cycles',
-      'Click any cycle in the left panel to view its chart',
-      'Use ↑ ↓ arrow keys to move between cycles',
-      'Symbol beat NEPSE win rate shown when stock is selected',
+      'This tab is being redesigned',
+      "Stock-vs-NEPSE cycle comparison moved to Breakdown → Compare",
+      'Use the Compare toggle in the center card',
     ],
   },
   {
@@ -268,11 +266,10 @@ function TabContent({ activeTab }) {
 
   if (activeTab === 'performance')
     return (
-      <ErrorBoundary label="Performance">
-        <Suspense fallback={<TabLoader />}>
-          <PerformanceChart />
-        </Suspense>
-      </ErrorBoundary>
+      <ComingSoon
+        label="Performance"
+        desc="Being redesigned — cycle comparison now lives in Breakdown's Compare view."
+      />
     )
 
   if (activeTab === 'insight')

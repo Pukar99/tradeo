@@ -20,8 +20,8 @@ const SECTIONS = [
   { id: 'ladder', label: 'Compound ladder' },
 ]
 
-// Compact cycle chip — "▲/▼ + start year" — mirrors PerformanceChart's cycleChip
-// but this table's rows are API rows (start_date/end_date/type), not named cycles.
+// Compact cycle chip — "▲/▼ + start year" — this table's rows are API rows
+// (start_date/end_date/type), not named cycles.
 function rowChip(r) {
   return `${r.type === 'bull' ? '▲' : '▼'} ${r.start_date?.slice(0, 4) || ''}`
 }
@@ -46,8 +46,8 @@ function SidePicker({ tag, side, onChange }) {
   )
 }
 
-// Dual diverging bars per cycle — transplant of PerformanceChart's CycleRow
-// (:721-822), generalized for A/B labels instead of NEPSE/stock. Clicking a
+// Dual diverging bars per cycle — transplant of the retired Performance tab's
+// CycleRow, generalized for A/B labels instead of NEPSE/stock. Clicking a
 // row anchors the Compound Ladder (amber left border = investment start).
 function CompareRow({ r, aLbl, bLbl, max, isStart, onClick }) {
   const isBull = r.type === 'bull'

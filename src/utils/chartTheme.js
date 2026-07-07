@@ -3,7 +3,7 @@
 // =============================================================================
 // Candle palettes intentionally vary by feature today:
 //   #22c55e/#ef4444 — NEPSEChart, BacktestChart, insight charts (the dominant pair → default)
-//   #10b981/#ef4444 — PerformanceChart, TradeGalleryView, MarketJournalTab
+//   #10b981/#ef4444 — TradeGalleryView, MarketJournalTab
 //   #16a34a/#dc2626 — chat ChartCard
 // Callers pass their feature's exact pair so adoption is pixel-identical; unifying
 // every feature onto one pair is an owner design decision (same policy as pnlClass).

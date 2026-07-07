@@ -1,6 +1,6 @@
 // =============================================================================
 // compareMath.js — pure math for Breakdown's Compare view (S3 §8.4.3).
-// Transplanted from PerformanceChart's Compound Ladder before its deletion.
+// Transplanted from the retired Performance tab's Compound Ladder.
 // rows = cycle-compare API rows: { start_date, end_date, type, a_ret, b_ret, diff }.
 // =============================================================================
 import { indexLabel } from '../../../utils/constants'

@@ -1,6 +1,6 @@
 // === datalab/shared.jsx — single source for DataLab design tokens + atoms ===
-// Used by all three tabs (PerformanceChart, InsightPage via insight/helpers,
-// BreakdownPage). These strings were previously duplicated per-file and drifted.
+// Used by all tabs (InsightPage via insight/helpers, BreakdownPage). These
+// strings were previously duplicated per-file and drifted.
 
 // ── Design tokens ─────────────────────────────────────────────────────────────
 export const CARD =

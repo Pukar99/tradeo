@@ -331,7 +331,7 @@ export async function getDashboardInit(force = false) {
 
 // Registry for module-local caches that want to be flushed on login/logout
 // without globalCache having to import those modules (avoids pulling lazy
-// chunks like PerformanceChart into the auth code path).
+// chunks like InsightPage into the auth code path).
 const _cleaners = new Set()
 export function registerCacheCleaner(fn) {
   if (typeof fn === 'function') _cleaners.add(fn)

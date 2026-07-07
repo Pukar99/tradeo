@@ -183,8 +183,6 @@ export const getBatchPrices = (symbols) =>
 export const getMarketSymbols = () => API.get('/api/market/symbols')
 export const getIndexChart = (params) => API.get('/api/market/index-chart', { params })
 export const getStockChart = (params, cfg) => API.get('/api/market/stock-chart', { params, ...cfg })
-export const getPerformance = (params, cfg) =>
-  API.get('/api/market/performance', { params, ...cfg })
 export const getTopVolume = (params) => API.get('/api/market/top-volume', { params })
 export const getLatestDate = () => API.get('/api/market/latest-date')
 export const getMarketDates = () => API.get('/api/market/dates')
