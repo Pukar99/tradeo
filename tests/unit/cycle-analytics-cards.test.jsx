@@ -1,5 +1,5 @@
 // @vitest-environment happy-dom
-import { render, screen, waitFor } from '@testing-library/react'
+import { render, screen, waitFor, fireEvent } from '@testing-library/react'
 import { describe, test, expect, vi, beforeEach } from 'vitest'
 
 const movers = vi.fn()
@@ -41,14 +41,21 @@ describe('CycleAnalyticsCards', () => {
     await waitFor(() => expect(screen.getAllByText('WINA').length).toBeGreaterThan(0), {
       timeout: 2000,
     })
+    // Movers view is shown by default — WINA (gainer) and LOSA (loser) both visible.
+    expect(screen.getByText('WINA')).toBeInTheDocument()
     expect(screen.getByText('LOSA')).toBeInTheDocument()
+
+    // Switching to Consistency must NOT refetch — same debounced fetch stays put.
+    fireEvent.click(screen.getByRole('tab', { name: 'Consistency' }))
     expect(screen.getByText(/up 1\/1/)).toBeInTheDocument()
     expect(screen.getByText('history, not a promise')).toBeInTheDocument()
     expect(screen.queryByText(/probability/i)).toBeNull()
+
     // payload shape: exactly the 3 fields + n for movers
     expect(movers).toHaveBeenCalledWith(
       { cycles: [{ start_date: '2023-01-01', end_date: '2023-06-01', type: 'bull' }], n: 5 },
       expect.anything()
     )
+    expect(movers).toHaveBeenCalledTimes(1)
   })
 })

@@ -232,8 +232,10 @@ export function CyclePill({ cycle, active, onClick, selected }) {
             : 'hover:bg-gray-50 dark:hover:bg-gray-900/40'
         }`}
     >
-      <div className="flex items-center justify-between mb-0.5">
-        <span className={`text-[10px] font-bold ${isBear ? 'text-red-500' : 'text-emerald-500'}`}>
+      <div className="flex items-center justify-between gap-1 mb-0.5">
+        <span
+          className={`min-w-0 truncate text-[10px] font-bold ${isBear ? 'text-red-500' : 'text-emerald-500'}`}
+        >
           {mark && (
             <span
               className={`mr-1 ${selected ? (isBear ? 'text-red-500' : 'text-emerald-500') : 'text-gray-300 dark:text-gray-600'}`}
@@ -244,14 +246,14 @@ export function CyclePill({ cycle, active, onClick, selected }) {
           {isBear ? '▼' : '▲'} {cycle.name || (isBear ? 'Bear' : 'Bull')}
         </span>
         <span
-          className={`text-[10px] font-black tabular-nums ${isBear ? 'text-red-500' : 'text-emerald-500'}`}
+          className={`shrink-0 text-[10px] font-black tabular-nums ${isBear ? 'text-red-500' : 'text-emerald-500'}`}
         >
           {cycle.pct >= 0 ? '+' : ''}
           {cycle.pct?.toFixed(1)}%
         </span>
       </div>
-      <div className="flex items-center justify-between text-[10px]">
-        <span className="text-gray-500 dark:text-gray-400">
+      <div className="flex items-center justify-between gap-1 text-[10px]">
+        <span className="min-w-0 truncate text-gray-500 dark:text-gray-400">
           <span className="font-mono text-gray-400">{cycle.start_date?.slice(0, 4)}</span> ·{' '}
           {cycle.duration_days}d
           {isBear &&
@@ -261,7 +263,9 @@ export function CyclePill({ cycle, active, onClick, selected }) {
               <span className="text-amber-500"> · Open</span>
             ))}
         </span>
-        <span className={`px-1 rounded-sm text-[10px] font-semibold ${phaseTone}`}>
+        <span
+          className={`shrink-0 px-1 rounded-sm text-[10px] font-semibold ${phaseTone}`}
+        >
           {cycle.phase}
         </span>
       </div>
@@ -269,10 +273,13 @@ export function CyclePill({ cycle, active, onClick, selected }) {
   )
 }
 
-// Memoized index selector
-export const IndexSelector = memo(function IndexSelector({ options, activeId, onSelect }) {
+// Memoized index selector. `wrap` (default false, toolbar look untouched) makes
+// the pill row wrap onto multiple lines and fill the container's width — used
+// by the Breakdown left panel (180-220px) where the toolbar's single-row
+// layout would overflow horizontally (S2b F1, owner eyeball).
+export const IndexSelector = memo(function IndexSelector({ options, activeId, onSelect, wrap = false }) {
   return (
-    <div className="flex items-center gap-1 flex-nowrap">
+    <div className={wrap ? 'flex flex-wrap items-center gap-1 w-full' : 'flex items-center gap-1 flex-nowrap'}>
       {options.map((opt) => (
         <button
           key={opt.id}

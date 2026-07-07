@@ -3,12 +3,23 @@
 // (spec §5.3 center-bottom, S2b). Data: S2a POST endpoints. Debounced 400ms,
 // abortable (Rule 45). Copy rule: NEVER the word "probability" — footer says
 // `history, not a promise`.
+//
+// One CARD with a ViewSwitcher toggle (movers/consistency) instead of two
+// side-by-side cards (S2b owner eyeball F3) — both endpoints are still
+// fetched together on cycle-selection change; switching the view is local
+// state only and never refetches.
 // =============================================================================
 
 import { useEffect, useRef, useState } from 'react'
 import { getCycleMovers, getCycleConsistency } from '../../../api'
 import { cycleKey } from './useCycleSelection'
-import { CARD, LABEL, STITLE, Skeleton, fmtPct } from '../../datalab/shared'
+import { CARD, LABEL, Skeleton, fmtPct } from '../../datalab/shared'
+import ViewSwitcher from '../../shared/ViewSwitcher'
+
+const VIEWS = [
+  { id: 'movers', label: 'Top movers' },
+  { id: 'consistency', label: 'Consistency' },
+]
 
 function EmptyState() {
   return (
@@ -45,6 +56,7 @@ export default function CycleAnalyticsCards({ selectedCycles }) {
   const [consistency, setConsistency] = useState(null)
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState('')
+  const [view, setView] = useState('movers')
   const ctrlRef = useRef(null)
 
   const sig = selectedCycles.map(cycleKey).join(',')
@@ -95,83 +107,64 @@ export default function CycleAnalyticsCards({ selectedCycles }) {
     ? Math.max(...[...movers.gainers, ...movers.losers].map((s) => Math.abs(s.avg_ret || 0)), 1)
     : 1
 
-  return (
-    <div className="flex gap-3 flex-1 min-h-0">
-      {/* Top movers */}
-      <div className={`${CARD} flex-1 min-w-0 flex flex-col overflow-hidden`}>
-        <div className="shrink-0 flex items-center gap-2 px-3 py-1.5 border-b border-gray-100 dark:border-gray-800">
-          <span className={STITLE}>Top movers</span>
-          <span className={`${LABEL} normal-case ml-auto`}>
-            {selectedCycles.length} cycle{selectedCycles.length === 1 ? '' : 's'} · avg return
-          </span>
-        </div>
-        {error && (
-          <div className="px-3 py-1.5 text-[10px] text-red-500 flex items-center justify-between">
-            <span>{error}</span>
-            <button onClick={() => setError('')} className="font-bold">×</button>
-          </div>
-        )}
-        {!selectedCycles.length ? (
-          <EmptyState />
-        ) : loading || !movers ? (
-          <Skeleton minH={80} />
-        ) : (
-          <div className="flex-1 min-h-0 overflow-y-auto px-3 py-2 flex gap-4">
-            <div className="flex-1 min-w-0">
-              <p className={`${LABEL} mb-1`}>Gainers</p>
-              {movers.gainers.map((s) => (
-                <MoverRow key={s.symbol} s={s} max={maxAbs} up />
-              ))}
-            </div>
-            <div className="flex-1 min-w-0">
-              <p className={`${LABEL} mb-1`}>Losers</p>
-              {movers.losers.map((s) => (
-                <MoverRow key={s.symbol} s={s} max={maxAbs} up={false} />
-              ))}
-            </div>
-          </div>
-        )}
-      </div>
+  const meta =
+    view === 'movers'
+      ? `${selectedCycles.length} cycle${selectedCycles.length === 1 ? '' : 's'} · avg return`
+      : 'history, not a promise'
 
-      {/* Consistency */}
-      <div className={`${CARD} flex-1 min-w-0 flex flex-col overflow-hidden`}>
-        <div className="shrink-0 flex items-center gap-2 px-3 py-1.5 border-b border-gray-100 dark:border-gray-800">
-          <span className={STITLE}>Consistency</span>
-          <span className={`${LABEL} normal-case ml-auto`}>history, not a promise</span>
+  return (
+    <div className={`${CARD} flex-1 min-h-0 flex flex-col overflow-hidden`}>
+      <div className="shrink-0 flex items-center gap-2 px-3 py-1.5 border-b border-gray-100 dark:border-gray-800">
+        <ViewSwitcher views={VIEWS} active={view} onChange={setView} ariaLabel="Cycle analytics view" />
+        <span className={`${LABEL} normal-case ml-auto`}>{meta}</span>
+      </div>
+      {error && (
+        <div className="px-3 py-1.5 text-[10px] text-red-500 flex items-center justify-between">
+          <span>{error}</span>
+          <button onClick={() => setError('')} className="font-bold">×</button>
         </div>
-        {error && (
-          <div className="px-3 py-1.5 text-[10px] text-red-500 flex items-center justify-between">
-            <span>{error}</span>
-            <button onClick={() => setError('')} className="font-bold">×</button>
-          </div>
-        )}
-        {!selectedCycles.length ? (
-          <EmptyState />
-        ) : loading || !consistency ? (
-          <Skeleton minH={80} />
-        ) : (
-          <div className="flex-1 min-h-0 overflow-y-auto px-3 py-1">
-            {consistency.stocks.map((s) => (
-              <div key={s.symbol} className="flex items-center gap-2 py-0.5 tabular-nums">
-                <span className="text-[11px] font-bold w-14 truncate text-gray-800 dark:text-gray-100">
-                  {s.symbol}
-                </span>
-                <span className="text-[10px] text-gray-500 dark:text-gray-400">
-                  up {s.up_count}/{s.n_covered}
-                </span>
-                <span
-                  className={`text-[11px] font-bold ml-auto ${s.avg_ret >= 0 ? 'text-emerald-600 dark:text-emerald-400' : 'text-red-600 dark:text-red-400'}`}
-                >
-                  {fmtPct(s.avg_ret)}
-                </span>
-                <span className="text-[10px] text-gray-400 w-14 text-right">
-                  corr {s.corr != null ? s.corr.toFixed(2) : '—'}
-                </span>
-              </div>
+      )}
+      {!selectedCycles.length ? (
+        <EmptyState />
+      ) : loading || !movers || !consistency ? (
+        <Skeleton minH={80} />
+      ) : view === 'movers' ? (
+        <div className="flex-1 min-h-0 overflow-y-auto px-3 py-2 flex gap-4">
+          <div className="flex-1 min-w-0">
+            <p className={`${LABEL} mb-1`}>Gainers</p>
+            {movers.gainers.map((s) => (
+              <MoverRow key={s.symbol} s={s} max={maxAbs} up />
             ))}
           </div>
-        )}
-      </div>
+          <div className="flex-1 min-w-0">
+            <p className={`${LABEL} mb-1`}>Losers</p>
+            {movers.losers.map((s) => (
+              <MoverRow key={s.symbol} s={s} max={maxAbs} up={false} />
+            ))}
+          </div>
+        </div>
+      ) : (
+        <div className="flex-1 min-h-0 overflow-y-auto px-3 py-1">
+          {consistency.stocks.map((s) => (
+            <div key={s.symbol} className="flex items-center gap-2 py-0.5 tabular-nums">
+              <span className="text-[11px] font-bold w-14 truncate text-gray-800 dark:text-gray-100">
+                {s.symbol}
+              </span>
+              <span className="text-[10px] text-gray-500 dark:text-gray-400">
+                up {s.up_count}/{s.n_covered}
+              </span>
+              <span
+                className={`text-[11px] font-bold ml-auto ${s.avg_ret >= 0 ? 'text-emerald-600 dark:text-emerald-400' : 'text-red-600 dark:text-red-400'}`}
+              >
+                {fmtPct(s.avg_ret)}
+              </span>
+              <span className="text-[10px] text-gray-400 w-14 text-right">
+                corr {s.corr != null ? s.corr.toFixed(2) : '—'}
+              </span>
+            </div>
+          ))}
+        </div>
+      )}
     </div>
   )
 }

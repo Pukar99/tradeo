@@ -433,7 +433,7 @@ export default function BreakdownPage() {
 
   // Cycle-filter tabs (shared by left panel + mobile sheet)
   const filterTabs = (padY) => (
-    <div className="shrink-0 flex border-b border-gray-100 dark:border-gray-800">
+    <div className="shrink-0 min-w-0 flex border-b border-gray-100 dark:border-gray-800">
       {[
         ['all', 'All'],
         ['bear', 'Bear'],
@@ -442,7 +442,7 @@ export default function BreakdownPage() {
         <button
           key={v}
           onClick={() => setCycleFilter(v)}
-          className={`flex-1 ${padY} text-[10px] font-semibold transition-colors
+          className={`flex-1 min-w-0 truncate ${padY} text-[10px] font-semibold transition-colors
             ${
               cycleFilter === v
                 ? v === 'bear'
@@ -557,13 +557,18 @@ export default function BreakdownPage() {
           open={leftOpen}
           widthCls="w-[200px] min-w-[180px] max-w-[220px]"
         >
-          <div className="shrink-0 px-2 py-2 border-b border-gray-100 dark:border-gray-800 space-y-2">
-            <IndexSelector options={INDEX_OPTIONS} activeId={indexId} onSelect={handleIndexSelect} />
+          <div className="shrink-0 min-w-0 px-2 py-2 border-b border-gray-100 dark:border-gray-800 space-y-2">
+            <IndexSelector
+              options={INDEX_OPTIONS}
+              activeId={indexId}
+              onSelect={handleIndexSelect}
+              wrap
+            />
             {quickChips}
           </div>
           {filterTabs('py-1.5')}
           {detecting && <Skeleton minH={120} />}
-          <div className="flex-1 min-h-0 overflow-y-auto bg-white/40 dark:bg-gray-950/40">
+          <div className="flex-1 min-w-0 min-h-0 overflow-y-auto overflow-x-hidden bg-white/40 dark:bg-gray-950/40">
             {cycleChecklist((c) => sel.toggle(c))}
           </div>
         </CollapsiblePanel>
