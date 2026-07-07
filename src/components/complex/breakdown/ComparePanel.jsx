@@ -6,7 +6,6 @@
 // =============================================================================
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { getCycleCompare } from '../../../api'
-import { INDEX_OPTIONS } from '../../../utils/constants'
 import { pnlClass } from '../../../utils/format'
 import { CARD, LABEL, STITLE, Skeleton, fmtPct } from '../../datalab/shared'
 import SymbolSearch from '../../common/SymbolSearch'
@@ -19,26 +18,22 @@ function rowChip(r) {
   return `${r.type === 'bull' ? '▲' : '▼'} ${r.start_date?.slice(0, 4) || ''}`
 }
 
+// One COMBINED box per side (owner eyeball 2026-07-07 — the earlier select+search
+// pair read as two duplicated controls). stocksOnly={false} makes SymbolSearch's
+// dropdown list indices (NEPSE + sector sub-indices) alongside stocks; its
+// onSelect passes indexId for index rows and null for stocks.
 function SidePicker({ tag, side, onChange }) {
-  const selValue = side?.index_id ?? ''
   return (
     <div className="flex items-center gap-1 min-w-0">
       <span className={`${LABEL} shrink-0`}>{tag}</span>
-      <select
-        value={selValue}
-        onChange={(e) => e.target.value && onChange({ index_id: +e.target.value })}
-        aria-label={`Side ${tag} index`}
-        className="text-[10px] font-semibold border border-gray-200 dark:border-gray-700 rounded px-1 py-0.5 bg-white dark:bg-gray-900 text-gray-700 dark:text-gray-200 focus:outline-none max-w-[110px]"
-      >
-        <option value="">{side?.symbol ? side.symbol : 'Index…'}</option>
-        {INDEX_OPTIONS.map((o) => (
-          <option key={o.id} value={o.id}>
-            {o.label}
-          </option>
-        ))}
-      </select>
-      {/* Owner addition 2026-07-07: search INSIDE Compare — either side can be a stock */}
-      <SymbolSearch value={side?.symbol || ''} stocksOnly onSelect={(sym) => onChange({ symbol: sym })} />
+      <SymbolSearch
+        value={side ? sideLabel(side) : ''}
+        stocksOnly={false}
+        inputClassName="w-[72px]"
+        onSelect={(label, indexId) =>
+          onChange(indexId ? { index_id: indexId } : { symbol: label })
+        }
+      />
     </div>
   )
 }
