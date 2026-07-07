@@ -15,10 +15,12 @@ import { getCycleMovers, getCycleConsistency } from '../../../api'
 import { cycleKey } from './useCycleSelection'
 import { CARD, LABEL, Skeleton, fmtPct } from '../../datalab/shared'
 import ViewSwitcher from '../../shared/ViewSwitcher'
+import ComparePanel from './ComparePanel'
 
 const VIEWS = [
   { id: 'movers', label: 'Top movers' },
   { id: 'consistency', label: 'Consistency' },
+  { id: 'compare', label: 'Compare' },
 ]
 
 const CONSISTENCY_GRID = 'grid grid-cols-[3.5rem_1fr_4rem_6.5rem] gap-2'
@@ -113,12 +115,11 @@ function MoverRow({ s, max, up }) {
   )
 }
 
-export default function CycleAnalyticsCards({ selectedCycles }) {
+export default function CycleAnalyticsCards({ selectedCycles, view, onViewChange, compare }) {
   const [movers, setMovers] = useState(null)
   const [consistency, setConsistency] = useState(null)
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState('')
-  const [view, setView] = useState('movers')
   const ctrlRef = useRef(null)
 
   const sig = selectedCycles.map(cycleKey).join(',')
@@ -146,7 +147,7 @@ export default function CycleAnalyticsCards({ selectedCycles }) {
       }
       try {
         const [m, c] = await Promise.all([
-          getCycleMovers({ ...payload, n: 5 }, { signal: ctrl.signal }),
+          getCycleMovers({ ...payload, n: 15 }, { signal: ctrl.signal }),
           getCycleConsistency(payload, { signal: ctrl.signal }),
         ])
         if (ctrl.signal.aborted) return
@@ -172,12 +173,14 @@ export default function CycleAnalyticsCards({ selectedCycles }) {
   const meta =
     view === 'movers'
       ? `${selectedCycles.length} cycle${selectedCycles.length === 1 ? '' : 's'} · avg return`
-      : 'history, not a promise'
+      : view === 'compare'
+        ? 'over selected cycles · history, not a promise'
+        : 'history, not a promise'
 
   return (
     <div className={`${CARD} flex-1 min-h-[260px] lg:min-h-0 flex flex-col overflow-hidden`}>
       <div className="shrink-0 flex items-center gap-2 px-3 py-1.5 border-b border-gray-100 dark:border-gray-800">
-        <ViewSwitcher views={VIEWS} active={view} onChange={setView} ariaLabel="Cycle analytics view" />
+        <ViewSwitcher views={VIEWS} active={view} onChange={onViewChange} ariaLabel="Cycle analytics view" />
         <span className={`${LABEL} normal-case ml-auto`}>{meta}</span>
       </div>
       {error && (
@@ -186,7 +189,15 @@ export default function CycleAnalyticsCards({ selectedCycles }) {
           <button onClick={() => setError('')} className="font-bold">×</button>
         </div>
       )}
-      {!selectedCycles.length ? (
+      {view === 'compare' ? (
+        <ComparePanel
+          cycles={selectedCycles}
+          a={compare.a}
+          b={compare.b}
+          onChangeA={compare.onChangeA}
+          onChangeB={compare.onChangeB}
+        />
+      ) : !selectedCycles.length ? (
         <EmptyState />
       ) : loading || !movers || !consistency ? (
         <Skeleton minH={80} />

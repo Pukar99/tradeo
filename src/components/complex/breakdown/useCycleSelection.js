@@ -71,6 +71,13 @@ export function useCycleSelection(cycles) {
     setFocused(null)
   }, [])
 
+  // Owner addition (S3): toolbar Reset — selection back to the default rule
+  // (last 3 bulls; all if no bulls), focus cleared.
+  const reset = useCallback(() => {
+    setKeys(defaultKeys(cycles))
+    setFocused(null)
+  }, [cyclesSig]) // eslint-disable-line react-hooks/exhaustive-deps
+
   const selectedCycles = useMemo(
     () => cycles.filter((c) => selectedKeys.has(cycleKey(c))),
     [cyclesSig, selectedKeys] // eslint-disable-line react-hooks/exhaustive-deps
@@ -87,6 +94,7 @@ export function useCycleSelection(cycles) {
     selectBears,
     selectLastBull,
     clear,
+    reset,
     selectedCycles,
   }
 }

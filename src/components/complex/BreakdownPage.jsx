@@ -15,6 +15,7 @@ import { CARD, LABEL, STITLE, Skeleton } from '../datalab/shared'
 import { CollapsiblePanel, PanelToggle, usePanelOpen } from '../shared/CollapsiblePanel'
 import ViewSwitcher from '../shared/ViewSwitcher'
 import { useDataLabControls } from '../datalab/DataLabControls'
+import SymbolSearch from '../common/SymbolSearch'
 import { stripIndexName, phaseCls, addDays } from './breakdown/helpers'
 import { PriceChart, MiniOverview, SectorIndexChart } from './breakdown/charts'
 import { SectorMatrix, StockList } from './breakdown/SectorMatrix'
@@ -38,7 +39,16 @@ export default function BreakdownPage() {
 
   // Swing threshold now lives in the shared DataLab toolbar controls (S2b) —
   // clamped 5–50 + session-persisted inside the provider.
-  const { threshold, setThreshold } = useDataLabControls()
+  const { threshold, setThreshold, symbol, setSymbol } = useDataLabControls()
+  // Center analytics card view + Compare sides (S3). Lifted here because the
+  // right panel switches to Compare mini charts when view === 'compare' (T7).
+  const [analyticsView, setAnalyticsView] = useState('movers')
+  const [sideA, setSideA] = useState({ index_id: 12 })
+  const [sideB, setSideB] = useState(null)
+  // Toolbar search feeds Compare side B (spec §8.4.5)
+  useEffect(() => {
+    if (symbol) setSideB({ symbol })
+  }, [symbol])
 
   // Core state — index survives refresh via sessionStorage
   const [indexId, setIndexId] = useState(() => {
@@ -331,6 +341,25 @@ export default function BreakdownPage() {
     [sortBy]
   )
 
+  // Toolbar Reset (owner addition): every control back to its default. If the
+  // detection inputs differ from defaults, re-detect — the cycles change then
+  // auto-resets the selection via the hook's cyclesSig effect.
+  const handleReset = useCallback(() => {
+    setCycleFilter('all')
+    setRange('all')
+    setSymbol('')
+    setSideA({ index_id: 12 })
+    setSideB(null)
+    setAnalyticsView('movers')
+    if (ranThreshold !== 10 || indexId !== 12) {
+      setIndexId(12)
+      detectCycles(10, 12)
+    } else {
+      setThreshold(10)
+      sel.reset()
+    }
+  }, [ranThreshold, indexId, detectCycles, setSymbol, setThreshold, sel])
+
   // Derived values (memoized — Rule 37)
   const sectors = useMemo(() => analysis?.sectors || [], [analysis])
   const summary = analysis?.summary
@@ -461,6 +490,8 @@ export default function BreakdownPage() {
   // Detect + counts + mobile cycles button stay here.
   const toolbar = useToolbarSlot(
     <div className="flex items-center gap-2 flex-nowrap whitespace-nowrap">
+      <SymbolSearch value={symbol} stocksOnly onSelect={setSymbol} />
+
       <div className="flex items-center gap-1 shrink-0">
         <span className={`${LABEL} normal-case`}>Swing ≥</span>
         <input
@@ -509,6 +540,14 @@ export default function BreakdownPage() {
             : `Cycles (${cycles.length})`}
         </button>
       )}
+
+      <button
+        onClick={handleReset}
+        title="Reset filters, selection and search to defaults"
+        className={`px-2 py-0.5 rounded ${LABEL} normal-case border border-gray-200 dark:border-gray-700 text-gray-600 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors`}
+      >
+        Reset
+      </button>
     </div>
   )
 
@@ -608,8 +647,13 @@ export default function BreakdownPage() {
             )}
           </div>
 
-          {/* Top Movers + Consistency for the SELECTED cycles — fills the rest */}
-          <CycleAnalyticsCards selectedCycles={sel.selectedCycles} />
+          {/* Top Movers + Consistency + Compare for the SELECTED cycles — fills the rest */}
+          <CycleAnalyticsCards
+            selectedCycles={sel.selectedCycles}
+            view={analyticsView}
+            onViewChange={setAnalyticsView}
+            compare={{ a: sideA, b: sideB, onChangeA: setSideA, onChangeB: setSideB }}
+          />
 
           {/* Mobile-only detail (no right panel below lg) — focused cycle drill-down */}
           {focused && (

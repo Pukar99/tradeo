@@ -1,4 +1,5 @@
 // @vitest-environment happy-dom
+import { useState } from 'react'
 import { render, screen, waitFor, fireEvent } from '@testing-library/react'
 import { describe, test, expect, vi, beforeEach } from 'vitest'
 
@@ -12,6 +13,24 @@ vi.mock('../../src/api', () => ({
 import CycleAnalyticsCards from '../../src/components/complex/breakdown/CycleAnalyticsCards'
 
 const CYCLES = [{ start_date: '2023-01-01', end_date: '2023-06-01', type: 'bull' }]
+
+// New required props (S3 T6): view is now controlled by the parent (BreakdownPage);
+// compare carries the A/B sides for the Compare view.
+const compareProp = { a: null, b: null, onChangeA() {}, onChangeB() {} }
+
+// Small stateful wrapper so tests can exercise the now-lifted `view` control
+// the same way BreakdownPage does (view state lives in the parent).
+function Harness({ selectedCycles }) {
+  const [view, setView] = useState('movers')
+  return (
+    <CycleAnalyticsCards
+      selectedCycles={selectedCycles}
+      view={view}
+      onViewChange={setView}
+      compare={compareProp}
+    />
+  )
+}
 
 beforeEach(() => {
   movers.mockReset().mockResolvedValue({
@@ -31,13 +50,13 @@ beforeEach(() => {
 
 describe('CycleAnalyticsCards', () => {
   test('empty selection: friendly empty state, no fetch', () => {
-    render(<CycleAnalyticsCards selectedCycles={[]} />)
+    render(<Harness selectedCycles={[]} />)
     expect(screen.getAllByText(/select a cycle/i).length).toBeGreaterThan(0)
     expect(movers).not.toHaveBeenCalled()
   })
 
   test('renders movers + consistency; corr null shows dash; honest footer', async () => {
-    render(<CycleAnalyticsCards selectedCycles={CYCLES} />)
+    render(<Harness selectedCycles={CYCLES} />)
     await waitFor(() => expect(screen.getAllByText('WINA').length).toBeGreaterThan(0), {
       timeout: 2000,
     })
@@ -53,9 +72,9 @@ describe('CycleAnalyticsCards', () => {
     expect(screen.getByText('history, not a promise')).toBeInTheDocument()
     expect(screen.queryByText(/probability/i)).toBeNull()
 
-    // payload shape: exactly the 3 fields + n for movers
+    // payload shape: exactly the 3 fields + bumped n (owner addition: 15 per side)
     expect(movers).toHaveBeenCalledWith(
-      { cycles: [{ start_date: '2023-01-01', end_date: '2023-06-01', type: 'bull' }], n: 5 },
+      { cycles: [{ start_date: '2023-01-01', end_date: '2023-06-01', type: 'bull' }], n: 15 },
       expect.anything()
     )
     expect(movers).toHaveBeenCalledTimes(1)

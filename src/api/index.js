@@ -310,6 +310,8 @@ export const getCycleMovers = (payload, cfg) =>
   API.post('/api/breakdown/cycle-movers', payload, cfg)
 export const getCycleConsistency = (payload, cfg) =>
   API.post('/api/breakdown/cycle-consistency', payload, cfg)
+export const getCycleCompare = (payload, cfg) =>
+  API.post('/api/breakdown/cycle-compare', payload, cfg)
 export const getSectorMonthStocks = (params, cfg) =>
   API.get('/api/breakdown/sector-month-stocks', { params, ...cfg })
 export const getStockReturns = (params, cfg) =>

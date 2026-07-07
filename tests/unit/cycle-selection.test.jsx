@@ -54,4 +54,17 @@ describe('useCycleSelection', () => {
     expect(result.current.selectedKeys.size).toBe(0)
     expect(result.current.selectedCycles).toEqual([])
   })
+
+  test('reset: returns to the default (last-3-bulls) selection and clears focus', () => {
+    const { result } = renderHook(() => useCycleSelection(CYC))
+    act(() => result.current.clear())
+    expect(result.current.selectedKeys.size).toBe(0)
+    act(() => result.current.reset())
+    // CYC has 2 bulls (idx 0, 2) — default rule selects both, no bear.
+    expect(result.current.selectedKeys.size).toBe(2)
+    expect(result.current.isSelected(CYC[0])).toBe(true)
+    expect(result.current.isSelected(CYC[2])).toBe(true)
+    expect(result.current.isSelected(CYC[1])).toBe(false)
+    expect(result.current.focused).toBeNull()
+  })
 })
