@@ -26,6 +26,33 @@ import CompareMiniCharts from './breakdown/CompareMiniCharts'
 import NowBox from './breakdown/NowBox'
 import { useCycleSelection, cycleKey } from './breakdown/useCycleSelection'
 
+// ── Small chrome icons (match DataLabPage tab-icon style: 24x24, stroke 2,
+// round caps/joins) — UI-only glyphs, never used where the character itself
+// carries data meaning (▲/▼/✓/○/●/▶ stay untouched). ─────────────────────────
+function IconRotateCcw({ className = 'w-3 h-3' }) {
+  return (
+    <svg className={className} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round">
+      <polyline points="1 4 1 10 7 10" />
+      <path d="M3.51 15a9 9 0 1 0 2.13-9.36L1 10" />
+    </svg>
+  )
+}
+function IconX({ className = 'w-3 h-3' }) {
+  return (
+    <svg className={className} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round">
+      <line x1="18" y1="6" x2="6" y2="18" />
+      <line x1="6" y1="6" x2="18" y2="18" />
+    </svg>
+  )
+}
+function IconChevronLeft({ className = 'w-3 h-3' }) {
+  return (
+    <svg className={className} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round">
+      <polyline points="15 18 9 12 15 6" />
+    </svg>
+  )
+}
+
 const RANGE_VIEWS = [
   { id: 'all', label: 'All' },
   { id: '5y', label: '5Y' },
@@ -450,7 +477,7 @@ export default function BreakdownPage() {
         <button
           key={label}
           onClick={fn}
-          className={`px-1.5 py-0.5 rounded ${LABEL} normal-case border border-gray-200 dark:border-gray-700 text-gray-600 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors`}
+          className={`px-1.5 py-0.5 rounded select-none ${LABEL} normal-case border border-gray-200 dark:border-gray-700 text-gray-600 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors`}
         >
           {label}
         </button>
@@ -469,7 +496,7 @@ export default function BreakdownPage() {
         <button
           key={v}
           onClick={() => setCycleFilter(v)}
-          className={`flex-1 min-w-0 truncate ${padY} text-[10px] font-semibold transition-colors
+          className={`flex-1 min-w-0 truncate select-none ${padY} text-[10px] font-semibold transition-colors
             ${
               cycleFilter === v
                 ? v === 'bear'
@@ -513,7 +540,7 @@ export default function BreakdownPage() {
           onClick={() => detectCycles(threshold, indexId)}
           disabled={detecting}
           title={thresholdDirty ? 'Threshold changed — press Detect to re-run' : undefined}
-          className={`px-2 py-0.5 rounded text-[10px] font-semibold hover:opacity-80 disabled:opacity-40 transition-opacity ${
+          className={`px-2 py-0.5 rounded select-none text-[10px] font-semibold hover:opacity-80 disabled:opacity-40 transition-opacity ${
             thresholdDirty
               ? 'bg-amber-500 text-white'
               : 'bg-gray-900 dark:bg-gray-100 text-white dark:text-gray-900'
@@ -533,7 +560,7 @@ export default function BreakdownPage() {
 
       {cycles.length > 0 && (
         <button
-          className="lg:hidden flex items-center gap-1 px-2 py-0.5 rounded text-[10px] font-semibold border border-gray-200 dark:border-gray-700 text-gray-600 dark:text-gray-300"
+          className="lg:hidden flex items-center gap-1 px-2 py-0.5 rounded select-none text-[10px] font-semibold border border-gray-200 dark:border-gray-700 text-gray-600 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors"
           onClick={() => setMobileCycles(true)}
         >
           {focused
@@ -545,8 +572,9 @@ export default function BreakdownPage() {
       <button
         onClick={handleReset}
         title="Reset filters, selection and search to defaults"
-        className={`px-2 py-0.5 rounded ${LABEL} normal-case border border-gray-200 dark:border-gray-700 text-gray-600 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors`}
+        className={`flex items-center gap-1 px-2 py-0.5 rounded select-none ${LABEL} normal-case border border-gray-200 dark:border-gray-700 text-gray-600 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors`}
       >
+        <IconRotateCcw className="w-2.5 h-2.5" />
         Reset
       </button>
     </div>
@@ -582,9 +610,10 @@ export default function BreakdownPage() {
           <span>{detectError}</span>
           <button
             onClick={() => setDetectError('')}
-            className="text-red-400 hover:text-red-600 font-bold ml-4"
+            aria-label="Dismiss error"
+            className="text-red-400 hover:text-red-600 font-bold ml-4 transition-colors"
           >
-            ×
+            <IconX className="w-3 h-3" />
           </button>
         </div>
       )}
@@ -620,7 +649,12 @@ export default function BreakdownPage() {
           {/* Mini overview — explicit detecting/empty/ready states (no ambiguous blank box) */}
           <div className={`${CARD} overflow-hidden shrink-0`}>
             <div className="px-3 py-1.5 border-b border-gray-100 dark:border-gray-800 flex items-center justify-between gap-2">
-              <span className={STITLE}>{selectedIndexLabel} — Full History</span>
+              <span className={`${STITLE} flex items-center gap-1.5`}>
+                <svg className="w-3 h-3 shrink-0" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round">
+                  <polyline points="22 12 18 12 15 21 9 3 6 12 2 12" />
+                </svg>
+                {selectedIndexLabel} — Full History
+              </span>
               <span className={`${LABEL} normal-case hidden sm:inline`}>
                 {detecting
                   ? 'Detecting…'
@@ -685,9 +719,10 @@ export default function BreakdownPage() {
                     <div className="flex items-center gap-2 mb-1">
                       <button
                         onClick={() => handleStockSelect(selectedStock)}
-                        className="text-[10px] text-gray-400"
+                        className="flex items-center gap-0.5 text-[10px] text-gray-400 hover:text-gray-600 dark:hover:text-gray-300 transition-colors"
                       >
-                        ← back
+                        <IconChevronLeft className="w-2.5 h-2.5" />
+                        back
                       </button>
                       <span className="text-[11px] font-bold text-gray-800 dark:text-gray-100">
                         {selectedStock.symbol}
@@ -726,8 +761,12 @@ export default function BreakdownPage() {
               {analyzeError && (
                 <div className="px-3 py-2 bg-red-50 dark:bg-red-950/20 border border-red-100 dark:border-red-900/40 rounded-lg text-[11px] text-red-600 dark:text-red-400 flex items-center justify-between">
                   <span>{analyzeError}</span>
-                  <button onClick={() => setAnalyzeError('')} className="font-bold ml-4">
-                    ×
+                  <button
+                    onClick={() => setAnalyzeError('')}
+                    aria-label="Dismiss error"
+                    className="font-bold ml-4 transition-colors"
+                  >
+                    <IconX className="w-3 h-3" />
                   </button>
                 </div>
               )}
@@ -760,9 +799,10 @@ export default function BreakdownPage() {
                     <span className={STITLE}>{stripIndexName(activeSector.index_name)}</span>
                     <button
                       onClick={() => handleSectorClick(activeSector)}
-                      className="text-gray-300 hover:text-gray-500 text-[14px] leading-none ml-auto"
+                      aria-label="Close sector detail"
+                      className="text-gray-300 hover:text-gray-500 leading-none ml-auto transition-colors"
                     >
-                      ×
+                      <IconX className="w-3 h-3" />
                     </button>
                   </div>
                   <div className="max-h-[260px] overflow-auto">
@@ -858,9 +898,9 @@ export default function BreakdownPage() {
               <button
                 onClick={() => setMobileCycles(false)}
                 aria-label="Close cycles sheet"
-                className="w-10 h-10 flex items-center justify-center rounded-full bg-gray-100 dark:bg-gray-800 text-gray-500 text-[14px]"
+                className="w-10 h-10 flex items-center justify-center rounded-full bg-gray-100 dark:bg-gray-800 text-gray-500 transition-colors"
               >
-                ✕
+                <IconX className="w-4 h-4" />
               </button>
             </div>
             <div className="shrink-0 px-4 py-2 border-b border-gray-100 dark:border-gray-800">

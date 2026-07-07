@@ -19,6 +19,23 @@ import { SectorMatrix, StockList } from './SectorMatrix'
 import { ResilientTile, Stat } from './atoms'
 import { cycleKey } from './useCycleSelection'
 
+// Small chrome icons — matches DataLabPage's 24x24 stroke-SVG icon style.
+function IconX({ className = 'w-3 h-3' }) {
+  return (
+    <svg className={className} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round">
+      <line x1="18" y1="6" x2="6" y2="18" />
+      <line x1="6" y1="6" x2="18" y2="18" />
+    </svg>
+  )
+}
+function IconChevronLeft({ className = 'w-3 h-3' }) {
+  return (
+    <svg className={className} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round">
+      <polyline points="15 18 9 12 15 6" />
+    </svg>
+  )
+}
+
 const PANEL_VIEWS = [
   { id: 'general', label: 'General' },
   { id: 'sector', label: 'Sector' },
@@ -79,9 +96,9 @@ export default function FocusedCyclePanel(props) {
           <button
             onClick={onClose}
             aria-label="Close cycle detail"
-            className="shrink-0 w-5 h-5 flex items-center justify-center rounded-full text-gray-400 hover:text-gray-600 dark:hover:text-gray-300 hover:bg-black/5 dark:hover:bg-white/10 text-[13px] leading-none"
+            className="shrink-0 w-5 h-5 flex items-center justify-center rounded-full text-gray-400 hover:text-gray-600 dark:hover:text-gray-300 hover:bg-black/5 dark:hover:bg-white/10 transition-colors leading-none"
           >
-            ×
+            <IconX className="w-3 h-3" />
           </button>
         </div>
       </div>
@@ -94,15 +111,16 @@ export default function FocusedCyclePanel(props) {
               <div className="flex items-center gap-2 mb-1">
                 <button
                   onClick={() => onStockSelect(selectedStock)}
-                  className="text-[10px] text-gray-400 hover:text-gray-600"
+                  className="flex items-center gap-0.5 text-[10px] text-gray-400 hover:text-gray-600 transition-colors"
                 >
-                  ← back
+                  <IconChevronLeft className="w-2.5 h-2.5" />
+                  back
                 </button>
                 <span className="text-[11px] font-bold text-gray-800 dark:text-gray-100">
                   {selectedStock.symbol}
                 </span>
                 <span
-                  className={`text-[10px] font-bold ml-auto ${pctTextCls(selectedStock.drop_pct)}`}
+                  className={`text-[10px] font-bold tabular-nums ml-auto ${pctTextCls(selectedStock.drop_pct)}`}
                 >
                   {selectedStock.drop_pct != null
                     ? `${selectedStock.drop_pct >= 0 ? '+' : ''}${selectedStock.drop_pct.toFixed(1)}%`
@@ -274,8 +292,8 @@ function SectorView(props) {
       {analyzeError && (
         <div className="px-3 py-2 bg-red-50 dark:bg-red-950/20 border border-red-100 dark:border-red-900/40 rounded-lg text-[11px] text-red-600 dark:text-red-400 flex items-center justify-between">
           <span>{analyzeError}</span>
-          <button onClick={onDismissAnalyzeError} className="font-bold ml-4">
-            ×
+          <button onClick={onDismissAnalyzeError} aria-label="Dismiss error" className="font-bold ml-4 transition-colors">
+            <IconX className="w-3 h-3" />
           </button>
         </div>
       )}
@@ -314,9 +332,10 @@ function SectorView(props) {
             <span className="text-[10px] text-gray-400 ml-auto">click to chart</span>
             <button
               onClick={() => onSectorClick(activeSector)}
-              className="text-gray-300 hover:text-gray-500 text-[14px] leading-none"
+              aria-label="Close sector detail"
+              className="text-gray-300 hover:text-gray-500 leading-none transition-colors"
             >
-              ×
+              <IconX className="w-3 h-3" />
             </button>
           </div>
           <div className="max-h-[320px] overflow-auto">

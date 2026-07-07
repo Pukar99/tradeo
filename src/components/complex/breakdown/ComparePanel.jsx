@@ -13,6 +13,36 @@ import ViewSwitcher from '../../shared/ViewSwitcher'
 import { cycleKey } from './useCycleSelection'
 import { buildLadder, compareSummary, rowKey, sideLabel } from './compareMath'
 
+// Small chrome icons — dismiss glyph, matches DataLabPage's 24x24 stroke style.
+function IconX({ className = 'w-3 h-3' }) {
+  return (
+    <svg className={className} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round">
+      <line x1="18" y1="6" x2="6" y2="18" />
+      <line x1="6" y1="6" x2="18" y2="18" />
+    </svg>
+  )
+}
+function IconLadder({ className = 'w-3 h-3' }) {
+  return (
+    <svg className={className} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round">
+      <line x1="6" y1="21" x2="6" y2="3" />
+      <line x1="18" y1="21" x2="18" y2="3" />
+      <line x1="6" y1="6" x2="18" y2="6" />
+      <line x1="6" y1="12" x2="18" y2="12" />
+      <line x1="6" y1="18" x2="18" y2="18" />
+    </svg>
+  )
+}
+function IconTable({ className = 'w-3 h-3' }) {
+  return (
+    <svg className={className} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round">
+      <rect x="3" y="4" width="18" height="16" rx="2" />
+      <line x1="3" y1="10" x2="21" y2="10" />
+      <line x1="9" y1="10" x2="9" y2="20" />
+    </svg>
+  )
+}
+
 // Owner addition 2026-07-07: one section at a time inside Compare — a toggle
 // ahead of the side pickers switches between the two tables.
 const SECTIONS = [
@@ -198,8 +228,8 @@ export default function ComparePanel({ cycles, a, b, onChangeA, onChangeB }) {
       {error && (
         <div className="text-[10px] text-red-500 flex items-center justify-between">
           <span>{error}</span>
-          <button onClick={() => setError('')} className="font-bold">
-            ×
+          <button onClick={() => setError('')} aria-label="Dismiss error" className="font-bold transition-colors">
+            <IconX className="w-3 h-3" />
           </button>
         </div>
       )}
@@ -231,7 +261,10 @@ export default function ComparePanel({ cycles, a, b, onChangeA, onChangeB }) {
           {section === 'returns' && (
           <div className={`${CARD} overflow-hidden`}>
             <div className="px-3 py-1.5 border-b border-gray-100 dark:border-gray-800 bg-gray-50/60 dark:bg-gray-800/30">
-              <p className={STITLE}>Cycle Returns</p>
+              <p className={`${STITLE} flex items-center gap-1.5`}>
+                <IconTable className="w-3 h-3 shrink-0" />
+                Cycle Returns
+              </p>
             </div>
             <div className="max-h-[280px] overflow-y-auto bg-white dark:bg-gray-900">
               {rows.map((r) => (
@@ -254,7 +287,10 @@ export default function ComparePanel({ cycles, a, b, onChangeA, onChangeB }) {
           <div className={`${CARD} overflow-hidden`}>
             <div className="px-3 py-2 border-b border-gray-100 dark:border-gray-800 bg-gray-50/60 dark:bg-gray-800/30">
               <div className="flex items-center justify-between mb-1.5">
-                <p className={STITLE}>Compound Ladder</p>
+                <p className={`${STITLE} flex items-center gap-1.5`}>
+                  <IconLadder className="w-3 h-3 shrink-0" />
+                  Compound Ladder
+                </p>
                 {startKey != null && (
                   <button
                     onClick={() => setStartKey(null)}

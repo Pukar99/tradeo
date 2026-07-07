@@ -17,6 +17,19 @@ const MODES = [
   { id: 'ratio', label: 'Ratio' },
 ]
 
+// Small icon-badge for empty states — same shape as ComingSoon's compact
+// variant (badge + centered stroke icon), no new colors.
+function EmptyIcon() {
+  return (
+    <div className="w-8 h-8 rounded-full bg-gray-100 dark:bg-gray-800 flex items-center justify-center shrink-0 mx-auto mb-2">
+      <svg className="w-4 h-4 text-gray-400" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={1.8} strokeLinecap="round" strokeLinejoin="round">
+        <path d="M3 3v18h18" />
+        <path d="M7 14l4-4 4 4 5-5" />
+      </svg>
+    </div>
+  )
+}
+
 // Fetch one side's candles for the focused window (−30d/+120d padding, capped today).
 function useSideCandles(side, focused) {
   const [state, setState] = useState({ candles: null, error: '' })
@@ -144,13 +157,21 @@ export default function CompareMiniCharts({ focused, a, b, dark }) {
   if (!a || !b)
     return (
       <div className="flex-1 min-h-0 overflow-y-auto p-3">
-        <div className={`${CARD} p-3 text-[11px] text-gray-400`}>Pick both Compare sides in the center card.</div>
+        <div className={`${CARD} p-6 text-center`}>
+          <EmptyIcon />
+          <p className="text-[11px] text-gray-400">Pick both Compare sides</p>
+          <p className="text-[11px] text-gray-400">in the center card.</p>
+        </div>
       </div>
     )
   if (!focused)
     return (
       <div className="flex-1 min-h-0 overflow-y-auto p-3">
-        <div className={`${CARD} p-3 text-[11px] text-gray-400`}>Click a selected cycle to see {sideLabel(a)} vs {sideLabel(b)} over its window.</div>
+        <div className={`${CARD} p-6 text-center`}>
+          <EmptyIcon />
+          <p className="text-[11px] text-gray-400">Click a selected cycle to see</p>
+          <p className="text-[11px] text-gray-400">{sideLabel(a)} vs {sideLabel(b)} over its window.</p>
+        </div>
       </div>
     )
 

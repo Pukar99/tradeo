@@ -5,6 +5,16 @@
 // =============================================================================
 import { CARD, LABEL, fmtPct } from '../../datalab/shared'
 
+// Small chrome icon — matches DataLabPage's 24x24 stroke-SVG icon style.
+function IconCompass({ className = 'w-3 h-3' }) {
+  return (
+    <svg className={className} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round">
+      <circle cx="12" cy="12" r="10" />
+      <polygon points="16.24 7.76 14.12 14.12 7.76 16.24 9.88 9.88 16.24 7.76" />
+    </svg>
+  )
+}
+
 function median(vals) {
   if (!vals.length) return null
   const s = [...vals].sort((a, b) => a - b)
@@ -45,7 +55,10 @@ export default function NowBox({ cycles, candles }) {
   const medDays = up ? now.med.bullDays : now.med.bearDays
   return (
     <div className={`${CARD} p-3`}>
-      <p className={`${LABEL} mb-1.5`}>Where are we now</p>
+      <p className={`${LABEL} mb-1.5 flex items-center gap-1`}>
+        <IconCompass className="w-2.5 h-2.5 shrink-0" />
+        Where are we now
+      </p>
       <div className="flex items-baseline gap-2">
         <span className={`text-[18px] font-black tabular-nums ${up ? 'text-emerald-600 dark:text-emerald-400' : 'text-red-600 dark:text-red-400'}`}>
           {fmtPct(now.retPct)}

@@ -17,6 +17,16 @@ import { CARD, LABEL, Skeleton, fmtPct } from '../../datalab/shared'
 import ViewSwitcher from '../../shared/ViewSwitcher'
 import ComparePanel from './ComparePanel'
 
+// Small chrome icon — dismiss glyph, matches DataLabPage's 24x24 stroke style.
+function IconX({ className = 'w-3 h-3' }) {
+  return (
+    <svg className={className} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round">
+      <line x1="18" y1="6" x2="6" y2="18" />
+      <line x1="6" y1="6" x2="18" y2="18" />
+    </svg>
+  )
+}
+
 const VIEWS = [
   { id: 'movers', label: 'Top movers' },
   { id: 'consistency', label: 'Consistency' },
@@ -186,7 +196,9 @@ export default function CycleAnalyticsCards({ selectedCycles, view, onViewChange
       {error && (
         <div className="px-3 py-1.5 text-[10px] text-red-500 flex items-center justify-between">
           <span>{error}</span>
-          <button onClick={() => setError('')} className="font-bold">×</button>
+          <button onClick={() => setError('')} aria-label="Dismiss error" className="font-bold transition-colors">
+            <IconX className="w-3 h-3" />
+          </button>
         </div>
       )}
       {view === 'compare' ? (
