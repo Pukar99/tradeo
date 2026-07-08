@@ -76,16 +76,16 @@ function SidePicker({ tag, side, onChange }) {
 // left border is a passive indicator of the Compound Ladder's anchor only.
 function CompareRow({ r, aLbl, bLbl, max, isStart, chipLabel, chipTitle, onClick }) {
   const isBull = r.type === 'bull'
-  // Bars are colored by SIDE, matching their labels (A blue-400, B amber-500) —
-  // owner 2026-07-08: same-green bars made NEPSE vs the stock impossible to
-  // tell apart. Gain/loss still reads from the bar's direction + the % text.
+  // Bar colors (owner idea 2026-07-08): hue = the CYCLE's direction, shade =
+  // the SIDE — bull rows use dark green (index, A) vs light green (symbol, B);
+  // bear rows dark red vs light red. Emerald/red 600↔400 Tailwind hexes.
   const barFor = (v, hue) => {
     if (v == null) return { w: 0, color: '#9ca3af', left: 50 }
     const w = Math.min((Math.abs(v) / max) * 50, 50)
     return { w, color: hue, left: v >= 0 ? 50 : 50 - w }
   }
-  const aBar = barFor(r.a_ret, '#60a5fa')
-  const bBar = barFor(r.b_ret, '#f59e0b')
+  const aBar = barFor(r.a_ret, isBull ? '#059669' : '#dc2626')
+  const bBar = barFor(r.b_ret, isBull ? '#34d399' : '#f87171')
 
   return (
     <button
