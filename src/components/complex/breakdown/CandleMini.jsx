@@ -206,7 +206,21 @@ export const MiniCandle = forwardRef(function MiniCandle(
           )
         }
 
-        chart.timeScale().fitContent()
+        // Default view = the SELECTED bull/bear window (owner 2026-07-08), not
+        // the whole fetched range — scroll/zoom (synced) reaches the padding.
+        // Anchor to actual bar dates so setVisibleRange never gets a date the
+        // series doesn't cover; fall back to fitContent when zone is absent.
+        const zs = hasZone ? data.find((d) => d.date >= startDate) : null
+        const ze = hasZone ? [...data].reverse().find((d) => d.date <= endDate) : null
+        if (zs && ze && zs.date < ze.date) {
+          try {
+            chart.timeScale().setVisibleRange({ from: zs.date, to: ze.date })
+          } catch (_) {
+            chart.timeScale().fitContent()
+          }
+        } else {
+          chart.timeScale().fitContent()
+        }
       }
 
       if (cancelled || !domRef.current) return
