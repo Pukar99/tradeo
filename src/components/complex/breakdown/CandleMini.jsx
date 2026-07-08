@@ -271,42 +271,38 @@ export const AutoMiniCandle = forwardRef(function AutoMiniCandle(
 })
 
 // ── Synced crosshair + timescale across two MiniCandle instances ─────────────
-// Adapted from PerformanceChart.jsx's CycleDetail sync effect (was ~L465-542):
-// same retry-until-ready pattern (chart refs may not be mounted yet because
-// AutoMiniCandle's ResizeObserver causes MiniCandle to remount after first
-// render), same bidirectional sub() wiring for crosshair + visible range.
+// Adapted from PerformanceChart.jsx's CycleDetail sync effect (was ~L465-542),
+// hardened 2026-07-08 (owner: "sync not working"): MiniCandle RECREATES its
+// chart whenever data/height/theme change — and height settles right after
+// first paint via AutoMiniCandle's ResizeObserver — so the original one-shot
+// retry wired instances that were immediately replaced. This version WATCHES:
+// it re-wires whenever EITHER chart instance changes and keeps watching while
+// enabled, so crosshair + date/zoom sync survive live use.
 export function useSyncedCharts(aRef, bRef, enabled) {
   const syncingRef = useRef(false)
   useEffect(() => {
     if (!enabled) return
     let unsubs = []
-    let attempts = 0
     let lastAc = null
+    let lastBc = null
+    let cancelled = false
 
-    function trySync() {
+    function wire() {
+      if (cancelled) return
       const ac = aRef.current?.getChart()
       const bc = bRef.current?.getChart()
       const as = aRef.current?.getSeries()
       const bs = bRef.current?.getSeries()
-
-      const chartChanged = ac && ac !== lastAc
-      if (!ac || !bc || !as || !bs) {
-        if (++attempts < 40) {
-          setTimeout(trySync, 150)
-          return
-        }
-        return
-      }
-      if (chartChanged && lastAc) {
-        unsubs.forEach((fn) => {
-          try {
-            fn()
-          } catch (_) {}
-        })
-        unsubs = []
-      }
+      if (!ac || !bc || !as || !bs) return
+      if (ac === lastAc && bc === lastBc && unsubs.length) return // still wired
+      unsubs.forEach((fn) => {
+        try {
+          fn()
+        } catch (_) {}
+      })
+      unsubs = []
       lastAc = ac
-      if (unsubs.length) return // already synced to this instance
+      lastBc = bc
 
       function sub(src, tgt, srcS, tgtS) {
         const u = src.subscribeCrosshairMove((p) => {
@@ -342,9 +338,13 @@ export function useSyncedCharts(aRef, bRef, enabled) {
       if (uA) unsubs.push(uA)
       if (uB) unsubs.push(uB)
     }
-    const tid = setTimeout(trySync, 300)
+    wire()
+    // 400ms watcher: cheap no-op when instances are unchanged; re-wires after
+    // any chart recreation (data switch, height settle, theme flip).
+    const iv = setInterval(wire, 400)
     return () => {
-      clearTimeout(tid)
+      cancelled = true
+      clearInterval(iv)
       unsubs.forEach((fn) => {
         try {
           fn()
