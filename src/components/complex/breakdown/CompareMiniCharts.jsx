@@ -9,8 +9,8 @@ import { apiError, isCanceled } from '../../../utils/format'
 import { CARD, LABEL, STITLE, Skeleton } from '../../datalab/shared'
 import ViewSwitcher from '../../shared/ViewSwitcher'
 import { addDays } from './helpers'
-import { PriceChart } from './charts'
 import { sideLabel } from './compareMath'
+import { AutoMiniCandle, useSyncedCharts } from './CandleMini'
 
 const MODES = [
   { id: 'lines', label: '2 lines' },
@@ -148,11 +148,15 @@ function FillChart({ children }) {
 
 export default function CompareMiniCharts({ focused, a, b, dark }) {
   const [mode, setMode] = useState('lines')
-  // Synced crosshair (owner 2026-07-07): hovering either chart drives BOTH by
-  // date, so the same trading day lines up across side A and side B.
-  const [hoverDate, setHoverDate] = useState(null)
   const aS = useSideCandles(a, focused)
   const bS = useSideCandles(b, focused)
+  // Native crosshair + visible-range sync between the two real candle charts
+  // (owner 2026-07-07): hovering/scrolling/zooming either chart drives BOTH,
+  // so the same trading day + zoom level line up across side A and side B.
+  // Only active in "2 lines" mode — Ratio keeps its own SVG path untouched.
+  const aRef = useRef(null)
+  const bRef = useRef(null)
+  useSyncedCharts(aRef, bRef, mode === 'lines')
 
   if (!a || !b)
     return (
@@ -210,29 +214,23 @@ export default function CompareMiniCharts({ focused, a, b, dark }) {
         [
           // Key by side SLOT, not label — NEPSE vs NEPSE is a legal pick and
           // duplicate keys would break reconciliation (final whole-branch review).
-          ['a', sideLabel(a), aS],
-          ['b', sideLabel(b), bS],
-        ].map(([slot, label, s]) => (
+          ['a', sideLabel(a), aS, aRef],
+          ['b', sideLabel(b), bS, bRef],
+        ].map(([slot, label, s, ref]) => (
           <div key={slot} className={`${CARD} overflow-hidden flex-1 min-h-0 flex flex-col`}>
             {header(label, s)}
             {!s.candles ? (
               <Skeleton minH={140} />
             ) : (
-              <FillChart>
-                {(h) => (
-                  <PriceChart
-                    candles={s.candles}
-                    startDate={focused.start_date}
-                    endDate={focused.end_date}
-                    type={focused.type}
-                    dark={dark}
-                    label={label}
-                    height={h}
-                    hoverDate={hoverDate}
-                    onHover={setHoverDate}
-                  />
-                )}
-              </FillChart>
+              <div className="flex-1 min-h-0">
+                <AutoMiniCandle
+                  ref={ref}
+                  data={s.candles}
+                  startDate={focused.start_date}
+                  endDate={focused.end_date}
+                  type={focused.type}
+                />
+              </div>
             )}
           </div>
         ))
