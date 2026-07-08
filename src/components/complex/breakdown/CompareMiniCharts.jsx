@@ -14,7 +14,7 @@ import { AutoMiniCandle, useSyncedCharts } from './CandleMini'
 
 const MODES = [
   { id: 'lines', label: '2 lines' },
-  { id: 'ratio', label: 'Ratio' },
+  { id: 'ratio', label: "Who's ahead" },
 ]
 
 // Small icon-badge for empty states — same shape as ComingSoon's compact
