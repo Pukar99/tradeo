@@ -319,7 +319,22 @@ export default function CycleAnalyticsCards({
       ) : !selectedCycles.length ? (
         <EmptyState />
       ) : loading || !movers || !consistency || !scan ? (
-        <Skeleton minH={80} />
+        view === 'movers' ? (
+          <div className="flex-1 min-h-0 overflow-y-auto px-3 py-2 flex gap-4">
+            <div className="flex-1 min-w-0">
+              <p className={`${LABEL} mb-1`}>Gainers</p>
+              <Skeleton variant="rows" rows={6} minH={0} />
+            </div>
+            <div className="flex-1 min-w-0">
+              <p className={`${LABEL} mb-1`}>Losers</p>
+              <Skeleton variant="rows" rows={6} minH={0} />
+            </div>
+          </div>
+        ) : (
+          <div className="flex-1 min-h-0 overflow-y-auto">
+            <Skeleton variant="table" rows={7} />
+          </div>
+        )
       ) : view === 'movers' ? (
         <div className="flex-1 min-h-0 overflow-y-auto px-3 py-2 flex gap-4">
           <div className="flex-1 min-w-0">

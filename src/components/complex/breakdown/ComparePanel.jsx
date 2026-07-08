@@ -241,8 +241,30 @@ export default function ComparePanel({ cycles, a, b, onChangeA, onChangeB, onFoc
           Select a cycle on the chart
         </div>
       ) : loading || !data ? (
-        /* 3. Loading */
-        <Skeleton minH={120} />
+        /* 3. Loading — mirror the section that's about to render so the
+            card chrome + shape don't jump when data arrives. */
+        <div className="space-y-3">
+          {section === 'general' && (
+            <>
+              <div className={CARD}>
+                <Skeleton variant="card" minH={140} />
+              </div>
+              <div className={`${CARD} overflow-hidden`}>
+                <Skeleton variant="table" rows={4} />
+              </div>
+            </>
+          )}
+          {section === 'returns' && (
+            <div className={`${CARD} overflow-hidden`}>
+              <Skeleton variant="rows" rows={6} minH={220} />
+            </div>
+          )}
+          {section === 'ladder' && (
+            <div className={`${CARD} overflow-hidden`}>
+              <Skeleton variant="table" rows={6} />
+            </div>
+          )}
+        </div>
       ) : (
         <>
           {/* General section — full A-vs-B verdict (owner 2026-07-08) */}

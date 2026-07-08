@@ -283,8 +283,8 @@ function SectorView(props) {
         </div>
       )}
       {analyzing ? (
-        <div className={`${CARD}`}>
-          <Skeleton minH={200} />
+        <div className={`${CARD} overflow-hidden`}>
+          <Skeleton variant="table" rows={7} minH={200} />
         </div>
       ) : sectors.length === 0 ? (
         <div
@@ -512,7 +512,7 @@ function PrecedingBearRecovery({ bear, indexId }) {
       </div>
       {error && <div className="px-3 py-2 text-[10px] text-red-500">{error}</div>}
       {!sectors && !error ? (
-        <Skeleton minH={100} />
+        <Skeleton variant="rows" rows={4} minH={100} />
       ) : (
         <div className="max-h-[240px] overflow-y-auto">
           {(sectors || []).map((s) => (
@@ -581,19 +581,23 @@ function CycleStocksList({ cycle, indexId, indexLbl, selected, onSelect }) {
   }, [data, desc])
 
   if (error) return <div className={`${CARD} px-3 py-2 text-[10px] text-red-500`}>{error}</div>
-  if (!data) return <div className={CARD}><Skeleton minH={200} /></div>
 
   return (
     <div className={`${CARD} overflow-hidden`}>
       <div className="flex items-center gap-2 px-3 py-1.5 border-b border-gray-100 dark:border-gray-800 bg-gray-50/60 dark:bg-gray-800/30">
-        <span className={STITLE}>All stocks · {data.total_symbols}</span>
+        <span className={STITLE}>All stocks{data ? ` · ${data.total_symbols}` : ''}</span>
         <button
           onClick={() => setDesc((d) => !d)}
-          className={`${LABEL} normal-case ml-auto hover:text-gray-600 dark:hover:text-gray-300`}
+          disabled={!data}
+          className={`${LABEL} normal-case ml-auto hover:text-gray-600 dark:hover:text-gray-300 disabled:opacity-40`}
         >
           {desc ? 'gainers first ↓' : 'losers first ↑'}
         </button>
       </div>
+      {!data ? (
+        <Skeleton variant="rows" rows={8} minH={200} />
+      ) : (
+      <>
       <div className={`grid grid-cols-[1fr_4rem_4.5rem] gap-2 px-3 py-1 ${LABEL} border-b border-gray-50 dark:border-gray-800/60`}>
         <span>Stock</span><span className="text-right">Return</span><span className="text-right">vs {indexLbl || 'NEPSE'}</span>
       </div>
@@ -614,6 +618,8 @@ function CycleStocksList({ cycle, indexId, indexLbl, selected, onSelect }) {
           </button>
         ))}
       </div>
+      </>
+      )}
     </div>
   )
 }

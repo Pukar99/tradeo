@@ -688,7 +688,7 @@ export default function BreakdownPage() {
             {quickChips}
           </div>
           {filterTabs('py-1.5')}
-          {detecting && <Skeleton minH={120} />}
+          {detecting && <Skeleton variant="rows" rows={5} minH={120} />}
           <div className="flex-1 min-w-0 min-h-0 overflow-y-auto overflow-x-hidden bg-white/40 dark:bg-gray-950/40">
             {cycleChecklist((c) => sel.toggle(c))}
           </div>
@@ -834,8 +834,8 @@ export default function BreakdownPage() {
                 </div>
               )}
               {analyzing ? (
-                <div className={`${CARD}`}>
-                  <Skeleton minH={260} />
+                <div className={`${CARD} overflow-hidden`}>
+                  <Skeleton variant="table" rows={8} minH={260} />
                 </div>
               ) : sectors.length === 0 ? (
                 <div

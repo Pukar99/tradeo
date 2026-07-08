@@ -188,7 +188,7 @@ export function StockList({ stocks, loading, onSelect, selected }) {
     }
   }
 
-  if (loading) return <Skeleton minH={140} />
+  if (loading) return <Skeleton variant="rows" rows={5} minH={140} />
   if (stocks === undefined) return null
   const valid = (stocks || []).filter((s) => s.drop_pct != null)
   if (!stocks?.length)
