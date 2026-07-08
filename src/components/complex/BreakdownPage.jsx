@@ -889,7 +889,7 @@ export default function BreakdownPage() {
           widthCls="w-[360px] lg:w-[420px] min-w-[300px]"
         >
           {analyticsView === 'compare' ? (
-            <CompareMiniCharts focused={focused} a={sideA} b={sideB} dark={isDark} />
+            <CompareMiniCharts focused={focused} a={sideA} b={sideB} dark={isDark} cycles={cycles} />
           ) : !focused ? (
             <div className="flex-1 min-h-0 overflow-y-auto bg-white/40 dark:bg-gray-950/40 p-3 space-y-3">
               <div className={`${CARD} p-3`}>

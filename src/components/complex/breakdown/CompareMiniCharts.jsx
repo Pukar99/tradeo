@@ -8,7 +8,7 @@ import { getSectorIndexChart, getStockPriceRange } from '../../../api'
 import { apiError, isCanceled } from '../../../utils/format'
 import { CARD, LABEL, STITLE, Skeleton } from '../../datalab/shared'
 import ViewSwitcher from '../../shared/ViewSwitcher'
-import { addDays } from './helpers'
+import { neighborWindow } from './helpers'
 import { sideLabel } from './compareMath'
 import { AutoMiniCandle, useSyncedCharts } from './CandleMini'
 
@@ -30,22 +30,24 @@ function EmptyIcon() {
   )
 }
 
-// Fetch one side's candles for the focused window (−30d/+120d padding, capped today).
-function useSideCandles(side, focused) {
+// Fetch one side's candles for the cycle-aware window: previous cycle's start
+// to next cycle's end (one neighbor of context each side, capped today) — so
+// the default zoom (selected cycle, set in CandleMini) has dimmed neighbors to
+// scroll into instead of a lopsided pad (owner 2026-07-08).
+function useSideCandles(side, focused, cycles) {
   const [state, setState] = useState({ candles: null, error: '' })
   const sideSig = JSON.stringify(side)
   useEffect(() => {
     if (!side || !focused) { setState({ candles: null, error: '' }); return }
     const ctrl = new AbortController()
     setState({ candles: null, error: '' })
-    const from = addDays(focused.start_date, -30)
+    const { from, to: winTo } = neighborWindow(cycles || [], focused)
     const today = new Date().toISOString().slice(0, 10)
-    const rawTo = addDays(focused.end_date, 120)
-    const to = rawTo < today ? rawTo : today
+    const to = winTo < today ? winTo : today
     const req = side.symbol
       ? getStockPriceRange({ symbol: side.symbol, from, to }, { signal: ctrl.signal })
       : getSectorIndexChart(
-          { index_id: side.index_id, peak_date: focused.start_date, trough_date: focused.end_date },
+          { index_id: side.index_id, peak_date: focused.start_date, trough_date: focused.end_date, from, to },
           { signal: ctrl.signal }
         )
     req
@@ -58,7 +60,7 @@ function useSideCandles(side, focused) {
       })
     return () => ctrl.abort()
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [sideSig, focused?.start_date, focused?.end_date])
+  }, [sideSig, focused?.start_date, focused?.end_date, cycles])
   return state
 }
 
@@ -146,10 +148,10 @@ function FillChart({ children }) {
   )
 }
 
-export default function CompareMiniCharts({ focused, a, b, dark }) {
+export default function CompareMiniCharts({ focused, a, b, dark, cycles }) {
   const [mode, setMode] = useState('lines')
-  const aS = useSideCandles(a, focused)
-  const bS = useSideCandles(b, focused)
+  const aS = useSideCandles(a, focused, cycles)
+  const bS = useSideCandles(b, focused, cycles)
   // Native crosshair + visible-range sync between the two real candle charts
   // (owner 2026-07-07): hovering/scrolling/zooming either chart drives BOTH,
   // so the same trading day + zoom level line up across side A and side B.

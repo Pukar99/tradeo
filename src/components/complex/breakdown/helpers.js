@@ -10,6 +10,20 @@ export function addDays(iso, n) {
   return d.toISOString().slice(0, 10)
 }
 
+// Cycle-aware chart window: previous cycle start → next cycle end, so the
+// selected cycle shows one neighbor of context each side (owner 2026-07-08).
+// Falls back to the focused cycle's own bounds at the chronological edges.
+export function neighborWindow(cycles, focused) {
+  const sorted = [...cycles].sort((a, b) => a.start_date.localeCompare(b.start_date))
+  const i = sorted.findIndex((c) => c.start_date === focused.start_date && c.end_date === focused.end_date)
+  const prev = i > 0 ? sorted[i - 1] : null
+  const next = i >= 0 && i < sorted.length - 1 ? sorted[i + 1] : null
+  return {
+    from: prev ? prev.start_date : focused.start_date,
+    to: next ? next.end_date : focused.end_date,
+  }
+}
+
 // ─────────────────────────────────────────────────────────────────────────────
 // COLOUR HELPERS
 // ─────────────────────────────────────────────────────────────────────────────
