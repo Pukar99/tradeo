@@ -76,14 +76,16 @@ function SidePicker({ tag, side, onChange }) {
 // left border is a passive indicator of the Compound Ladder's anchor only.
 function CompareRow({ r, aLbl, bLbl, max, isStart, chipLabel, chipTitle, onClick }) {
   const isBull = r.type === 'bull'
-  const barFor = (v) => {
+  // Bars are colored by SIDE, matching their labels (A blue-400, B amber-500) —
+  // owner 2026-07-08: same-green bars made NEPSE vs the stock impossible to
+  // tell apart. Gain/loss still reads from the bar's direction + the % text.
+  const barFor = (v, hue) => {
     if (v == null) return { w: 0, color: '#9ca3af', left: 50 }
     const w = Math.min((Math.abs(v) / max) * 50, 50)
-    const color = pnlClass(v, '#10b981', '#ef4444')
-    return { w, color, left: v >= 0 ? 50 : 50 - w }
+    return { w, color: hue, left: v >= 0 ? 50 : 50 - w }
   }
-  const aBar = barFor(r.a_ret)
-  const bBar = barFor(r.b_ret)
+  const aBar = barFor(r.a_ret, '#60a5fa')
+  const bBar = barFor(r.b_ret, '#f59e0b')
 
   return (
     <button
