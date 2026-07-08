@@ -112,8 +112,8 @@ function CompareRow({ r, aLbl, bLbl, max, isStart, chipLabel, chipTitle, onClick
 
         <div className="flex-1 min-w-0 space-y-0.5">
           <div className="flex items-center gap-1.5">
-            <span className="w-8 shrink-0 text-[10px] font-bold uppercase tracking-widest text-blue-400 truncate">
-              {aLbl.slice(0, 4)}
+            <span className="max-w-[72px] shrink-0 text-[10px] font-bold uppercase tracking-widest text-blue-400 truncate" title={aLbl}>
+              {aLbl}
             </span>
             <div className="relative flex-1 h-2 bg-gray-100 dark:bg-gray-800 rounded-sm overflow-hidden">
               <div className="absolute inset-y-0 left-1/2 w-px bg-gray-300 dark:bg-gray-600" />
@@ -129,8 +129,8 @@ function CompareRow({ r, aLbl, bLbl, max, isStart, chipLabel, chipTitle, onClick
             </span>
           </div>
           <div className="flex items-center gap-1.5">
-            <span className="w-8 shrink-0 text-[10px] font-bold uppercase tracking-widest text-amber-500 truncate">
-              {bLbl.slice(0, 4)}
+            <span className="max-w-[72px] shrink-0 text-[10px] font-bold uppercase tracking-widest text-amber-500 truncate" title={bLbl}>
+              {bLbl}
             </span>
             <div className="relative flex-1 h-2 bg-gray-100 dark:bg-gray-800 rounded-sm overflow-hidden">
               <div className="absolute inset-y-0 left-1/2 w-px bg-gray-300 dark:bg-gray-600" />
@@ -204,6 +204,8 @@ export default function ComparePanel({ cycles, a, b, onChangeA, onChangeB, onFoc
   // Real Bull/Bear names for the Cycle Returns rows (owner eyeball) — cycles
   // prop carries the injected `name` (e.g. 'Bull 3'); compacted to fit the chip.
   const nameByKey = useMemo(() => new Map(cycles.map((c) => [cycleKey(c), c.name])), [cycles])
+  // Cycle duration (days) for the General range table's Days column.
+  const durByKey = useMemo(() => new Map(cycles.map((c) => [cycleKey(c), c.duration_days])), [cycles])
 
   return (
     <div className="flex-1 min-h-0 overflow-y-auto px-3 py-2 space-y-3">
@@ -311,6 +313,55 @@ export default function ComparePanel({ cycles, a, b, onChangeA, onChangeB, onFoc
               </div>
             )
           })()}
+
+          {/* General section — per-cycle range table (owner 2026-07-08) */}
+          {section === 'general' && rows.length > 0 && (
+            <div className={`${CARD} overflow-hidden`}>
+              <div className="px-3 py-1.5 border-b border-gray-100 dark:border-gray-800 bg-gray-50/60 dark:bg-gray-800/30">
+                <span className={STITLE}>Per-cycle stats</span>
+              </div>
+              <div className="overflow-x-auto">
+                <table className="w-full text-[10px] tabular-nums">
+                  <thead>
+                    <tr className="text-gray-400 border-b border-gray-100 dark:border-gray-800">
+                      <th className="text-left font-semibold px-2 py-1">Cycle</th>
+                      <th className="text-left font-semibold px-2 py-1">Start</th>
+                      <th className="text-left font-semibold px-2 py-1">End</th>
+                      <th className="text-right font-semibold px-2 py-1">Days</th>
+                      <th className="text-right font-semibold px-2 py-1" title={aLbl}>{aLbl} range·hi·lo</th>
+                      <th className="text-right font-semibold px-2 py-1" title={bLbl}>{bLbl} range·hi·lo</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {rows.map((r) => {
+                      const nm = nameByKey.get(rowKey(r)) || (r.type === 'bull' ? 'Bull' : 'Bear')
+                      const days = durByKey.get(rowKey(r))
+                      const cell = (rng, hi, lo) =>
+                        rng == null ? <span className="text-gray-300">—</span> : (
+                          <>
+                            <span className="font-bold text-gray-700 dark:text-gray-200">{rng.toFixed(1)}%</span>
+                            <span className="block text-gray-400">{hi.toFixed(0)} / {lo.toFixed(0)}</span>
+                          </>
+                        )
+                      return (
+                        <tr key={rowKey(r)} className={`border-b border-gray-50 dark:border-gray-800/60 last:border-0 ${r.type === 'bear' ? 'bg-red-50/40 dark:bg-red-950/10' : ''}`}>
+                          <td className="px-2 py-1 font-semibold text-gray-600 dark:text-gray-300 whitespace-nowrap">
+                            {r.type === 'bull' ? '▲' : '▼'} {nm}
+                          </td>
+                          <td className="px-2 py-1 text-gray-500 whitespace-nowrap">{r.start_date}</td>
+                          <td className="px-2 py-1 text-gray-500 whitespace-nowrap">{r.end_date}</td>
+                          <td className="px-2 py-1 text-right text-gray-500 whitespace-nowrap">{days != null ? `${days}d` : '—'}</td>
+                          <td className="px-2 py-1 text-right">{cell(r.a_range, r.a_high, r.a_low)}</td>
+                          <td className="px-2 py-1 text-right">{cell(r.b_range, r.b_high, r.b_low)}</td>
+                        </tr>
+                      )
+                    })}
+                  </tbody>
+                </table>
+              </div>
+              <p className={`${LABEL} normal-case px-2 py-1 text-gray-400`}>Range = (high − low) ÷ low over the cycle. History, not a promise.</p>
+            </div>
+          )}
 
           {/* 5. Per-cycle returns table (section-toggled) */}
           {section === 'returns' && (
