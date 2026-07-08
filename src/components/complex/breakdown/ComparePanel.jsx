@@ -262,11 +262,10 @@ export default function ComparePanel({ cycles, a, b, onChangeA, onChangeB, onFoc
             </div>
             <div className="max-h-[280px] overflow-y-auto bg-white dark:bg-gray-900">
               {rows.map((r) => {
+                // Full "Bull 1 / Bear 1" names — the compacted B1/Br1 read as
+                // noise (owner 2026-07-08).
                 const fullName = nameByKey.get(rowKey(r))
-                const compactName = fullName
-                  ? fullName.replace('Bull ', 'B').replace('Bear ', 'Br')
-                  : r.start_date?.slice(0, 4)
-                const chipLabel = `${r.type === 'bull' ? '▲' : '▼'} ${compactName}`
+                const chipLabel = `${r.type === 'bull' ? '▲' : '▼'} ${fullName || r.start_date?.slice(0, 4)}`
                 const chipTitle = `${fullName || (r.type === 'bull' ? 'Bull' : 'Bear')} · ${r.start_date} → ${r.end_date}`
                 return (
                   <CompareRow
@@ -321,7 +320,7 @@ export default function ComparePanel({ cycles, a, b, onChangeA, onChangeB, onFoc
               </div>
             </div>
 
-            <div className="grid grid-cols-[3.5rem_1fr_1fr] items-center gap-1 px-2 py-1.5 border-b border-gray-100 dark:border-gray-800 bg-gray-50/40 dark:bg-gray-800/20">
+            <div className="grid grid-cols-[4.5rem_1fr_1fr] items-center gap-1 px-2 py-1.5 border-b border-gray-100 dark:border-gray-800 bg-gray-50/40 dark:bg-gray-800/20">
               <span className="text-[10px] font-semibold uppercase tracking-widest text-gray-400">
                 Cycle
               </span>
@@ -341,13 +340,9 @@ export default function ComparePanel({ cycles, a, b, onChangeA, onChangeB, onFoc
               {ladder.map((row) => {
                 const isBull = row.type === 'bull'
                 const isStart = startKey === row.key
-                // Same compact Bull/Bear naming as the Cycle Returns rows —
-                // a bare ▲ chip read as an icon, and the old ▶ anchor badge
-                // read as a play button (owner audit 2026-07-08).
+                // Full "Bull 1 / Bear 1" naming, matching the Cycle Returns
+                // rows (owner 2026-07-08 — compacted B1/Br1 read as noise).
                 const fullName = nameByKey.get(row.key)
-                const compactName = fullName
-                  ? fullName.replace('Bull ', 'B').replace('Bear ', 'Br')
-                  : ''
                 return (
                   <button
                     key={row.key}
@@ -357,7 +352,7 @@ export default function ComparePanel({ cycles, a, b, onChangeA, onChangeB, onFoc
                         ? `Investment starts at ${fullName || 'this cycle'}. Click to unset.`
                         : `Start the investment at ${fullName || 'this cycle'}`
                     }
-                    className={`w-full grid grid-cols-[3.5rem_1fr_1fr] items-center gap-1 px-2 py-1 border-b border-gray-50 dark:border-gray-800/60 last:border-b-0 transition-colors relative
+                    className={`w-full grid grid-cols-[4.5rem_1fr_1fr] items-center gap-1 px-2 py-1 border-b border-gray-50 dark:border-gray-800/60 last:border-b-0 transition-colors relative
                       ${
                         isStart
                           ? 'bg-amber-50/70 dark:bg-amber-950/20 border-l-2 border-l-amber-500'
@@ -373,7 +368,7 @@ export default function ComparePanel({ cycles, a, b, onChangeA, onChangeB, onFoc
                             : 'bg-red-100   dark:bg-red-900/40   text-red-500   dark:text-red-400'
                         }`}
                       >
-                        {row.type === 'bull' ? '▲' : '▼'} {compactName}
+                        {row.type === 'bull' ? '▲' : '▼'} {fullName || ''}
                       </span>
                       {isStart && (
                         <span className="text-[9px] font-black uppercase tracking-widest text-amber-500 leading-none">
@@ -408,7 +403,7 @@ export default function ComparePanel({ cycles, a, b, onChangeA, onChangeB, onFoc
 
             {final && (
               <div className="px-2 py-2 border-t border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-800/40">
-                <div className="grid grid-cols-[3.5rem_1fr_1fr] items-center gap-1">
+                <div className="grid grid-cols-[4.5rem_1fr_1fr] items-center gap-1">
                   <span className="text-[10px] font-semibold uppercase tracking-widest text-gray-500">
                     End
                   </span>
