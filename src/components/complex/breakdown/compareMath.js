@@ -15,12 +15,28 @@ export function sideLabel(side) {
 export function compareSummary(rows) {
   const scored = rows.filter((r) => r.diff != null)
   const avg = (k) => scored.reduce((s, r) => s + r[k], 0) / scored.length
+  const avgDiff = scored.length ? avg('diff') : null
+  // Winner = higher average return over the scored (both-sides-present) cycles.
+  // Tie when averages are within 0.05pp; null when nothing scored.
+  let winner = null
+  let winnerLead = null
+  if (scored.length && avgDiff != null) {
+    if (Math.abs(avgDiff) < 0.05) winner = 'tie'
+    else winner = avgDiff > 0 ? 'a' : 'b'
+    winnerLead = winner === 'tie' ? 0 : Math.abs(avgDiff)
+  }
+  // Where it mattered: biggest gap and closest cycle (scored rows only).
+  const byGapDesc = [...scored].sort((x, y) => Math.abs(y.diff) - Math.abs(x.diff))
   return {
     aWins: scored.filter((r) => r.diff > 0).length,
     compared: scored.length,
     avgA: scored.length ? avg('a_ret') : null,
     avgB: scored.length ? avg('b_ret') : null,
-    avgDiff: scored.length ? avg('diff') : null,
+    avgDiff,
+    winner,
+    winnerLead,
+    bestRow: byGapDesc[0] || null,
+    closestRow: byGapDesc.length ? byGapDesc[byGapDesc.length - 1] : null,
   }
 }
 

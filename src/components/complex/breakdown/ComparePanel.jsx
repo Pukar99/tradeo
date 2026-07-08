@@ -46,6 +46,7 @@ function IconTable({ className = 'w-3 h-3' }) {
 // Owner addition 2026-07-07: one section at a time inside Compare — a toggle
 // ahead of the side pickers switches between the two tables.
 const SECTIONS = [
+  { id: 'general', label: 'General' },
   { id: 'returns', label: 'Cycle returns' },
   { id: 'ladder', label: 'Compound ladder' },
 ]
@@ -158,7 +159,7 @@ export default function ComparePanel({ cycles, a, b, onChangeA, onChangeB, onFoc
   const [error, setError] = useState('')
   const [amount, setAmount] = useState(100)
   const [startKey, setStartKey] = useState(null)
-  const [section, setSection] = useState('returns')
+  const [section, setSection] = useState('general')
   const ctrlRef = useRef(null)
 
   const sig = `${cycles.map(cycleKey).join(',')}|${JSON.stringify(a)}|${JSON.stringify(b)}`
@@ -242,14 +243,74 @@ export default function ComparePanel({ cycles, a, b, onChangeA, onChangeB, onFoc
         <Skeleton minH={120} />
       ) : (
         <>
-          {/* 4. Scorecard line */}
-          <p className="text-[11px] text-gray-600 dark:text-gray-300 leading-snug">
-            {aLbl} beat {bLbl} in {sum.aWins}/{sum.compared} cycles · avg {fmtPct(sum.avgA)} vs{' '}
-            {fmtPct(sum.avgB)} ·{' '}
-            <span className={`font-bold ${pnlClass(sum.avgDiff ?? 0, 'text-emerald-500', 'text-red-500')}`}>
-              edge {fmtPct(sum.avgDiff)}
-            </span>
-          </p>
+          {/* General section — full A-vs-B verdict (owner 2026-07-08) */}
+          {section === 'general' && (() => {
+            const winLbl = sum.winner === 'a' ? aLbl : sum.winner === 'b' ? bLbl : null
+            const loseLbl = sum.winner === 'a' ? bLbl : sum.winner === 'b' ? aLbl : null
+            const bestName = sum.bestRow ? nameByKey.get(rowKey(sum.bestRow)) : null
+            const closeName = sum.closestRow ? nameByKey.get(rowKey(sum.closestRow)) : null
+            return (
+              <div className={`${CARD} p-3 space-y-2`}>
+                {/* Headline verdict */}
+                <p className="text-[12px] font-semibold text-gray-800 dark:text-gray-100 leading-snug">
+                  {sum.compared === 0 ? (
+                    'Not enough overlapping data to compare these two.'
+                  ) : sum.winner === 'tie' ? (
+                    <>Neck and neck — {aLbl} and {bLbl} averaged about the same across your {sum.compared} cycle{sum.compared === 1 ? '' : 's'}.</>
+                  ) : (
+                    <>
+                      <span className={sum.winner === 'a' ? 'text-blue-500' : 'text-amber-500'}>{winLbl}</span>{' '}
+                      was the stronger pick over your {sum.compared} cycle{sum.compared === 1 ? '' : 's'} — averaging{' '}
+                      <span className="font-bold">{fmtPct(sum.winnerLead)}</span> more per cycle than {loseLbl}.
+                    </>
+                  )}
+                </p>
+
+                {sum.compared > 0 && (
+                  <>
+                    {/* Scoreline + win/loss strip (from A's perspective) */}
+                    <div className="flex items-center gap-2">
+                      <span className="text-[10px] text-gray-500 dark:text-gray-400">
+                        {aLbl} won {sum.aWins} of {sum.compared}
+                      </span>
+                      <span className="flex gap-0.5">
+                        {rows.filter((r) => r.diff != null).map((r) => (
+                          <span
+                            key={rowKey(r)}
+                            title={`${nameByKey.get(rowKey(r)) || r.start_date}: ${aLbl} ${r.diff > 0 ? 'won' : 'lost'} by ${fmtPct(Math.abs(r.diff))}`}
+                            className={`inline-block w-2 h-2 rounded-sm ${r.diff > 0 ? 'bg-blue-400' : 'bg-amber-400'}`}
+                          />
+                        ))}
+                      </span>
+                    </div>
+
+                    {/* Labeled averages */}
+                    <div className="grid grid-cols-2 gap-2 text-[10px]">
+                      <div className="flex items-center justify-between rounded bg-gray-50 dark:bg-gray-800/40 px-2 py-1">
+                        <span className="uppercase tracking-widest text-blue-400 font-bold truncate">{aLbl}</span>
+                        <span className={`font-bold tabular-nums ${pnlClass(sum.avgA ?? 0, 'text-emerald-500', 'text-red-500')}`}>{fmtPct(sum.avgA)}</span>
+                      </div>
+                      <div className="flex items-center justify-between rounded bg-gray-50 dark:bg-gray-800/40 px-2 py-1">
+                        <span className="uppercase tracking-widest text-amber-500 font-bold truncate">{bLbl}</span>
+                        <span className={`font-bold tabular-nums ${pnlClass(sum.avgB ?? 0, 'text-emerald-500', 'text-red-500')}`}>{fmtPct(sum.avgB)}</span>
+                      </div>
+                    </div>
+                    <p className="text-[10px] text-gray-500 dark:text-gray-400">Average return per cycle</p>
+
+                    {/* Where it mattered */}
+                    {sum.bestRow && sum.compared > 1 && (
+                      <p className="text-[10px] text-gray-500 dark:text-gray-400 leading-snug pt-1.5 border-t border-gray-100 dark:border-gray-800">
+                        Biggest gap in <span className="font-semibold text-gray-600 dark:text-gray-300">{bestName || 'a cycle'}</span>
+                        {' '}({fmtPct(sum.bestRow.a_ret)} vs {fmtPct(sum.bestRow.b_ret)}).
+                        {closeName && closeName !== bestName && <> Closest in <span className="font-semibold text-gray-600 dark:text-gray-300">{closeName}</span>.</>}
+                      </p>
+                    )}
+                    <p className="text-[10px] text-gray-400">History, not a promise.</p>
+                  </>
+                )}
+              </div>
+            )
+          })()}
 
           {/* 5. Per-cycle returns table (section-toggled) */}
           {section === 'returns' && (
