@@ -19,21 +19,71 @@
 
 const _store = new Map()
 
+// Opt-in sessionStorage persistence tier — namespaced so it never collides
+// with unrelated sessionStorage usage. All access is try/catch'd so private
+// browsing / quota-exceeded / storage-disabled environments silently fall
+// back to memory-only behavior (never throws).
+const PREFIX = 'gc:'
+const _ss = {
+  set(key, entry) {
+    try {
+      sessionStorage.setItem(PREFIX + key, JSON.stringify(entry))
+    } catch {} // eslint-disable-line no-empty
+  },
+  get(key) {
+    try {
+      const r = sessionStorage.getItem(PREFIX + key)
+      return r ? JSON.parse(r) : null
+    } catch {
+      return null
+    }
+  },
+  del(key) {
+    try {
+      sessionStorage.removeItem(PREFIX + key)
+    } catch {} // eslint-disable-line no-empty
+  },
+  keys() {
+    try {
+      return Object.keys(sessionStorage).filter((k) => k.startsWith(PREFIX))
+    } catch {
+      return []
+    }
+  },
+}
+
 export const gCache = {
   // Get a cached value. Returns undefined if missing or expired.
+  // On a memory miss, hydrates from sessionStorage (if a persisted copy
+  // exists and hasn't expired) and repopulates the in-memory store.
   get(key) {
     const entry = _store.get(key)
-    if (!entry) return undefined
-    if (Date.now() > entry.exp) {
-      _store.delete(key)
+    if (entry) {
+      if (Date.now() > entry.exp) {
+        _store.delete(key)
+        return undefined
+      }
+      return entry.val
+    }
+    const persisted = _ss.get(key)
+    if (!persisted) return undefined
+    if (Date.now() > persisted.exp) {
+      _ss.del(key)
       return undefined
     }
-    return entry.val
+    _store.set(key, { val: persisted.val, exp: persisted.exp })
+    return persisted.val
   },
 
-  // Set a value with a TTL in milliseconds.
-  set(key, val, ttlMs = 60 * 60_000) {
-    _store.set(key, { val, exp: Date.now() + ttlMs })
+  // Set a value with a TTL in milliseconds. Pass { persist: 'session' } to
+  // also write a sessionStorage copy that survives a page reload (default
+  // remains memory-only — backward compatible with all existing callers).
+  set(key, val, ttlMs = 60 * 60_000, opts = {}) {
+    const exp = Date.now() + ttlMs
+    _store.set(key, { val, exp })
+    if (opts.persist === 'session') {
+      _ss.set(key, { val, exp })
+    }
   },
 
   // Check if a key exists and is fresh.
@@ -50,6 +100,7 @@ export const gCache = {
   // Invalidate a key (e.g. after a write).
   del(key) {
     _store.delete(key)
+    _ss.del(key)
   },
 
   // Invalidate all keys matching a prefix.
@@ -57,10 +108,28 @@ export const gCache = {
     for (const k of _store.keys()) {
       if (k.startsWith(prefix)) _store.delete(k)
     }
+    for (const k of _ss.keys()) {
+      if (k.slice(PREFIX.length).startsWith(prefix)) {
+        try {
+          sessionStorage.removeItem(k)
+        } catch {} // eslint-disable-line no-empty
+      }
+    }
   },
 
   // Clear everything (e.g. on logout).
   clear() {
+    _store.clear()
+    for (const k of _ss.keys()) {
+      try {
+        sessionStorage.removeItem(k)
+      } catch {} // eslint-disable-line no-empty
+    }
+  },
+
+  // Test-only: clears the in-memory store but leaves sessionStorage intact,
+  // simulating a page reload. Not for use in application code.
+  _dropMemory() {
     _store.clear()
   },
 }
@@ -85,6 +154,7 @@ export const TTL = {
   DAY_FULL: 10 * 60_000, // 10 min — EOD day data is stable
   FEED: 30 * 60_000, // 30 min — IPOs and news change infrequently
   DISCIPLINE: 5 * 60_000, // 5 min  — score can change after task/journal write
+  CYCLE_ANALYTICS: 60 * 60_000, // 1 hour — historical cycles never change; persisted to sessionStorage
 }
 
 // =============================================================================
@@ -111,6 +181,7 @@ import {
   getIPOs as _getIPOs,
   getMarketNews as _getMarketNews,
   getDashboardInit as _getDashboardInit,
+  getCycleAnalytics as _getCycleAnalytics,
 } from '../api'
 
 export async function getMarketSymbols() {
@@ -200,6 +271,18 @@ export async function getPositions(status) {
   if (cached !== undefined) return cached
   const result = await _getPositions(status)
   gCache.set(key, result, TTL.POSITIONS)
+  return result
+}
+
+// Breakdown cycle analytics — historical cycles → 1h TTL, persisted to
+// sessionStorage so re-selecting the same cycle set or reloading is instant.
+export async function getCycleAnalytics(payload) {
+  const cyc = [...payload.cycles].map((c) => `${c.start_date}|${c.end_date}`).sort().join(',')
+  const key = `cycle-analytics:${payload.index_id ?? 12}:${payload.sector_index || ''}:${cyc}:${payload.n ?? 15}`
+  const cached = gCache.get(key)
+  if (cached !== undefined) return cached
+  const result = await _getCycleAnalytics(payload)
+  gCache.set(key, result, TTL.CYCLE_ANALYTICS, { persist: 'session' })
   return result
 }
 
