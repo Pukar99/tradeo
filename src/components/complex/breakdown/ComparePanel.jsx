@@ -325,7 +325,7 @@ export default function ComparePanel({ cycles, a, b, onChangeA, onChangeB, onFoc
               </div>
             </div>
 
-            <div className="grid grid-cols-[40px_1fr_1fr] items-center gap-1 px-2 py-1.5 border-b border-gray-100 dark:border-gray-800 bg-gray-50/40 dark:bg-gray-800/20">
+            <div className="grid grid-cols-[3.5rem_1fr_1fr] items-center gap-1 px-2 py-1.5 border-b border-gray-100 dark:border-gray-800 bg-gray-50/40 dark:bg-gray-800/20">
               <span className="text-[10px] font-semibold uppercase tracking-widest text-gray-400">
                 Cycle
               </span>
@@ -345,37 +345,43 @@ export default function ComparePanel({ cycles, a, b, onChangeA, onChangeB, onFoc
               {ladder.map((row) => {
                 const isBull = row.type === 'bull'
                 const isStart = startKey === row.key
+                // Same compact Bull/Bear naming as the Cycle Returns rows —
+                // a bare ▲ chip read as an icon, and the old ▶ anchor badge
+                // read as a play button (owner audit 2026-07-08).
+                const fullName = nameByKey.get(row.key)
+                const compactName = fullName
+                  ? fullName.replace('Bull ', 'B').replace('Bear ', 'Br')
+                  : ''
                 return (
                   <button
                     key={row.key}
                     onClick={() => setStartKey((prev) => (prev === row.key ? null : row.key))}
                     title={
                       isStart
-                        ? 'Investment starts here. Click to unset.'
-                        : 'Anchor investment start at this cycle'
+                        ? `Investment starts at ${fullName || 'this cycle'}. Click to unset.`
+                        : `Start the investment at ${fullName || 'this cycle'}`
                     }
-                    className={`w-full grid grid-cols-[40px_1fr_1fr] items-center gap-1 px-2 py-1 border-b border-gray-50 dark:border-gray-800/60 last:border-b-0 transition-colors relative
+                    className={`w-full grid grid-cols-[3.5rem_1fr_1fr] items-center gap-1 px-2 py-1 border-b border-gray-50 dark:border-gray-800/60 last:border-b-0 transition-colors relative
                       ${
                         isStart
                           ? 'bg-amber-50/70 dark:bg-amber-950/20 border-l-2 border-l-amber-500'
                           : 'hover:bg-gray-50 dark:hover:bg-gray-900/50 border-l-2 border-l-transparent'
                       }`}
                   >
-                    <span
-                      className={`inline-flex items-center justify-center px-1 h-5 min-w-[36px] rounded text-[10px] font-black tabular-nums relative
-                      ${
-                        isBull
-                          ? 'bg-emerald-100 dark:bg-emerald-900/40 text-emerald-600 dark:text-emerald-400'
-                          : 'bg-red-100   dark:bg-red-900/40   text-red-500   dark:text-red-400'
-                      }`}
-                    >
-                      {row.type === 'bull' ? '▲' : '▼'}
+                    <span className="flex flex-col items-start gap-0.5">
+                      <span
+                        className={`inline-flex items-center justify-center px-1 h-5 min-w-[36px] rounded text-[10px] font-black tabular-nums
+                        ${
+                          isBull
+                            ? 'bg-emerald-100 dark:bg-emerald-900/40 text-emerald-600 dark:text-emerald-400'
+                            : 'bg-red-100   dark:bg-red-900/40   text-red-500   dark:text-red-400'
+                        }`}
+                      >
+                        {row.type === 'bull' ? '▲' : '▼'} {compactName}
+                      </span>
                       {isStart && (
-                        <span
-                          className="absolute -top-1 -right-1 text-[9px] font-black px-1 rounded-sm bg-amber-500 text-white leading-tight"
-                          title="Investment start"
-                        >
-                          ▶
+                        <span className="text-[9px] font-black uppercase tracking-widest text-amber-500 leading-none">
+                          start
                         </span>
                       )}
                     </span>
@@ -406,7 +412,7 @@ export default function ComparePanel({ cycles, a, b, onChangeA, onChangeB, onFoc
 
             {final && (
               <div className="px-2 py-2 border-t border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-800/40">
-                <div className="grid grid-cols-[40px_1fr_1fr] items-center gap-1">
+                <div className="grid grid-cols-[3.5rem_1fr_1fr] items-center gap-1">
                   <span className="text-[10px] font-semibold uppercase tracking-widest text-gray-500">
                     End
                   </span>
