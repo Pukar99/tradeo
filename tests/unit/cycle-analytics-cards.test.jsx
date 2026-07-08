@@ -5,9 +5,11 @@ import { describe, test, expect, vi, beforeEach } from 'vitest'
 
 const movers = vi.fn()
 const consistency = vi.fn()
+const scan = vi.fn()
 vi.mock('../../src/api', () => ({
   getCycleMovers: (...a) => movers(...a),
   getCycleConsistency: (...a) => consistency(...a),
+  getCycleScan: (...a) => scan(...a),
 }))
 
 import CycleAnalyticsCards from '../../src/components/complex/breakdown/CycleAnalyticsCards'
@@ -50,6 +52,12 @@ beforeEach(() => {
       cycles_selected: 1, index_id: 12,
     },
   })
+  scan.mockReset().mockResolvedValue({
+    data: {
+      stocks: [{ symbol: 'WINA', company_name: 'Winner A', floor: 12.3, avg: 20.5, per_wave: [12.3] }],
+      cycles_selected: 1, index_id: 12,
+    },
+  })
 })
 
 describe('CycleAnalyticsCards', () => {
@@ -70,11 +78,12 @@ describe('CycleAnalyticsCards', () => {
 
     // Switching to Consistency must NOT refetch — same debounced fetch stays put.
     fireEvent.click(screen.getByRole('tab', { name: 'Consistency' }))
-    expect(screen.getByText(/selected cycle/)).toBeInTheDocument()
-    expect(screen.getByText(/1 of 1/)).toBeInTheDocument()
+    expect(screen.getByText(/1 cycle/)).toBeInTheDocument()
+    expect(screen.getByText(/Up in 1 of 1/)).toBeInTheDocument()
     expect(screen.getByText('—')).toBeInTheDocument() // corr null
-    expect(screen.getByText('history, not a promise')).toBeInTheDocument()
     expect(screen.queryByText(/probability/i)).toBeNull()
+    // Honest footer stays on the Consistency view (header meta span).
+    expect(screen.getByText('history, not a promise')).toBeInTheDocument()
 
     // payload shape: cycles + index_id + bumped n (owner addition: 15 per side)
     expect(movers).toHaveBeenCalledWith(
@@ -86,5 +95,6 @@ describe('CycleAnalyticsCards', () => {
       expect.anything()
     )
     expect(movers).toHaveBeenCalledTimes(1)
+    expect(scan).toHaveBeenCalledTimes(1)
   })
 })
