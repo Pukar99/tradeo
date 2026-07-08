@@ -10,12 +10,12 @@
 // =============================================================================
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { getCycleMovers, runDropAnalysis } from '../../../api'
-import { apiError, isCanceled } from '../../../utils/format'
+import { apiError, isCanceled, pnlClass } from '../../../utils/format'
 import { CARD, LABEL, STITLE, Skeleton, fmtPct } from '../../datalab/shared'
 import ViewSwitcher from '../../shared/ViewSwitcher'
-import { stripIndexName, pctTextCls, phaseCls } from './helpers'
+import { stripIndexName, pctTextCls, phaseCls, gradColor } from './helpers'
 import { PriceChart, SectorIndexChart } from './charts'
-import { SectorMatrix, StockList } from './SectorMatrix'
+import { StockList } from './SectorMatrix'
 import { ResilientTile, Stat } from './atoms'
 import { cycleKey } from './useCycleSelection'
 
@@ -303,7 +303,7 @@ function SectorView(props) {
       ) : (
         <div className={`${CARD} overflow-hidden`}>
           <div className="max-h-[320px] overflow-y-auto">
-            <SectorMatrix
+            <SectorPanelList
               rows={matrixRows}
               activeSectorName={activeSector?.index_name}
               onRowClick={onSectorClick}
@@ -348,6 +348,136 @@ function SectorView(props) {
       )}
 
       {precedingBear && <PrecedingBearRecovery bear={precedingBear} indexId={indexId} />}
+    </div>
+  )
+}
+
+// Compact two-line sector list purpose-built for the ~420px right panel
+// (owner eyeball 2026-07-08): SectorMatrix's fixed pixel columns (150/170/
+// 70/120/50/36 ≈ 600px) overlap/wrap when squeezed here. Every color/class
+// below is copied verbatim from SectorMatrix.jsx (gradColor, pctTextCls,
+// pnlClass chip, recovery bar colors, active-row bg) or from
+// PrecedingBearRecovery's two-line row style — zero new colors.
+function SectorPanelList({
+  rows,
+  activeSectorName,
+  onRowClick,
+  cycleType,
+  sortBy,
+  sortAsc,
+  onSort,
+  maxMoveAbs,
+}) {
+  const isBull = cycleType === 'bull'
+
+  // Same small sort-button pattern as SectorMatrix's Glyph, minus the fixed width.
+  const Glyph = ({ col, label, className = '' }) => (
+    <button
+      onClick={() => onSort(col)}
+      className={`flex items-center gap-0.5 ${LABEL} normal-case hover:text-gray-600 dark:hover:text-gray-300 ${className}`}
+    >
+      <span>{label}</span>
+      <span className="text-[10px] opacity-60">{sortBy === col ? (sortAsc ? '▲' : '▼') : '·'}</span>
+    </button>
+  )
+
+  return (
+    <div>
+      {/* Header — compact sort buttons, no fixed columns */}
+      <div className="flex items-center justify-between px-3 py-2 border-b border-gray-100 dark:border-gray-800 bg-gray-50/60 dark:bg-gray-800/30 gap-2">
+        <Glyph col="index_name" label="Sector" />
+        <div className="flex items-center gap-2 shrink-0">
+          <Glyph col="drop_pct" label={isBull ? 'Gain' : 'Drop'} />
+          {!isBull && <Glyph col="recovery_progress" label="Recovery" />}
+          <Glyph col="stock_count" label="#" />
+        </div>
+      </div>
+
+      {/* Rows — two lines each, no zebra striping (owner: keep it clean) */}
+      <div>
+        {rows.map((s) => {
+          const isActive = activeSectorName === s.index_name
+          const isNepse = s.index_name === 'NEPSE'
+          const moveAbs = Math.abs(s.drop_pct || 0)
+          const barW = maxMoveAbs > 0 ? (moveAbs / maxMoveAbs) * 100 : 0
+          const x = Math.max(-1, Math.min(1, (s.drop_pct || 0) / 50))
+          const barColor = gradColor(x)
+          return (
+            <button
+              key={s.index_name}
+              onClick={() => onRowClick(s)}
+              className={`w-full text-left px-3 py-2 border-b border-gray-50 dark:border-gray-800/60 last:border-b-0 transition-colors
+                ${isActive ? 'bg-blue-50 dark:bg-blue-950/30' : 'hover:bg-gray-50 dark:hover:bg-gray-900/50'}`}
+            >
+              {/* Line 1: dot + name + move% + vs-index chip */}
+              <div className="flex items-center gap-2">
+                <span className="w-1.5 h-1.5 rounded-full shrink-0" style={{ background: barColor }} />
+                <span
+                  className={`flex-1 truncate text-[11px] ${isNepse ? 'font-bold text-gray-900 dark:text-white' : 'font-medium text-gray-800 dark:text-gray-100'}`}
+                >
+                  {isNepse ? 'NEPSE' : stripIndexName(s.index_name)}
+                </span>
+                <span className={`text-[11px] font-bold tabular-nums ${pctTextCls(s.drop_pct)}`}>
+                  {s.drop_pct != null
+                    ? `${s.drop_pct >= 0 ? '+' : ''}${s.drop_pct.toFixed(1)}%`
+                    : '—'}
+                </span>
+                {s.vs_nepse != null && (
+                  <span
+                    className={`inline-flex px-1.5 py-0.5 rounded text-[10px] font-semibold tabular-nums
+                    ${pnlClass(
+                      s.vs_nepse,
+                      'bg-emerald-50 dark:bg-emerald-950/30 text-emerald-600 dark:text-emerald-400',
+                      'bg-red-50 dark:bg-red-950/30 text-red-500 dark:text-red-400'
+                    )}`}
+                  >
+                    {s.vs_nepse >= 0 ? '+' : ''}
+                    {s.vs_nepse.toFixed(1)}%
+                  </span>
+                )}
+              </div>
+
+              {/* Line 2: move-magnitude bar (+ recovery cluster for bear cycles) */}
+              <div className="flex items-center gap-2 mt-1">
+                <div className="flex-1 h-1.5 rounded-full bg-gray-100 dark:bg-gray-800 overflow-hidden">
+                  <div
+                    className="h-full rounded-full"
+                    style={{ width: `${barW}%`, background: barColor }}
+                  />
+                </div>
+                {!isBull && s.recovery_progress != null && (
+                  <div className="flex items-center gap-1 shrink-0">
+                    <div className="w-14 h-1.5 rounded-full bg-gray-100 dark:bg-gray-800 overflow-hidden">
+                      <div
+                        className="h-full rounded-full transition-all"
+                        style={{
+                          width: `${Math.min(100, s.recovery_progress)}%`,
+                          background: s.fully_recovered ? '#10b981' : '#f59e0b',
+                        }}
+                      />
+                    </div>
+                    <span
+                      className={`text-[10px] font-semibold tabular-nums ${s.fully_recovered ? 'text-emerald-500' : 'text-amber-500'}`}
+                    >
+                      {(s.recovery_progress || 0).toFixed(0)}%
+                    </span>
+                    {s.fully_recovered && s.recovery_days != null && (
+                      <span className="text-[10px] text-emerald-500 font-semibold tabular-nums">
+                        {s.recovery_days}d
+                      </span>
+                    )}
+                  </div>
+                )}
+                {s.stock_count != null && (
+                  <span className="text-[10px] text-gray-400 tabular-nums shrink-0">
+                    · {s.stock_count}
+                  </span>
+                )}
+              </div>
+            </button>
+          )
+        })}
+      </div>
     </div>
   )
 }
