@@ -93,11 +93,12 @@ function CompareRow({ r, aLbl, bLbl, max, isStart, chipLabel, chipTitle, onClick
       title={chipTitle}
       className={`w-full text-left px-2 py-1.5 border-b border-gray-50 dark:border-gray-800/60 last:border-b-0 transition-colors border-l-2
         ${isStart ? 'border-l-amber-500' : 'border-l-transparent'}
+        ${!isBull ? 'bg-red-50/50 dark:bg-red-950/10' : ''}
         hover:bg-gray-50 dark:hover:bg-gray-900/50`}
     >
       <div className="flex items-center gap-2">
         <span
-          className={`shrink-0 inline-flex items-center justify-center px-1 h-5 min-w-[36px] rounded text-[10px] font-black tabular-nums relative
+          className={`shrink-0 inline-flex items-center justify-center px-1 h-5 min-w-[36px] rounded text-[10px] font-black tabular-nums
           ${
             isBull
               ? 'bg-emerald-100 dark:bg-emerald-900/40 text-emerald-600 dark:text-emerald-400'
@@ -105,14 +106,6 @@ function CompareRow({ r, aLbl, bLbl, max, isStart, chipLabel, chipTitle, onClick
           }`}
         >
           {chipLabel}
-          {isStart && (
-            <span
-              className="absolute -top-1 -right-1 text-[9px] font-black px-1 rounded-sm bg-amber-500 text-white leading-tight"
-              title="Investment start"
-            >
-              ▶
-            </span>
-          )}
         </span>
 
         <div className="flex-1 min-w-0 space-y-0.5">
