@@ -367,23 +367,22 @@ export default function BreakdownPage() {
     [focused]
   )
 
-  // Owner eyeball: clicking a mover/consistency row charts that stock in the
-  // right panel for the focused cycle — or the LAST selected cycle when
-  // nothing is focused (focusing runs analysis, which resets stock state, so
-  // the queued symbol loads after the focus effect fires).
+  // pendingStockRef: queues a stock selected before its cycle is focused —
+  // focusing runs analysis, which resets stock state, so the queued symbol
+  // loads after the focus effect fires (see the useEffect above).
   const pendingStockRef = useRef(null)
-  const handleAnalyticsStockOpen = useCallback(
+
+  // Analytics rework: clicking a Top movers / Consistency / Scan row routes the
+  // stock into Compare (side A = stock, side B = NEPSE if unset) and switches the
+  // center view to Compare. Reuses the existing Compare panel unchanged.
+  const handleAnalyticsCompare = useCallback(
     (stock) => {
-      const cycle = focused || sel.selectedCycles[sel.selectedCycles.length - 1]
-      if (!cycle) return
-      if (focused && cycleKey(focused) === cycleKey(cycle)) {
-        loadStockChart(stock)
-      } else {
-        pendingStockRef.current = stock
-        sel.setFocused(cycle)
-      }
+      if (!stock?.symbol) return
+      setSideA({ symbol: stock.symbol })
+      setSideB((b) => b || { index_id: 12 })
+      setAnalyticsView('compare')
     },
-    [focused, sel, loadStockChart]
+    [] // setters are stable
   )
 
   const handleStockSelect = useCallback(
@@ -744,7 +743,7 @@ export default function BreakdownPage() {
             indexId={indexId}
             sectorIndex={sectorIndexName}
             indexLbl={selectedIndexLabel}
-            onStockOpen={handleAnalyticsStockOpen}
+            onStockOpen={handleAnalyticsCompare}
             compare={{
               a: sideA,
               b: sideB,
