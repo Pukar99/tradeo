@@ -437,8 +437,8 @@ export default function ComparePanel({ cycles, a, b, onChangeA, onChangeB, onFoc
             )}
           </div>
           )}
-
-          <p className="text-[10px] text-gray-400 text-center">history, not a promise</p>
+          {/* No footer line — the card's meta already says
+              "over selected cycles · history, not a promise" (owner 2026-07-08). */}
         </>
       )}
     </div>

@@ -919,7 +919,6 @@ export default function BreakdownPage() {
               stockLoading={stockLoading}
               stockError={stockError}
               onStockSelect={handleStockSelect}
-              onClose={() => sel.setFocused(null)}
             />
           )}
         </CollapsiblePanel>

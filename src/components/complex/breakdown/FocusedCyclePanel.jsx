@@ -56,25 +56,17 @@ export default function FocusedCyclePanel(props) {
     onStockSelect,
     activeSector,
     summary,
-    onClose,
   } = props
   const [view, setView] = useState('general')
   useEffect(() => setView('general'), [focused && cycleKey(focused)]) // eslint-disable-line react-hooks/exhaustive-deps
 
   const idxLabel = indexLabel || selectedIndexLabel
 
+  // No close button (owner 2026-07-08: "useless — remove") — unfocusing happens
+  // by re-clicking the cycle's band/row or the Clear chip, like everywhere else.
   return (
     <>
       <div className="relative flex-1 min-h-0 overflow-y-auto bg-white/40 dark:bg-gray-950/40 p-3 space-y-3">
-        {/* Floating close button — identity now lives inside General (below) */}
-        <button
-          onClick={onClose}
-          aria-label="Close cycle detail"
-          className="absolute top-2 right-2 z-10 shrink-0 w-5 h-5 flex items-center justify-center rounded-full text-gray-400 hover:text-gray-600 dark:hover:text-gray-300 hover:bg-black/5 dark:hover:bg-white/10 transition-colors leading-none"
-        >
-          <IconX className="w-3 h-3" />
-        </button>
-
         {/* Chart: cycle / sector / stock */}
         <div className={`${CARD} p-2`}>
           {selectedStock ? (
