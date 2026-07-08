@@ -103,6 +103,16 @@ export default function BreakdownPage() {
   useEffect(() => {
     safeSessionSet('tradeo_breakdown_range', range)
   }, [range])
+  // Range now SCOPES DETECTION too (owner eyeball 2026-07-08): Detect sends
+  // this start date, so 2Y detects cycles in the last 2 years only.
+  const rangeFrom = (r) => {
+    const years = r === '5y' ? 5 : r === '2y' ? 2 : null
+    if (!years) return undefined
+    const d = new Date()
+    d.setFullYear(d.getFullYear() - years)
+    return d.toISOString().slice(0, 10)
+  }
+  const [ranRange, setRanRange] = useState(range) // range of the last Detect run
 
   const [cycles, setCycles] = useState([])
   const [allCandles, setAllCandles] = useState([])
@@ -140,7 +150,7 @@ export default function BreakdownPage() {
 
   // Detect cycles (Rule 45 — abort superseded)
   const detectCtrlRef = useRef(null)
-  const detectCycles = useCallback(async (thresh, idxId) => {
+  const detectCycles = useCallback(async (thresh, idxId, rng = 'all') => {
     if (detectCtrlRef.current) detectCtrlRef.current.abort()
     const ctrl = new AbortController()
     detectCtrlRef.current = ctrl
@@ -150,11 +160,13 @@ export default function BreakdownPage() {
     setThreshold(thresh)
     const t = Math.min(50, Math.max(5, parseFloat(thresh) || 10))
     setRanThreshold(t)
+    setRanRange(rng)
     setDetecting(true)
     setDetectError('')
     try {
+      const from = rangeFrom(rng)
       const { data } = await getMarketCycles(
-        { threshold: t, index_id: idxId },
+        { threshold: t, index_id: idxId, ...(from ? { from } : {}) },
         { signal: ctrl.signal }
       )
       if (ctrl.signal.aborted) return
@@ -186,16 +198,16 @@ export default function BreakdownPage() {
   useEffect(() => {
     if (mountedRef.current) return
     mountedRef.current = true
-    detectCycles(threshold, indexId)
+    detectCycles(threshold, indexId, range)
   }, []) // eslint-disable-line react-hooks/exhaustive-deps
 
   const handleIndexSelect = useCallback(
     (id) => {
       if (id === indexId) return
       setIndexId(id)
-      detectCycles(threshold, id)
+      detectCycles(threshold, id, range)
     },
-    [indexId, threshold, detectCycles]
+    [indexId, threshold, range, detectCycles]
   )
 
   // AbortController refs hoisted together so runAnalysis can cancel sibling
@@ -418,14 +430,14 @@ export default function BreakdownPage() {
     setSideA({ index_id: 12 })
     setSideB(null)
     setAnalyticsView('movers')
-    if (ranThreshold !== 10 || indexId !== 12) {
+    if (ranThreshold !== 10 || indexId !== 12 || ranRange !== 'all') {
       setIndexId(12)
-      detectCycles(10, 12)
+      detectCycles(10, 12, 'all')
     } else {
       setThreshold(10)
       sel.reset()
     }
-  }, [ranThreshold, indexId, detectCycles, setSymbol, setThreshold, sel])
+  }, [ranThreshold, indexId, ranRange, detectCycles, setSymbol, setThreshold, sel])
 
   // Derived values (memoized — Rule 37)
   const sectors = useMemo(() => analysis?.sectors || [], [analysis])
@@ -490,7 +502,9 @@ export default function BreakdownPage() {
   const selectedIndexLabel = INDEX_OPTIONS.find((o) => o.id === indexId)?.label || 'NEPSE'
   const sectorIndexName = INDEX_OPTIONS.find((o) => o.id === indexId)?.sector_index || null
   const thresholdDirty =
-    cycles.length > 0 && Math.min(50, Math.max(5, parseFloat(threshold) || 10)) !== ranThreshold
+    cycles.length > 0 &&
+    (Math.min(50, Math.max(5, parseFloat(threshold) || 10)) !== ranThreshold ||
+      range !== ranRange)
   const focusedKey = focused ? cycleKey(focused) : null
 
   const cycleCandles = useMemo(() => {
@@ -570,16 +584,16 @@ export default function BreakdownPage() {
           step={1}
           onChange={(e) => setThreshold(e.target.value)}
           onKeyDown={(e) => {
-            if (e.key === 'Enter') detectCycles(threshold, indexId)
+            if (e.key === 'Enter') detectCycles(threshold, indexId, range)
           }}
           className="w-10 text-[10px] font-semibold text-center border border-gray-200 dark:border-gray-700 rounded px-1 py-0.5 dark:bg-gray-900 dark:text-gray-100 focus:outline-none focus:ring-1 focus:ring-gray-400"
         />
         <span className={`${LABEL} normal-case`}>%</span>
         {/* Amber = input differs from the threshold the visible cycles were detected with */}
         <button
-          onClick={() => detectCycles(threshold, indexId)}
+          onClick={() => detectCycles(threshold, indexId, range)}
           disabled={detecting}
-          title={thresholdDirty ? 'Threshold changed — press Detect to re-run' : undefined}
+          title={thresholdDirty ? 'Threshold or range changed — press Detect to re-run' : undefined}
           className={`px-2 py-0.5 rounded select-none text-[10px] font-semibold hover:opacity-80 disabled:opacity-40 transition-opacity ${
             thresholdDirty
               ? 'bg-amber-500 text-white'
