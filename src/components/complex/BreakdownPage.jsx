@@ -56,6 +56,8 @@ function IconChevronLeft({ className = 'w-3 h-3' }) {
 const RANGE_VIEWS = [
   { id: 'all', label: 'All' },
   { id: '5y', label: '5Y' },
+  { id: '4y', label: '4Y' },
+  { id: '3y', label: '3Y' },
   { id: '2y', label: '2Y' },
 ]
 
@@ -106,7 +108,10 @@ export default function BreakdownPage() {
   // Range now SCOPES DETECTION too (owner eyeball 2026-07-08): Detect sends
   // this start date, so 2Y detects cycles in the last 2 years only.
   const rangeFrom = (r) => {
-    const years = r === '5y' ? 5 : r === '2y' ? 2 : null
+    // Derive the year count from the range id (e.g. '3y' → 3) so RANGE_VIEWS is
+    // the single source of truth — adding a new NyY option needs no edit here.
+    const m = /^(\d+)y$/.exec(r)
+    const years = m ? Number(m[1]) : null
     if (!years) return undefined
     const d = new Date()
     d.setFullYear(d.getFullYear() - years)
