@@ -11,7 +11,7 @@
 // =============================================================================
 
 import { useEffect, useMemo, useRef, useState } from 'react'
-import { getCycleMovers, getCycleConsistency, getCycleScan } from '../../../api'
+import { getCycleAnalytics } from '../../../utils/globalCache'
 import { cycleKey } from './useCycleSelection'
 import { CARD, LABEL, Skeleton, fmtPct } from '../../datalab/shared'
 import ViewSwitcher from '../../shared/ViewSwitcher'
@@ -230,15 +230,11 @@ export default function CycleAnalyticsCards({
         ...(sectorIndex ? { sector_index: sectorIndex } : {}),
       }
       try {
-        const [m, c, sc] = await Promise.all([
-          getCycleMovers({ ...payload, n: 15 }, { signal: ctrl.signal }),
-          getCycleConsistency(payload, { signal: ctrl.signal }),
-          getCycleScan({ ...payload, n: 15 }, { signal: ctrl.signal }),
-        ])
+        const r = await getCycleAnalytics({ ...payload, n: 15 })
         if (ctrl.signal.aborted) return
-        setMovers(m.data)
-        setConsistency(c.data)
-        setScan(sc.data)
+        setMovers(r.data.movers)
+        setConsistency(r.data.consistency)
+        setScan(r.data.scan)
       } catch (e) {
         if (ctrl.signal.aborted) return
         setError('Failed to load cycle analytics')

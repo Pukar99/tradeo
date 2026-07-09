@@ -3,13 +3,9 @@ import { useState } from 'react'
 import { render, screen, waitFor, fireEvent } from '@testing-library/react'
 import { describe, test, expect, vi, beforeEach } from 'vitest'
 
-const movers = vi.fn()
-const consistency = vi.fn()
-const scan = vi.fn()
-vi.mock('../../src/api', () => ({
-  getCycleMovers: (...a) => movers(...a),
-  getCycleConsistency: (...a) => consistency(...a),
-  getCycleScan: (...a) => scan(...a),
+const analytics = vi.fn()
+vi.mock('../../src/utils/globalCache', () => ({
+  getCycleAnalytics: (...a) => analytics(...a),
 }))
 
 import CycleAnalyticsCards from '../../src/components/complex/breakdown/CycleAnalyticsCards'
@@ -39,23 +35,21 @@ function Harness({ selectedCycles }) {
 }
 
 beforeEach(() => {
-  movers.mockReset().mockResolvedValue({
+  analytics.mockReset().mockResolvedValue({
     data: {
-      gainers: [{ symbol: 'WINA', company_name: 'Winner A', avg_ret: 55.1, cycles_covered: 1 }],
-      losers: [{ symbol: 'LOSA', company_name: 'Loser A', avg_ret: -16.6, cycles_covered: 1 }],
-      n: 5, cycles_selected: 1, total_symbols: 3, excluded_partial: 0,
-    },
-  })
-  consistency.mockReset().mockResolvedValue({
-    data: {
-      stocks: [{ symbol: 'WINA', company_name: 'Winner A', up_count: 1, n_covered: 1, avg_ret: 55.1, corr: null }],
-      cycles_selected: 1, index_id: 12,
-    },
-  })
-  scan.mockReset().mockResolvedValue({
-    data: {
-      stocks: [{ symbol: 'WINA', company_name: 'Winner A', floor: 12.3, avg: 20.5, per_wave: [12.3] }],
-      cycles_selected: 1, index_id: 12,
+      movers: {
+        gainers: [{ symbol: 'WINA', company_name: 'Winner A', avg_ret: 55.1, cycles_covered: 1 }],
+        losers: [{ symbol: 'LOSA', company_name: 'Loser A', avg_ret: -16.6, cycles_covered: 1 }],
+        n: 5, cycles_selected: 1, total_symbols: 3, excluded_partial: 0,
+      },
+      consistency: {
+        stocks: [{ symbol: 'WINA', company_name: 'Winner A', up_count: 1, n_covered: 1, avg_ret: 55.1, corr: null }],
+        cycles_selected: 1, index_id: 12,
+      },
+      scan: {
+        stocks: [{ symbol: 'WINA', company_name: 'Winner A', floor: 12.3, avg: 20.5, per_wave: [12.3] }],
+        cycles_selected: 1, index_id: 12,
+      },
     },
   })
 })
@@ -64,7 +58,7 @@ describe('CycleAnalyticsCards', () => {
   test('empty selection: friendly empty state, no fetch', () => {
     render(<Harness selectedCycles={[]} />)
     expect(screen.getAllByText(/select a cycle/i).length).toBeGreaterThan(0)
-    expect(movers).not.toHaveBeenCalled()
+    expect(analytics).not.toHaveBeenCalled()
   })
 
   test('renders movers + consistency; corr null shows dash; honest footer', async () => {
@@ -86,15 +80,12 @@ describe('CycleAnalyticsCards', () => {
     expect(screen.getByText('history, not a promise')).toBeInTheDocument()
 
     // payload shape: cycles + index_id + bumped n (owner addition: 15 per side)
-    expect(movers).toHaveBeenCalledWith(
-      {
-        cycles: [{ start_date: '2023-01-01', end_date: '2023-06-01', type: 'bull' }],
-        index_id: 12,
-        n: 15,
-      },
-      expect.anything()
-    )
-    expect(movers).toHaveBeenCalledTimes(1)
-    expect(scan).toHaveBeenCalledTimes(1)
+    expect(analytics).toHaveBeenCalledWith({
+      cycles: [{ start_date: '2023-01-01', end_date: '2023-06-01', type: 'bull' }],
+      index_id: 12,
+      n: 15,
+    })
+    // Single merged call — was 3 parallel calls (movers/consistency/scan).
+    expect(analytics).toHaveBeenCalledTimes(1)
   })
 })
