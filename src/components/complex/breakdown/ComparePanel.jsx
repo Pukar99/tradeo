@@ -112,7 +112,7 @@ function CompareRow({ r, aLbl, bLbl, max, isStart, chipLabel, chipTitle, onClick
 
         <div className="flex-1 min-w-0 space-y-0.5">
           <div className="flex items-center gap-1.5">
-            <span className="max-w-[72px] shrink-0 text-[10px] font-bold uppercase tracking-widest text-blue-400 truncate" title={aLbl}>
+            <span className="w-14 shrink-0 text-[10px] font-bold uppercase tracking-widest text-blue-400 truncate" title={aLbl}>
               {aLbl}
             </span>
             <div className="relative flex-1 h-2 bg-gray-100 dark:bg-gray-800 rounded-sm overflow-hidden">
@@ -129,7 +129,7 @@ function CompareRow({ r, aLbl, bLbl, max, isStart, chipLabel, chipTitle, onClick
             </span>
           </div>
           <div className="flex items-center gap-1.5">
-            <span className="max-w-[72px] shrink-0 text-[10px] font-bold uppercase tracking-widest text-amber-500 truncate" title={bLbl}>
+            <span className="w-14 shrink-0 text-[10px] font-bold uppercase tracking-widest text-amber-500 truncate" title={bLbl}>
               {bLbl}
             </span>
             <div className="relative flex-1 h-2 bg-gray-100 dark:bg-gray-800 rounded-sm overflow-hidden">
