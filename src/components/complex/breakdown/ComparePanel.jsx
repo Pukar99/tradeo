@@ -208,9 +208,10 @@ export default function ComparePanel({ cycles, a, b, onChangeA, onChangeB, onFoc
   const durByKey = useMemo(() => new Map(cycles.map((c) => [cycleKey(c), c.duration_days])), [cycles])
 
   return (
-    <div className="flex-1 min-h-0 overflow-y-auto px-3 py-2 space-y-3">
-      {/* 1. Section toggle FIRST, then the two side pickers (owner 2026-07-07) */}
-      <div className="flex items-center gap-2 flex-wrap">
+    <div className="flex-1 min-h-0 flex flex-col">
+      {/* 1. Section toggle FIRST, then the two side pickers (owner 2026-07-07).
+          Pinned header (shrink-0) — only the content below scrolls (owner 2026-07-08). */}
+      <div className="shrink-0 flex items-center gap-2 flex-wrap px-3 pt-2 pb-2 border-b border-gray-100 dark:border-gray-800">
         <ViewSwitcher
           views={SECTIONS}
           active={section}
@@ -222,6 +223,8 @@ export default function ComparePanel({ cycles, a, b, onChangeA, onChangeB, onFoc
         <SidePicker tag="B" side={b} onChange={onChangeB} />
       </div>
 
+      {/* 2. Scrollable content — the toggle above stays put while this scrolls. */}
+      <div className="flex-1 min-h-0 overflow-y-auto px-3 py-2 space-y-3">
       {error && (
         <div className="text-[10px] text-red-500 flex items-center justify-between">
           <span>{error}</span>
@@ -572,6 +575,7 @@ export default function ComparePanel({ cycles, a, b, onChangeA, onChangeB, onFoc
               "over selected cycles · history, not a promise" (owner 2026-07-08). */}
         </>
       )}
+      </div>
     </div>
   )
 }

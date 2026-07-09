@@ -373,16 +373,16 @@ export default function BreakdownPage() {
   const pendingStockRef = useRef(null)
 
   // Analytics rework: clicking a Top movers / Consistency / Scan row routes the
-  // stock into Compare (side A = stock, side B = NEPSE if unset) and switches the
-  // center view to Compare. Reuses the existing Compare panel unchanged.
+  // stock into Compare (side A = NEPSE/index baseline, side B = the clicked stock)
+  // and switches the center view to Compare. Reuses the existing Compare panel.
   const handleAnalyticsCompare = useCallback(
     (stock) => {
       if (!stock?.symbol) return
-      setSideA({ symbol: stock.symbol })
-      setSideB((b) => b || { index_id: 12 })
+      setSideA({ index_id: indexId })
+      setSideB({ symbol: stock.symbol })
       setAnalyticsView('compare')
     },
-    [] // setters are stable
+    [indexId]
   )
 
   const handleStockSelect = useCallback(
