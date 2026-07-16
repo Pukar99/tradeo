@@ -360,6 +360,8 @@ export const toggleMeroshareAutoApply = (accountId, enabled) =>
   API.post('/api/meroshare/auto-apply/toggle', { account_id: accountId, enabled })
 export const runMeroshareAutoApply = () => API.post('/api/meroshare/auto-apply/run')
 export const runMeroshareAutoApplyOnLogin = () => API.post('/api/meroshare/auto-apply/on-login')
+export const getMeroshareApplyLog = (limit = 20) =>
+  API.get(`/api/meroshare/apply-log?limit=${limit}`)
 
 // =============================================================================
 // 11. MARKET JOURNAL

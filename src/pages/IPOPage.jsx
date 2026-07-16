@@ -2,6 +2,7 @@
 import { useState, useEffect, useCallback, useRef } from 'react'
 import { useAuth } from '../context/AuthContext'
 import { useExploreToolbarSlot } from './ExplorePage'
+import AutoApplyActivity from '../components/AutoApplyActivity'
 import {
   getMeroshareDpList,
   getMeroshareAccounts,
@@ -2258,6 +2259,9 @@ function IPOPage({ isActive = true }) {
                 )}
               </div>
             )}
+
+            {/* Durable auto-apply history (meroshare_apply_log) */}
+            <AutoApplyActivity />
 
             {/* Errors */}
             {actionError && (
