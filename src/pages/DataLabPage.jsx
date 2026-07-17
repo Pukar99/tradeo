@@ -309,7 +309,9 @@ export { safeSessionGet, safeSessionSet } from '../utils/safeSession'
 
 export default function DataLabPage() {
   const [activeTab, setActiveTab] = useState(() =>
-    safeSessionGet('tradeo_datalab_tab', 'performance')
+    // Default = Breakdown (the flagship tab). 'performance' is a ComingSoon stub
+    // since 2026-07-08 — defaulting there made the page open on an empty toolbar.
+    safeSessionGet('tradeo_datalab_tab', 'breakdown')
   )
   const slotRef = useRef(null)
   const { user, loading: authLoading } = useAuth()
