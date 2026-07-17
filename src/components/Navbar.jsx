@@ -88,7 +88,6 @@ function Navbar({ autoHide = false, hidden = false, onMouseEnter, onMouseLeave }
       { path: '/', label: t('nav.home') },
       { path: '/screen', label: 'Screen' },
       { path: '/logs', label: 'Logs', authOnly: true },
-      { path: '/portfolio', label: t('nav.portfolio'), authOnly: true },
       { path: '/datalab', label: 'Data Lab' },
       { path: '/explore', label: 'Explore' },
     ],
@@ -716,6 +715,15 @@ function Navbar({ autoHide = false, hidden = false, onMouseEnter, onMouseLeave }
                 className="flex items-center gap-2 px-4 py-3 min-h-[48px] rounded-xl text-sm font-semibold text-gray-600 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-800/80 hover:text-gray-900 dark:hover:text-white transition-all"
               >
                 <span>👤</span> {t('nav.profile')}
+              </Link>
+
+              {/* Portfolio — off the main nav, reachable via profile menu only */}
+              <Link
+                to="/portfolio"
+                onClick={() => setMobileMenuOpen(false)}
+                className="flex items-center gap-2 px-4 py-3 min-h-[48px] rounded-xl text-sm font-semibold text-gray-600 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-800/80 hover:text-gray-900 dark:hover:text-white transition-all"
+              >
+                <span>💼</span> {t('nav.portfolio')}
               </Link>
 
               <button
