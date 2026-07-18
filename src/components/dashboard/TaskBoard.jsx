@@ -4,7 +4,6 @@ import { useNavigate } from 'react-router-dom'
 import {
   getTodayTasks,
   toggleFixedTask,
-  addCustomTask,
   updateCustomTask,
   deleteCustomTask,
   getMindset,
@@ -98,11 +97,6 @@ const Icons = {
         strokeLinejoin="round"
         d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14"
       />
-    </svg>
-  ),
-  plus: (
-    <svg className="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-      <path strokeLinecap="round" strokeLinejoin="round" d="M12 4v16m8-8H4" />
     </svg>
   ),
   tradeLog: (
@@ -664,10 +658,7 @@ function TaskBoard({ initData, mindsetContent }) {
     FIXED_TASKS.map((task) => ({ ...task, completed: false }))
   )
   const [customTasks, setCustomTasks] = useState([])
-  const [newTask, setNewTask] = useState('')
   const [loading, setLoading] = useState(!initData)
-  const [adding, setAdding] = useState(false)
-  const [showAdd, setShowAdd] = useState(false)
   const [activeModal, setActiveModal] = useState(null)
   const [mutateErr, setMutateErr] = useState(null)
   const { onContextMenu: _ocm, ContextMenuPortal } = useContextMenu()
@@ -745,23 +736,6 @@ function TaskBoard({ initData, mindsetContent }) {
       gCache.del('dashboard')
     } catch {
       setMutateErr('Failed to update task')
-    }
-  }
-
-  const handleAddTask = async (e) => {
-    e.preventDefault()
-    if (!newTask.trim()) return
-    setAdding(true)
-    setMutateErr(null)
-    try {
-      const res = await addCustomTask(newTask.trim())
-      setCustomTasks((prev) => [...prev, res.data])
-      setNewTask('')
-      setShowAdd(false)
-    } catch {
-      setMutateErr('Failed to add task')
-    } finally {
-      setAdding(false)
     }
   }
 
@@ -858,61 +832,15 @@ function TaskBoard({ initData, mindsetContent }) {
           </div>
         </div>
 
-        {/* Fixed footer — add task, never scrolls */}
-        <div className="flex-shrink-0 border-t border-gray-50 dark:border-gray-800 px-4 py-2.5 space-y-1.5">
-          {mutateErr && (
+        {/* Fixed footer — mutation errors only (custom tasks are added via the
+            AI chat / future Settings page, not from the routine card) */}
+        {mutateErr && (
+          <div className="flex-shrink-0 border-t border-gray-50 dark:border-gray-800 px-4 py-2.5">
             <p className="text-[10px] text-red-500 bg-red-50 dark:bg-red-950 px-2 py-1 rounded-lg">
               {mutateErr}
             </p>
-          )}
-          {showAdd ? (
-            <form onSubmit={handleAddTask} className="flex gap-1.5">
-              <input
-                type="text"
-                value={newTask}
-                onChange={(e) => setNewTask(e.target.value)}
-                placeholder="Task name…"
-                autoFocus
-                maxLength={100}
-                className="flex-1 bg-gray-50 dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg px-2.5 py-1.5 text-[11px] text-gray-800 dark:text-white placeholder-gray-400 focus:outline-none focus:border-blue-400 transition-colors min-w-0"
-              />
-              <button
-                type="submit"
-                disabled={adding || !newTask.trim()}
-                className="bg-blue-500 hover:bg-blue-400 disabled:opacity-40 text-white px-3 py-1.5 rounded-lg text-[11px] font-semibold transition-colors flex-shrink-0"
-              >
-                {adding ? '…' : 'Add'}
-              </button>
-              <button
-                type="button"
-                onClick={() => {
-                  setShowAdd(false)
-                  setNewTask('')
-                  setMutateErr(null)
-                }}
-                className="text-gray-400 hover:text-gray-600 flex items-center px-1.5 transition-colors flex-shrink-0"
-              >
-                <svg
-                  className="w-3.5 h-3.5"
-                  fill="none"
-                  viewBox="0 0 24 24"
-                  stroke="currentColor"
-                  strokeWidth={2}
-                >
-                  <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" />
-                </svg>
-              </button>
-            </form>
-          ) : (
-            <button
-              onClick={() => setShowAdd(true)}
-              className="flex items-center gap-1.5 text-[10px] text-gray-400 hover:text-blue-500 transition-colors group"
-            >
-              <span className="group-hover:text-blue-500 transition-colors">{Icons.plus}</span>
-              Add custom task
-            </button>
-          )}
-        </div>
+          </div>
+        )}
       </div>
     </>
   )
