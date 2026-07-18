@@ -2,15 +2,18 @@
 // Wave 1 (SET-2) shipped the shell with placeholder bodies; Wave 2 (SET-3/4/5) filled Appearance
 // theme/language, Dashboard prefs, and the static MeroShare card. Wave 3 (SET-6+, owner-ordered
 // 2026-07-19) moves identity/account editing here too — Profile becomes pure display. SET-6 added
-// the Account section (avatar + profile fields); SET-7 adds Security (password change). This page
-// itself still performs ZERO network activity of its own — AccountSection owns its cached
-// getProfile() call, SecuritySection calls changePassword only on submit.
+// the Account section (avatar + profile fields); SET-7 added Security (password change); SET-8
+// adds Danger zone (delete account) as the LAST section, red-toned via SettingsSection's
+// tone="danger" prop. This page itself still performs ZERO network activity of its own —
+// AccountSection owns its cached getProfile() call, SecuritySection/DangerZone call their APIs
+// only on submit.
 import SettingsSection from '../components/settings/SettingsSection'
 import AppearanceSection from '../components/settings/AppearanceSection'
 import DashboardPrefs from '../components/settings/DashboardPrefs'
 import MeroshareCard from '../components/settings/MeroshareCard'
 import AccountSection from '../components/settings/AccountSection'
 import SecuritySection from '../components/settings/SecuritySection'
+import DangerZone from '../components/settings/DangerZone'
 
 export default function SettingsPage() {
   return (
@@ -51,6 +54,15 @@ export default function SettingsPage() {
 
         <SettingsSection id="security" title="Security" caption="Change your password.">
           <SecuritySection />
+        </SettingsSection>
+
+        <SettingsSection
+          id="danger"
+          title="Danger zone"
+          caption="Irreversible actions."
+          tone="danger"
+        >
+          <DangerZone />
         </SettingsSection>
       </div>
     </div>
