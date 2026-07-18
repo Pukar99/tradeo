@@ -3,6 +3,7 @@ import globals from 'globals'
 import react from 'eslint-plugin-react'
 import reactHooks from 'eslint-plugin-react-hooks'
 import reactRefresh from 'eslint-plugin-react-refresh'
+import jsxA11y from 'eslint-plugin-jsx-a11y'
 
 export default [
   { ignores: ['dist', 'node_modules'] },
@@ -22,6 +23,7 @@ export default [
       react,
       'react-hooks': reactHooks,
       'react-refresh': reactRefresh,
+      'jsx-a11y': jsxA11y,
     },
     rules: {
       ...js.configs.recommended.rules,
@@ -61,12 +63,36 @@ export default [
       'no-unused-vars': ['warn', { argsIgnorePattern: '^_', varsIgnorePattern: '^_' }],
       // intentional empty catches are common
       'no-empty': ['error', { allowEmptyCatch: true }],
+      // jsx-a11y recommended rules at warn level globally (existing code = visible debt, never a broken build)
+      ...Object.entries(jsxA11y.configs.recommended.rules).reduce((acc, [rule, _level]) => {
+        acc[rule] = 'warn'
+        return acc
+      }, {}),
     },
   },
   {
     files: ['tests/**/*.{js,jsx}', '**/*.test.{js,jsx}'],
     languageOptions: {
       globals: { ...globals.browser, ...globals.jest },
+    },
+  },
+  // Settings scope: jsx-a11y at error level + Gate-3 meroshare import ban
+  {
+    files: ['src/pages/SettingsPage.jsx', 'src/components/settings/**/*.jsx'],
+    plugins: {
+      'jsx-a11y': jsxA11y,
+    },
+    rules: {
+      // jsx-a11y recommended rules at error level for Settings
+      ...Object.entries(jsxA11y.configs.recommended.rules).reduce((acc, [rule, _level]) => {
+        acc[rule] = 'error'
+        return acc
+      }, {}),
+      // Gate-3 security boundary: Settings must never touch MeroShare data
+      'no-restricted-syntax': ['error', {
+        selector: "ImportSpecifier[imported.name=/[Mm]eroshare/]",
+        message: "Gate-3: Settings must never touch MeroShare data (decrypted credentials in response)",
+      }],
     },
   },
 ]
