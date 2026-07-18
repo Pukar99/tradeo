@@ -1,14 +1,16 @@
 // === SettingsPage.jsx — orchestrator only: page header + titled sections ===
 // Wave 1 (SET-2) shipped the shell with placeholder bodies; Wave 2 (SET-3/4/5) filled Appearance
 // theme/language, Dashboard prefs, and the static MeroShare card. Wave 3 (SET-6+, owner-ordered
-// 2026-07-19) moves identity/account editing here too — Profile becomes pure display. SET-6 adds
-// the Account section (avatar + profile fields); this page itself still performs ZERO network
-// activity of its own — AccountSection owns its cached getProfile() call.
+// 2026-07-19) moves identity/account editing here too — Profile becomes pure display. SET-6 added
+// the Account section (avatar + profile fields); SET-7 adds Security (password change). This page
+// itself still performs ZERO network activity of its own — AccountSection owns its cached
+// getProfile() call, SecuritySection calls changePassword only on submit.
 import SettingsSection from '../components/settings/SettingsSection'
 import AppearanceSection from '../components/settings/AppearanceSection'
 import DashboardPrefs from '../components/settings/DashboardPrefs'
 import MeroshareCard from '../components/settings/MeroshareCard'
 import AccountSection from '../components/settings/AccountSection'
+import SecuritySection from '../components/settings/SecuritySection'
 
 export default function SettingsPage() {
   return (
@@ -45,6 +47,10 @@ export default function SettingsPage() {
           caption="Your profile details and avatar."
         >
           <AccountSection />
+        </SettingsSection>
+
+        <SettingsSection id="security" title="Security" caption="Change your password.">
+          <SecuritySection />
         </SettingsSection>
       </div>
     </div>
