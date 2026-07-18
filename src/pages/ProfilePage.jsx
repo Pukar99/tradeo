@@ -1,13 +1,14 @@
-// === ProfilePage.jsx — profile page: hero banner, stat tabs (overview/trading/discipline/research), edit form, avatar upload, password change ===
-import { useState, useEffect, useRef, useCallback } from 'react'
+// === ProfilePage.jsx — profile page: hero banner + stat tabs (overview/trading/discipline/research), PURE DISPLAY (account changes happen on the Settings page) ===
+import { useState, useEffect, useCallback } from 'react'
 import { useAuth } from '../context/AuthContext'
-import { useNavigate } from 'react-router-dom'
-import { updateProfile, uploadAvatar, changePassword, deleteAccount } from '../api'
-import { getProfile, clearProfileCache } from '../utils/globalCache'
+import { useNavigate, Link } from 'react-router-dom'
+import { getProfile } from '../utils/globalCache'
 import { pnlClass } from '../utils/format'
 
-const MAX_AVATAR_SIZE = 5 * 1024 * 1024 // 5 MB
-const ALLOWED_IMAGE_TYPES = ['image/jpeg', 'image/jpg', 'image/png', 'image/gif', 'image/webp']
+// Link style reused from MeroshareCard.jsx (settings-folder secondary-link convention:
+// focus-ring + ≥44px touch target)
+const EDIT_LINK =
+  'inline-flex min-h-[44px] items-center gap-1 px-4 rounded-xl text-sm font-medium text-white bg-white bg-opacity-10 hover:bg-opacity-20 border border-white border-opacity-20 transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-400/60'
 
 function StatCard({ label, value, color = 'text-gray-900 dark:text-white', sub }) {
   return (
@@ -22,39 +23,13 @@ function StatCard({ label, value, color = 'text-gray-900 dark:text-white', sub }
 }
 
 function ProfilePage() {
-  const { user, updateUser, logout } = useAuth()
+  const { user } = useAuth()
   const navigate = useNavigate()
-  const fileInputRef = useRef(null)
   const [profile, setProfile] = useState(null)
   const [avatarImgError, setAvatarImgError] = useState(false)
   const [loading, setLoading] = useState(true)
   const [fetchError, setFetchError] = useState('')
-  const [editing, setEditing] = useState(false)
-  const [uploadingAvatar, setUploadingAvatar] = useState(false)
-  const [avatarError, setAvatarError] = useState('')
-  const [saving, setSaving] = useState(false)
-  const [saveError, setSaveError] = useState('')
   const [activeTab, setActiveTab] = useState('overview')
-  const [form, setForm] = useState({
-    name: '',
-    bio: '',
-    location: '',
-    trading_since: '',
-  })
-  const [formErrors, setFormErrors] = useState({})
-  const [showPasswordForm, setShowPasswordForm] = useState(false)
-  const [passwordForm, setPasswordForm] = useState({
-    currentPassword: '',
-    newPassword: '',
-    confirmPassword: '',
-  })
-  const [passwordError, setPasswordError] = useState('')
-  const [passwordSuccess, setPasswordSuccess] = useState('')
-  const [savingPassword, setSavingPassword] = useState(false)
-  const [showDeleteForm, setShowDeleteForm] = useState(false)
-  const [deletePassword, setDeletePassword] = useState('')
-  const [deleteError, setDeleteError] = useState('')
-  const [deleting, setDeleting] = useState(false)
 
   // Auth redirect — use useEffect, never navigate during render
   useEffect(() => {
@@ -66,12 +41,6 @@ function ProfilePage() {
     try {
       const res = await getProfile()
       setProfile(res.data)
-      setForm({
-        name: res.data.user.name || '',
-        bio: res.data.user.bio || '',
-        location: res.data.user.location || '',
-        trading_since: res.data.user.trading_since || '',
-      })
     } catch (err) {
       setFetchError(err.response?.data?.message || 'Failed to load profile. Please try again.')
     } finally {
@@ -82,142 +51,6 @@ function ProfilePage() {
   useEffect(() => {
     if (user) fetchProfile()
   }, [user, fetchProfile])
-
-  const handleAvatarUpload = async (e) => {
-    const file = e.target.files[0]
-    if (!file) return
-
-    // Client-side validation before hitting the network
-    setAvatarError('')
-    if (!ALLOWED_IMAGE_TYPES.includes(file.type)) {
-      setAvatarError('Only JPG, PNG, GIF or WebP images are allowed.')
-      e.target.value = ''
-      return
-    }
-    if (file.size > MAX_AVATAR_SIZE) {
-      setAvatarError('Image must be under 5 MB.')
-      e.target.value = ''
-      return
-    }
-
-    setUploadingAvatar(true)
-    try {
-      const formData = new FormData()
-      formData.append('avatar', file)
-      const res = await uploadAvatar(formData)
-      clearProfileCache()
-      setProfile((prev) => ({
-        ...prev,
-        user: { ...prev.user, avatar_url: res.data.avatar_url },
-      }))
-      updateUser({ avatar_url: res.data.avatar_url })
-    } catch (err) {
-      setAvatarError(err.response?.data?.message || 'Failed to upload avatar. Please try again.')
-    } finally {
-      setUploadingAvatar(false)
-      // Reset input so the same file can be re-selected after an error
-      e.target.value = ''
-    }
-  }
-
-  const validateForm = () => {
-    const errors = {}
-    if (!form.name.trim()) errors.name = 'Name is required'
-    if (form.name.trim().length > 100) errors.name = 'Name must be under 100 characters'
-    if (form.bio.length > 500) errors.bio = 'Bio must be under 500 characters'
-    setFormErrors(errors)
-    return Object.keys(errors).length === 0
-  }
-
-  const handleSave = async () => {
-    if (!validateForm()) return
-    setSaving(true)
-    setSaveError('')
-    try {
-      const res = await updateProfile(form)
-      clearProfileCache()
-      setProfile((prev) => ({ ...prev, user: { ...prev.user, ...res.data } }))
-      updateUser({ name: form.name.trim() })
-      setEditing(false)
-      setFormErrors({})
-    } catch (err) {
-      setSaveError(err.response?.data?.message || 'Failed to save changes. Please try again.')
-    } finally {
-      setSaving(false)
-    }
-  }
-
-  const handleCancelEdit = () => {
-    // Reset form to current saved values
-    if (profile) {
-      setForm({
-        name: profile.user.name || '',
-        bio: profile.user.bio || '',
-        location: profile.user.location || '',
-        trading_since: profile.user.trading_since || '',
-      })
-    }
-    setEditing(false)
-    setFormErrors({})
-    setSaveError('')
-    setShowPasswordForm(false)
-  }
-
-  const handleChangePassword = async (e) => {
-    e.preventDefault()
-    setPasswordError('')
-    setPasswordSuccess('')
-
-    if (passwordForm.newPassword !== passwordForm.confirmPassword) {
-      setPasswordError('New passwords do not match')
-      return
-    }
-    if (passwordForm.newPassword.length < 8) {
-      setPasswordError('Password must be at least 8 characters')
-      return
-    }
-    if (passwordForm.currentPassword === passwordForm.newPassword) {
-      setPasswordError('New password must be different from current password')
-      return
-    }
-
-    setSavingPassword(true)
-    try {
-      await changePassword({
-        currentPassword: passwordForm.currentPassword,
-        newPassword: passwordForm.newPassword,
-      })
-      setPasswordSuccess('Password changed successfully!')
-      setPasswordForm({ currentPassword: '', newPassword: '', confirmPassword: '' })
-      setTimeout(() => {
-        setShowPasswordForm(false)
-        setPasswordSuccess('')
-      }, 2000)
-    } catch (err) {
-      setPasswordError(err.response?.data?.message || 'Failed to change password')
-    } finally {
-      setSavingPassword(false)
-    }
-  }
-
-  const handleDeleteAccount = async (e) => {
-    e.preventDefault()
-    setDeleteError('')
-    if (!deletePassword) {
-      setDeleteError('Password is required')
-      return
-    }
-    setDeleting(true)
-    try {
-      await deleteAccount({ password: deletePassword })
-      logout()
-      navigate('/login')
-    } catch (err) {
-      setDeleteError(err.response?.data?.message || 'Failed to delete account. Please try again.')
-    } finally {
-      setDeleting(false)
-    }
-  }
 
   const getInitials = (name) => {
     if (!name) return '?'
@@ -346,43 +179,6 @@ function ProfilePage() {
                     </div>
                   )}
                 </div>
-                <button
-                  onClick={() => fileInputRef.current?.click()}
-                  disabled={uploadingAvatar}
-                  title="Change avatar"
-                  className="absolute -bottom-2 -right-2 w-8 h-8 bg-blue-600 hover:bg-blue-500 disabled:opacity-50 rounded-lg flex items-center justify-center shadow-lg transition-colors"
-                >
-                  {uploadingAvatar ? (
-                    <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" />
-                  ) : (
-                    <svg
-                      className="w-4 h-4 text-white"
-                      fill="none"
-                      viewBox="0 0 24 24"
-                      stroke="currentColor"
-                    >
-                      <path
-                        strokeLinecap="round"
-                        strokeLinejoin="round"
-                        strokeWidth={2}
-                        d="M3 9a2 2 0 012-2h.93a2 2 0 001.664-.89l.812-1.22A2 2 0 0110.07 4h3.86a2 2 0 011.664.89l.812 1.22A2 2 0 0018.07 7H19a2 2 0 012 2v9a2 2 0 01-2 2H5a2 2 0 01-2-2V9z"
-                      />
-                      <path
-                        strokeLinecap="round"
-                        strokeLinejoin="round"
-                        strokeWidth={2}
-                        d="M15 13a3 3 0 11-6 0 3 3 0 016 0z"
-                      />
-                    </svg>
-                  )}
-                </button>
-                <input
-                  ref={fileInputRef}
-                  type="file"
-                  accept="image/jpeg,image/jpg,image/png,image/gif,image/webp"
-                  onChange={handleAvatarUpload}
-                  className="hidden"
-                />
               </div>
 
               <div>
@@ -431,28 +227,12 @@ function ProfilePage() {
                 {profile.user.bio && (
                   <p className="text-gray-300 text-sm mt-2 max-w-md">{profile.user.bio}</p>
                 )}
-                {/* Avatar error shown near the avatar area */}
-                {avatarError && (
-                  <p className="text-red-400 text-xs mt-1">
-                    {avatarError}
-                    <button onClick={() => setAvatarError('')} className="ml-2 underline">
-                      Dismiss
-                    </button>
-                  </p>
-                )}
               </div>
             </div>
 
-            <button
-              onClick={() => (editing ? handleCancelEdit() : setEditing(true))}
-              className={`px-4 py-2.5 rounded-xl text-sm font-medium transition-colors min-h-[44px] ${
-                editing
-                  ? 'bg-gray-700 text-gray-300 hover:bg-gray-600'
-                  : 'bg-white bg-opacity-10 text-white hover:bg-opacity-20 border border-white border-opacity-20'
-              }`}
-            >
-              {editing ? 'Cancel' : '✏️ Edit Profile'}
-            </button>
+            <Link to="/settings" className={EDIT_LINK}>
+              Edit in Settings →
+            </Link>
           </div>
 
           {/* Quick stats strip */}
@@ -488,269 +268,6 @@ function ProfilePage() {
           </div>
         </div>
       </div>
-
-      {/* ── Edit Panel ── */}
-      {editing && (
-        <div className="bg-white dark:bg-gray-800 rounded-2xl p-6 mb-6 shadow-sm border border-gray-100 dark:border-gray-700">
-          <h2 className="text-base font-semibold text-gray-900 dark:text-white mb-4">
-            Edit Profile
-          </h2>
-
-          {saveError && (
-            <div className="bg-red-50 dark:bg-red-900/30 text-red-600 dark:text-red-300 px-4 py-3 rounded-xl text-sm mb-4 flex items-center justify-between">
-              <span>{saveError}</span>
-              <button
-                onClick={() => setSaveError('')}
-                className="text-red-400 hover:text-red-600 ml-2"
-              >
-                ✕
-              </button>
-            </div>
-          )}
-
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 mb-4">
-            <div>
-              <label className="block text-xs text-gray-500 dark:text-gray-400 mb-1">
-                Full Name <span className="text-red-400">*</span>
-              </label>
-              <input
-                type="text"
-                value={form.name}
-                onChange={(e) => {
-                  setForm({ ...form, name: e.target.value })
-                  setFormErrors((p) => ({ ...p, name: '' }))
-                }}
-                maxLength={100}
-                className={`w-full border rounded-xl px-3 py-2 text-sm focus:outline-none dark:bg-gray-700 dark:text-white ${
-                  formErrors.name
-                    ? 'border-red-400 focus:border-red-400'
-                    : 'border-gray-200 dark:border-gray-600 focus:border-blue-500'
-                }`}
-              />
-              {formErrors.name && <p className="text-red-400 text-xs mt-1">{formErrors.name}</p>}
-            </div>
-            <div>
-              <label className="block text-xs text-gray-500 dark:text-gray-400 mb-1">
-                Location
-              </label>
-              <input
-                type="text"
-                value={form.location}
-                onChange={(e) => setForm({ ...form, location: e.target.value })}
-                placeholder="e.g. Kathmandu, Nepal"
-                className="w-full border border-gray-200 dark:border-gray-600 dark:bg-gray-700 dark:text-white rounded-xl px-3 py-2 text-sm focus:outline-none focus:border-blue-500"
-              />
-            </div>
-            <div>
-              <label className="block text-xs text-gray-500 dark:text-gray-400 mb-1">
-                Trading Since
-              </label>
-              <input
-                type="text"
-                value={form.trading_since}
-                onChange={(e) => setForm({ ...form, trading_since: e.target.value })}
-                placeholder="e.g. 2020"
-                className="w-full border border-gray-200 dark:border-gray-600 dark:bg-gray-700 dark:text-white rounded-xl px-3 py-2 text-sm focus:outline-none focus:border-blue-500"
-              />
-            </div>
-            <div>
-              <label className="block text-xs text-gray-500 dark:text-gray-400 mb-1 flex items-center justify-between">
-                <span>Bio</span>
-                <span
-                  className={`text-xs ${form.bio.length > 450 ? 'text-red-400' : 'text-gray-400'}`}
-                >
-                  {form.bio.length}/500
-                </span>
-              </label>
-              {/* textarea for multi-line bio — input was wrong here */}
-              <textarea
-                value={form.bio}
-                onChange={(e) => {
-                  setForm({ ...form, bio: e.target.value })
-                  setFormErrors((p) => ({ ...p, bio: '' }))
-                }}
-                placeholder="Short bio about your trading style"
-                rows={3}
-                maxLength={500}
-                className={`w-full border rounded-xl px-3 py-2 text-sm focus:outline-none resize-none dark:bg-gray-700 dark:text-white ${
-                  formErrors.bio
-                    ? 'border-red-400 focus:border-red-400'
-                    : 'border-gray-200 dark:border-gray-600 focus:border-blue-500'
-                }`}
-              />
-              {formErrors.bio && <p className="text-red-400 text-xs mt-1">{formErrors.bio}</p>}
-            </div>
-          </div>
-
-          <div className="flex flex-wrap items-center gap-3">
-            <button
-              onClick={handleSave}
-              disabled={saving}
-              className="bg-blue-600 text-white px-6 py-2.5 rounded-xl text-sm font-medium hover:bg-blue-700 disabled:opacity-50 transition-colors min-h-[44px]"
-            >
-              {saving ? 'Saving...' : 'Save Changes'}
-            </button>
-            <button
-              type="button"
-              onClick={() => setShowPasswordForm(!showPasswordForm)}
-              className="bg-gray-100 dark:bg-gray-700 text-gray-600 dark:text-gray-300 px-6 py-2.5 rounded-xl text-sm font-medium hover:bg-gray-200 dark:hover:bg-gray-600 transition-colors min-h-[44px]"
-            >
-              {showPasswordForm ? 'Cancel Password Change' : '🔒 Change Password'}
-            </button>
-          </div>
-
-          {showPasswordForm && (
-            <div className="mt-4 pt-4 border-t border-gray-100 dark:border-gray-700">
-              <h3 className="text-sm font-semibold text-gray-900 dark:text-white mb-3">
-                Change Password
-              </h3>
-              {passwordError && (
-                <div className="bg-red-50 dark:bg-red-900/30 text-red-600 dark:text-red-300 px-3 py-2 rounded-xl text-sm mb-3 flex items-center justify-between">
-                  <span>{passwordError}</span>
-                  <button
-                    onClick={() => setPasswordError('')}
-                    className="ml-2 text-red-400 hover:text-red-600"
-                  >
-                    ✕
-                  </button>
-                </div>
-              )}
-              {passwordSuccess && (
-                <div className="bg-green-50 dark:bg-green-900/30 text-green-600 dark:text-green-300 px-3 py-2 rounded-xl text-sm mb-3">
-                  ✓ {passwordSuccess}
-                </div>
-              )}
-              <form onSubmit={handleChangePassword} autoComplete="off">
-                <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 mb-4">
-                  <div>
-                    <label className="block text-xs text-gray-500 dark:text-gray-400 mb-1">
-                      Current Password
-                    </label>
-                    <input
-                      type="password"
-                      autoComplete="current-password"
-                      value={passwordForm.currentPassword}
-                      onChange={(e) =>
-                        setPasswordForm({ ...passwordForm, currentPassword: e.target.value })
-                      }
-                      placeholder="••••••••"
-                      className="w-full border border-gray-200 dark:border-gray-600 dark:bg-gray-700 dark:text-white rounded-xl px-3 py-2 text-sm focus:outline-none focus:border-blue-500"
-                      required
-                    />
-                  </div>
-                  <div>
-                    <label className="block text-xs text-gray-500 dark:text-gray-400 mb-1">
-                      New Password
-                    </label>
-                    <input
-                      type="password"
-                      autoComplete="new-password"
-                      value={passwordForm.newPassword}
-                      onChange={(e) =>
-                        setPasswordForm({ ...passwordForm, newPassword: e.target.value })
-                      }
-                      placeholder="••••••••"
-                      className="w-full border border-gray-200 dark:border-gray-600 dark:bg-gray-700 dark:text-white rounded-xl px-3 py-2 text-sm focus:outline-none focus:border-blue-500"
-                      required
-                    />
-                  </div>
-                  <div>
-                    <label className="block text-xs text-gray-500 dark:text-gray-400 mb-1">
-                      Confirm New Password
-                    </label>
-                    <input
-                      type="password"
-                      autoComplete="new-password"
-                      value={passwordForm.confirmPassword}
-                      onChange={(e) =>
-                        setPasswordForm({ ...passwordForm, confirmPassword: e.target.value })
-                      }
-                      placeholder="••••••••"
-                      className="w-full border border-gray-200 dark:border-gray-600 dark:bg-gray-700 dark:text-white rounded-xl px-3 py-2 text-sm focus:outline-none focus:border-blue-500"
-                      required
-                    />
-                  </div>
-                </div>
-                <button
-                  type="submit"
-                  disabled={savingPassword}
-                  className="bg-red-500 text-white px-6 py-2 rounded-xl text-sm font-medium hover:bg-red-600 disabled:opacity-50 transition-colors"
-                >
-                  {savingPassword ? 'Changing...' : 'Change Password'}
-                </button>
-              </form>
-            </div>
-          )}
-        </div>
-      )}
-
-      {/* ── Danger Zone ── */}
-      {editing && (
-        <div className="bg-white dark:bg-gray-800 rounded-2xl p-5 shadow-sm border border-red-200 dark:border-red-900/50 mb-6">
-          <div className="flex items-center justify-between">
-            <div>
-              <h3 className="text-sm font-semibold text-red-600 dark:text-red-400">
-                Delete Account
-              </h3>
-              <p className="text-xs text-gray-500 dark:text-gray-400 mt-0.5">
-                Permanently removes all your data. This cannot be undone.
-              </p>
-            </div>
-            <button
-              type="button"
-              onClick={() => {
-                setShowDeleteForm(!showDeleteForm)
-                setDeleteError('')
-                setDeletePassword('')
-              }}
-              className="text-xs font-semibold text-red-500 hover:text-red-700 dark:hover:text-red-300 transition-colors px-3 py-1.5 rounded-lg border border-red-200 dark:border-red-800 hover:bg-red-50 dark:hover:bg-red-900/20"
-            >
-              {showDeleteForm ? 'Cancel' : 'Delete Account'}
-            </button>
-          </div>
-          {showDeleteForm && (
-            <form
-              onSubmit={handleDeleteAccount}
-              className="mt-4 pt-4 border-t border-red-100 dark:border-red-900/40"
-            >
-              {deleteError && (
-                <div className="bg-red-50 dark:bg-red-900/30 text-red-600 dark:text-red-300 px-3 py-2 rounded-xl text-sm mb-3 flex items-center justify-between">
-                  <span>{deleteError}</span>
-                  <button
-                    type="button"
-                    onClick={() => setDeleteError('')}
-                    className="ml-2 text-red-400 hover:text-red-600"
-                  >
-                    ✕
-                  </button>
-                </div>
-              )}
-              <p className="text-xs text-gray-500 dark:text-gray-400 mb-3">
-                Enter your password to confirm deletion of all trades, journals, research, and
-                settings.
-              </p>
-              <div className="flex items-center gap-3">
-                <input
-                  type="password"
-                  autoComplete="current-password"
-                  value={deletePassword}
-                  onChange={(e) => setDeletePassword(e.target.value)}
-                  placeholder="Your password"
-                  className="flex-1 border border-red-200 dark:border-red-800 dark:bg-gray-700 dark:text-white rounded-xl px-3 py-2 text-sm focus:outline-none focus:border-red-500"
-                  required
-                />
-                <button
-                  type="submit"
-                  disabled={deleting}
-                  className="bg-red-600 text-white px-5 py-2 rounded-xl text-sm font-semibold hover:bg-red-700 disabled:opacity-50 transition-colors whitespace-nowrap"
-                >
-                  {deleting ? 'Deleting...' : 'Confirm Delete'}
-                </button>
-              </div>
-            </form>
-          )}
-        </div>
-      )}
 
       {/* ── Tabs ── */}
       <div className="flex gap-2 mb-6">
