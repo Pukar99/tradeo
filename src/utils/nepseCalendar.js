@@ -29,11 +29,28 @@ export function expectedLatestTradingDate() {
   return null
 }
 
-// NEPSE trading hours: 11:00–15:00 NPT on trading days.
+// NEPSE trading hours — default 11:00–15:00 NPT, overridable at runtime from the
+// admin-editable app_config key `market_hours` ({"open":"11:00","close":"15:00"}).
+// The override arrives with the /api/market/symbols payload (see globalCache
+// getMarketSymbols); pages that never load symbols simply keep the defaults.
+let _marketHours = { open: 11 * 60, close: 15 * 60 }
+
+export function setMarketHours(cfg) {
+  const parse = (s) => {
+    const m = /^(\d{1,2}):(\d{2})$/.exec(String(s || '').trim())
+    if (!m) return null
+    const mins = Number(m[1]) * 60 + Number(m[2])
+    return mins >= 0 && mins < 24 * 60 ? mins : null
+  }
+  const open = parse(cfg?.open)
+  const close = parse(cfg?.close)
+  if (open != null && close != null && open < close) _marketHours = { open, close }
+}
+
 export function isMarketOpenNow() {
   const npt = nptNow()
   const iso = npt.toISOString().slice(0, 10)
   if (isNepseWeekend(iso, npt.getUTCDay())) return false
   const mins = npt.getUTCHours() * 60 + npt.getUTCMinutes()
-  return mins >= 11 * 60 && mins < 15 * 60
+  return mins >= _marketHours.open && mins < _marketHours.close
 }
