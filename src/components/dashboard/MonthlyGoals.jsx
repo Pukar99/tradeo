@@ -2,6 +2,7 @@
 import { useState, useEffect, useCallback, useMemo, useRef } from 'react'
 import { getGoals, addGoal, updateGoal, deleteGoal } from '../../api'
 import { useContextMenu } from '../ContextMenu'
+import { IconPencil, IconTrash } from '../common/icons'
 import { useChatRefresh, useHighlightListener } from '../../utils/chatEvents'
 import { gCache } from '../../utils/globalCache'
 
@@ -647,9 +648,9 @@ function GoalRow({
     <div
       ref={rowRef}
       onContextMenu={onContextMenu([
-        { label: 'Edit', icon: '✏️', action: () => onStartEdit(goal) },
+        { label: 'Edit', icon: <IconPencil />, action: () => onStartEdit(goal) },
         { separator: true },
-        { label: 'Delete', icon: '🗑️', danger: true, action: () => onDelete(goal.id) },
+        { label: 'Delete', icon: <IconTrash />, danger: true, action: () => onDelete(goal.id) },
       ])}
       className={`flex items-start gap-2.5 px-2.5 py-2 rounded-xl transition-colors ${
         isEditing

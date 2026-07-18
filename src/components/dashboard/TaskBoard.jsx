@@ -11,6 +11,7 @@ import {
 } from '../../api'
 import { gCache } from '../../utils/globalCache'
 import { useContextMenu } from '../ContextMenu'
+import { IconTrash } from '../common/icons'
 
 // ── SVG icons (no emojis) ─────────────────────────────────────────────────────
 const Icons = {
@@ -672,7 +673,7 @@ function TaskBoard({ initData, mindsetContent }) {
         preventDefault: () => {},
         stopPropagation: () => {},
       }
-      _ocm([{ label: 'Delete', icon: '🗑️', danger: true, action: onDelete }])(fakeEvent)
+      _ocm([{ label: 'Delete', icon: <IconTrash />, danger: true, action: onDelete }])(fakeEvent)
     }
     window.addEventListener('taskrow-context', handler)
     return () => window.removeEventListener('taskrow-context', handler)

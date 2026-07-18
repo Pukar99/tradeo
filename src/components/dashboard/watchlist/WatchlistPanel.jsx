@@ -12,6 +12,7 @@ import { useHighlightListener } from '../../../utils/chatEvents'
 import { addToWatchlist, updateWatchlist, removeFromWatchlist } from '../../../api'
 import { getMarketSymbols } from '../../../utils/globalCache'
 import StockAvatar, { getStockBorder, getStockBar } from '../../common/StockAvatar'
+import { IconPencil, IconTrash, IconWarning } from '../../common/icons'
 import WatchAlertForm from './WatchAlertForm'
 
 const EMPTY_FORM = { price_alert: '', alert_date: '', watch_low: '', watch_high: '', notes: '' }
@@ -761,8 +762,8 @@ export default function WatchlistPanel({
                               : `Rs.${t.sl.toLocaleString()}`}
                           </span>
                         ) : (
-                          <span className="text-[10px] bg-orange-50 dark:bg-orange-900/40 text-orange-500 px-1.5 py-0.5 rounded">
-                            ⚠ No SL
+                          <span className="inline-flex items-center gap-0.5 text-[10px] bg-orange-50 dark:bg-orange-900/40 text-orange-500 px-1.5 py-0.5 rounded">
+                            <IconWarning className="w-2.5 h-2.5" /> No SL
                           </span>
                         )}
                         {t.tp != null && (
@@ -841,11 +842,11 @@ export default function WatchlistPanel({
                       selectMode
                         ? undefined
                         : watchCtx([
-                            { label: 'Edit', icon: '✏️', action: () => openWatchEdit(item) },
+                            { label: 'Edit', icon: <IconPencil />, action: () => openWatchEdit(item) },
                             { separator: true },
                             {
                               label: 'Delete',
-                              icon: '🗑️',
+                              icon: <IconTrash />,
                               danger: true,
                               action: () => handleRemoveWatch(item.id),
                             },

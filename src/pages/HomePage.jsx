@@ -14,6 +14,14 @@ import PageSkeleton from '../components/PageSkeleton'
 import { getDashboardInit } from '../utils/globalCache'
 import { MarketStatusChip } from '../components/common/MarketStatusBadge'
 import StockAvatar from '../components/common/StockAvatar'
+import {
+  IconWarning,
+  IconAlertCircle,
+  IconCheckCircle,
+  IconBell,
+  IconCalendar,
+  IconBolt,
+} from '../components/common/icons'
 import WatchlistPanel from '../components/dashboard/watchlist/WatchlistPanel'
 
 const MOTIVATIONAL_QUOTES = [
@@ -518,12 +526,12 @@ function AlertsWidget({ initData }) {
   const hasMoreAlerts = sortedAlerts.length > ALERTS_DEFAULT_LIMIT
 
   const iconMap = {
-    nosl: '⚠',
-    sl: '🔴',
-    tp: '🟢',
-    watch: '🔔',
-    goal: '📅',
-    circuit: '⚡',
+    nosl: <IconWarning />,
+    sl: <IconAlertCircle />,
+    tp: <IconCheckCircle />,
+    watch: <IconBell />,
+    goal: <IconCalendar />,
+    circuit: <IconBolt />,
   }
   const severityClass = {
     danger: 'border-l-red-400 bg-red-50 dark:bg-red-900/10',
@@ -584,7 +592,7 @@ function AlertsWidget({ initData }) {
                 }}
                 className={`hp-alert-row w-full text-left flex items-center gap-2.5 px-3 py-2.5 border-l-2 ${severityClass[a.severity]}`}
               >
-                <span className="text-[13px] flex-shrink-0">{iconMap[a.type]}</span>
+                <span className={`flex-shrink-0 ${textClass[a.severity]}`}>{iconMap[a.type]}</span>
                 <span className={`text-[11px] font-medium leading-snug ${textClass[a.severity]}`}>
                   {a.label}
                 </span>
@@ -629,7 +637,6 @@ function CenterDashboard({ navigate, initData, onRefresh, onDataReady, mobileTop
   const [watchlist, setWatchlist] = useState([])
   const priceMapRef = useRef({})
   const [loading, setLoading] = useState(!initData)
-  const [error, setError] = useState(null)
 
   // Stats window in months — owner-selectable + persisted (the future Settings
   // page takes ownership of this preference later). Clamped 1–24. #t30 HOME-9
@@ -795,16 +802,6 @@ function CenterDashboard({ navigate, initData, onRefresh, onDataReady, mobileTop
             ))}
           </div>
         </div>
-      </div>
-    )
-
-  if (error)
-    return (
-      <div className="bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 rounded-2xl p-6 text-center">
-        <p className="text-red-600 dark:text-red-400 text-sm">{error}</p>
-        <button onClick={onRefresh} className="mt-3 text-xs text-red-500 hover:underline">
-          Retry
-        </button>
       </div>
     )
 
@@ -1081,7 +1078,7 @@ function LoggedInHome() {
         <div className="flex items-center justify-between mb-3 sm:mb-4 px-1 animate-fade-up flex-shrink-0">
           <div>
             <p className="text-sm font-semibold text-gray-800 dark:text-gray-200">
-              {getGreeting()}, {user?.name?.split(' ')[0] || 'Trader'} 👋
+              {getGreeting()}, {user?.name?.split(' ')[0] || 'Trader'}
             </p>
             <p className="text-[11px] text-gray-400 mt-0.5">{today}</p>
           </div>
