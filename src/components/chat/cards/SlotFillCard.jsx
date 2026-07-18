@@ -2,17 +2,28 @@
 // Moved verbatim from AIChat.jsx (P2.1 split).
 import { useState } from 'react'
 
-// ── Slot-fill card — money action awaiting a missing field (multi-turn binding) ──
+const todayStr = () => new Date().toISOString().slice(0, 10)
+
+// ── Slot-fill card — an action awaiting fields (multi-turn binding) ──────────
+// Renders required inputs (`missing`, gate Continue), optional inputs
+// (`optionalFields`, never gate) and an optional date (`dateField` — trade date
+// for money actions, deadline for goals; `default`/`min`/`max` come from the
+// server, with today as the trade-date fallback).
 export function SlotFillCard({ slot, onSubmit, onCancel, done }) {
-  // Pre-seed the optional trade date with today (buy/sell forms only). It rides in `vals`, so the
-  // existing submit() picks it up automatically; it is NOT in `slot.missing`, so it never gates Continue.
+  const dateKey = slot?.dateField?.field || 'date'
   const [vals, setVals] = useState(() =>
-    slot?.dateField ? { date: new Date().toISOString().slice(0, 10) } : {}
+    slot?.dateField ? { [dateKey]: slot.dateField.default || todayStr() } : {}
   )
-  if (!slot?.missing?.length && !slot?.suggestion) return null
+  if (
+    !slot?.missing?.length &&
+    !slot?.suggestion &&
+    !slot?.optionalFields?.length &&
+    !slot?.dateField
+  )
+    return null
 
   const set = (f, v) => setVals((p) => ({ ...p, [f]: v }))
-  const ready = slot.missing.every((f) => {
+  const ready = (slot.missing || []).every((f) => {
     const v = vals[f.field]
     if (v == null || v === '') return false
     if (f.kind === 'int') return /^\d+$/.test(String(v))
@@ -30,6 +41,22 @@ export function SlotFillCard({ slot, onSubmit, onCancel, done }) {
     onSubmit({ action: slot.action, ...slot.knownArgs, ...filled, ...extra })
   }
 
+  // Money symbol boxes uppercase as you type; free-text fields (goal title/details) don't.
+  const textInput = (f) => (
+    <input
+      key={f.field}
+      type={f.kind === 'text' ? 'text' : 'number'}
+      placeholder={f.label}
+      value={vals[f.field] ?? ''}
+      disabled={done}
+      maxLength={f.field === 'description' ? 500 : f.field === 'title' ? 200 : undefined}
+      onChange={(e) =>
+        set(f.field, f.kind === 'text' && !f.free ? e.target.value.toUpperCase() : e.target.value)
+      }
+      className="w-full mb-1.5 px-2 py-1.5 rounded-lg text-[12px] bg-white dark:bg-gray-800 border border-gray-300 dark:border-gray-700 text-gray-800 dark:text-gray-100"
+    />
+  )
+
   return (
     <div className="border-l-2 border-gray-300 dark:border-gray-700 bg-gray-50 dark:bg-gray-900/40 rounded-xl px-3 py-2 mb-1.5 w-full">
       <p className="text-[11px] text-gray-700 dark:text-gray-200 mb-2 leading-snug" translate="no">
@@ -44,26 +71,21 @@ export function SlotFillCard({ slot, onSubmit, onCancel, done }) {
           Yes, {slot.suggestion}
         </button>
       )}
-      {slot.missing.map((f) => (
-        <input
-          key={f.field}
-          type={f.kind === 'text' ? 'text' : 'number'}
-          placeholder={f.label}
-          value={vals[f.field] ?? ''}
-          disabled={done}
-          onChange={(e) => set(f.field, f.kind === 'text' ? e.target.value.toUpperCase() : e.target.value)}
-          className="w-full mb-1.5 px-2 py-1.5 rounded-lg text-[12px] bg-white dark:bg-gray-800 border border-gray-300 dark:border-gray-700 text-gray-800 dark:text-gray-100"
-        />
-      ))}
+      {(slot.missing || []).map(textInput)}
+      {(slot.optionalFields || []).map(textInput)}
       {slot.dateField && (
         <label className="block mb-1.5">
-          <span className="text-[10px] text-gray-500 dark:text-gray-400">{slot.dateField.label} (defaults to today)</span>
+          <span className="text-[10px] text-gray-500 dark:text-gray-400">
+            {slot.dateField.label}
+            {dateKey === 'date' ? ' (defaults to today)' : ''}
+          </span>
           <input
             type="date"
-            value={vals.date ?? ''}
+            value={vals[dateKey] ?? ''}
             disabled={done}
-            max={new Date().toISOString().slice(0, 10)}
-            onChange={(e) => set('date', e.target.value)}
+            min={slot.dateField.min || undefined}
+            max={slot.dateField.max || (dateKey === 'date' ? todayStr() : undefined)}
+            onChange={(e) => set(dateKey, e.target.value)}
             className="w-full mt-0.5 px-2 py-1.5 rounded-lg text-[12px] bg-white dark:bg-gray-800 border border-gray-300 dark:border-gray-700 text-gray-800 dark:text-gray-100"
           />
         </label>

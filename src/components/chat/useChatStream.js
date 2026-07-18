@@ -80,6 +80,10 @@ export default function useChatStream({
               missing: data.missing || [],
               reply: data.reply,
               suggestion: data.suggestion || null,
+              // dateField was silently dropped here since the multi-turn build —
+              // the optional date input never rendered. Restored (#t30 HOME-7).
+              dateField: data.dateField || null,
+              optionalFields: data.optionalFields || [],
             }
           : null,
         // card protocol: a structured card reply (e.g. candlestick chart) rendered by CardRenderer
