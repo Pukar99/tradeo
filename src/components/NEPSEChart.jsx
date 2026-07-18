@@ -6,7 +6,7 @@
 //   2. NEPSEChart     — full chart with range selector; fixed=true = dual daily/weekly panels
 // =============================================================================
 
-import { memo, useCallback, useEffect, useRef, useState } from 'react'
+import { memo, useEffect, useRef, useState } from 'react'
 import { getNepseChart as _getNepseChartCached, getNepseWeeklyChart } from '../utils/globalCache'
 import { useTheme } from '../context/ThemeContext'
 import { useLightweightChart } from '../hooks/useLightweightChart'
@@ -25,25 +25,24 @@ const ranges = [
 // 1. NEPSE MINI CHART
 // =============================================================================
 
+// Fixed dual-panel framing (#t30 HOME-11, owner spec): each panel shows its own
+// LAST 80 bars, charts are not scrollable/zoomable, and the last candle sits
+// ~35 bar-widths in from the right edge (breathing room, not glued to the edge).
+// Cross-panel linkage is crosshair hover ONLY — no range sync.
+const FIXED_BARS = 80
+const RIGHT_OFFSET_BARS = 35
+
 const NEPSEMiniChart = memo(function NEPSEMiniChart({
   data,
   label,
   height = 200,
   onCrosshairMove,
   syncTime,
-  onRangeChange,
-  syncRange,
 }) {
   const chartContainerRef = useRef(null)
   const seriesRef = useRef(null)
-  const dataRef = useRef(data)
   const { isDark } = useTheme()
   const [hovered, setHovered] = useState(null) // { date, o, h, l, c } from crosshair
-
-  // Keep dataRef always current without triggering chart reinit
-  useEffect(() => {
-    dataRef.current = data
-  }, [data])
 
   const getThemeOptions = (dark) => ({
     layout: {
@@ -71,12 +70,11 @@ const NEPSEMiniChart = memo(function NEPSEMiniChart({
       timeScale: {
         borderColor: isDark ? '#1f2937' : '#e5e7eb',
         timeVisible: true,
-        fixLeftEdge: false,
-        fixRightEdge: false,
       },
       crosshair: { mode: 1 },
-      handleScroll: { mouseWheel: true, pressedMouseMove: true, horzTouchDrag: true },
-      handleScale: { mouseWheel: true, pinch: true, axisPressedMouseMove: true },
+      // Static frame: no pan, no zoom, no drag — the 80-bar window IS the chart.
+      handleScroll: { mouseWheel: false, pressedMouseMove: false, horzTouchDrag: false, vertTouchDrag: false },
+      handleScale: { mouseWheel: false, pinch: false, axisPressedMouseMove: false, axisDoubleClickReset: false },
       watermark: { visible: false },
     }),
     setup: (chart) => {
@@ -96,10 +94,6 @@ const NEPSEMiniChart = memo(function NEPSEMiniChart({
         onCrosshairMove?.(param.time)
       })
 
-      chart.timeScale().subscribeVisibleTimeRangeChange((range) => {
-        if (range) onRangeChange?.(range)
-      })
-
       seriesRef.current = series
       return () => {
         seriesRef.current = null
@@ -109,12 +103,13 @@ const NEPSEMiniChart = memo(function NEPSEMiniChart({
 
   const applyData = (d) => {
     if (!d || d.length === 0 || !seriesRef.current || !chartRef.current) return
-    seriesRef.current.setData(d)
-    const BARS = 28
-    const from = d.length > BARS ? d[d.length - BARS].time : d[0].time
-    const to = d[d.length - 1].time
-    chartRef.current.timeScale().setVisibleRange({ from, to })
-    chartRef.current.timeScale().scrollToPosition(2, false)
+    // Each panel owns its LAST 80 bars; the logical range extends 35 empty
+    // bar-slots past the data so the newest candle isn't glued to the right edge.
+    const bars = d.slice(-FIXED_BARS)
+    seriesRef.current.setData(bars)
+    chartRef.current
+      .timeScale()
+      .setVisibleLogicalRange({ from: -0.5, to: bars.length - 0.5 + RIGHT_OFFSET_BARS })
   }
 
   // Theme change — update colors only, keep data intact, no refetch
@@ -138,16 +133,6 @@ const NEPSEMiniChart = memo(function NEPSEMiniChart({
       chartRef.current.setCrosshairPosition(0, syncTime, seriesRef.current)
     }
   }, [syncTime, chartRef])
-
-  // Sync visible time range from sibling chart — guard null values and empty data
-  useEffect(() => {
-    if (!chartRef.current || !syncRange) return
-    if (!syncRange.from || !syncRange.to) return
-    if (!dataRef.current || dataRef.current.length === 0) return
-    try {
-      chartRef.current.timeScale().setVisibleRange(syncRange)
-    } catch (_) {}
-  }, [syncRange, chartRef])
 
   const last = data?.[data.length - 1]
   const prev = data?.[data.length - 2]
@@ -302,9 +287,6 @@ function NEPSEChart({ fixed = false }) {
   const [weeklyData, setWeeklyData] = useState(null)
   const [dailySync, setDailySync] = useState(null)
   const [weeklySync, setWeeklySync] = useState(null)
-  const [dailyRange, setDailyRange] = useState(null)
-  const [weeklyRange, setWeeklyRange] = useState(null)
-  const rangeSyncLockRef = useRef(false)
 
   useEffect(() => {
     if (!fixed) return
@@ -319,31 +301,7 @@ function NEPSEChart({ fixed = false }) {
   // Mobile view tab: 'daily' | 'weekly'
   const [mobileTab, setMobileTab] = useState('daily')
 
-  const handleMobileTabSwitch = (tab) => {
-    // Clear stale range so the newly-mounted chart doesn't receive an invalid syncRange
-    setDailyRange(null)
-    setWeeklyRange(null)
-    setMobileTab(tab)
-  }
-
-  // Stable identities so the memoized NEPSEMiniChart children don't re-render on
-  // every crosshair/range sync state change. Refs + setState are stable → [] deps.
-  const handleDailyRange = useCallback((r) => {
-    if (rangeSyncLockRef.current) return
-    rangeSyncLockRef.current = true
-    setWeeklyRange(r)
-    setTimeout(() => {
-      rangeSyncLockRef.current = false
-    }, 50)
-  }, [])
-  const handleWeeklyRange = useCallback((r) => {
-    if (rangeSyncLockRef.current) return
-    rangeSyncLockRef.current = true
-    setDailyRange(r)
-    setTimeout(() => {
-      rangeSyncLockRef.current = false
-    }, 50)
-  }, [])
+  const handleMobileTabSwitch = (tab) => setMobileTab(tab)
 
   if (fixed) {
     return (
@@ -383,8 +341,6 @@ function NEPSEChart({ fixed = false }) {
             height={200}
             onCrosshairMove={setWeeklySync}
             syncTime={dailySync}
-            onRangeChange={handleDailyRange}
-            syncRange={dailyRange}
           />
           <NEPSEMiniChart
             data={weeklyData}
@@ -392,8 +348,6 @@ function NEPSEChart({ fixed = false }) {
             height={200}
             onCrosshairMove={setDailySync}
             syncTime={weeklySync}
-            onRangeChange={handleWeeklyRange}
-            syncRange={weeklyRange}
           />
         </div>
         <div className="lg:hidden">
@@ -404,8 +358,6 @@ function NEPSEChart({ fixed = false }) {
               height={180}
               onCrosshairMove={setWeeklySync}
               syncTime={dailySync}
-              onRangeChange={handleDailyRange}
-              syncRange={dailyRange}
             />
           ) : (
             <NEPSEMiniChart
@@ -414,8 +366,6 @@ function NEPSEChart({ fixed = false }) {
               height={180}
               onCrosshairMove={setDailySync}
               syncTime={weeklySync}
-              onRangeChange={handleWeeklyRange}
-              syncRange={weeklyRange}
             />
           )}
         </div>
