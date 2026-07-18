@@ -13,6 +13,7 @@ import NEPSEChart from '../components/NEPSEChart'
 import PageSkeleton from '../components/PageSkeleton'
 import { addToWatchlist, updateWatchlist, removeFromWatchlist } from '../api'
 import { getDashboardInit, getMarketSymbols } from '../utils/globalCache'
+import { MarketStatusChip } from '../components/common/MarketStatusBadge'
 
 const MOTIVATIONAL_QUOTES = [
   'The market is a device for transferring money from the impatient to the patient.',
@@ -2348,12 +2349,7 @@ function LoggedInHome() {
             </p>
             <p className="text-[11px] text-gray-400 mt-0.5">{today}</p>
           </div>
-          <div className="flex items-center gap-1.5 bg-green-50 dark:bg-green-900/20 border border-green-200 dark:border-green-800/40 rounded-full px-2.5 py-1">
-            <div className="w-1.5 h-1.5 bg-green-500 rounded-full animate-pulse flex-shrink-0" />
-            <span className="text-[10px] font-semibold text-green-600 dark:text-green-400">
-              Live
-            </span>
-          </div>
+          <MarketStatusChip />
         </div>
 
         {/* 3-Column Layout — flex-1 so it fills exactly the remaining height */}
