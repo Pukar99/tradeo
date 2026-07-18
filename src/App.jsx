@@ -37,6 +37,7 @@ const ResearchPage = lazy(() => import('./pages/ResearchPage'))
 const ResearchEditorPage = lazy(() => import('./pages/ResearchEditorPage'))
 const ResearchViewPage = lazy(() => import('./pages/ResearchViewPage'))
 const ProfilePage = lazy(() => import('./pages/ProfilePage'))
+const SettingsPage = lazy(() => import('./pages/SettingsPage'))
 const ChatPage = lazy(() => import('./pages/ChatPage'))
 const DataLabPage = lazy(() => import('./pages/DataLabPage'))
 const ExplorePage = lazy(() => import('./pages/ExplorePage'))
@@ -326,6 +327,14 @@ function AppContent() {
               element={
                 <PrivateRoute>
                   <ProfilePage />
+                </PrivateRoute>
+              }
+            />
+            <Route
+              path="/settings"
+              element={
+                <PrivateRoute>
+                  <SettingsPage />
                 </PrivateRoute>
               }
             />
