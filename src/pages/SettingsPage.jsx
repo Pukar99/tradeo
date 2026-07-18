@@ -6,8 +6,7 @@
 import SettingsSection from '../components/settings/SettingsSection'
 import AppearanceSection from '../components/settings/AppearanceSection'
 import DashboardPrefs from '../components/settings/DashboardPrefs'
-
-const PLACEHOLDER = 'Available in this update.'
+import MeroshareCard from '../components/settings/MeroshareCard'
 
 export default function SettingsPage() {
   return (
@@ -35,7 +34,7 @@ export default function SettingsPage() {
           title="MeroShare Integration"
           caption="IPO auto-apply and account management live on the IPO page."
         >
-          <p className="text-[12px] text-gray-400 dark:text-gray-500">{PLACEHOLDER}</p>
+          <MeroshareCard />
         </SettingsSection>
       </div>
     </div>
