@@ -3,6 +3,7 @@
 // =============================================================================
 import { useState, useEffect } from 'react'
 import { getDiscipline } from '../../utils/globalCache'
+import { IconFlame } from '../common/icons'
 
 const GRADE = (s) => {
   if (s >= 85) return { letter: 'A+', color: 'text-emerald-500', ring: '#10b981' }
@@ -128,7 +129,7 @@ function DisciplineScore({ initData }) {
         <div className="flex gap-4">
           <div className="w-20 h-20 rounded-full bg-gray-100 dark:bg-gray-800 flex-shrink-0" />
           <div className="flex-1 space-y-2 pt-1">
-            {[1, 2, 3].map((i) => (
+            {[1, 2, 3, 4, 5].map((i) => (
               <div key={i} className="h-2 bg-gray-100 dark:bg-gray-800 rounded" />
             ))}
           </div>
@@ -138,6 +139,8 @@ function DisciplineScore({ initData }) {
 
   const score = data?.finalScore ?? data?.monthlyScore ?? 0
   const bd = data?.breakdown || {}
+  // All 5 scored dimensions (HOME-5 Option A) — SL Discipline and R:R Quality were
+  // computed by the backend all along but never rendered here.
   const dims = [
     { key: 'taskCompletion', extra: null, noData: false },
     { key: 'journalConsistency', extra: null, noData: false },
@@ -145,6 +148,12 @@ function DisciplineScore({ initData }) {
       key: 'winRate',
       extra: bd.winRate?.raw != null ? `${bd.winRate.raw}% WR` : null,
       noData: bd.winRate?.raw == null && bd.winRate?.score === 0,
+    },
+    { key: 'slUsage', extra: null, noData: false },
+    {
+      key: 'rrConsistency',
+      extra: bd.rrConsistency?.raw != null ? `${bd.rrConsistency.raw} avg` : null,
+      noData: bd.rrConsistency?.raw == null && bd.rrConsistency?.score === 0,
     },
   ]
 
@@ -156,8 +165,8 @@ function DisciplineScore({ initData }) {
           Discipline Score
         </h3>
         {data?.streak > 0 && (
-          <span className="text-[10px] text-orange-400 dark:text-orange-300 font-medium">
-            🔥 {data.streak}d streak
+          <span className="inline-flex items-center gap-0.5 text-[10px] text-orange-400 dark:text-orange-300 font-medium">
+            <IconFlame className="w-3 h-3" /> {data.streak}d streak
           </span>
         )}
       </div>
@@ -169,7 +178,7 @@ function DisciplineScore({ initData }) {
           <Ring score={score} />
         </div>
 
-        <div className="flex-1 space-y-2.5 pt-1">
+        <div className="flex-1 space-y-2 pt-0.5">
           {dims.map(({ key, extra, noData }) => {
             const dim = bd[key]
             if (!dim) return null
