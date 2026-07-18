@@ -5,6 +5,60 @@ import { useNavigate } from 'react-router-dom'
 import { updateProfile, uploadAvatar, changePassword, deleteAccount } from '../api'
 import { getProfile, clearProfileCache } from '../utils/globalCache'
 import { pnlClass } from '../utils/format'
+import { useLocalStorage } from '../hooks/useLocalStorage'
+
+// ── Dashboard preferences (t30 HOME-9c) ──────────────────────────────────────
+// Interim home for dashboard customization, reached via the profile icon — the
+// HomePage itself carries NO settings UI (owner rule). Same storage key the
+// HomePage stats read ('hp.statsMonths'), so changes apply immediately. This
+// card MIGRATES to the dedicated Settings page when that 3.0 turn is built.
+function DashboardPrefsCard() {
+  const [statMonthsRaw, setStatMonths] = useLocalStorage('hp.statsMonths', 2)
+  const statMonths = Math.min(24, Math.max(1, parseInt(statMonthsRaw) || 2))
+  return (
+    <div className="bg-white dark:bg-gray-800 rounded-2xl p-5 shadow-sm border border-gray-100 dark:border-gray-700 h-full">
+      <h3 className="text-sm font-semibold text-gray-900 dark:text-white mb-4">
+        Dashboard Preferences
+      </h3>
+      <div className="space-y-2">
+        <p className="text-xs text-gray-500 dark:text-gray-400">Home stats window</p>
+        <div className="flex items-center gap-1.5">
+          <div className="flex items-center bg-gray-100 dark:bg-gray-700 rounded-lg p-0.5">
+            {[1, 3, 6].map((m) => (
+              <button
+                key={m}
+                onClick={() => setStatMonths(m)}
+                className={`px-2.5 py-1 rounded-md text-xs font-semibold transition-all ${
+                  statMonths === m
+                    ? 'bg-white dark:bg-gray-600 text-gray-900 dark:text-white shadow-sm'
+                    : 'text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-200'
+                }`}
+              >
+                {m}M
+              </button>
+            ))}
+          </div>
+          <input
+            type="number"
+            min="1"
+            max="24"
+            value={statMonths}
+            onChange={(e) => {
+              const v = parseInt(e.target.value)
+              if (v >= 1 && v <= 24) setStatMonths(v)
+            }}
+            title="Custom window (months)"
+            className="w-14 px-2 py-1 rounded-md text-xs font-semibold text-center bg-gray-100 dark:bg-gray-700 text-gray-700 dark:text-gray-200 border border-transparent focus:border-blue-400 outline-none"
+          />
+          <span className="text-xs text-gray-400">months</span>
+        </div>
+        <p className="text-[11px] text-gray-400 leading-snug">
+          Sets the period for the Realized P/L and Win Rate cards on your home dashboard.
+        </p>
+      </div>
+    </div>
+  )
+}
 
 const MAX_AVATAR_SIZE = 5 * 1024 * 1024 // 5 MB
 const ALLOWED_IMAGE_TYPES = ['image/jpeg', 'image/jpg', 'image/png', 'image/gif', 'image/webp']
@@ -776,6 +830,7 @@ function ProfilePage() {
       {/* ── Overview Tab ── */}
       {activeTab === 'overview' && (
         <div className="grid grid-cols-1 md:grid-cols-3 gap-4 items-start">
+          <DashboardPrefsCard />
           <div className="bg-white dark:bg-gray-800 rounded-2xl p-5 shadow-sm border border-gray-100 dark:border-gray-700 h-full">
             <h3 className="text-sm font-semibold text-gray-900 dark:text-white mb-4 flex items-center gap-2">
               <span>📈</span> Trading Summary

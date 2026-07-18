@@ -7,7 +7,6 @@ import DisciplineScore from '../components/dashboard/DisciplineScore'
 import MonthlyGoals from '../components/dashboard/MonthlyGoals'
 import { Link, useNavigate } from 'react-router-dom'
 import { useState, useEffect, useCallback, useRef } from 'react'
-import { useEscapeKey } from '../hooks/useEscapeKey'
 import { useLocalStorage } from '../hooks/useLocalStorage'
 import NEPSEChart from '../components/NEPSEChart'
 import PageSkeleton from '../components/PageSkeleton'
@@ -638,13 +637,11 @@ function CenterDashboard({ navigate, initData, onRefresh, onDataReady, mobileTop
   const priceMapRef = useRef({})
   const [loading, setLoading] = useState(!initData)
 
-  // Stats window in months — owner-selectable + persisted (the future Settings
-  // page takes ownership of this preference later). Clamped 1–24. #t30 HOME-9
-  const [statMonthsRaw, setStatMonths] = useLocalStorage('hp.statsMonths', 2)
+  // Stats window in months — READ-ONLY here (HOME-9c: the home screen carries no
+  // settings UI; the control lives in Profile → Dashboard preferences, same key,
+  // until the full Settings page absorbs it). Clamped 1–24, default 2.
+  const [statMonthsRaw] = useLocalStorage('hp.statsMonths', 2)
   const statMonths = Math.min(24, Math.max(1, parseInt(statMonthsRaw) || 2))
-  const [showStatsSettings, setShowStatsSettings] = useState(false)
-
-  useEscapeKey(() => setShowStatsSettings(false))
 
   const applyData = useCallback(
     (d) => {
@@ -809,78 +806,6 @@ function CenterDashboard({ navigate, initData, onRefresh, onDataReady, mobileTop
     <div className="flex flex-col gap-3 sm:gap-4">
       {/* ── Stats Bar ────────────────────────────────────────────────────────── */}
       <div className="flex flex-col gap-2">
-        {/* Stats settings — the window preference lives behind a gear button, not on
-            the page surface (owner call; the future Settings page absorbs this). #t30 HOME-9 */}
-        <div className="flex items-center justify-end px-1 relative">
-          <button
-            onClick={() => setShowStatsSettings((s) => !s)}
-            title="Stats settings"
-            aria-label="Stats settings"
-            className={`w-5 h-5 flex items-center justify-center rounded-md transition-colors ${
-              showStatsSettings
-                ? 'text-gray-600 dark:text-gray-300 bg-gray-100 dark:bg-gray-800'
-                : 'text-gray-400 hover:text-gray-600 dark:hover:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-800'
-            }`}
-          >
-            <svg
-              className="w-3.5 h-3.5"
-              fill="none"
-              viewBox="0 0 24 24"
-              stroke="currentColor"
-              strokeWidth={2}
-            >
-              <path
-                strokeLinecap="round"
-                strokeLinejoin="round"
-                d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z"
-              />
-              <path strokeLinecap="round" strokeLinejoin="round" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
-            </svg>
-          </button>
-          {showStatsSettings && (
-            <>
-              <div className="fixed inset-0 z-30" onClick={() => setShowStatsSettings(false)} />
-              <div className="absolute right-0 top-6 z-40 bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-700 rounded-xl shadow-lg p-3 w-56">
-                <p className="text-[9px] font-semibold uppercase tracking-widest text-gray-400 mb-1.5">
-                  Stats window
-                </p>
-                <div className="flex items-center gap-1.5">
-                  <div className="flex items-center bg-gray-100 dark:bg-gray-800 rounded-lg p-0.5">
-                    {[1, 3, 6].map((m) => (
-                      <button
-                        key={m}
-                        onClick={() => setStatMonths(m)}
-                        className={`px-2 py-0.5 rounded-md text-[10px] font-semibold transition-all ${
-                          statMonths === m
-                            ? 'bg-white dark:bg-gray-700 text-gray-900 dark:text-white shadow-sm'
-                            : 'text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-300'
-                        }`}
-                      >
-                        {m}M
-                      </button>
-                    ))}
-                  </div>
-                  <input
-                    type="number"
-                    min="1"
-                    max="24"
-                    value={statMonths}
-                    onChange={(e) => {
-                      const v = parseInt(e.target.value)
-                      if (v >= 1 && v <= 24) setStatMonths(v)
-                    }}
-                    title="Custom window (months)"
-                    className="w-11 px-1 py-0.5 rounded-md text-[10px] font-semibold text-center bg-gray-100 dark:bg-gray-800 text-gray-700 dark:text-gray-300 border border-transparent focus:border-blue-400 outline-none"
-                  />
-                  <span className="text-[9px] text-gray-400">mo</span>
-                </div>
-                <p className="text-[9px] text-gray-400 mt-1.5 leading-snug">
-                  Applies to Realized P/L and Win Rate cards.
-                </p>
-              </div>
-            </>
-          )}
-        </div>
         {!perfStats ? (
           <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 sm:gap-2.5 animate-pulse">
             {[1, 2, 3, 4].map((i) => (
