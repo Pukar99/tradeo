@@ -494,6 +494,7 @@ function Navbar({ autoHide = false, hidden = false, onMouseEnter, onMouseLeave }
                   {[
                     { to: '/', icon: '🏠', label: t('nav.dashboard'), kbd: 'Alt+H' },
                     { to: '/profile', icon: '👤', label: t('nav.profile') },
+                    { to: '/settings', icon: '⚙️', label: t('nav.settings') },
                     { to: '/chat', icon: '🤖', label: t('nav.aiChat'), kbd: 'Alt+C' },
                     { to: '/logs', icon: '📈', label: t('nav.tradeLog'), kbd: 'Alt+L' },
                     { to: '/portfolio', icon: '💼', label: t('nav.portfolio'), kbd: 'Alt+P' },
@@ -502,7 +503,11 @@ function Navbar({ autoHide = false, hidden = false, onMouseEnter, onMouseLeave }
                       key={item.to}
                       to={item.to}
                       role="menuitem"
-                      className="flex items-center gap-2 px-3 py-2 text-sm text-gray-600 dark:text-gray-300 hover:text-gray-900 dark:hover:text-white hover:bg-gray-50 dark:hover:bg-gray-800 rounded-lg transition-colors"
+                      className={`flex items-center gap-2 px-3 py-2 text-sm rounded-lg transition-colors ${
+                        location.pathname === item.to
+                          ? 'bg-gray-50 dark:bg-gray-800 text-gray-900 dark:text-white font-medium'
+                          : 'text-gray-600 dark:text-gray-300 hover:text-gray-900 dark:hover:text-white hover:bg-gray-50 dark:hover:bg-gray-800'
+                      }`}
                     >
                       <span>{item.icon}</span> {item.label}
                       {item.kbd && (
@@ -712,9 +717,26 @@ function Navbar({ autoHide = false, hidden = false, onMouseEnter, onMouseLeave }
               <Link
                 to="/profile"
                 onClick={() => setMobileMenuOpen(false)}
-                className="flex items-center gap-2 px-4 py-3 min-h-[48px] rounded-xl text-sm font-semibold text-gray-600 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-800/80 hover:text-gray-900 dark:hover:text-white transition-all"
+                className={`flex items-center gap-2 px-4 py-3 min-h-[48px] rounded-xl text-sm font-semibold transition-all ${
+                  location.pathname === '/profile'
+                    ? 'bg-gray-50 dark:bg-gray-800 text-gray-900 dark:text-white'
+                    : 'text-gray-600 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-800/80 hover:text-gray-900 dark:hover:text-white'
+                }`}
               >
                 <span>👤</span> {t('nav.profile')}
+              </Link>
+
+              {/* Settings — in profile menu */}
+              <Link
+                to="/settings"
+                onClick={() => setMobileMenuOpen(false)}
+                className={`flex items-center gap-2 px-4 py-3 min-h-[48px] rounded-xl text-sm font-semibold transition-all ${
+                  location.pathname === '/settings'
+                    ? 'bg-gray-50 dark:bg-gray-800 text-gray-900 dark:text-white'
+                    : 'text-gray-600 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-800/80 hover:text-gray-900 dark:hover:text-white'
+                }`}
+              >
+                <span>⚙️</span> {t('nav.settings')}
               </Link>
 
               {/* Portfolio — off the main nav, reachable via profile menu only */}
