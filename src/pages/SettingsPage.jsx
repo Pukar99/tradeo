@@ -5,6 +5,7 @@
 // network-triggering effect — identity/account stays on ProfilePage.
 import SettingsSection from '../components/settings/SettingsSection'
 import AppearanceSection from '../components/settings/AppearanceSection'
+import DashboardPrefs from '../components/settings/DashboardPrefs'
 
 const PLACEHOLDER = 'Available in this update.'
 
@@ -26,7 +27,7 @@ export default function SettingsPage() {
         </SettingsSection>
 
         <SettingsSection id="dashboard" title="Dashboard" caption="Home dashboard preferences.">
-          <p className="text-[12px] text-gray-400 dark:text-gray-500">{PLACEHOLDER}</p>
+          <DashboardPrefs />
         </SettingsSection>
 
         <SettingsSection
