@@ -1,12 +1,14 @@
-// === SettingsPage.jsx — orchestrator only: page header + 3 titled sections ===
-// Wave 1 (SET-2) ships the shell with placeholder bodies; Wave 2 (SET-3/4/5) fills each
-// section with real controls (Appearance theme/language, Dashboard prefs, MeroShare static
-// card). This page performs ZERO network activity — no api/index.js import, no fetch, no
-// network-triggering effect — identity/account stays on ProfilePage.
+// === SettingsPage.jsx — orchestrator only: page header + titled sections ===
+// Wave 1 (SET-2) shipped the shell with placeholder bodies; Wave 2 (SET-3/4/5) filled Appearance
+// theme/language, Dashboard prefs, and the static MeroShare card. Wave 3 (SET-6+, owner-ordered
+// 2026-07-19) moves identity/account editing here too — Profile becomes pure display. SET-6 adds
+// the Account section (avatar + profile fields); this page itself still performs ZERO network
+// activity of its own — AccountSection owns its cached getProfile() call.
 import SettingsSection from '../components/settings/SettingsSection'
 import AppearanceSection from '../components/settings/AppearanceSection'
 import DashboardPrefs from '../components/settings/DashboardPrefs'
 import MeroshareCard from '../components/settings/MeroshareCard'
+import AccountSection from '../components/settings/AccountSection'
 
 export default function SettingsPage() {
   return (
@@ -16,7 +18,7 @@ export default function SettingsPage() {
           <span aria-hidden="true">⚙️</span> Settings
         </h1>
         <p className="text-[11px] text-gray-400 dark:text-gray-500 mt-0.5">
-          App preferences. Your identity and account stay in Profile.
+          App preferences and your account.
         </p>
       </div>
 
@@ -35,6 +37,14 @@ export default function SettingsPage() {
           caption="IPO auto-apply and account management live on the IPO page."
         >
           <MeroshareCard />
+        </SettingsSection>
+
+        <SettingsSection
+          id="account"
+          title="Account"
+          caption="Your profile details and avatar."
+        >
+          <AccountSection />
         </SettingsSection>
       </div>
     </div>
