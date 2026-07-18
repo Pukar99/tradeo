@@ -4,6 +4,7 @@
 // card). This page performs ZERO network activity — no api/index.js import, no fetch, no
 // network-triggering effect — identity/account stays on ProfilePage.
 import SettingsSection from '../components/settings/SettingsSection'
+import AppearanceSection from '../components/settings/AppearanceSection'
 
 const PLACEHOLDER = 'Available in this update.'
 
@@ -21,7 +22,7 @@ export default function SettingsPage() {
 
       <div className="space-y-4">
         <SettingsSection id="appearance" title="Appearance" caption="Theme and language.">
-          <p className="text-[12px] text-gray-400 dark:text-gray-500">{PLACEHOLDER}</p>
+          <AppearanceSection />
         </SettingsSection>
 
         <SettingsSection id="dashboard" title="Dashboard" caption="Home dashboard preferences.">
