@@ -19,10 +19,18 @@ function lastDayOfMonth(year, month) {
   return new Date(year, month + 1, 0)
 }
 
+// Owner rule (3.0): a new goal defaults to the LAST day of the current month —
+// same default the chatbot ADD_GOAL uses, so both entry paths agree.
 function defaultDeadline() {
   const d = new Date()
-  d.setDate(d.getDate() + 15)
-  return toLocalDateStr(d)
+  return toLocalDateStr(lastDayOfMonth(d.getFullYear(), d.getMonth()))
+}
+
+// Dates before the current month make a goal vanish from the card (it only
+// shows current + next month) — both date inputs are floored to the 1st.
+function minGoalDate() {
+  const d = new Date()
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-01`
 }
 
 function autoDeadlineForMonth(year, month) {
@@ -240,6 +248,11 @@ function MonthlyGoals({ initData }) {
 
   const handleAdd = async (e) => {
     e.preventDefault()
+    // min= on the input doesn't stop a hand-typed past date — guard here too.
+    if (form.target_date && form.target_date < minGoalDate()) {
+      setMutateErr('Deadline cannot be before this month')
+      return
+    }
     setAdding(true)
     setMutateErr(null)
     try {
@@ -304,6 +317,10 @@ function MonthlyGoals({ initData }) {
 
   const handleSaveEdit = async (id) => {
     if (!editForm.title.trim()) return
+    if (editForm.target_date && editForm.target_date < minGoalDate()) {
+      setMutateErr('Deadline cannot be before this month')
+      return
+    }
     setSaving(true)
     setMutateErr(null)
     try {
@@ -457,6 +474,7 @@ function MonthlyGoals({ initData }) {
                 <input
                   type="date"
                   value={form.target_date}
+                  min={minGoalDate()}
                   onChange={(e) => setForm((f) => ({ ...f, target_date: e.target.value }))}
                   className="w-full bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-700 rounded-lg px-2.5 py-1.5 text-xs text-gray-600 dark:text-gray-300 focus:outline-none focus:ring-1 focus:ring-indigo-400 dark:focus:ring-indigo-600 transition-all"
                 />
@@ -506,6 +524,7 @@ function MonthlyGoals({ initData }) {
             <input
               type="date"
               value={editForm.target_date}
+              min={minGoalDate()}
               onChange={(e) => setEditForm((f) => ({ ...f, target_date: e.target.value }))}
               className="flex-1 bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-700 rounded-lg px-2.5 py-1.5 text-xs text-gray-600 dark:text-gray-300 focus:outline-none focus:ring-1 focus:ring-indigo-400 transition-all"
             />
