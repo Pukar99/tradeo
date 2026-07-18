@@ -129,7 +129,7 @@ function DisciplineScore({ initData }) {
         <div className="flex gap-4">
           <div className="w-20 h-20 rounded-full bg-gray-100 dark:bg-gray-800 flex-shrink-0" />
           <div className="flex-1 space-y-2 pt-1">
-            {[1, 2, 3, 4, 5].map((i) => (
+            {[1, 2, 3].map((i) => (
               <div key={i} className="h-2 bg-gray-100 dark:bg-gray-800 rounded" />
             ))}
           </div>
@@ -139,8 +139,9 @@ function DisciplineScore({ initData }) {
 
   const score = data?.finalScore ?? data?.monthlyScore ?? 0
   const bd = data?.breakdown || {}
-  // All 5 scored dimensions (HOME-5 Option A) — SL Discipline and R:R Quality were
-  // computed by the backend all along but never rendered here.
+  // DELIBERATE (owner decision, discipline cleanup 8711f44; reaffirmed 2026-07-18):
+  // only these 3 dims render. slUsage + rrConsistency exist in the payload but are
+  // intentionally NOT shown — do not "complete" this list. See landmines.md.
   const dims = [
     { key: 'taskCompletion', extra: null, noData: false },
     { key: 'journalConsistency', extra: null, noData: false },
@@ -148,12 +149,6 @@ function DisciplineScore({ initData }) {
       key: 'winRate',
       extra: bd.winRate?.raw != null ? `${bd.winRate.raw}% WR` : null,
       noData: bd.winRate?.raw == null && bd.winRate?.score === 0,
-    },
-    { key: 'slUsage', extra: null, noData: false },
-    {
-      key: 'rrConsistency',
-      extra: bd.rrConsistency?.raw != null ? `${bd.rrConsistency.raw} avg` : null,
-      noData: bd.rrConsistency?.raw == null && bd.rrConsistency?.score === 0,
     },
   ]
 
@@ -178,7 +173,7 @@ function DisciplineScore({ initData }) {
           <Ring score={score} />
         </div>
 
-        <div className="flex-1 space-y-2 pt-0.5">
+        <div className="flex-1 space-y-2.5 pt-1">
           {dims.map(({ key, extra, noData }) => {
             const dim = bd[key]
             if (!dim) return null
