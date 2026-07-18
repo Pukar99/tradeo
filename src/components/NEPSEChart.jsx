@@ -72,9 +72,10 @@ const NEPSEMiniChart = memo(function NEPSEMiniChart({
         timeVisible: true,
       },
       crosshair: { mode: 1 },
-      // Static frame: no pan, no zoom, no drag — the 80-bar window IS the chart.
+      // Fixed frame with inspect-zoom (HOME-11b): wheel/pinch zoom allowed, but no
+      // panning/drag — and double-click snaps back to the 80-bar frame.
       handleScroll: { mouseWheel: false, pressedMouseMove: false, horzTouchDrag: false, vertTouchDrag: false },
-      handleScale: { mouseWheel: false, pinch: false, axisPressedMouseMove: false, axisDoubleClickReset: false },
+      handleScale: { mouseWheel: true, pinch: true, axisPressedMouseMove: false, axisDoubleClickReset: false },
       watermark: { visible: false },
     }),
     setup: (chart) => {
@@ -101,15 +102,23 @@ const NEPSEMiniChart = memo(function NEPSEMiniChart({
     },
   })
 
+  const barCountRef = useRef(0)
+
+  const applyFrame = () => {
+    if (!chartRef.current || !barCountRef.current) return
+    chartRef.current
+      .timeScale()
+      .setVisibleLogicalRange({ from: -0.5, to: barCountRef.current - 0.5 + RIGHT_OFFSET_BARS })
+  }
+
   const applyData = (d) => {
     if (!d || d.length === 0 || !seriesRef.current || !chartRef.current) return
     // Each panel owns its LAST 80 bars; the logical range extends 35 empty
     // bar-slots past the data so the newest candle isn't glued to the right edge.
     const bars = d.slice(-FIXED_BARS)
     seriesRef.current.setData(bars)
-    chartRef.current
-      .timeScale()
-      .setVisibleLogicalRange({ from: -0.5, to: bars.length - 0.5 + RIGHT_OFFSET_BARS })
+    barCountRef.current = bars.length
+    applyFrame()
   }
 
   // Theme change — update colors only, keep data intact, no refetch
@@ -210,7 +219,12 @@ const NEPSEMiniChart = memo(function NEPSEMiniChart({
             <div className="h-2 bg-gray-100 dark:bg-gray-800 rounded w-1/2" />
           </div>
         )}
-        <div ref={chartContainerRef} style={{ width: '100%', height }} />
+        <div
+          ref={chartContainerRef}
+          style={{ width: '100%', height }}
+          onDoubleClick={applyFrame}
+          title="Scroll to zoom · double-click to reset"
+        />
         <style>{`.tv-lightweight-charts a[href*="tradingview"] { display: none !important; }`}</style>
       </div>
     </div>
