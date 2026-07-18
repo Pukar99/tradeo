@@ -715,26 +715,31 @@ function TaskBoard({ initData, mindsetContent }) {
     setActiveModal({ type: task.type, task })
   }
 
+  // Optimistic toggles: flip the UI immediately, roll back on API failure —
+  // the card never waits on the network for a checkbox.
   const handleTaskDone = async (taskId) => {
+    setMutateErr(null)
+    setFixedTasks((prev) => prev.map((t) => (t.id === taskId ? { ...t, completed: true } : t)))
     try {
       await toggleFixedTask(taskId)
-      setFixedTasks((prev) => prev.map((t) => (t.id === taskId ? { ...t, completed: true } : t)))
       gCache.del('dashboard')
     } catch (err) {
       console.error('[toggle error]', err.response?.data || err.message)
+      setFixedTasks((prev) => prev.map((t) => (t.id === taskId ? { ...t, completed: false } : t)))
       setMutateErr('Failed to save — please try again')
     }
   }
 
   const handleToggleCustom = async (task) => {
     setMutateErr(null)
+    const flip = (val) => (prev) =>
+      prev.map((t) => (t.id === task.id ? { ...t, completed: val } : t))
+    setCustomTasks(flip(!task.completed))
     try {
       await updateCustomTask(task.id, !task.completed)
-      setCustomTasks((prev) =>
-        prev.map((t) => (t.id === task.id ? { ...t, completed: !t.completed } : t))
-      )
       gCache.del('dashboard')
     } catch {
+      setCustomTasks(flip(task.completed))
       setMutateErr('Failed to update task')
     }
   }
