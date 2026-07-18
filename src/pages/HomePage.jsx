@@ -9,6 +9,7 @@ import MonthlyGoals from '../components/dashboard/MonthlyGoals'
 import { Link, useNavigate } from 'react-router-dom'
 import { useState, useEffect, useCallback, useRef, useMemo } from 'react'
 import { useEscapeKey } from '../hooks/useEscapeKey'
+import { useLocalStorage } from '../hooks/useLocalStorage'
 import NEPSEChart from '../components/NEPSEChart'
 import PageSkeleton from '../components/PageSkeleton'
 import { addToWatchlist, updateWatchlist, removeFromWatchlist } from '../api'
@@ -698,6 +699,11 @@ function CenterDashboard({ navigate, initData, onRefresh, onDataReady, mobileTop
   const [loading, setLoading] = useState(!initData)
   const [error, setError] = useState(null)
 
+  // Stats window in months — owner-selectable + persisted (the future Settings
+  // page takes ownership of this preference later). Clamped 1–24. #t30 HOME-9
+  const [statMonthsRaw, setStatMonths] = useLocalStorage('hp.statsMonths', 2)
+  const statMonths = Math.min(24, Math.max(1, parseInt(statMonthsRaw) || 2))
+
   // add-flow: null | 'search' | { symbol, refPrice }
   const [watchAddState, setWatchAddState] = useState(null)
   // edit-flow
@@ -789,13 +795,13 @@ function CenterDashboard({ navigate, initData, onRefresh, onDataReady, mobileTop
         const day = String(d.getDate()).padStart(2, '0')
         return `${y}-${m}-${day}`
       })()
-      // 2-month window for the explicitly-labeled "Realized P/L (2M)" / "Win Rate (2M)" cards
-      const twoMonthsAgo = new Date()
-      twoMonthsAgo.setMonth(twoMonthsAgo.getMonth() - 2)
-      twoMonthsAgo.setHours(0, 0, 0, 0)
+      // Selected window (statMonths) for the labeled "Realized P/L (nM)" / "Win Rate (nM)" cards
+      const windowStart = new Date()
+      windowStart.setMonth(windowStart.getMonth() - statMonths)
+      windowStart.setHours(0, 0, 0, 0)
       // Backend /init maps last_action_at → updated_at in the trade shape
-      const recent = closed.filter((t) => t.updated_at && new Date(t.updated_at) >= twoMonthsAgo)
-      const realized2M = recent.reduce((s, t) => s + (parseFloat(t.realized_pnl) || 0), 0)
+      const recent = closed.filter((t) => t.updated_at && new Date(t.updated_at) >= windowStart)
+      const realizedWindow = recent.reduce((s, t) => s + (parseFloat(t.realized_pnl) || 0), 0)
       const profitable = recent.filter((t) => (parseFloat(t.realized_pnl) || 0) > 0).length
       const winRate = recent.length > 0 ? Math.round((profitable / recent.length) * 100) : 0
       // "Total P/L" must be a true lifetime figure: all closed realized P/L + open
@@ -816,7 +822,7 @@ function CenterDashboard({ navigate, initData, onRefresh, onDataReady, mobileTop
       const stats = {
         totalPnl: realizedAll + totalUnrealized,
         unrealizedPnl: totalUnrealized,
-        realizedPnl: realized2M,
+        realizedPnl: realizedWindow,
         todayPnl,
         winRate,
         openCount: openWithPrices.length,
@@ -839,17 +845,17 @@ function CenterDashboard({ navigate, initData, onRefresh, onDataReady, mobileTop
       setWatchlist(watchWithPrices)
       if (onDataReady) onDataReady({ openPositions: openWithPrices, perfStats: stats })
     },
-    [onDataReady]
+    [onDataReady, statMonths]
   )
 
-  // Hydrate from parent-supplied initData (avoids a second /init fetch)
-  // eslint-disable-next-line react-hooks/exhaustive-deps
+  // Hydrate from parent-supplied initData (avoids a second /init fetch).
+  // applyData in deps → the stats recompute locally when the window changes (no refetch).
   useEffect(() => {
     if (initData) {
       applyData(initData)
       setLoading(false)
     }
-  }, [initData])
+  }, [initData, applyData])
 
   useChatRefresh(['trades', 'watchlist'], onRefresh)
 
@@ -1237,6 +1243,40 @@ function CenterDashboard({ navigate, initData, onRefresh, onDataReady, mobileTop
     <div className="flex flex-col gap-3 sm:gap-4">
       {/* ── Stats Bar ────────────────────────────────────────────────────────── */}
       <div className="flex flex-col gap-2">
+        {/* Window selector — quick pills + custom months; persisted (#t30 HOME-9) */}
+        <div className="flex items-center justify-end gap-1 px-1">
+          <span className="text-[9px] font-semibold uppercase tracking-widest text-gray-400 mr-0.5">
+            Window
+          </span>
+          <div className="flex items-center bg-gray-100 dark:bg-gray-800 rounded-lg p-0.5">
+            {[1, 3, 6].map((m) => (
+              <button
+                key={m}
+                onClick={() => setStatMonths(m)}
+                className={`px-2 py-0.5 rounded-md text-[10px] font-semibold transition-all ${
+                  statMonths === m
+                    ? 'bg-white dark:bg-gray-700 text-gray-900 dark:text-white shadow-sm'
+                    : 'text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-300'
+                }`}
+              >
+                {m}M
+              </button>
+            ))}
+          </div>
+          <input
+            type="number"
+            min="1"
+            max="24"
+            value={statMonths}
+            onChange={(e) => {
+              const v = parseInt(e.target.value)
+              if (v >= 1 && v <= 24) setStatMonths(v)
+            }}
+            title="Custom window (months)"
+            className="w-10 px-1 py-0.5 rounded-md text-[10px] font-semibold text-center bg-gray-100 dark:bg-gray-800 text-gray-700 dark:text-gray-300 border border-transparent focus:border-blue-400 outline-none"
+          />
+          <span className="text-[9px] text-gray-400">mo</span>
+        </div>
         {!perfStats ? (
           <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 sm:gap-2.5 animate-pulse">
             {[1, 2, 3, 4].map((i) => (
@@ -1270,7 +1310,7 @@ function CenterDashboard({ navigate, initData, onRefresh, onDataReady, mobileTop
               }
             />
             <StatCard
-              label="Realized P/L (2M)"
+              label={`Realized P/L (${statMonths}M)`}
               value={`${perfStats.realizedPnl >= 0 ? '+' : ''}Rs. ${Math.abs(Math.round(perfStats.realizedPnl)).toLocaleString()}`}
               color={
                 perfStats.realizedPnl > 0
@@ -1281,12 +1321,12 @@ function CenterDashboard({ navigate, initData, onRefresh, onDataReady, mobileTop
               }
               sub={
                 perfStats.closedCount > 0
-                  ? `${perfStats.closedCount} trade${perfStats.closedCount !== 1 ? 's' : ''} last 2mo`
-                  : 'No trades last 2mo'
+                  ? `${perfStats.closedCount} trade${perfStats.closedCount !== 1 ? 's' : ''} last ${statMonths}mo`
+                  : `No trades last ${statMonths}mo`
               }
             />
             <StatCard
-              label="Win Rate (2M)"
+              label={`Win Rate (${statMonths}M)`}
               value={`${perfStats.winRate}%`}
               color={
                 perfStats.winRate >= 50
@@ -1297,8 +1337,8 @@ function CenterDashboard({ navigate, initData, onRefresh, onDataReady, mobileTop
               }
               sub={
                 perfStats.closedCount > 0
-                  ? `${perfStats.closedCount} trade${perfStats.closedCount !== 1 ? 's' : ''} last 2mo`
-                  : 'No trades last 2mo'
+                  ? `${perfStats.closedCount} trade${perfStats.closedCount !== 1 ? 's' : ''} last ${statMonths}mo`
+                  : `No trades last ${statMonths}mo`
               }
             />
             <StatCard
