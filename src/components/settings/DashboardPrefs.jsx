@@ -15,7 +15,7 @@ const PILL_ACTIVE = 'bg-white dark:bg-gray-700 shadow-sm text-gray-900 dark:text
 const PILL_INACTIVE =
   'text-gray-400 dark:text-gray-500 hover:text-gray-700 dark:hover:text-gray-300'
 
-const ROW_LABEL = 'text-[11px] font-semibold text-gray-700 dark:text-gray-200'
+const ROW_LABEL = 'text-[10px] font-semibold uppercase tracking-widest text-gray-400 dark:text-gray-500'
 
 export default function DashboardPrefs() {
   const [statMonthsRaw, setStatMonths] = useLocalStorage('hp.statsMonths', 2)

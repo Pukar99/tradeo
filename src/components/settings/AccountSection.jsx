@@ -15,7 +15,10 @@ import { getProfile, clearProfileCache } from '../../utils/globalCache'
 const MAX_AVATAR_SIZE = 5 * 1024 * 1024 // 5 MB
 const ALLOWED_IMAGE_TYPES = ['image/jpeg', 'image/jpg', 'image/png', 'image/gif', 'image/webp']
 
-const LABEL_CLS = 'block text-[11px] font-semibold text-gray-700 dark:text-gray-200 mb-1.5'
+const LABEL_CLS =
+  'block text-[10px] font-semibold uppercase tracking-widest text-gray-400 dark:text-gray-500 mb-1.5'
+const GROUP_LABEL_CLS =
+  'text-[10px] font-semibold uppercase tracking-widest text-gray-400 dark:text-gray-500 mb-1.5'
 const INPUT_CLS =
   'w-full min-h-[44px] border rounded-xl px-3 py-2 text-sm focus:outline-none focus-visible:ring-2 focus-visible:ring-blue-500/40 dark:bg-gray-800 dark:text-white'
 const INPUT_BORDER = 'border-gray-200 dark:border-gray-700 focus:border-blue-500'
@@ -160,77 +163,78 @@ export default function AccountSection() {
   }
 
   return (
-    <div className="space-y-5">
-      {/* Avatar row */}
-      <div className="flex items-center gap-4">
-        <div className="w-16 h-16 rounded-2xl overflow-hidden border border-gray-100 dark:border-gray-800 shrink-0">
-          {avatarUrl && !avatarImgError && /^https?:\/\//.test(avatarUrl) ? (
-            // eslint-disable-next-line jsx-a11y/no-noninteractive-element-interactions -- onError is a load-lifecycle fallback, not a user interaction; same pattern as ProfilePage.jsx
-            <img
-              src={avatarUrl}
-              alt={displayName}
-              className="w-full h-full object-cover"
-              onError={() => setAvatarImgError(true)}
+    <div className="space-y-6">
+      {/* Identity cluster: avatar + Full Name */}
+      <div className="space-y-4">
+        <p className={GROUP_LABEL_CLS}>Identity</p>
+        {/* Avatar row */}
+        <div className="flex items-center gap-4">
+          <div className="w-16 h-16 rounded-2xl overflow-hidden border border-gray-100 dark:border-gray-800 shrink-0">
+            {avatarUrl && !avatarImgError && /^https?:\/\//.test(avatarUrl) ? (
+              // eslint-disable-next-line jsx-a11y/no-noninteractive-element-interactions -- onError is a load-lifecycle fallback, not a user interaction; same pattern as ProfilePage.jsx
+              <img
+                src={avatarUrl}
+                alt={displayName}
+                className="w-full h-full object-cover"
+                onError={() => setAvatarImgError(true)}
+              />
+            ) : (
+              <div className="w-full h-full bg-gradient-to-br from-blue-500 to-purple-600 flex items-center justify-center">
+                <span className="text-white text-xl font-bold">{getInitials(displayName)}</span>
+              </div>
+            )}
+          </div>
+          <div className="flex flex-col gap-1.5">
+            <button
+              type="button"
+              onClick={() => fileInputRef.current?.click()}
+              disabled={uploadingAvatar}
+              className="min-h-[44px] px-4 rounded-xl text-sm font-medium bg-gray-100 dark:bg-gray-800 text-gray-700 dark:text-gray-200 hover:bg-gray-200 dark:hover:bg-gray-700 disabled:opacity-50 transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500/40"
+            >
+              {uploadingAvatar ? 'Uploading...' : 'Upload avatar'}
+            </button>
+            <input
+              ref={fileInputRef}
+              id="account-avatar-input"
+              type="file"
+              accept="image/jpeg,image/jpg,image/png,image/gif,image/webp"
+              onChange={handleAvatarUpload}
+              className="hidden"
+              aria-label="Upload avatar image"
             />
-          ) : (
-            <div className="w-full h-full bg-gradient-to-br from-blue-500 to-purple-600 flex items-center justify-center">
-              <span className="text-white text-xl font-bold">{getInitials(displayName)}</span>
-            </div>
-          )}
+            {avatarError && (
+              <p className="text-red-400 text-xs">
+                {avatarError}
+                <button
+                  type="button"
+                  onClick={() => setAvatarError('')}
+                  className="ml-2 underline"
+                >
+                  Dismiss
+                </button>
+              </p>
+            )}
+          </div>
         </div>
-        <div className="flex flex-col gap-1.5">
-          <button
-            type="button"
-            onClick={() => fileInputRef.current?.click()}
-            disabled={uploadingAvatar}
-            className="min-h-[44px] px-4 rounded-xl text-sm font-medium bg-gray-100 dark:bg-gray-800 text-gray-700 dark:text-gray-200 hover:bg-gray-200 dark:hover:bg-gray-700 disabled:opacity-50 transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500/40"
-          >
-            {uploadingAvatar ? 'Uploading...' : 'Upload avatar'}
-          </button>
-          <input
-            ref={fileInputRef}
-            id="account-avatar-input"
-            type="file"
-            accept="image/jpeg,image/jpg,image/png,image/gif,image/webp"
-            onChange={handleAvatarUpload}
-            className="hidden"
-            aria-label="Upload avatar image"
-          />
-          {avatarError && (
-            <p className="text-red-400 text-xs">
-              {avatarError}
-              <button
-                type="button"
-                onClick={() => setAvatarError('')}
-                className="ml-2 underline"
-              >
-                Dismiss
-              </button>
-            </p>
-          )}
-        </div>
-      </div>
 
-      {saveError && (
-        <div className="bg-red-50 dark:bg-red-900/30 text-red-600 dark:text-red-300 px-4 py-3 rounded-xl text-sm flex items-center justify-between">
-          <span>{saveError}</span>
-          <button
-            type="button"
-            onClick={() => setSaveError('')}
-            className="text-red-400 hover:text-red-600 ml-2"
-          >
-            ✕
-          </button>
-        </div>
-      )}
-      {saveSuccess && (
-        <div className="bg-green-50 dark:bg-green-900/30 text-green-600 dark:text-green-300 px-4 py-3 rounded-xl text-sm">
-          ✓ {saveSuccess}
-        </div>
-      )}
+        {saveError && (
+          <div className="bg-red-50 dark:bg-red-900/30 text-red-600 dark:text-red-300 px-4 py-3 rounded-xl text-sm flex items-center justify-between">
+            <span>{saveError}</span>
+            <button
+              type="button"
+              onClick={() => setSaveError('')}
+              className="text-red-400 hover:text-red-600 ml-2"
+            >
+              ✕
+            </button>
+          </div>
+        )}
+        {saveSuccess && (
+          <div className="bg-green-50 dark:bg-green-900/30 text-green-600 dark:text-green-300 px-4 py-3 rounded-xl text-sm">
+            ✓ {saveSuccess}
+          </div>
+        )}
 
-      {/* Fields */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
         <div>
           <label htmlFor="account-name" className={LABEL_CLS}>
             <span>
@@ -251,59 +255,66 @@ export default function AccountSection() {
           </label>
           {formErrors.name && <p className="text-red-400 text-xs mt-1">{formErrors.name}</p>}
         </div>
-        <div>
-          <label htmlFor="account-location" className={LABEL_CLS}>
-            <span>Location</span>
-            <input
-              id="account-location"
-              type="text"
-              aria-label="Location"
-              value={form.location}
-              onChange={(e) => setForm({ ...form, location: e.target.value })}
-              placeholder="e.g. Kathmandu, Nepal"
-              className={`${INPUT_CLS} ${INPUT_BORDER}`}
-            />
-          </label>
-        </div>
-        <div>
-          <label htmlFor="account-trading-since" className={LABEL_CLS}>
-            <span>Trading Since</span>
-            <input
-              id="account-trading-since"
-              type="text"
-              aria-label="Trading Since"
-              value={form.trading_since}
-              onChange={(e) => setForm({ ...form, trading_since: e.target.value })}
-              placeholder="e.g. 2020"
-              className={`${INPUT_CLS} ${INPUT_BORDER}`}
-            />
-          </label>
-        </div>
-        <div>
-          <label htmlFor="account-bio" className={LABEL_CLS}>
-            <span className="flex items-center justify-between">
-              <span>Bio</span>
-              <span
-                className={`text-xs font-normal normal-case tracking-normal ${form.bio.length > 450 ? 'text-red-400' : 'text-gray-400'}`}
-              >
-                {form.bio.length}/500
+      </div>
+
+      {/* Profile cluster: Location, Trading Since, Bio */}
+      <div className="space-y-4">
+        <p className={GROUP_LABEL_CLS}>Profile</p>
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+          <div>
+            <label htmlFor="account-location" className={LABEL_CLS}>
+              <span>Location</span>
+              <input
+                id="account-location"
+                type="text"
+                aria-label="Location"
+                value={form.location}
+                onChange={(e) => setForm({ ...form, location: e.target.value })}
+                placeholder="e.g. Kathmandu, Nepal"
+                className={`${INPUT_CLS} ${INPUT_BORDER}`}
+              />
+            </label>
+          </div>
+          <div>
+            <label htmlFor="account-trading-since" className={LABEL_CLS}>
+              <span>Trading Since</span>
+              <input
+                id="account-trading-since"
+                type="text"
+                aria-label="Trading Since"
+                value={form.trading_since}
+                onChange={(e) => setForm({ ...form, trading_since: e.target.value })}
+                placeholder="e.g. 2020"
+                className={`${INPUT_CLS} ${INPUT_BORDER}`}
+              />
+            </label>
+          </div>
+          <div>
+            <label htmlFor="account-bio" className={LABEL_CLS}>
+              <span className="flex items-center justify-between">
+                <span>Bio</span>
+                <span
+                  className={`text-xs font-normal normal-case tracking-normal ${form.bio.length > 450 ? 'text-red-400' : 'text-gray-400'}`}
+                >
+                  {form.bio.length}/500
+                </span>
               </span>
-            </span>
-            <textarea
-              id="account-bio"
-              aria-label="Bio"
-              value={form.bio}
-              onChange={(e) => {
-                setForm({ ...form, bio: e.target.value })
-                setFormErrors((p) => ({ ...p, bio: '' }))
-              }}
-              placeholder="Short bio about your trading style"
-              rows={3}
-              maxLength={500}
-              className={`${INPUT_CLS} resize-none ${formErrors.bio ? INPUT_BORDER_ERROR : INPUT_BORDER}`}
-            />
-          </label>
-          {formErrors.bio && <p className="text-red-400 text-xs mt-1">{formErrors.bio}</p>}
+              <textarea
+                id="account-bio"
+                aria-label="Bio"
+                value={form.bio}
+                onChange={(e) => {
+                  setForm({ ...form, bio: e.target.value })
+                  setFormErrors((p) => ({ ...p, bio: '' }))
+                }}
+                placeholder="Short bio about your trading style"
+                rows={3}
+                maxLength={500}
+                className={`${INPUT_CLS} resize-none ${formErrors.bio ? INPUT_BORDER_ERROR : INPUT_BORDER}`}
+              />
+            </label>
+            {formErrors.bio && <p className="text-red-400 text-xs mt-1">{formErrors.bio}</p>}
+          </div>
         </div>
       </div>
 

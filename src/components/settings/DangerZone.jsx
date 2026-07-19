@@ -14,7 +14,8 @@ import { useNavigate } from 'react-router-dom'
 import { useAuth } from '../../context/AuthContext'
 import { deleteAccount } from '../../api'
 
-const LABEL_CLS = 'block text-[11px] font-semibold text-gray-700 dark:text-gray-200 mb-1.5'
+const LABEL_CLS =
+  'block text-[10px] font-semibold uppercase tracking-widest text-gray-400 dark:text-gray-500 mb-1.5'
 const INPUT_CLS =
   'w-full min-h-[44px] border rounded-xl px-3 py-2 text-sm focus:outline-none focus-visible:ring-2 focus-visible:ring-red-500/40 dark:bg-gray-800 dark:text-white border-red-200 dark:border-red-800 focus:border-red-500'
 
