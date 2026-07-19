@@ -113,11 +113,11 @@ export default function SettingsPage() {
             <SecuritySection />
           </SettingsSection>
 
-          <SettingsSection id="appearance" title="Appearance" caption="Theme and language." icon={AppearanceIcon}>
+          <SettingsSection id="appearance" title="Appearance" caption="Theme and language. Saved automatically." icon={AppearanceIcon}>
             <AppearanceSection />
           </SettingsSection>
 
-          <SettingsSection id="dashboard" title="Dashboard" caption="Home dashboard preferences." icon={DashboardIcon}>
+          <SettingsSection id="dashboard" title="Dashboard" caption="Home dashboard preferences. Saved automatically." icon={DashboardIcon}>
             <DashboardPrefs />
           </SettingsSection>
 
