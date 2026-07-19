@@ -11,8 +11,16 @@
 // convention: viewBox 0 0 24 24, fill none, stroke currentColor, strokeWidth 2, round caps/joins)
 // passed via SettingsSection's new `icon` prop; the H1 gear pictograph is replaced with a
 // matching SVG. Danger zone gains a stronger visual break (extra top margin + a red divider
-// line) ahead of its section. No layout/nav/label/behavior changes (those are SET-11/12/13).
+// line) ahead of its section.
+// SET-11 (Wave 4): full-width hub — container widens max-w-2xl → max-w-5xl (ProfilePage:152
+// standard); IA reorder to identity-first (Account, Security, Appearance, Dashboard,
+// Integrations, Danger — R17); desktop sticky left rail (SettingsRail) + mobile/tablet sticky
+// pill strip (SettingsPillStrip), both from SettingsNav.jsx, with IntersectionObserver
+// active-anchor tracking. The rail/strip markup is placed BEFORE the section content column in
+// this JSX — a structural DOM-order guarantee for Tab order, never a CSS `order-` hack. Still
+// zero network/behavior changes (R21).
 import SettingsSection from '../components/settings/SettingsSection'
+import { SettingsRail, SettingsPillStrip } from '../components/settings/SettingsNav'
 import AppearanceSection from '../components/settings/AppearanceSection'
 import DashboardPrefs from '../components/settings/DashboardPrefs'
 import MeroshareCard from '../components/settings/MeroshareCard'
@@ -69,8 +77,8 @@ const DangerIcon = (
 
 export default function SettingsPage() {
   return (
-    <div className="w-full px-3 sm:px-6 pt-4 sm:pt-6 pb-10 max-w-2xl mx-auto space-y-4">
-      <div>
+    <div className="w-full px-3 sm:px-6 pt-4 sm:pt-6 pb-10 max-w-5xl mx-auto">
+      <div className="mb-4">
         <h1 className="flex items-center gap-2 text-[17px] font-bold text-gray-900 dark:text-white tracking-tight">
           <span aria-hidden="true" className="w-6 h-6 shrink-0">
             {GearIcon}
@@ -82,48 +90,58 @@ export default function SettingsPage() {
         </p>
       </div>
 
-      <div className="space-y-4">
-        <SettingsSection id="appearance" title="Appearance" caption="Theme and language." icon={AppearanceIcon}>
-          <AppearanceSection />
-        </SettingsSection>
+      {/* Mobile/tablet sticky pill strip — below the H1, above the section column (lg:hidden) */}
+      <SettingsPillStrip />
 
-        <SettingsSection id="dashboard" title="Dashboard" caption="Home dashboard preferences." icon={DashboardIcon}>
-          <DashboardPrefs />
-        </SettingsSection>
+      <div className="lg:grid lg:grid-cols-[176px_1fr] lg:gap-8 lg:items-start mt-4 lg:mt-0">
+        {/* Rail markup literally precedes the section content in DOM order — Tab-order
+            guarantee, never a CSS `order-` hack (hidden lg:block; invisible/no tab stops
+            on mobile since display:none elements are unfocusable). */}
+        <SettingsRail />
 
-        <SettingsSection
-          id="integrations"
-          title="MeroShare Integration"
-          caption="IPO auto-apply and account management live on the IPO page."
-          icon={IntegrationIcon}
-        >
-          <MeroshareCard />
-        </SettingsSection>
+        <div className="space-y-4 min-w-0">
+          <SettingsSection
+            id="account"
+            title="Account"
+            caption="Your profile details and avatar."
+            icon={AccountIcon}
+          >
+            <AccountSection />
+          </SettingsSection>
 
-        <SettingsSection
-          id="account"
-          title="Account"
-          caption="Your profile details and avatar."
-          icon={AccountIcon}
-        >
-          <AccountSection />
-        </SettingsSection>
+          <SettingsSection id="security" title="Security" caption="Change your password." icon={SecurityIcon}>
+            <SecuritySection />
+          </SettingsSection>
 
-        <SettingsSection id="security" title="Security" caption="Change your password." icon={SecurityIcon}>
-          <SecuritySection />
-        </SettingsSection>
+          <SettingsSection id="appearance" title="Appearance" caption="Theme and language." icon={AppearanceIcon}>
+            <AppearanceSection />
+          </SettingsSection>
 
-        <div className="mt-8 pt-4 border-t border-red-200 dark:border-red-900/50" />
+          <SettingsSection id="dashboard" title="Dashboard" caption="Home dashboard preferences." icon={DashboardIcon}>
+            <DashboardPrefs />
+          </SettingsSection>
 
-        <SettingsSection
-          id="danger"
-          title="Danger zone"
-          caption="Irreversible actions."
-          tone="danger"
-          icon={DangerIcon}
-        >
-          <DangerZone />
-        </SettingsSection>
+          <SettingsSection
+            id="integrations"
+            title="MeroShare Integration"
+            caption="IPO auto-apply and account management live on the IPO page."
+            icon={IntegrationIcon}
+          >
+            <MeroshareCard />
+          </SettingsSection>
+
+          <div className="mt-8 pt-4 border-t border-red-200 dark:border-red-900/50" />
+
+          <SettingsSection
+            id="danger"
+            title="Danger zone"
+            caption="Irreversible actions."
+            tone="danger"
+            icon={DangerIcon}
+          >
+            <DangerZone />
+          </SettingsSection>
+        </div>
       </div>
     </div>
   )
