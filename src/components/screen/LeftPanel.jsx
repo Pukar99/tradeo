@@ -10,6 +10,7 @@ import { useAuth } from '../../context/AuthContext'
 import { useEscapeKey } from '../../hooks/useEscapeKey'
 import { ALERT_PCT_THRESHOLD } from '../../utils/constants'
 import { apiError } from '../../utils/format'
+import { nptToday } from '../../utils/nepseCalendar'
 
 // ── BUY / SELL Modal ──────────────────────────────────────────────────────────
 
@@ -39,7 +40,7 @@ function TradeModal({ side, symbol, onClose, onSaved }) {
         tp: form.tp ? parseFloat(form.tp) : null,
         quantity: parseInt(form.quantity),
         notes: form.notes || null,
-        entry_date: new Date().toISOString().slice(0, 10),
+        entry_date: nptToday(),
       })
       dispatchChatAction('ADD_TRADE')
       onSaved()
@@ -150,7 +151,7 @@ function CloseConfirm({ position, onClose, onDone }) {
       const latestClose = position._latestPrice || position.entry_price
       await closePosition(position.trade_id, {
         exit_price: latestClose,
-        date: new Date().toISOString().slice(0, 10),
+        date: nptToday(),
       })
       dispatchChatAction('CLOSE_TRADE')
       onDone()

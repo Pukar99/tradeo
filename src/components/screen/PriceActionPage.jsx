@@ -1,6 +1,8 @@
 // === PriceActionPage.jsx — Price Action chart tab: swings (HH/HL/LH/LL), S/R, demand/supply zones, volume spikes, patterns ===
 import { useState, useEffect, useCallback, useMemo } from 'react'
 import { ScreenProvider, useScreen } from '../../context/ScreenContext'
+import AnalysisMobilePanels from './AnalysisMobilePanels'
+import { ProfessionalPALeftPanel, ProfessionalPARightPanel } from './ProfessionalAnalysisPanels'
 import { useLocalStorage } from '../../hooks/useLocalStorage'
 import StockChart from './StockChart'
 import { useScreenToolbarSlot } from '../../pages/ScreenPage'
@@ -144,7 +146,9 @@ function PAToolbar({ toggles, setToggles, config, setConfig, symbols }) {
           symbols={symbols}
           stocksOnly
           value={selectedSymbol}
-          onSelect={(symbol, indexId, companyName) => selectSymbol(symbol, indexId, null, companyName)}
+          onSelect={(symbol, indexId, companyName) =>
+            selectSymbol(symbol, indexId, null, companyName)
+          }
         />
         <div className="flex-1 min-w-0" />
         <ToolbarMenu activeCount={activeCount}>
@@ -164,7 +168,9 @@ function PAToolbar({ toggles, setToggles, config, setConfig, symbols }) {
           symbols={symbols}
           stocksOnly
           value={selectedSymbol}
-          onSelect={(symbol, indexId, companyName) => selectSymbol(symbol, indexId, null, companyName)}
+          onSelect={(symbol, indexId, companyName) =>
+            selectSymbol(symbol, indexId, null, companyName)
+          }
         />
         <ToolbarDivider />
         <ToolbarTimeframes frames={PA_TIMEFRAMES} />
@@ -178,7 +184,8 @@ function PAToolbar({ toggles, setToggles, config, setConfig, symbols }) {
 }
 
 // ── Left Panel ────────────────────────────────────────────────────────────────
-function PALeftPanel({ paData, currentPrice }) {
+// eslint-disable-next-line no-unused-vars
+function LegacyPALeftPanel({ paData, currentPrice }) {
   const LABEL =
     'text-[10px] font-semibold uppercase tracking-widest text-gray-400 dark:text-gray-500'
   const SUB = 'text-[10px] text-gray-500 dark:text-gray-400'
@@ -414,7 +421,8 @@ function PALeftPanel({ paData, currentPrice }) {
 }
 
 // ── Right Panel ───────────────────────────────────────────────────────────────
-function PARightPanel({ paData, kpis }) {
+// eslint-disable-next-line no-unused-vars
+function LegacyPARightPanel({ paData, kpis }) {
   const [tab, setTab] = useState('signals')
 
   const LABEL =
@@ -729,13 +737,16 @@ function PAInner() {
   const [toggles, setToggles] = useState(DEFAULT_TOGGLES)
   const [config, setConfig] = useState(() => loadConfig())
   const [symbols, setSymbols] = useState(null)
+  const [scanError, setScanError] = useState('')
+  const [symbolError, setSymbolError] = useState('')
+  const [mobilePanel, setMobilePanel] = useState(null)
 
   useEffect(() => {
     getMarketSymbols()
       .then((r) => {
         if (r.data?.stocks?.length) setSymbols(r.data)
       })
-      .catch(() => {})
+      .catch(() => setSymbolError('Symbol search is temporarily unavailable.'))
   }, [])
 
   const isStock = !isIndex?.()
@@ -747,10 +758,12 @@ function PAInner() {
   useEffect(() => {
     if (!selectedSymbol || !isStock) {
       setPaData(null)
+      setScanError('')
       return
     }
     let cancelled = false
     setLoading(true)
+    setScanError('')
     getPriceActionScan({
       symbol: selectedSymbol,
       days,
@@ -761,8 +774,11 @@ function PAInner() {
       .then((res) => {
         if (!cancelled) setPaData(res.data)
       })
-      .catch(() => {
-        if (!cancelled) setPaData(null)
+      .catch((err) => {
+        if (!cancelled) {
+          setPaData(null)
+          setScanError(err.response?.data?.error || 'Price Action scan failed. Please retry.')
+        }
       })
       .finally(() => {
         if (!cancelled) setLoading(false)
@@ -816,7 +832,11 @@ function PAInner() {
                         ${leftOpen ? 'w-[13%] min-w-[150px] max-w-[200px]' : 'w-0 min-w-0 max-w-0 overflow-hidden'} ${!leftOpen ? 'screen-panel-collapsed' : ''}`}
         >
           <div className="screen-panel-content flex flex-col h-full">
-            <PALeftPanel paData={isStock ? paData : null} currentPrice={currentPrice} />
+            <ProfessionalPALeftPanel
+              paData={isStock ? paData : null}
+              chartData={chartData}
+              currentPrice={currentPrice}
+            />
           </div>
         </div>
 
@@ -826,6 +846,7 @@ function PAInner() {
           <button
             onClick={toggleLeft}
             title={leftOpen ? 'Hide left panel' : 'Show left panel'}
+            aria-label={leftOpen ? 'Hide left panel' : 'Show left panel'}
             className="hidden lg:flex absolute left-0 top-1/2 -translate-y-1/2 z-30
                        h-12 w-4 items-center justify-center
                        bg-white/70 dark:bg-gray-800/70 backdrop-blur-sm
@@ -852,6 +873,7 @@ function PAInner() {
           <button
             onClick={toggleRight}
             title={rightOpen ? 'Hide right panel' : 'Show right panel'}
+            aria-label={rightOpen ? 'Hide right panel' : 'Show right panel'}
             className="hidden lg:flex absolute right-0 top-1/2 -translate-y-1/2 z-30
                        h-12 w-4 items-center justify-center
                        bg-white/70 dark:bg-gray-800/70 backdrop-blur-sm
@@ -881,6 +903,11 @@ function PAInner() {
               </span>
             </div>
           )}
+          {(scanError || symbolError) && (
+            <div className="absolute top-2 left-3 z-30 text-[10px] text-red-600 bg-red-50 dark:bg-red-950/80 px-2 py-1 rounded border border-red-200 dark:border-red-800">
+              {scanError || symbolError}
+            </div>
+          )}
           <StockChart hideToolbar {...paOverlayData} onChartDataReady={handleChartDataReady} />
         </div>
 
@@ -894,10 +921,34 @@ function PAInner() {
                         ${rightOpen ? 'w-[15%] min-w-[160px] max-w-[240px]' : 'w-0 min-w-0 max-w-0 overflow-hidden'} ${!rightOpen ? 'screen-panel-collapsed' : ''}`}
         >
           <div className="screen-panel-content flex flex-col h-full">
-            <PARightPanel paData={isStock ? paData : null} kpis={kpis} />
+            <ProfessionalPARightPanel
+              paData={isStock ? paData : null}
+              kpis={kpis}
+              chartData={chartData}
+              currentPrice={currentPrice}
+            />
           </div>
         </div>
       </div>
+      <AnalysisMobilePanels
+        panel={mobilePanel}
+        setPanel={setMobilePanel}
+        left={
+          <ProfessionalPALeftPanel
+            paData={isStock ? paData : null}
+            chartData={chartData}
+            currentPrice={currentPrice}
+          />
+        }
+        right={
+          <ProfessionalPARightPanel
+            paData={isStock ? paData : null}
+            kpis={kpis}
+            chartData={chartData}
+            currentPrice={currentPrice}
+          />
+        }
+      />
     </>
   )
 }

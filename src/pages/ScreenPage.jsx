@@ -24,6 +24,7 @@ import ComingSoon from '../components/ComingSoon'
 import UpgradePrompt from '../components/UpgradePrompt'
 import AuthWall from '../components/AuthWall'
 import PageSkeleton from '../components/PageSkeleton'
+import { useCompactToolbar } from '../components/screen/ScreenToolbarAtoms'
 
 // ── Screen toolbar slot — EXACT same portal pattern as DataLabPage.useToolbarSlot ──
 // Context value is a stable useRef object; the hook forces one re-render after DOM
@@ -93,6 +94,10 @@ function SimpleContent({
   toggleRight,
 }) {
   const { user } = useAuth()
+  const compact = useCompactToolbar()
+  useEffect(() => {
+    if (!compact || activeTab !== 'General') setMobilePanel(null)
+  }, [compact, activeTab, setMobilePanel])
   if (activeTab === 'MultiChart')
     return (
       <div key="MultiChart" className="flex-1 min-h-0 flex flex-col animate-tab-in">
@@ -131,25 +136,28 @@ function SimpleContent({
     <>
       <div className="flex-1 flex overflow-hidden min-h-0">
         {/* Left panel — collapsible */}
-        <div
-          className={`hidden lg:flex flex-col shrink-0 overflow-y-auto relative
+        {!compact && (
+          <div
+            className={`hidden lg:flex flex-col shrink-0 overflow-y-auto relative
                         bg-white/50 dark:bg-gray-950/60 backdrop-blur-2xl
                         shadow-[1px_0_0_rgba(255,255,255,0.18),2px_0_12px_rgba(0,0,0,0.06)]
                         dark:shadow-[1px_0_0_rgba(255,255,255,0.07),2px_0_16px_rgba(0,0,0,0.4)]
                         transition-all duration-200 ease-in-out
                         ${leftOpen ? 'w-[13%] min-w-[150px] max-w-[200px]' : 'w-0 min-w-0 max-w-0 overflow-hidden'}
                         ${!leftOpen ? 'screen-panel-collapsed' : ''}`}
-        >
-          <div className="screen-panel-content flex flex-col h-full">
-            <LeftPanel />
+          >
+            <div className="screen-panel-content flex flex-col h-full">
+              <LeftPanel />
+            </div>
           </div>
-        </div>
+        )}
 
         {/* Chart */}
         <div className="flex-1 min-h-0 overflow-hidden relative">
           <button
             onClick={toggleLeft}
             title={leftOpen ? 'Hide left panel' : 'Show left panel'}
+            aria-label={leftOpen ? 'Hide left panel' : 'Show left panel'}
             className="hidden lg:flex absolute left-0 top-1/2 -translate-y-1/2 z-30
                        h-12 w-4 items-center justify-center
                        bg-white/70 dark:bg-gray-800/70 backdrop-blur-sm
@@ -175,6 +183,7 @@ function SimpleContent({
           <button
             onClick={toggleRight}
             title={rightOpen ? 'Hide right panel' : 'Show right panel'}
+            aria-label={rightOpen ? 'Hide right panel' : 'Show right panel'}
             className="hidden lg:flex absolute right-0 top-1/2 -translate-y-1/2 z-30
                        h-12 w-4 items-center justify-center
                        bg-white/70 dark:bg-gray-800/70 backdrop-blur-sm
@@ -203,23 +212,25 @@ function SimpleContent({
         </div>
 
         {/* Right panel — collapsible */}
-        <div
-          className={`hidden lg:flex flex-col shrink-0 overflow-y-auto relative
+        {!compact && (
+          <div
+            className={`hidden lg:flex flex-col shrink-0 overflow-y-auto relative
                         bg-white/50 dark:bg-gray-950/60 backdrop-blur-2xl
                         shadow-[-1px_0_0_rgba(255,255,255,0.18),-2px_0_12px_rgba(0,0,0,0.06)]
                         dark:shadow-[-1px_0_0_rgba(255,255,255,0.07),-2px_0_16px_rgba(0,0,0,0.4)]
                         transition-all duration-200 ease-in-out
                         ${rightOpen ? 'w-[16%] min-w-[170px] max-w-[240px]' : 'w-0 min-w-0 max-w-0 overflow-hidden'}
                         ${!rightOpen ? 'screen-panel-collapsed' : ''}`}
-        >
-          <div className="screen-panel-content flex flex-col h-full">
-            <RightPanel />
+          >
+            <div className="screen-panel-content flex flex-col h-full">
+              <RightPanel />
+            </div>
           </div>
-        </div>
+        )}
       </div>
 
-      <MobileBottomNav panel={mobilePanel} setPanel={setMobilePanel} />
-      <MobileSheet panel={mobilePanel} onClose={() => setMobilePanel(null)} />
+      {compact && <MobileBottomNav panel={mobilePanel} setPanel={setMobilePanel} />}
+      {compact && <MobileSheet panel={mobilePanel} onClose={() => setMobilePanel(null)} />}
     </>
   )
 }
@@ -239,7 +250,9 @@ function ComplexContent({ activeTab }) {
       </Suspense>
     )
   if (activeTab === 'Replay')
-    return (
+    return user?.tier === 'basic' && !user?.is_admin ? (
+      <UpgradePrompt feature="Replay" />
+    ) : (
       <Suspense fallback={<TabSpinner />}>
         <ErrorBoundary label="Replay">
           <ReplayPage />
@@ -344,11 +357,35 @@ function MobileBottomNav({ panel, setPanel }) {
 // ── Mobile slide-up sheet ────────────────────────────────────────────────────
 
 function MobileSheet({ panel, onClose }) {
+  const dialogRef = useRef(null)
   useEffect(() => {
     if (!panel) return
+    const previousOverflow = document.body.style.overflow
+    const previousFocus = document.activeElement
     document.body.style.overflow = 'hidden'
+    const dialog = dialogRef.current
+    const focusable = dialog?.querySelectorAll(
+      'button, [href], input, select, textarea, [tabindex]:not([tabindex="-1"])'
+    )
+    focusable?.[0]?.focus()
+
+    const trapFocus = (event) => {
+      if (event.key !== 'Tab' || !focusable?.length) return
+      const first = focusable[0]
+      const last = focusable[focusable.length - 1]
+      if (event.shiftKey && document.activeElement === first) {
+        event.preventDefault()
+        last.focus()
+      } else if (!event.shiftKey && document.activeElement === last) {
+        event.preventDefault()
+        first.focus()
+      }
+    }
+    dialog?.addEventListener('keydown', trapFocus)
     return () => {
-      document.body.style.overflow = ''
+      dialog?.removeEventListener('keydown', trapFocus)
+      document.body.style.overflow = previousOverflow
+      previousFocus?.focus?.()
     }
   }, [panel])
 
@@ -357,11 +394,17 @@ function MobileSheet({ panel, onClose }) {
 
   return (
     <>
-      <div
+      <button
+        type="button"
+        aria-label="Close panel"
         className="lg:hidden fixed inset-0 bg-black/40 backdrop-blur-[2px] z-40"
         onClick={onClose}
       />
       <div
+        ref={dialogRef}
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby="screen-mobile-sheet-title"
         className="lg:hidden fixed bottom-0 left-0 right-0 z-50 flex flex-col bg-white dark:bg-gray-900 rounded-t-2xl shadow-2xl border-t border-gray-200 dark:border-gray-800"
         style={{ height: '68vh', paddingBottom: 'env(safe-area-inset-bottom, 0px)' }}
       >
@@ -369,9 +412,15 @@ function MobileSheet({ panel, onClose }) {
           <div className="w-10 h-1 rounded-full bg-gray-300 dark:bg-gray-600" />
         </div>
         <div className="shrink-0 flex items-center justify-between px-4 pb-2.5 border-b border-gray-100 dark:border-gray-800">
-          <span className="text-[13px] font-bold text-gray-800 dark:text-gray-100">{title}</span>
+          <span
+            id="screen-mobile-sheet-title"
+            className="text-[13px] font-bold text-gray-800 dark:text-gray-100"
+          >
+            {title}
+          </span>
           <button
             onClick={onClose}
+            aria-label="Close panel"
             className="w-7 h-7 flex items-center justify-center rounded-full bg-gray-100 dark:bg-gray-800 text-gray-500 dark:text-gray-400 hover:bg-gray-200 dark:hover:bg-gray-700 text-[12px] transition-colors"
           >
             ✕
@@ -433,7 +482,10 @@ function TabStrip({ tabs, active, onChange, lockedIds = [] }) {
 // ── Screen inner ─────────────────────────────────────────────────────────────
 
 function ScreenInner() {
-  const [mode, setMode] = useState(() => sessionStorage.getItem('tradeo_screen_mode') || 'simple')
+  const [mode, setMode] = useState(() => {
+    const stored = sessionStorage.getItem('tradeo_screen_mode')
+    return stored === 'complex' ? 'complex' : 'simple'
+  })
   const [simpleTab, setSimpleTab] = useState(() => {
     const stored = sessionStorage.getItem('tradeo_screen_simpleTab')
     return SIMPLE_TABS.some((t) => t.id === stored) ? stored : 'General'

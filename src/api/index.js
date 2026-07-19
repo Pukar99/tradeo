@@ -59,7 +59,7 @@ API.interceptors.request.use((config) => {
   // interceptor and could otherwise be dedup'd against a stale in-flight entry, returning a
   // different request's outcome instead of the intended retry.
   if (config.method === 'get' && !config._retried) {
-    const key = config.url + JSON.stringify(config.params || '')
+    const key = `${stored || 'cookie'}:${config.url}${JSON.stringify(config.params || '')}`
     const entry = _inFlight.get(key)
     if (entry && Date.now() - entry.ts < DEDUP_MS) {
       // Return a new promise that mirrors the original request's outcome
@@ -74,6 +74,7 @@ API.interceptors.request.use((config) => {
       resolve = res
       reject = rej
     })
+    shared.catch(() => {})
     _inFlight.set(key, { ts: Date.now(), shared, resolve, reject })
     config._inFlightKey = key
   }
@@ -122,17 +123,27 @@ API.interceptors.response.use(
     const status = error.response?.status
     const url = error.config?.url || ''
     const onAuthPage = ['/login', '/signup'].some((p) => window.location.pathname.startsWith(p))
+    const expireSession = () => {
+      localStorage.removeItem('auth_token')
+      window.dispatchEvent(new Event('tradeo:auth-expired'))
+    }
 
     if (status === 401) {
       // 401 from /api/auth/me is expected when logged out — don't redirect
-      if (!url.includes('/api/auth/me') && !onAuthPage) {
+      if (!url.includes('/api/auth/') && !onAuthPage) {
+        expireSession()
         sessionStorage.setItem('authExpiredMsg', 'Your session has expired. Please log in again.')
         window.location.href = '/login'
       }
       return Promise.reject(error)
     }
 
-    if (status === 403 && !error.config?._retried && !onAuthPage) {
+    if (
+      status === 403 &&
+      error.response?.data?.authError === true &&
+      !error.config?._retried &&
+      !onAuthPage
+    ) {
       // Skip refresh loop for auth endpoints themselves
       if (url.includes('/api/auth/')) return Promise.reject(error)
 
@@ -150,6 +161,7 @@ API.interceptors.response.use(
         if (data?.token) localStorage.setItem('auth_token', data.token)
         return API(error.config)
       } catch {
+        expireSession()
         // Refresh failed — session is truly dead
         sessionStorage.setItem('authExpiredMsg', 'Your session has expired. Please log in again.')
         window.location.href = '/login'

@@ -46,7 +46,8 @@ export default function BacktestControls({
   onStepBack,
   onSpeedChange,
 }) {
-  const progress = totalCandles > 0 ? Math.round((cursorIndex / totalCandles) * 100) : 0
+  const visibleCount = totalCandles > 0 ? Math.min(cursorIndex + 1, totalCandles) : 0
+  const progress = totalCandles > 0 ? Math.round((visibleCount / totalCandles) * 100) : 0
   const atEnd = totalCandles > 0 && cursorIndex >= totalCandles - 1
   // Step-back disabled state is computed by the page (it also blocks once a position
   // exists). Fall back to the local at-start/playing check if the prop isn't passed.
@@ -124,7 +125,7 @@ export default function BacktestControls({
           />
         </div>
         <span className="text-[10px] text-gray-400 dark:text-gray-500 tabular-nums whitespace-nowrap shrink-0">
-          {cursorIndex}/{totalCandles}
+          {visibleCount}/{totalCandles}
         </span>
       </div>
 

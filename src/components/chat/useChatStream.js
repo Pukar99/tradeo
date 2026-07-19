@@ -47,7 +47,20 @@ export default function useChatStream({
 
     // Keep lastAction alive for follow-ups
     // DELETE_TRADE removed — it now arrives as type:'pending' (covered by that clause below)
-    const keepAliveActions = ['ADD_TRADE', 'ADD_TO_POSITION', 'CLOSE_TRADE', 'DRAFT_JOURNAL', 'NEEDS_DISAMBIGUATION']
+    const keepAliveActions = [
+      'ADD_TRADE',
+      'ADD_TO_POSITION',
+      'CLOSE_TRADE',
+      'ADD_WATCHLIST',
+      'BULK_ADD_WATCHLIST',
+      'REMOVE_WATCHLIST',
+      'ADD_GOAL',
+      'UPDATE_GOAL',
+      'ADD_JOURNAL',
+      'UPDATE_SL_TP',
+      'DRAFT_JOURNAL',
+      'NEEDS_DISAMBIGUATION',
+    ]
     if (
       data.type === 'pending' ||
       data.type === 'slotfill' ||
@@ -109,8 +122,9 @@ export default function useChatStream({
         body: JSON.stringify(payload),
       })
       const data = await res.json()
+      if (!res.ok) throw new Error(data?.error || data?.message || `Request failed (${res.status})`)
       handleAgentResponse(data)
-    } catch (err) {
+    } catch {
       setMessages((prev) => [
         ...prev,
         {

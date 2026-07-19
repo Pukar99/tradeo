@@ -11,6 +11,10 @@ export function nptNow() {
   return new Date(Date.now() + (5 * 60 + 45) * 60 * 1000)
 }
 
+export function nptToday() {
+  return nptNow().toISOString().slice(0, 10)
+}
+
 // isoDate: 'YYYY-MM-DD'; dow: getUTCDay() of that date in NPT-shifted time
 export function isNepseWeekend(isoDate, dow) {
   return isoDate >= WEEKEND_RULE_CUTOFF

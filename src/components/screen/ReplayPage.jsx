@@ -5,6 +5,7 @@ import { btGetOHLCV } from '../../api/backtest'
 import BacktestChart from '../backtest/BacktestChart'
 import BacktestControls from '../backtest/BacktestControls'
 import SymbolSearch from '../common/SymbolSearch'
+import { nptToday } from '../../utils/nepseCalendar'
 
 // ── Minimal replay engine (no session, no orders) ────────────────────────────
 // Replicates the play/pause/step/speed logic from useBacktestEngine without
@@ -31,14 +32,14 @@ function useReplayEngine({ candles, cursorIndex, onAdvance, onEnd }) {
 
   const tick = useCallback(() => {
     const idx = cursorRef.current
-    if (idx >= candlesRef.current.length) {
+    if (idx >= candlesRef.current.length - 1) {
       pauseInternal()
       onEnd()
       return
     }
     const next = idx + 1
-    onAdvance(next, candlesRef.current[idx]?.date || '')
-    if (next >= candlesRef.current.length) {
+    onAdvance(next, candlesRef.current[next]?.date || '')
+    if (next >= candlesRef.current.length - 1) {
       pauseInternal()
       onEnd()
     }
@@ -46,7 +47,7 @@ function useReplayEngine({ candles, cursorIndex, onAdvance, onEnd }) {
 
   const play = useCallback(() => {
     if (playingRef.current) return
-    if (cursorRef.current >= candlesRef.current.length) return
+    if (cursorRef.current >= candlesRef.current.length - 1) return
     playingRef.current = true
     const ms = 1000 / parseFloat(speedRef.current)
     timerRef.current = setInterval(() => {
@@ -72,7 +73,7 @@ function useReplayEngine({ candles, cursorIndex, onAdvance, onEnd }) {
     if (playingRef.current) return
     const idx = cursorRef.current
     if (idx <= 0) return
-    onAdvance(idx - 1, candlesRef.current[idx - 2]?.date || '')
+    onAdvance(idx - 1, candlesRef.current[idx - 1]?.date || '')
   }, [onAdvance])
 
   const setSpeed = useCallback(
@@ -154,8 +155,7 @@ export default function ReplayPage() {
     setCursorIndex(0)
 
     try {
-      const today = new Date().toISOString().slice(0, 10)
-      const res = await btGetOHLCV(symbol, startDate, today)
+      const res = await btGetOHLCV(symbol, startDate, nptToday())
       const all = res.data.candles || []
       if (all.length === 0) {
         setError(`No data found for ${symbol} from ${startDate}`)
@@ -231,7 +231,7 @@ export default function ReplayPage() {
     return () => window.removeEventListener('keydown', h)
   }, [ready, isPlaying, handlePlay, handlePause, handleStep, handleStepBack])
 
-  const currentCandle = candles[cursorIndex - 1] || null
+  const currentCandle = candles[cursorIndex] || null
   const currentDate = currentCandle?.date || ''
 
   // ── Setup screen ──────────────────────────────────────────────────────────────
@@ -271,7 +271,7 @@ export default function ReplayPage() {
                 type="date"
                 value={startDate}
                 onChange={(e) => setStartDate(e.target.value)}
-                max={new Date().toISOString().slice(0, 10)}
+                max={nptToday()}
                 className="w-full px-3 py-1.5 text-[12px] border border-gray-200 dark:border-gray-700 rounded-lg
                            bg-gray-50 dark:bg-gray-800 text-gray-700 dark:text-gray-200 outline-none
                            focus:ring-2 focus:ring-blue-500"

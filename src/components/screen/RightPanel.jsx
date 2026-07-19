@@ -475,14 +475,17 @@ export default function RightPanel() {
 
   // Client-side cache: date → { movers, volume, summary } — avoids re-fetching same date
   const dayCache = useRef({})
+  const requestIdRef = useRef(0)
 
   const fetchForDate = useCallback(async (date) => {
     if (!date) return
+    const requestId = ++requestIdRef.current
     if (dayCache.current[date]) {
       const c = dayCache.current[date]
       setDbMovers(c.movers)
       setDbVolume(c.volume)
       setSummary(c.summary)
+      setLoading(false)
       return
     }
     setLoading(true)
@@ -495,13 +498,14 @@ export default function RightPanel() {
         volume: r.data.volume,
         summary: r.data.summary,
       }
+      if (requestId !== requestIdRef.current) return
       setDbMovers(r.data.movers)
       setDbVolume(r.data.volume)
       setSummary(r.data.summary)
     } catch {
-      setMoversErr('Failed to load market data')
+      if (requestId === requestIdRef.current) setMoversErr('Failed to load market data')
     } finally {
-      setLoading(false)
+      if (requestId === requestIdRef.current) setLoading(false)
     }
   }, [])
 
@@ -532,23 +536,15 @@ export default function RightPanel() {
         }
       })
       .catch(() => setDatesErr('Failed to load dates'))
-  }, []) // eslint-disable-line react-hooks/exhaustive-deps
+  }, [])
 
-  // When user navigates to a different date (not the initial load)
-  const prevSelectedDate = useRef('')
+  // Keep the auxiliary volume/summary data aligned with either the pinned candle
+  // or the date navigator, including restoring the selected date after unpinning.
   useEffect(() => {
-    if (!selectedDate || selectedDate === prevSelectedDate.current) return
-    prevSelectedDate.current = selectedDate
-    fetchForDate(selectedDate)
-  }, [selectedDate, fetchForDate])
-
-  // When candle is pinned, use the same cached fetchForDate (movers from chart cache still shown via clickedMovers)
-  useEffect(() => {
-    if (!clickedMovers) return
-    const d = clickedMovers.date
-    if (d === selectedDate) return
-    fetchForDate(d)
-  }, [clickedMovers?.date]) // eslint-disable-line react-hooks/exhaustive-deps
+    const date = clickedMovers?.date || selectedDate
+    if (!date) return
+    fetchForDate(date)
+  }, [clickedMovers?.date, selectedDate, fetchForDate])
 
   // Load news/IPO feed once
   useEffect(() => {

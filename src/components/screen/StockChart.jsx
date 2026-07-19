@@ -492,7 +492,15 @@ function ChartIndicatorDropdown({
                         >
                           {/* left candle: wick + body */}
                           <line x1="8" y1="3" x2="8" y2="21" />
-                          <rect x="5.5" y="7" width="5" height="8" rx="1" fill="currentColor" stroke="none" />
+                          <rect
+                            x="5.5"
+                            y="7"
+                            width="5"
+                            height="8"
+                            rx="1"
+                            fill="currentColor"
+                            stroke="none"
+                          />
                           {/* right candle: wick + body */}
                           <line x1="16" y1="5" x2="16" y2="19" />
                           <rect x="13.5" y="9" width="5" height="7" rx="1" />
@@ -835,9 +843,7 @@ function PositionBadge({ positions, latestClose }) {
                   {u !== null && (
                     <div>
                       <p className="text-[9px] text-gray-400 uppercase tracking-widest">P&L</p>
-                      <p
-                        className={`text-[10px] font-semibold tabular-nums ${pnlClass(u)}`}
-                      >
+                      <p className={`text-[10px] font-semibold tabular-nums ${pnlClass(u)}`}>
                         {u >= 0 ? '+' : '−'}
                         {Math.abs(Math.round(u)).toLocaleString()}
                       </p>
@@ -933,9 +939,7 @@ function OHLCTooltip({ bar, change }) {
                 {(bar.close ?? bar.value)?.toLocaleString()}
               </span>
               {change != null && (
-                <span
-                  className={`text-[10px] font-semibold ${pnlClass(change)}`}
-                >
+                <span className={`text-[10px] font-semibold ${pnlClass(change)}`}>
                   {change >= 0 ? '▲' : '▼'} {Math.abs(change).toFixed(2)}%
                 </span>
               )}
@@ -1523,7 +1527,9 @@ export default function StockChart({
           the controls; search is shrink-0 so it anchors at the left. */}
         <SymbolSearch
           value={selectedSymbol}
-          onSelect={(symbol, indexId, companyName) => selectSymbol(symbol, indexId, null, companyName)}
+          onSelect={(symbol, indexId, companyName) =>
+            selectSymbol(symbol, indexId, null, companyName)
+          }
           globalTypeToSearch
         />
         {/* Compact (mobile): the row is just search + menu — timeframes/chart-type
@@ -1641,16 +1647,29 @@ export default function StockChart({
             try {
               const wasIndex = isIndex()
               const bf = await triggerBackfill(expected)
-              if (bf.data?.filled) {
-                const reloaded = wasIndex
-                  ? await getIndexChart({ index_id: selectedIndexId, timeframe })
-                  : await getStockChart({ symbol: selectedSymbol, timeframe })
-                const fresh = reloaded.data.data || []
-                const freshLatest = fresh.length > 0 ? fresh[fresh.length - 1].close : null
-                // Update cache with fresh data after backfill
-                _chartCache.set(cacheKey, { data: fresh, latest: freshLatest, ts: Date.now() })
-                setChartData(fresh)
-                setLatestClose(freshLatest)
+              // The backend intentionally returns 202 while scraping in the
+              // background. Poll chart data until the requested trading date lands
+              // instead of waiting for a `filled` field that a 202 can never contain.
+              if (bf.status === 202 || bf.data?.filled) {
+                for (let attempt = 0; attempt < 8 && !cancelled; attempt++) {
+                  if (bf.status === 202) {
+                    await new Promise((resolve) => setTimeout(resolve, 4000))
+                    if (cancelled) return
+                  }
+                  const reloaded = wasIndex
+                    ? await getIndexChart({ index_id: selectedIndexId, timeframe })
+                    : await getStockChart({ symbol: selectedSymbol, timeframe })
+                  if (cancelled) return
+                  const fresh = reloaded.data.data || []
+                  const newestDate = fresh[fresh.length - 1]?.time
+                  if (!newestDate || newestDate < expected) continue
+                  const freshLatest = fresh[fresh.length - 1].close
+                  _chartCache.set(cacheKey, { data: fresh, latest: freshLatest, ts: Date.now() })
+                  setChartData(fresh)
+                  setLatestClose(freshLatest)
+                  onChartDataReady?.(fresh)
+                  break
+                }
               }
             } catch {
               /* backfill is best-effort */

@@ -67,7 +67,8 @@ export function nepseCGT(netGain, entryDateStr, exitDateStr) {
 // =============================================================================
 
 // Today's date as YYYY-MM-DD string — used for date input defaults and max caps
-export const today = () => new Date().toISOString().split('T')[0]
+export const today = () =>
+  new Date(Date.now() + (5 * 60 + 45) * 60_000).toISOString().split('T')[0]
 
 // Absolute Rupees — no sign, rounded integer. e.g. fmtRs(-500) → 'Rs.500'
 // forex=true switches to USD display: fmtRs(12.5, true) → '$12.50'

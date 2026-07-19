@@ -23,7 +23,9 @@ function PositionCard({ pos, currentCandle, onEditSLTP, onExit, onPartial }) {
         <span
           className={`inline-flex items-center gap-1 text-[10px] font-semibold px-1.5 py-0.5 rounded-full ${settled ? 'bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400' : 'bg-orange-100 text-orange-700 dark:bg-orange-900/30 dark:text-orange-400'}`}
         >
-          <span className={`w-1.5 h-1.5 rounded-full ${settled ? 'bg-green-500' : 'bg-orange-500 animate-pulse'}`} />
+          <span
+            className={`w-1.5 h-1.5 rounded-full ${settled ? 'bg-green-500' : 'bg-orange-500 animate-pulse'}`}
+          />
           {settled ? 'Settled' : 'Settling'}
         </span>
       </div>
@@ -119,20 +121,30 @@ export default function BacktestActivePanel({
   // Rule 1: parseFloat all Supabase numeric strings
   const initCap = parseFloat(session.initial_capital) || 0
   const availCap = parseFloat(session.available_capital) || 0
-  const inCapital = initCap - availCap
-
-  const unrealizedTotal = openPositions.reduce((s, p) => {
-    const ep = parseFloat(p.entry_price) || 0
-    const ltp = currentCandle?.close != null ? parseFloat(currentCandle.close) : ep
-    return s + (ltp - ep) * parseFloat(p.remaining_quantity ?? p.quantity)
+  const sessionOpenPositions = (session.scripts || []).flatMap((script) =>
+    (script.positions || [])
+      .filter((p) => p.status === 'OPEN' || p.status === 'PARTIAL')
+      .map((p) => ({ ...p, script_id: script.id }))
+  )
+  const inCapital = sessionOpenPositions.reduce(
+    (sum, p) =>
+      sum +
+      (parseFloat(p.entry_price) || 0) * (parseFloat(p.remaining_quantity ?? p.quantity) || 0),
+    0
+  )
+  const marketValue = sessionOpenPositions.reduce((sum, p) => {
+    const entry = parseFloat(p.entry_price) || 0
+    const isCurrentScript = p.script_id === currentScript?.id
+    const mark = isCurrentScript && currentCandle?.close != null ? +currentCandle.close : entry
+    return sum + mark * (parseFloat(p.remaining_quantity ?? p.quantity) || 0)
   }, 0)
-
-  const totalEquity = availCap + unrealizedTotal
+  const unrealizedTotal = marketValue - inCapital
+  const totalEquity = availCap + marketValue
   const totalEquityPct = initCap > 0 ? ((totalEquity - initCap) / initCap) * 100 : 0
 
   const progress =
     currentScript && totalCandles > 0
-      ? Math.round((currentScript.cursor_index / totalCandles) * 100)
+      ? Math.round((Math.min(currentScript.cursor_index + 1, totalCandles) / totalCandles) * 100)
       : 0
 
   const handleAddScript = useCallback(async () => {
@@ -205,6 +217,7 @@ export default function BacktestActivePanel({
       {addingScript && (
         <div className="px-2 py-2 border-b border-gray-100 dark:border-gray-800 bg-blue-50 dark:bg-blue-900/10 shrink-0">
           <input
+            aria-label="Script symbol"
             value={newSymbol}
             onChange={(e) => setNewSymbol(e.target.value.toUpperCase())}
             placeholder="Symbol (e.g. NLIC)"
@@ -212,6 +225,7 @@ export default function BacktestActivePanel({
             className="w-full px-2 py-1 text-[10px] rounded border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 dark:text-white outline-none mb-1"
           />
           <input
+            aria-label="Script start date"
             type="date"
             value={newStartDate}
             onChange={(e) => setNewStartDate(e.target.value)}

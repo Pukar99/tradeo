@@ -1,7 +1,7 @@
 // === BacktestReport.jsx — session performance report (equity curve, trade log, behavior log, CSV export) ===
 
 import { useState, useEffect, useCallback } from 'react'
-import { btGetReport, btEndSession } from '../../api/backtest'
+import { btGetReport } from '../../api/backtest'
 import { pnlClass } from '../../utils/format'
 import { AreaChart, Area, XAxis, YAxis, Tooltip, ResponsiveContainer } from 'recharts'
 import { useTheme } from '../../context/ThemeContext'
@@ -20,7 +20,9 @@ function StatCard({ label, value, sub, color, hint }) {
         </div>
         {hint && (
           <div className="relative group">
-            <span className="flex items-center justify-center w-3 h-3 rounded-full border border-gray-300 dark:border-gray-600 text-[8px] font-bold text-gray-400 dark:text-gray-500 cursor-default">i</span>
+            <span className="flex items-center justify-center w-3 h-3 rounded-full border border-gray-300 dark:border-gray-600 text-[8px] font-bold text-gray-400 dark:text-gray-500 cursor-default">
+              i
+            </span>
             <div className="absolute bottom-5 left-0 z-20 bg-gray-900 dark:bg-gray-700 text-white text-[10px] rounded-md shadow-lg px-2 py-1 w-40 opacity-0 group-hover:opacity-100 pointer-events-none transition-opacity leading-tight">
               {hint}
             </div>
@@ -148,10 +150,13 @@ export default function BacktestReport({ sessionId, onClose }) {
             curW++
             curL = 0
             maxWStrk = Math.max(maxWStrk, curW)
-          } else {
+          } else if (parseFloat(t.net_pnl) < 0) {
             curL++
             curW = 0
             maxLStrk = Math.max(maxLStrk, curL)
+          } else {
+            curW = 0
+            curL = 0
           }
         }
 
@@ -185,12 +190,20 @@ export default function BacktestReport({ sessionId, onClose }) {
       t.hold_days,
       t.exit_reason,
     ])
-    const csv = [headers, ...rows].map((r) => r.map((c) => `"${c ?? ''}"`).join(',')).join('\n')
+    const escapeCell = (value) => {
+      let text = String(value ?? '')
+      if (/^[=+\-@]/.test(text)) text = `'${text}`
+      return `"${text.replace(/"/g, '""')}"`
+    }
+    const csv = [headers, ...rows].map((row) => row.map(escapeCell).join(',')).join('\n')
     const blob = new Blob([csv], { type: 'text/csv' })
     const url = URL.createObjectURL(blob)
     const a = document.createElement('a')
     a.href = url
-    a.download = `backtest_${report.strategy_name?.replace(/\s+/g, '_')}.csv`
+    const safeName = String(report.strategy_name || 'report')
+      .replace(/[^a-z0-9_-]+/gi, '_')
+      .replace(/^_+|_+$/g, '')
+    a.download = `backtest_${safeName || 'report'}.csv`
     a.click()
     URL.revokeObjectURL(url)
   }, [report])

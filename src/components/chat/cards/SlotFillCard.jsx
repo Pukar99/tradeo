@@ -1,8 +1,9 @@
 // === SlotFillCard.jsx — multi-turn slot-fill + disambiguation cards ===
 // Moved verbatim from AIChat.jsx (P2.1 split).
 import { useState } from 'react'
+import { today } from '../../../utils/format'
 
-const todayStr = () => new Date().toISOString().slice(0, 10)
+const todayStr = today
 
 // ── Slot-fill card — an action awaiting fields (multi-turn binding) ──────────
 // Renders required inputs (`missing`, gate Continue), optional inputs

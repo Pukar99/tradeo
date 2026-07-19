@@ -1,6 +1,8 @@
 // === SMCChartPage.jsx — SMC chart tab: StockChart + SMC overlays (BOS/CHoCH/OB/FVG/Sweeps/Entry), left/right panels, toolbar ===
 import { useState, useEffect, useCallback, useMemo } from 'react'
 import { ScreenProvider, useScreen } from '../../context/ScreenContext'
+import AnalysisMobilePanels from './AnalysisMobilePanels'
+import { ProfessionalSMCLeftPanel, ProfessionalSMCRightPanel } from './ProfessionalAnalysisPanels'
 import { useLocalStorage } from '../../hooks/useLocalStorage'
 import StockChart from './StockChart'
 import { useScreenToolbarSlot } from '../../pages/ScreenPage'
@@ -98,81 +100,81 @@ function SMCToolbar({ toggles, setToggles, config, setConfig, symbols }) {
       <ToolbarConfigTitle>Signal Configuration</ToolbarConfigTitle>
 
       <ToolbarConfigSection label="Min confluence score">
-          <div className="flex gap-1">
-            {[1, 2, 3, 4, 5, 6].map((n) => (
-              <button
-                key={n}
-                onClick={() => updateConfig('minScore', n)}
-                className={`w-8 h-8 rounded text-[10px] font-bold transition-colors ${
-                  config.minScore === n
-                    ? 'bg-blue-600 text-white'
-                    : 'bg-gray-100 dark:bg-gray-800 text-gray-500 dark:text-gray-400 hover:bg-gray-200 dark:hover:bg-gray-700'
-                }`}
-              >
-                {n}
-              </button>
-            ))}
-          </div>
-        </ToolbarConfigSection>
+        <div className="flex gap-1">
+          {[1, 2, 3, 4, 5, 6].map((n) => (
+            <button
+              key={n}
+              onClick={() => updateConfig('minScore', n)}
+              className={`w-8 h-8 rounded text-[10px] font-bold transition-colors ${
+                config.minScore === n
+                  ? 'bg-blue-600 text-white'
+                  : 'bg-gray-100 dark:bg-gray-800 text-gray-500 dark:text-gray-400 hover:bg-gray-200 dark:hover:bg-gray-700'
+              }`}
+            >
+              {n}
+            </button>
+          ))}
+        </div>
+      </ToolbarConfigSection>
 
-        <ToolbarConfigSection label="Active conditions">
-          <div className="space-y-1.5">
-            {[
-              { key: 'useBOS', label: 'Bullish BOS' },
-              { key: 'useCHoCH', label: 'Bullish CHoCH' },
-              { key: 'useOB', label: 'OB Mitigation' },
-              { key: 'useSweep', label: 'Liquidity Sweep' },
-            ].map(({ key, label }) => (
-              <label key={key} className="flex items-center gap-2 cursor-pointer">
-                <input
-                  type="checkbox"
-                  checked={config[key]}
-                  onChange={(e) => updateConfig(key, e.target.checked)}
-                  className="w-3 h-3 rounded accent-blue-600"
-                />
-                <span className="text-[11px] text-gray-700 dark:text-gray-300">{label}</span>
-              </label>
-            ))}
-            <label className="flex items-center gap-2 cursor-pointer">
+      <ToolbarConfigSection label="Active conditions">
+        <div className="space-y-1.5">
+          {[
+            { key: 'useBOS', label: 'Bullish BOS' },
+            { key: 'useCHoCH', label: 'Bullish CHoCH' },
+            { key: 'useOB', label: 'OB Mitigation' },
+            { key: 'useSweep', label: 'Liquidity Sweep' },
+          ].map(({ key, label }) => (
+            <label key={key} className="flex items-center gap-2 cursor-pointer">
               <input
                 type="checkbox"
-                checked={config.useDiscount}
-                onChange={(e) => updateConfig('useDiscount', e.target.checked)}
+                checked={config[key]}
+                onChange={(e) => updateConfig(key, e.target.checked)}
                 className="w-3 h-3 rounded accent-blue-600"
               />
-              <span className="text-[11px] text-gray-700 dark:text-gray-300">Discount zone ≤</span>
-              <input
-                type="number"
-                value={config.discountPct}
-                min={10}
-                max={50}
-                step={5}
-                onChange={(e) => updateConfig('discountPct', parseInt(e.target.value) || 40)}
-                className="w-8 text-[10px] text-center border border-gray-200 dark:border-gray-700 rounded px-1 py-0.5 bg-white dark:bg-gray-800 text-gray-700 dark:text-gray-200"
-              />
-              <span className="text-[10px] text-gray-400">%</span>
+              <span className="text-[11px] text-gray-700 dark:text-gray-300">{label}</span>
             </label>
-            <label className="flex items-center gap-2 cursor-pointer">
-              <input
-                type="checkbox"
-                checked={config.useFVG}
-                onChange={(e) => updateConfig('useFVG', e.target.checked)}
-                className="w-3 h-3 rounded accent-blue-600"
-              />
-              <span className="text-[11px] text-gray-700 dark:text-gray-300">FVG fill ≤</span>
-              <input
-                type="number"
-                value={config.fvgMaxDistPct}
-                min={1}
-                max={10}
-                step={1}
-                onChange={(e) => updateConfig('fvgMaxDistPct', parseInt(e.target.value) || 3)}
-                className="w-8 text-[10px] text-center border border-gray-200 dark:border-gray-700 rounded px-1 py-0.5 bg-white dark:bg-gray-800 text-gray-700 dark:text-gray-200"
-              />
-              <span className="text-[10px] text-gray-400">%</span>
-            </label>
-          </div>
-        </ToolbarConfigSection>
+          ))}
+          <label className="flex items-center gap-2 cursor-pointer">
+            <input
+              type="checkbox"
+              checked={config.useDiscount}
+              onChange={(e) => updateConfig('useDiscount', e.target.checked)}
+              className="w-3 h-3 rounded accent-blue-600"
+            />
+            <span className="text-[11px] text-gray-700 dark:text-gray-300">Discount zone ≤</span>
+            <input
+              type="number"
+              value={config.discountPct}
+              min={10}
+              max={50}
+              step={5}
+              onChange={(e) => updateConfig('discountPct', parseInt(e.target.value) || 40)}
+              className="w-8 text-[10px] text-center border border-gray-200 dark:border-gray-700 rounded px-1 py-0.5 bg-white dark:bg-gray-800 text-gray-700 dark:text-gray-200"
+            />
+            <span className="text-[10px] text-gray-400">%</span>
+          </label>
+          <label className="flex items-center gap-2 cursor-pointer">
+            <input
+              type="checkbox"
+              checked={config.useFVG}
+              onChange={(e) => updateConfig('useFVG', e.target.checked)}
+              className="w-3 h-3 rounded accent-blue-600"
+            />
+            <span className="text-[11px] text-gray-700 dark:text-gray-300">FVG fill ≤</span>
+            <input
+              type="number"
+              value={config.fvgMaxDistPct}
+              min={1}
+              max={10}
+              step={1}
+              onChange={(e) => updateConfig('fvgMaxDistPct', parseInt(e.target.value) || 3)}
+              className="w-8 text-[10px] text-center border border-gray-200 dark:border-gray-700 rounded px-1 py-0.5 bg-white dark:bg-gray-800 text-gray-700 dark:text-gray-200"
+            />
+            <span className="text-[10px] text-gray-400">%</span>
+          </label>
+        </div>
+      </ToolbarConfigSection>
 
       <button
         onClick={() => {
@@ -197,7 +199,9 @@ function SMCToolbar({ toggles, setToggles, config, setConfig, symbols }) {
           symbols={symbols}
           stocksOnly
           value={selectedSymbol}
-          onSelect={(symbol, indexId, companyName) => selectSymbol(symbol, indexId, null, companyName)}
+          onSelect={(symbol, indexId, companyName) =>
+            selectSymbol(symbol, indexId, null, companyName)
+          }
         />
         <div className="flex-1 min-w-0" />
         <ToolbarMenu activeCount={activeCount}>
@@ -217,7 +221,9 @@ function SMCToolbar({ toggles, setToggles, config, setConfig, symbols }) {
           symbols={symbols}
           stocksOnly
           value={selectedSymbol}
-          onSelect={(symbol, indexId, companyName) => selectSymbol(symbol, indexId, null, companyName)}
+          onSelect={(symbol, indexId, companyName) =>
+            selectSymbol(symbol, indexId, null, companyName)
+          }
         />
         <ToolbarDivider />
         <ToolbarTimeframes frames={SMC_TIMEFRAMES} />
@@ -231,7 +237,8 @@ function SMCToolbar({ toggles, setToggles, config, setConfig, symbols }) {
 }
 
 // ── SMC Left Panel ────────────────────────────────────────────────────────────
-function SMCLeftPanel({ smcData, chartData, currentPrice }) {
+// eslint-disable-next-line no-unused-vars
+function LegacySMCLeftPanel({ smcData, chartData, currentPrice }) {
   if (!smcData)
     return (
       <div className="flex-1 overflow-y-auto p-3 space-y-3">
@@ -402,7 +409,8 @@ function SMCLeftPanel({ smcData, chartData, currentPrice }) {
 }
 
 // ── SMC Right Panel ───────────────────────────────────────────────────────────
-function SMCRightPanel({ smcData, signals }) {
+// eslint-disable-next-line no-unused-vars
+function LegacySMCRightPanel({ smcData, signals }) {
   const LABEL =
     'text-[10px] font-semibold uppercase tracking-widest text-gray-400 dark:text-gray-500'
   const SUB = 'text-[10px] text-gray-500 dark:text-gray-400'
@@ -651,13 +659,16 @@ function SMCInner() {
   const [toggles, setToggles] = useState(DEFAULT_TOGGLES)
   const [config, setConfig] = useState(() => loadConfig())
   const [symbols, setSymbols] = useState(null)
+  const [scanError, setScanError] = useState('')
+  const [symbolError, setSymbolError] = useState('')
+  const [mobilePanel, setMobilePanel] = useState(null)
 
   useEffect(() => {
     getMarketSymbols()
       .then((r) => {
         if (r.data?.stocks?.length) setSymbols(r.data)
       })
-      .catch(() => {})
+      .catch(() => setSymbolError('Symbol search is temporarily unavailable.'))
   }, [])
 
   const isStock = !isIndex?.()
@@ -670,16 +681,21 @@ function SMCInner() {
   useEffect(() => {
     if (!selectedSymbol || !isStock) {
       setSmcData(null)
+      setScanError('')
       return
     }
     let cancelled = false
     setLoading(true)
+    setScanError('')
     getSMCScan({ symbol: selectedSymbol, days })
       .then((res) => {
         if (!cancelled) setSmcData(res.data)
       })
-      .catch(() => {
-        if (!cancelled) setSmcData(null)
+      .catch((err) => {
+        if (!cancelled) {
+          setSmcData(null)
+          setScanError(err.response?.data?.error || 'SMC scan failed. Please retry.')
+        }
       })
       .finally(() => {
         if (!cancelled) setLoading(false)
@@ -742,7 +758,7 @@ function SMCInner() {
         >
           <div className="screen-panel-content flex flex-col h-full">
             {/* scanData (not full chartData) — zone position must use the same range as signal scoring */}
-            <SMCLeftPanel
+            <ProfessionalSMCLeftPanel
               smcData={isStock ? smcData : null}
               chartData={scanData}
               currentPrice={currentPrice}
@@ -756,6 +772,7 @@ function SMCInner() {
           <button
             onClick={toggleLeft}
             title={leftOpen ? 'Hide left panel' : 'Show left panel'}
+            aria-label={leftOpen ? 'Hide left panel' : 'Show left panel'}
             className="hidden lg:flex absolute left-0 top-1/2 -translate-y-1/2 z-30
                        h-12 w-4 items-center justify-center
                        bg-white/70 dark:bg-gray-800/70 backdrop-blur-sm
@@ -782,6 +799,7 @@ function SMCInner() {
           <button
             onClick={toggleRight}
             title={rightOpen ? 'Hide right panel' : 'Show right panel'}
+            aria-label={rightOpen ? 'Hide right panel' : 'Show right panel'}
             className="hidden lg:flex absolute right-0 top-1/2 -translate-y-1/2 z-30
                        h-12 w-4 items-center justify-center
                        bg-white/70 dark:bg-gray-800/70 backdrop-blur-sm
@@ -811,6 +829,11 @@ function SMCInner() {
               </span>
             </div>
           )}
+          {(scanError || symbolError) && (
+            <div className="absolute top-2 left-3 z-30 text-[10px] text-red-600 bg-red-50 dark:bg-red-950/80 px-2 py-1 rounded border border-red-200 dark:border-red-800">
+              {scanError || symbolError}
+            </div>
+          )}
           <StockChart hideToolbar {...smcOverlayData} onChartDataReady={handleChartDataReady} />
         </div>
 
@@ -824,10 +847,36 @@ function SMCInner() {
                         ${rightOpen ? 'w-[15%] min-w-[160px] max-w-[240px]' : 'w-0 min-w-0 max-w-0 overflow-hidden'} ${!rightOpen ? 'screen-panel-collapsed' : ''}`}
         >
           <div className="screen-panel-content flex flex-col h-full">
-            <SMCRightPanel smcData={isStock ? smcData : null} signals={signals} />
+            <ProfessionalSMCRightPanel
+              smcData={isStock ? smcData : null}
+              signals={signals}
+              config={config}
+              chartData={scanData}
+              currentPrice={currentPrice}
+            />
           </div>
         </div>
       </div>
+      <AnalysisMobilePanels
+        panel={mobilePanel}
+        setPanel={setMobilePanel}
+        left={
+          <ProfessionalSMCLeftPanel
+            smcData={isStock ? smcData : null}
+            chartData={scanData}
+            currentPrice={currentPrice}
+          />
+        }
+        right={
+          <ProfessionalSMCRightPanel
+            smcData={isStock ? smcData : null}
+            signals={signals}
+            config={config}
+            chartData={scanData}
+            currentPrice={currentPrice}
+          />
+        }
+      />
     </>
   )
 }
