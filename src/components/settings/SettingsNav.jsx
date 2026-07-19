@@ -27,6 +27,10 @@ export const SETTINGS_SECTIONS = [
   { id: 'danger', label: 'Danger', danger: true },
 ]
 
+// Section ids extracted once at module level to avoid recreating the array on every render,
+// which would retrigger useActiveSection's effect and cause IntersectionObserver churn.
+const SECTION_IDS = SETTINGS_SECTIONS.map((s) => s.id)
+
 // Navbar's real measured height (see header comment) — single source for the offset so the
 // rail, the pill strip, and the observer's rootMargin all agree.
 const NAVBAR_H = 60
@@ -94,8 +98,7 @@ function railLinkClasses(isActive, danger) {
 
 // ── Desktop sticky rail (lg: and up) ─────────────────────────────────────────────────
 export function SettingsRail() {
-  const ids = SETTINGS_SECTIONS.map((s) => s.id)
-  const activeId = useActiveSection(ids, NAVBAR_H)
+  const activeId = useActiveSection(SECTION_IDS, NAVBAR_H)
 
   return (
     <nav
@@ -137,12 +140,11 @@ const PILL_INACTIVE_DANGER =
   'text-red-500/80 dark:text-red-400/70 hover:text-red-600 dark:hover:text-red-400'
 
 export function SettingsPillStrip() {
-  const ids = SETTINGS_SECTIONS.map((s) => s.id)
-  const activeId = useActiveSection(ids, NAVBAR_H + 56)
+  const activeId = useActiveSection(SECTION_IDS, NAVBAR_H + 56)
 
   return (
     <nav
-      aria-label="Settings sections"
+      aria-label="Settings sections (mobile)"
       className="lg:hidden sticky top-[60px] z-40 -mx-3 sm:-mx-6 px-3 sm:px-6 py-1.5 bg-gray-100/95 dark:bg-gray-800/95 backdrop-blur-sm border-b border-gray-200 dark:border-gray-800"
     >
       <div className={`${PILL_WRAP} overflow-x-auto no-scrollbar`}>
