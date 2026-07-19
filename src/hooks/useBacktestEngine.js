@@ -70,14 +70,21 @@ export function useBacktestEngine({
       processingRef.current = true
 
       const sess = sessionRef.current
-      const script = scriptRef.current
       if (!sess || !candle) {
         processingRef.current = false
         return
       }
 
       // 1. Settle positions whose settlement_date <= candle.date
-      await settlePositions(candle.date)
+      const settlementFailures = await settlePositions(candle.date)
+      if (settlementFailures?.length) {
+        pauseInternal()
+        onActionError?.(
+          `Settlement failed repeatedly for ${settlementFailures.map((p) => p.symbol).join(', ')} — playback paused`
+        )
+        processingRef.current = false
+        return
+      }
 
       // 2. Read open positions from ref (always fresh after settlePositions updates)
       //    We re-read scriptRef after await so we see the settled updates
@@ -88,12 +95,12 @@ export function useBacktestEngine({
       for (const pos of openPositions) {
         const sl = pos.sl ? parseFloat(pos.sl) : null
         const tp = pos.tp ? parseFloat(pos.tp) : null
-        const settled = pos.settled || pos.settlement_date?.slice(0, 10) <= candle.date
+        const settled = pos.settled === true
 
-        // ── SL check — strict < so touching SL price exactly doesn't trigger ──────
+        // ── SL check — `<=` so a candle low that touches OR breaches SL triggers ──
         // SL takes priority over TP: if both levels are hit on the same candle,
         // SL is processed first and the position is closed — TP check is skipped.
-        if (sl !== null && candle.low < sl) {
+        if (sl !== null && candle.low <= sl) {
           if (!settled) {
             // Pre-settlement SL breach — prompt user
             pauseInternal()
@@ -105,21 +112,19 @@ export function useBacktestEngine({
                 {
                   label: 'Close Early (EARLY_EXIT)',
                   action: async () => {
-                    try {
-                      const res = await btExitOrder(sess.id, pos.id, {
-                        exit_date: candle.date,
-                        exit_price: candle.close,
-                        reason: 'EARLY_EXIT',
-                      })
-                      closePositionLocal(pos.id, res.data)
-                      await btLogBehavior(sess.id, {
-                        order_id: pos.id,
-                        event_date: candle.date,
-                        event_type: 'EARLY_EXIT',
-                        symbol: pos.symbol,
-                        detail: { sl, low: candle.low },
-                      }).catch(() => {})
-                    } catch {}
+                    const res = await btExitOrder(sess.id, pos.id, {
+                      exit_date: candle.date,
+                      exit_price: candle.close,
+                      reason: 'EARLY_EXIT',
+                    })
+                    closePositionLocal(pos.id, res.data)
+                    await btLogBehavior(sess.id, {
+                      order_id: pos.id,
+                      event_date: candle.date,
+                      event_type: 'EARLY_EXIT',
+                      symbol: pos.symbol,
+                      detail: { sl, low: candle.low },
+                    }).catch(() => {})
                   },
                 },
                 {
@@ -161,7 +166,8 @@ export function useBacktestEngine({
               console.error('[Engine] AUTO SL exit failed for', pos.id, err?.message)
               pauseInternal()
               onActionError?.(
-                err?.response?.data?.message || `Auto SL exit failed for ${pos.symbol} — playback paused`
+                err?.response?.data?.message ||
+                  `Auto SL exit failed for ${pos.symbol} — playback paused`
               )
               processingRef.current = false
               return
@@ -178,27 +184,23 @@ export function useBacktestEngine({
                 {
                   label: `Close at SL Rs.${sl}`,
                   action: async () => {
-                    try {
-                      const res = await btExitOrder(sess.id, pos.id, {
-                        exit_date: candle.date,
-                        exit_price: sl,
-                        reason: 'SL_HIT',
-                      })
-                      closePositionLocal(pos.id, res.data)
-                    } catch {}
+                    const res = await btExitOrder(sess.id, pos.id, {
+                      exit_date: candle.date,
+                      exit_price: sl,
+                      reason: 'SL_HIT',
+                    })
+                    closePositionLocal(pos.id, res.data)
                   },
                 },
                 {
                   label: `Close at Today's Close Rs.${candle.close}`,
                   action: async () => {
-                    try {
-                      const res = await btExitOrder(sess.id, pos.id, {
-                        exit_date: candle.date,
-                        exit_price: candle.close,
-                        reason: 'SL_HIT',
-                      })
-                      closePositionLocal(pos.id, res.data)
-                    } catch {}
+                    const res = await btExitOrder(sess.id, pos.id, {
+                      exit_date: candle.date,
+                      exit_price: candle.close,
+                      reason: 'SL_HIT',
+                    })
+                    closePositionLocal(pos.id, res.data)
                   },
                 },
                 {
@@ -232,21 +234,19 @@ export function useBacktestEngine({
                 {
                   label: 'Close Early (EARLY_EXIT)',
                   action: async () => {
-                    try {
-                      const res = await btExitOrder(sess.id, pos.id, {
-                        exit_date: candle.date,
-                        exit_price: candle.close,
-                        reason: 'EARLY_EXIT',
-                      })
-                      closePositionLocal(pos.id, res.data)
-                      await btLogBehavior(sess.id, {
-                        order_id: pos.id,
-                        event_date: candle.date,
-                        event_type: 'EARLY_EXIT',
-                        symbol: pos.symbol,
-                        detail: { tp, high: candle.high },
-                      }).catch(() => {})
-                    } catch {}
+                    const res = await btExitOrder(sess.id, pos.id, {
+                      exit_date: candle.date,
+                      exit_price: candle.close,
+                      reason: 'EARLY_EXIT',
+                    })
+                    closePositionLocal(pos.id, res.data)
+                    await btLogBehavior(sess.id, {
+                      order_id: pos.id,
+                      event_date: candle.date,
+                      event_type: 'EARLY_EXIT',
+                      symbol: pos.symbol,
+                      detail: { tp, high: candle.high },
+                    }).catch(() => {})
                   },
                 },
                 { label: 'Keep Position', action: () => {} },
@@ -271,7 +271,8 @@ export function useBacktestEngine({
             console.error('[Engine] TP exit failed for', pos.id, err?.message)
             pauseInternal()
             onActionError?.(
-              err?.response?.data?.message || `Auto TP exit failed for ${pos.symbol} — playback paused`
+              err?.response?.data?.message ||
+                `Auto TP exit failed for ${pos.symbol} — playback paused`
             )
             processingRef.current = false
             return
@@ -280,11 +281,10 @@ export function useBacktestEngine({
       }
 
       // 3. Advance cursor
-      const nextIndex = index + 1
-      advanceCursor(nextIndex, candle.date)
+      advanceCursor(index, candle.date)
 
       // 4. Check end of data
-      if (nextIndex >= candlesRef.current.length) {
+      if (index >= candlesRef.current.length - 1) {
         playingRef.current = false
         if (timerRef.current) {
           clearInterval(timerRef.current)
@@ -313,7 +313,7 @@ export function useBacktestEngine({
 
   const play = useCallback(() => {
     if (playingRef.current) return
-    if (cursorRef.current >= candlesRef.current.length) return
+    if (cursorRef.current >= candlesRef.current.length - 1) return
 
     playingRef.current = true
     const ms = 1000 / parseFloat(speedRef.current)
@@ -324,7 +324,7 @@ export function useBacktestEngine({
         timerRef.current = null
         return
       }
-      const idx = cursorRef.current
+      const idx = cursorRef.current + 1
       const candle = candlesRef.current[idx]
       if (!candle) {
         pauseInternal()
@@ -345,7 +345,7 @@ export function useBacktestEngine({
 
   const stepForward = useCallback(async () => {
     if (playingRef.current) return
-    const idx = cursorRef.current
+    const idx = cursorRef.current + 1
     const candle = candlesRef.current[idx]
     if (!candle) {
       onDataEnd()

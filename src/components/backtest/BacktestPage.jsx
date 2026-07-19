@@ -1,6 +1,6 @@
 // === BacktestPage.jsx — backtest page root: session orchestration, modals, chart, keyboard shortcuts ===
 
-import { useState, useCallback, useEffect } from 'react'
+import { useState, useCallback, useEffect, useRef } from 'react'
 import { useBacktestSession } from '../../hooks/useBacktestSession'
 import { useBacktestEngine } from '../../hooks/useBacktestEngine'
 import BacktestHome from './BacktestHome'
@@ -12,7 +12,7 @@ import BuyOrderModal from './BuyOrderModal'
 import SLTPUpdateModal from './SLTPUpdateModal'
 import SLValidationPrompt from './SLValidationPrompt'
 import BacktestPartialExitModal from './BacktestPartialExitModal'
-import { btExitOrder } from '../../api/backtest'
+import { btEndSession, btExitOrder } from '../../api/backtest'
 
 export default function BacktestPage() {
   const {
@@ -46,6 +46,7 @@ export default function BacktestPage() {
   const [isPlaying, setIsPlaying] = useState(false)
   // Exit/action error toast — set by manual exit and by engine auto SL/TP failures
   const [exitError, setExitError] = useState('')
+  const endingRef = useRef(false)
 
   // Load session on mount (restore if active)
   useEffect(() => {
@@ -73,10 +74,20 @@ export default function BacktestPage() {
     setPrompt({ ...data, type: 'PRE_SETTLEMENT_TP' })
   }, [])
 
-  const handleDataEnd = useCallback(() => {
+  const handleDataEnd = useCallback(async () => {
     setIsPlaying(false)
-    setShowReport(true)
-  }, [])
+    if (!session || endingRef.current) return
+    endingRef.current = true
+    try {
+      await flushPersist()
+      await btEndSession(session.id)
+      setShowReport(true)
+    } catch (err) {
+      setExitError(err.response?.data?.message || 'Failed to complete the session. Please retry.')
+    } finally {
+      endingRef.current = false
+    }
+  }, [session, flushPersist])
 
   // Surface engine-side action failures (auto SL/TP exits) and stop the UI play state
   // so the engine's internal pause is reflected in the controls.
@@ -132,8 +143,12 @@ export default function BacktestPage() {
 
   // ── Prompt dismiss/action ─────────────────────────────────────────────────────
   const handlePromptAction = useCallback(async (opt) => {
-    await opt.action()
-    setPrompt(null)
+    try {
+      await opt.action()
+      setPrompt(null)
+    } catch (err) {
+      setExitError(err.response?.data?.message || 'The selected action failed. Please try again.')
+    }
   }, [])
 
   // ── Full exit (from panel button) ─────────────────────────────────────────────
@@ -174,10 +189,22 @@ export default function BacktestPage() {
   )
 
   // ── End session ───────────────────────────────────────────────────────────────
-  const handleEndSession = useCallback(() => {
+  // Mirrors handleDataEnd: a manual end must COMPLETE the backend session (status→COMPLETED),
+  // not just show the report — otherwise the session stays ACTIVE and loadSession() restores it.
+  const handleEndSession = useCallback(async () => {
     handlePause()
-    setShowReport(true)
-  }, [handlePause])
+    if (!session || endingRef.current) return
+    endingRef.current = true
+    try {
+      await flushPersist()
+      await btEndSession(session.id)
+      setShowReport(true)
+    } catch (err) {
+      setExitError(err.response?.data?.message || 'Failed to complete the session. Please retry.')
+    } finally {
+      endingRef.current = false
+    }
+  }, [handlePause, session, flushPersist])
 
   // ── Keyboard shortcuts (must be after all handlers) ───────────────────────────
   useEffect(() => {
