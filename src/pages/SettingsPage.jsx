@@ -77,7 +77,7 @@ const DangerIcon = (
 
 export default function SettingsPage() {
   return (
-    <div className="w-full px-3 sm:px-6 pt-4 sm:pt-6 pb-10 max-w-5xl mx-auto">
+    <div className="w-full px-3 sm:px-6 pt-4 sm:pt-6 pb-10 lg:pb-0 max-w-5xl mx-auto lg:h-[calc(100vh-60px)] lg:flex lg:flex-col lg:min-h-0">
       <div className="mb-4">
         <h1 className="flex items-center gap-2 text-[17px] font-bold text-gray-900 dark:text-white tracking-tight">
           <span aria-hidden="true" className="w-6 h-6 shrink-0">
@@ -93,13 +93,22 @@ export default function SettingsPage() {
       {/* Mobile/tablet sticky pill strip — below the H1, above the section column (lg:hidden) */}
       <SettingsPillStrip />
 
-      <div className="lg:grid lg:grid-cols-[176px_1fr] lg:gap-8 lg:items-start mt-4 lg:mt-0">
+      {/* Desktop (lg+): fixed-height row — the rail stays STATIC while ONLY the content
+          column scrolls internally (viewport − navbar 60px − page header/padding ≈ 132px).
+          Mobile keeps normal page scroll (the grid/height rules are lg:-only). */}
+      <div className="lg:grid lg:grid-cols-[176px_1fr] lg:gap-8 mt-4 lg:mt-0 lg:flex-1 lg:min-h-0">
         {/* Rail markup literally precedes the section content in DOM order — Tab-order
             guarantee, never a CSS `order-` hack (hidden lg:block; invisible/no tab stops
             on mobile since display:none elements are unfocusable). */}
         <SettingsRail />
 
-        <div className="space-y-4 min-w-0">
+        {/* Content pane: on lg+ it's the scroll container (own scrollbar); the observer's
+            root is switched to this element so active-section tracking follows THIS scroll,
+            not the page viewport. pr-1 gives the scrollbar breathing room. */}
+        {/* pb spacer sized so the LAST section (Danger) can always scroll up to the pane's
+            top when its rail anchor is clicked — without it the pane bottoms out early and
+            the jump appears dead. lg:pb-[70vh] leaves a full jump's worth of runway. */}
+        <div id="settings-scroll" className="space-y-4 min-w-0 lg:h-full lg:overflow-y-auto lg:pr-1 pb-6 lg:pb-[70vh] scroll-smooth">
           <SettingsSection
             id="account"
             title="Account"

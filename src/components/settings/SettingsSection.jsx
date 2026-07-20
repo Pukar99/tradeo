@@ -24,7 +24,7 @@ export default function SettingsSection({ id, title, caption, children, tone, ic
   const headingId = `${id}-heading`
   const isDanger = tone === 'danger'
   return (
-    <section aria-labelledby={headingId} className="scroll-mt-[120px] lg:scroll-mt-20">
+    <section id={id} aria-labelledby={headingId} className="scroll-mt-[120px] lg:scroll-mt-20">
       <div className={`${isDanger ? CARD_DANGER : CARD} p-5 sm:p-6`}>
         <div
           className={`flex items-center gap-2 ${

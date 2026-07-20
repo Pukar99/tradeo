@@ -26,6 +26,10 @@ body {
 /* ── Global font size: 110% = 17.6px base — matches the "looks right at 110% zoom" point ── */
 html {
   font-size: 110%;
+  /* Smooth in-page anchor scrolling (e.g. the Settings rail/pill jumps). Motion-sensitive
+     users get instant jumps instead — the reduced-motion block below forces this back to
+     `auto !important`. */
+  scroll-behavior: smooth;
 }
 
 /* ── BlockNote dark theme ───────────────────────────────────────────────── */

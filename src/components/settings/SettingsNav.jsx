@@ -43,13 +43,18 @@ const NAVBAR_H = 60
  * @param {string[]} ids section ids in document order
  * @param {number} topOffset px to shrink the observer's top edge by (sticky stack height)
  */
-function useActiveSection(ids, topOffset) {
+function useActiveSection(ids, topOffset, rootId) {
   const [activeId, setActiveId] = useState(ids[0])
   const ratiosRef = useRef({})
 
   useEffect(() => {
     const elements = ids.map((id) => document.getElementById(id)).filter(Boolean)
     if (elements.length === 0) return undefined
+
+    // On lg+, sections scroll inside #settings-scroll — the observer must use THAT as its
+    // root so ratios track the pane's scroll, not the page viewport. rootId absent (mobile)
+    // → root:null (viewport), which is correct for the page-scrolling pill-strip layout.
+    const root = rootId ? document.getElementById(rootId) : null
 
     const observer = new IntersectionObserver(
       (entries) => {
@@ -69,6 +74,7 @@ function useActiveSection(ids, topOffset) {
         if (best) setActiveId(best)
       },
       {
+        root,
         // Shrink the top by the sticky stack height so a section counts as "entered" only
         // once its heading clears the rail/strip; shrink the bottom so short trailing
         // sections (Danger) can still become active without needing to reach mid-viewport.
@@ -79,9 +85,20 @@ function useActiveSection(ids, topOffset) {
 
     elements.forEach((el) => observer.observe(el))
     return () => observer.disconnect()
-  }, [ids, topOffset])
+  }, [ids, topOffset, rootId])
 
   return activeId
+}
+
+// Reliable smooth jump: native `#anchor` on a nested overflow pane is inconsistently smooth
+// across browsers, so drive it in JS. Respects reduced-motion. Falls back to the native
+// anchor if the target isn't found (defensive).
+function handleNavClick(e, id) {
+  const el = document.getElementById(id)
+  if (!el) return // let the native href fire
+  e.preventDefault()
+  const reduce = window.matchMedia('(prefers-reduced-motion: reduce)').matches
+  el.scrollIntoView({ behavior: reduce ? 'auto' : 'smooth', block: 'start' })
 }
 
 // ── Shared link styling ──────────────────────────────────────────────────────────────
@@ -98,12 +115,14 @@ function railLinkClasses(isActive, danger) {
 
 // ── Desktop sticky rail (lg: and up) ─────────────────────────────────────────────────
 export function SettingsRail() {
-  const activeId = useActiveSection(SECTION_IDS, NAVBAR_H)
+  // Sections scroll inside #settings-scroll (the pane), whose own top is the observer root's
+  // top edge — so no extra top offset is needed to clear a sticky bar. Root = the pane.
+  const activeId = useActiveSection(SECTION_IDS, 0, 'settings-scroll')
 
   return (
     <nav
       aria-label="Settings sections"
-      className="hidden lg:block sticky top-[60px] z-40 self-start h-fit"
+      className="hidden lg:block h-fit"
     >
       <ul className="space-y-0.5">
         {SETTINGS_SECTIONS.map(({ id, label, danger }) => {
@@ -112,6 +131,7 @@ export function SettingsRail() {
             <li key={id}>
               <a
                 href={`#${id}`}
+                onClick={(e) => handleNavClick(e, id)}
                 aria-current={isActive ? 'true' : undefined}
                 className={`flex items-center gap-2 min-h-[44px] px-3 rounded-lg text-[13px] transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500/40 ${railLinkClasses(isActive, danger)}`}
               >
@@ -156,6 +176,7 @@ export function SettingsPillStrip() {
             <a
               key={id}
               href={`#${id}`}
+                onClick={(e) => handleNavClick(e, id)}
               aria-current={isActive ? 'true' : undefined}
               className={`${PILL_BASE} ${isActive ? activeCls : inactiveCls}`}
             >

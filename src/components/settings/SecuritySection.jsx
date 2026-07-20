@@ -13,7 +13,10 @@
 import { useState } from 'react'
 import { changePassword } from '../../api'
 
-const LABEL_CLS =
+// Label wraps the text span + input (nested-label a11y contract). The mb spacing lives on the
+// text span (see LABEL_TEXT) so the gap sits BETWEEN the label text and the input, not after it.
+const LABEL_CLS = 'block'
+const LABEL_TEXT =
   'block text-[10px] font-semibold uppercase tracking-widest text-gray-400 dark:text-gray-500 mb-1.5'
 const INPUT_CLS =
   'w-full min-h-[44px] border rounded-xl px-3 py-2 text-sm focus:outline-none focus-visible:ring-2 focus-visible:ring-blue-500/40 dark:bg-gray-800 dark:text-white'
@@ -89,7 +92,7 @@ export default function SecuritySection() {
         <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 mb-4">
           <div>
             <label htmlFor="security-current-password" className={LABEL_CLS}>
-              <span>Current Password</span>
+              <span className={LABEL_TEXT}>Current Password</span>
               <input
                 id="security-current-password"
                 type="password"
@@ -107,7 +110,7 @@ export default function SecuritySection() {
           </div>
           <div>
             <label htmlFor="security-new-password" className={LABEL_CLS}>
-              <span>New Password</span>
+              <span className={LABEL_TEXT}>New Password</span>
               <input
                 id="security-new-password"
                 type="password"
@@ -125,7 +128,7 @@ export default function SecuritySection() {
           </div>
           <div>
             <label htmlFor="security-confirm-password" className={LABEL_CLS}>
-              <span>Confirm New Password</span>
+              <span className={LABEL_TEXT}>Confirm New Password</span>
               <input
                 id="security-confirm-password"
                 type="password"
