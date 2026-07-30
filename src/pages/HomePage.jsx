@@ -962,6 +962,7 @@ function LoggedInHome() {
   const { user } = useAuth()
   const navigate = useNavigate()
   const [initData, setInitData] = useState(null)
+  const [fetchError, setFetchError] = useState(null)
   const [mobileTopTab, setMobileTopTab] = useState('tasks') // 'tasks' | 'discipline'
   const [mobileBottomTab, setMobileBottomTab] = useState('goals') // 'goals' | 'alerts'
 
@@ -970,8 +971,10 @@ function LoggedInHome() {
     try {
       const res = await getDashboardInit(force)
       setInitData(res.data)
+      setFetchError(null)
     } catch (err) {
       console.error(err)
+      setFetchError('Failed to load dashboard. Please refresh.')
     }
   }, [])
 
@@ -994,6 +997,27 @@ function LoggedInHome() {
     month: 'long',
     day: 'numeric',
   })
+
+  // A failed initial fetch left `initData` null forever — without this, CenterDashboard's own
+  // `loading` (derived purely from `!initData`) never clears, so the page was stuck on the
+  // skeleton indefinitely with no error shown and no way to retry.
+  if (fetchError && !initData)
+    return (
+      <div className="flex items-center justify-center min-h-[60vh]">
+        <div className="text-center space-y-3">
+          <p className="text-[13px] text-red-400 font-medium">{fetchError}</p>
+          <button
+            onClick={() => {
+              setFetchError(null)
+              fetchDashboard(true)
+            }}
+            className="text-[11px] text-blue-500 border border-blue-200 dark:border-blue-800 px-4 py-1.5 rounded-lg transition-colors hover:text-blue-400"
+          >
+            Retry
+          </button>
+        </div>
+      </div>
+    )
 
   return (
     <>
