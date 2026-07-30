@@ -6,7 +6,7 @@ import { ProfessionalSMCLeftPanel, ProfessionalSMCRightPanel } from './Professio
 import { useLocalStorage } from '../../hooks/useLocalStorage'
 import StockChart from './StockChart'
 import { useScreenToolbarSlot } from '../../pages/ScreenPage'
-import { getSMCScan } from '../../api'
+import { getSMCScan, getSMCV2Shadow } from '../../api'
 import { getMarketSymbols } from '../../utils/globalCache'
 import SymbolSearch from '../common/SymbolSearch'
 import {
@@ -331,6 +331,9 @@ function SMCInner() {
   const toggleRight = () => setRightOpen((v) => !v)
 
   const [smcData, setSmcData] = useState(null)
+  const [shadowData, setShadowData] = useState(null)
+  const [shadowLoading, setShadowLoading] = useState(false)
+  const [shadowError, setShadowError] = useState('')
   const [loading, setLoading] = useState(false)
   const [chartData, setChartData] = useState([]) // state (not ref) so useMemo reacts
   const [toggles, setToggles] = useState(DEFAULT_TOGGLES)
@@ -376,6 +379,35 @@ function SMCInner() {
       })
       .finally(() => {
         if (!cancelled) setLoading(false)
+      })
+    return () => {
+      cancelled = true
+    }
+  }, [selectedSymbol, days, isStock])
+
+  // V2 remains an independent shadow read. Its failure must never remove V1 data or chart overlays.
+  useEffect(() => {
+    if (!selectedSymbol || !isStock) {
+      setShadowData(null)
+      setShadowError('')
+      setShadowLoading(false)
+      return
+    }
+    let cancelled = false
+    setShadowLoading(true)
+    setShadowError('')
+    getSMCV2Shadow({ symbol: selectedSymbol, days })
+      .then((res) => {
+        if (!cancelled) setShadowData(res.data)
+      })
+      .catch(() => {
+        if (!cancelled) {
+          setShadowData(null)
+          setShadowError('V2 shadow evidence is temporarily unavailable.')
+        }
+      })
+      .finally(() => {
+        if (!cancelled) setShadowLoading(false)
       })
     return () => {
       cancelled = true
@@ -530,6 +562,9 @@ function SMCInner() {
               config={config}
               chartData={scanData}
               currentPrice={currentPrice}
+              shadowData={shadowData}
+              shadowLoading={shadowLoading}
+              shadowError={shadowError}
             />
           </div>
         </div>
@@ -551,6 +586,9 @@ function SMCInner() {
             config={config}
             chartData={scanData}
             currentPrice={currentPrice}
+            shadowData={shadowData}
+            shadowLoading={shadowLoading}
+            shadowError={shadowError}
           />
         }
       />

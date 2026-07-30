@@ -207,6 +207,7 @@ export const getIPOs = () => API.get('/api/market/ipos')
 export const getMarketNews = () => API.get('/api/market/news')
 export const triggerBackfill = (date) => API.post('/api/market/backfill', { date })
 export const getSMCScan = (params) => API.get('/api/smc/scan', { params })
+export const getSMCV2Shadow = (params) => API.get('/api/smc/v2/shadow', { params })
 export const getPriceActionScan = (params) => API.get('/api/market/price-action', { params })
 
 // =============================================================================

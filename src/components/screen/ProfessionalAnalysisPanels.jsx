@@ -108,6 +108,20 @@ function readableLabel(value, fallback = 'Unclassified pattern') {
   return value.replaceAll('_', ' ')
 }
 
+function assessmentLabel(value, fallback = 'Not assessed') {
+  if (typeof value === 'string') return readableLabel(value, fallback)
+  if (!value || typeof value !== 'object') return fallback
+  return readableLabel(
+    value.classification ||
+      value.severity ||
+      value.state ||
+      value.label ||
+      value.regime ||
+      value.quality,
+    fallback
+  )
+}
+
 function pctDistance(price, level) {
   if (!(price > 0) || !Number.isFinite(Number(level))) return null
   return ((Number(level) - price) / price) * 100
@@ -289,8 +303,212 @@ export function ProfessionalSMCLeftPanel({ smcData, chartData, currentPrice }) {
   )
 }
 
-export function ProfessionalSMCRightPanel({ smcData, signals, config, chartData, currentPrice }) {
+export function SMCShadowEvidence({ data, loading = false, error = '' }) {
+  if (loading) {
+    return (
+      <Section title="V2 shadow engine" aside="loading evidence">
+        <div aria-label="Loading V2 shadow evidence" className="space-y-2 animate-pulse">
+          <div className="h-2 rounded bg-gray-100 dark:bg-gray-800" />
+          <div className="h-2 w-4/5 rounded bg-gray-100 dark:bg-gray-800" />
+          <div className="h-2 w-3/5 rounded bg-gray-100 dark:bg-gray-800" />
+        </div>
+      </Section>
+    )
+  }
+
+  if (error) {
+    return (
+      <Section title="V2 shadow engine">
+        <Badge tone="warning">Shadow unavailable</Badge>
+        <p className={MUTED}>{error}</p>
+        <p className="text-[9px] text-gray-400 dark:text-gray-500">
+          V1 evidence and chart overlays continue normally.
+        </p>
+      </Section>
+    )
+  }
+
+  if (!data) {
+    return (
+      <Section title="V2 shadow engine">
+        <p className={MUTED}>Waiting for the internal shadow scan.</p>
+      </Section>
+    )
+  }
+
+  const active = data.active || {}
+  const counts = {
+    structure: active.structureEvents?.length || 0,
+    liquidity: active.liquidityEvents?.length || 0,
+    pools: active.liquidityPools?.length || 0,
+    orderBlocks: active.orderBlocks?.length || 0,
+    fairValueGaps: active.fairValueGaps?.length || 0,
+  }
+  const activeTotal = Object.values(counts).reduce((sum, count) => sum + count, 0)
+  const recentEvidence = [
+    ...(active.orderBlocks || []),
+    ...(active.fairValueGaps || []),
+    ...(active.liquidityEvents || []),
+  ]
+    .sort((a, b) =>
+      String(b.confirmedAt || b.detectedAt || b.originTime || '').localeCompare(
+        String(a.confirmedAt || a.detectedAt || a.originTime || '')
+      )
+    )
+    .slice(0, 5)
+  const decisionState = data.decision?.state || 'SCANNING'
+  const decisionTone =
+    decisionState === 'AVOID' || decisionState === 'INVALIDATED'
+      ? 'negative'
+      : decisionState === 'DEVELOPING'
+        ? 'info'
+        : decisionState === 'ARMED' || decisionState === 'ENTERED' || decisionState === 'LATE'
+          ? 'warning'
+          : 'neutral'
+  const quality = data.dataQuality?.quality || 'UNKNOWN'
+  const qualityState =
+    quality === 'QUALIFIED' ? 'met' : quality === 'REJECTED' ? 'conflict' : 'caution'
+  const qualityDetail =
+    quality === 'LIMITED' && data.dataQuality?.summary?.adjustmentVerified === false
+      ? 'Coverage is usable, but corporate-action adjustment has not been independently verified.'
+      : quality === 'REJECTED'
+        ? 'The available history did not pass the mandatory dataset checks.'
+        : 'The dataset passed the current qualification checks.'
+  const lead = data.decision?.leadSetup
+
+  return (
+    <>
+      <Section title="V2 shadow engine" aside={data.asOf || undefined}>
+        <div className="flex flex-wrap items-center gap-1.5">
+          <Badge tone={decisionTone}>{readableLabel(decisionState, 'Scanning')}</Badge>
+          <Badge tone="warning">UNVALIDATED · HOLD</Badge>
+        </div>
+        <p className={MUTED}>
+          {data.decision?.reason || 'No authenticated setup currently satisfies every V2 gate.'}
+        </p>
+        <EvidenceRow
+          label="Next confirmation"
+          value={data.decision?.nextConfirmation || lead?.nextConfirmation || 'Not available'}
+          state="wait"
+        />
+        <p className="text-[9px] font-semibold text-amber-600 dark:text-amber-400">
+          SHADOW ONLY — internal evidence, not a trade recommendation.
+        </p>
+      </Section>
+
+      <Section title="V2 data quality" aside={`${data.candles || 0} candles`}>
+        <EvidenceRow label="Dataset" value={quality} state={qualityState} detail={qualityDetail} />
+        <EvidenceRow
+          label="Exploratory scan"
+          value={data.dataQuality?.canScan ? 'Allowed' : 'Blocked'}
+          state={data.dataQuality?.canScan ? 'met' : 'conflict'}
+        />
+        <EvidenceRow
+          label="Reliability"
+          value={data.reliability?.label || 'UNVALIDATED'}
+          state="caution"
+          detail="Engineering correctness is separate from future trading performance."
+        />
+      </Section>
+
+      <Section title="V2 market context">
+        <EvidenceRow
+          label="Structure"
+          value={readableLabel(data.context?.structureBias, 'Not established')}
+          state={
+            data.context?.structureBias === 'BULLISH'
+              ? 'met'
+              : data.context?.structureBias === 'BEARISH'
+                ? 'conflict'
+                : 'wait'
+          }
+        />
+        <EvidenceRow
+          label="Regime"
+          value={assessmentLabel(data.context?.regime)}
+          state={data.context?.regime ? 'met' : 'wait'}
+        />
+        <EvidenceRow
+          label="Execution"
+          value={assessmentLabel(data.context?.execution)}
+          state={
+            data.context?.execution?.severity === 'BLOCK'
+              ? 'conflict'
+              : data.context?.execution?.severity === 'CAUTION'
+                ? 'caution'
+                : data.context?.execution
+                  ? 'met'
+                  : 'wait'
+          }
+          detail={data.context?.execution?.explanation}
+        />
+      </Section>
+
+      <Section title="V2 evidence window" aside={`${activeTotal} bounded`}>
+        <div className="grid grid-cols-2 gap-1.5">
+          <Metric label="Recent structure" value={counts.structure} />
+          <Metric label="Recent liquidity" value={counts.liquidity} />
+          <Metric label="Tracked pools" value={counts.pools} />
+          <Metric label="Active order blocks" value={counts.orderBlocks} tone="positive" />
+          <Metric label="Active FVGs" value={counts.fairValueGaps} tone="info" />
+          <Metric label="Setup candidates" value={active.setups?.length || 0} tone="warning" />
+        </div>
+        {recentEvidence.length ? (
+          <div className="space-y-0.5 pt-1">
+            {recentEvidence.map((event, index) => (
+              <EvidenceRow
+                key={event.id || `${event.type}-${event.originTime}-${index}`}
+                label={readableLabel(event.type, 'Lifecycle event')}
+                value={`${readableLabel(event.direction, 'neutral')} · ${
+                  event.confirmedAt || event.detectedAt || event.originTime || 'date unavailable'
+                }`}
+                state={event.status === 'ACTIVE' ? 'met' : 'wait'}
+                detail={`Origin ${event.originTime || '—'} · ${readableLabel(event.status, 'tracked')}`}
+              />
+            ))}
+          </div>
+        ) : (
+          <p className={MUTED}>No active OB, FVG or liquidity lifecycle evidence was returned.</p>
+        )}
+      </Section>
+
+      {lead && (
+        <Section title="V2 lead setup">
+          <EvidenceRow
+            label={readableLabel(lead.family, 'Setup family')}
+            value={readableLabel(lead.decisionState || lead.status, 'Developing')}
+            state={
+              lead.decisionState === 'ENTERED'
+                ? 'met'
+                : lead.decisionState === 'ARMED'
+                  ? 'caution'
+                  : 'wait'
+            }
+            detail={lead.reason}
+          />
+          <p className={MUTED}>
+            {lead.nextConfirmation
+              ? `Needs: ${lead.nextConfirmation}`
+              : 'No further confirmation is recorded in this shadow snapshot.'}
+          </p>
+        </Section>
+      )}
+    </>
+  )
+}
+
+export function ProfessionalSMCRightPanel({
+  smcData,
+  signals,
+  config,
+  chartData,
+  currentPrice,
+  shadowData,
+  shadowLoading,
+  shadowError,
+}) {
   const [tab, setTab] = useState('setup')
+  const [legacyOpen, setLegacyOpen] = useState(false)
   if (!smcData) return <EmptyPanel title="SMC setup unavailable" />
 
   const lastSignal = signals?.at(-1)
@@ -473,40 +691,60 @@ export function ProfessionalSMCRightPanel({ smcData, signals, config, chartData,
           </PanelShell>
         ) : (
           <PanelShell>
-            <Section title="Latest candidate">
-              {lastSignal ? (
-                <>
-                  <div className="flex items-center justify-between">
-                    <Badge tone="info">Candidate</Badge>
-                    <span className="text-[9px] text-gray-400">{lastSignal.date}</span>
-                  </div>
-                  <p className={MUTED}>
-                    Entry reference {fmt(lastSignal.entryPrice)} · {signalAge ?? '—'} candles ago
-                  </p>
-                </>
-              ) : (
-                <p className={MUTED}>No configured candidate in the analyzed period.</p>
-              )}
-            </Section>
-            <Section title="Recent structure events">
-              {[...(smcData.bos || []), ...(smcData.choch || [])]
-                .sort((a, b) => b.date.localeCompare(a.date))
-                .slice(0, 6)
-                .map((event, index) => (
-                  <EvidenceRow
-                    key={`${event.date}-${index}`}
-                    label={smcData.choch?.includes(event) ? 'Structure shift' : 'BOS'}
-                    value={`${event.type} · ${event.date}`}
-                    state={event.type === 'bullish' ? 'met' : 'conflict'}
-                  />
-                ))}
-            </Section>
-            <Section title="Interpretation limits">
+            <SMCShadowEvidence data={shadowData} loading={shadowLoading} error={shadowError} />
+            <Section title="Legacy V1 reference" aside="heuristic">
               <p className={MUTED}>
-                Signals are heuristic and historical pivot confirmation is delayed. Order-block
-                invalidation and calibrated outcome probability are not yet available.
+                Older V1 candidates are kept only for comparison. They have not passed the V2
+                mandatory gates.
               </p>
+              <button
+                type="button"
+                aria-expanded={legacyOpen}
+                onClick={() => setLegacyOpen((open) => !open)}
+                className="text-[10px] font-semibold text-blue-600 hover:underline dark:text-blue-400"
+              >
+                {legacyOpen ? 'Hide legacy diagnostics' : 'Show legacy diagnostics'}
+              </button>
             </Section>
+            {legacyOpen && (
+              <>
+                <Section title="V1 latest candidate">
+                  {lastSignal ? (
+                    <>
+                      <div className="flex items-center justify-between">
+                        <Badge tone="info">V1 candidate</Badge>
+                        <span className="text-[9px] text-gray-400">{lastSignal.date}</span>
+                      </div>
+                      <p className={MUTED}>
+                        Entry reference {fmt(lastSignal.entryPrice)} · {signalAge ?? '—'} candles
+                        ago
+                      </p>
+                    </>
+                  ) : (
+                    <p className={MUTED}>No configured V1 candidate in the analyzed period.</p>
+                  )}
+                </Section>
+                <Section title="V1 recent structure events">
+                  {[...(smcData.bos || []), ...(smcData.choch || [])]
+                    .sort((a, b) => b.date.localeCompare(a.date))
+                    .slice(0, 6)
+                    .map((event, index) => (
+                      <EvidenceRow
+                        key={`${event.date}-${index}`}
+                        label={smcData.choch?.includes(event) ? 'V1 structure shift' : 'V1 BOS'}
+                        value={`${event.type} · ${event.date}`}
+                        state={event.type === 'bullish' ? 'met' : 'conflict'}
+                      />
+                    ))}
+                </Section>
+                <Section title="V1 interpretation limits">
+                  <p className={MUTED}>
+                    V1 signals are heuristic and historical pivot confirmation is delayed.
+                    Order-block invalidation and calibrated outcome probability are not available.
+                  </p>
+                </Section>
+              </>
+            )}
           </PanelShell>
         )}
       </div>
