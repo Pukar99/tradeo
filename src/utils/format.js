@@ -4,7 +4,7 @@
 // Sections:
 //   1. NEPSE Fee Utilities      — commission, SEBON fee, DP charge, CGT
 //   2. Number Formatters        — Rs, signed Rs, %, decimal, crore
-//   3. Safe Parsers             — safeFloat, isCanceled, apiError, safeUrl
+//   3. Safe Parsers             — isCanceled, apiError, safeUrl
 // =============================================================================
 
 // =============================================================================
@@ -123,13 +123,6 @@ export const pnlClass = (v, pos = 'text-emerald-500', neg = 'text-red-400') =>
 // =============================================================================
 // 3. SAFE PARSERS
 // =============================================================================
-
-// Parse Supabase NUMERIC string to float — Supabase returns NUMERIC as strings.
-// Always use this before arithmetic on DB values. Returns fallback (default 0) on failure.
-export const safeFloat = (v, fallback = 0) => {
-  const n = parseFloat(v)
-  return isNaN(n) ? fallback : n
-}
 
 // Detect request cancellation across all axios + fetch cancel variants.
 // Use this in every .catch() before showing an error — cancellations are intentional.
