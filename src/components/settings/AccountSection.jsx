@@ -15,7 +15,10 @@ import { getProfile, clearProfileCache } from '../../utils/globalCache'
 const MAX_AVATAR_SIZE = 5 * 1024 * 1024 // 5 MB
 const ALLOWED_IMAGE_TYPES = ['image/jpeg', 'image/jpg', 'image/png', 'image/gif', 'image/webp']
 
-const LABEL_CLS =
+// Label wraps the text span + input (nested-label a11y contract). The mb spacing lives on the
+// text span (see LABEL_TEXT) so the gap sits BETWEEN the label text and the input, not after it.
+const LABEL_CLS = 'block'
+const LABEL_TEXT =
   'block text-[10px] font-semibold uppercase tracking-widest text-gray-400 dark:text-gray-500 mb-1.5'
 const GROUP_LABEL_CLS =
   'text-[10px] font-semibold uppercase tracking-widest text-gray-400 dark:text-gray-500 mb-1.5'
@@ -237,7 +240,7 @@ export default function AccountSection() {
 
         <div>
           <label htmlFor="account-name" className={LABEL_CLS}>
-            <span>
+            <span className={LABEL_TEXT}>
               Full Name <span className="text-red-400">*</span>
             </span>
             <input
@@ -263,7 +266,7 @@ export default function AccountSection() {
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
           <div>
             <label htmlFor="account-location" className={LABEL_CLS}>
-              <span>Location</span>
+              <span className={LABEL_TEXT}>Location</span>
               <input
                 id="account-location"
                 type="text"
@@ -277,7 +280,7 @@ export default function AccountSection() {
           </div>
           <div>
             <label htmlFor="account-trading-since" className={LABEL_CLS}>
-              <span>Trading Since</span>
+              <span className={LABEL_TEXT}>Trading Since</span>
               <input
                 id="account-trading-since"
                 type="text"
@@ -291,7 +294,7 @@ export default function AccountSection() {
           </div>
           <div>
             <label htmlFor="account-bio" className={LABEL_CLS}>
-              <span className="flex items-center justify-between">
+              <span className={`${LABEL_TEXT} flex items-center justify-between`}>
                 <span>Bio</span>
                 <span
                   className={`text-xs font-normal normal-case tracking-normal ${form.bio.length > 450 ? 'text-red-400' : 'text-gray-400'}`}
