@@ -40,11 +40,8 @@ export const INDEX_OPTIONS = [
   { id: 15, label: 'Investment', short: 'Invest', sector_index: 'Investment Index' },
 ]
 
-// Pre-built Maps — avoids repeated .find() across callers
+// Pre-built Map — avoids repeated .find() across callers
 export const INDEX_BY_ID = new Map(INDEX_OPTIONS.map((o) => [o.id, o]))
-export const INDEX_BY_SI = new Map(
-  INDEX_OPTIONS.filter((o) => o.sector_index).map((o) => [o.sector_index, o])
-)
 
 // Resolve index_id → display label. Returns fallback (default '') when id is unknown.
 export const indexLabel = (id, fallback = '') => INDEX_BY_ID.get(id)?.label ?? fallback
@@ -81,49 +78,11 @@ export const MONTHS_FULL = [
   'November',
   'December',
 ]
-export const MONTHS_NP = [
-  'Bai',
-  'Jes',
-  'Asa',
-  'Shr',
-  'Bha',
-  'Asw',
-  'Kar',
-  'Man',
-  'Pou',
-  'Mag',
-  'Fal',
-  'Cha',
-]
-
 // =============================================================================
 // 3. BACKTEST ENUMS
 // =============================================================================
 
-// Keep all three enums in sync with backend CHECK constraints in backtest schema
 export const SPEEDS = ['0.5', '1', '2', '5', '10']
-
-export const BT_STATUS = {
-  ACTIVE: 'ACTIVE',
-  COMPLETED: 'COMPLETED',
-  ABANDONED: 'ABANDONED',
-}
-
-export const BT_ORDER_STATUS = {
-  OPEN: 'OPEN',
-  PARTIAL: 'PARTIAL',
-  CLOSED: 'CLOSED',
-  ABANDONED: 'ABANDONED',
-}
-
-export const BT_EXIT_REASON = {
-  TP_HIT: 'TP_HIT',
-  SL_HIT: 'SL_HIT',
-  MANUAL: 'MANUAL',
-  EARLY_EXIT: 'EARLY_EXIT',
-  SL_IGNORED: 'SL_IGNORED',
-  ABANDONED: 'ABANDONED',
-}
 
 // =============================================================================
 // 4. THRESHOLDS

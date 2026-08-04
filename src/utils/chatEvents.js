@@ -20,12 +20,9 @@ export function dispatchChatAction(action) {
 }
 
 // Fired after trade close — injects an AI debrief message into FloatingChat.
-// NOTE (2026-07-30): AIChat.jsx listens for this, but nothing currently calls
-// dispatchDebrief() to fire it — the trade-close trigger was never wired up.
+// NOTE (2026-07-30): AIChat.jsx listens for this, but the trade-close trigger
+// that would dispatch it was never wired up — no dispatcher exists yet.
 export const DEBRIEF_EVENT = 'tradeo:coach-debrief'
-export function dispatchDebrief({ symbol, debrief }) {
-  window.dispatchEvent(new CustomEvent(DEBRIEF_EVENT, { detail: { symbol, debrief } }))
-}
 
 // Fired when a HomePage alert is clicked — tells the matching card (goals,
 // watchlist, …) to scroll its item into view and flash a highlight.
