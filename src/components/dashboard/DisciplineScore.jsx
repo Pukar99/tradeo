@@ -4,6 +4,32 @@
 import { useState, useEffect } from 'react'
 import { getDiscipline } from '../../utils/globalCache'
 import { IconFlame } from '../common/icons'
+import { useAuth } from '../../context/AuthContext'
+
+// Tier accent — Home prototype (see HomePage.jsx TierName for the matching
+// name-chip treatment). Basic renders no accent, same card as always. Same hex
+// values as the badge/mockup so the material reads as one system.
+//
+// Hover behavior (owner decision): the ring + top bar render as a separate
+// absolute-positioned overlay (not the card's own border/shadow) so the
+// reveal is a clean opacity fade rather than a border/shadow swap. Always
+// visible on touch (`[@media(hover:none)]`, no hover gesture exists there);
+// hidden until the card is hovered on real pointers (`[@media(hover:hover)]`
+// + `group-hover`) so it doesn't compete with the page all the time on desktop.
+const TIER_ACCENT = {
+  pro: {
+    ring: 'shadow-[0_0_0_1px_rgba(35,84,201,0.35),0_10px_26px_-14px_rgba(35,84,201,0.55)] dark:shadow-[0_0_0_1px_rgba(91,157,255,0.4),0_10px_26px_-14px_rgba(35,84,201,0.7)]',
+    bar: 'from-[#14275c] to-[#5b9dff]',
+  },
+  premium: {
+    ring: 'shadow-[0_0_0_1px_rgba(217,154,31,0.4),0_12px_30px_-14px_rgba(217,154,31,0.6)] dark:shadow-[0_0_0_1px_rgba(243,192,74,0.4),0_12px_30px_-14px_rgba(217,154,31,0.75)]',
+    bar: 'from-[#7a4a08] via-[#d99a1f] to-[#ffe9ad]',
+  },
+}
+
+// Shared opacity choreography for both overlay layers.
+const HOVER_REVEAL =
+  'opacity-100 [@media(hover:hover)]:opacity-0 [@media(hover:hover)]:group-hover:opacity-100 transition-opacity duration-300'
 
 const GRADE = (s) => {
   if (s >= 85) return { letter: 'A+', color: 'text-emerald-500', ring: '#10b981' }
@@ -87,6 +113,8 @@ function DimBar({ label, score, extra, noData }) {
 }
 
 function DisciplineScore({ initData }) {
+  const { user } = useAuth()
+  const accent = TIER_ACCENT[user?.tier]
   const [data, setData] = useState(initData || null)
   const [loading, setLoading] = useState(!initData)
   const [error, setError] = useState(null)
@@ -153,7 +181,19 @@ function DisciplineScore({ initData }) {
   ]
 
   return (
-    <div className="hp-card bg-white/70 dark:bg-gray-900/60 backdrop-blur-md rounded-2xl border border-white/60 dark:border-white/10 shadow-sm p-4 pb-3 flex flex-col gap-3 h-full min-h-0 overflow-y-auto">
+    <div className="hp-card group relative bg-white/70 dark:bg-gray-900/60 backdrop-blur-md rounded-2xl border border-white/60 dark:border-white/10 shadow-sm p-4 pb-3 flex flex-col gap-3 h-full min-h-0 overflow-y-auto">
+      {accent && (
+        <>
+          <div
+            aria-hidden="true"
+            className={`pointer-events-none absolute inset-0 rounded-2xl ${accent.ring} ${HOVER_REVEAL}`}
+          />
+          <div
+            aria-hidden="true"
+            className={`pointer-events-none absolute left-4 right-4 top-0 h-0.5 rounded-full bg-gradient-to-r ${accent.bar} ${HOVER_REVEAL}`}
+          />
+        </>
+      )}
       {/* Header */}
       <div className="flex items-center justify-between">
         <h3 className="text-[11px] font-semibold uppercase tracking-widest text-gray-400 dark:text-gray-500">

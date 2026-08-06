@@ -1047,6 +1047,53 @@ function CenterDashboard({ navigate, initData, onRefresh, onDataReady, mobileTop
   )
 }
 
+// ── Tier name chip (Home prototype — owner-approved material, not yet rolled
+// out elsewhere; layout is owner-picked "variant A" from the badge-placement
+// review — the name itself is the chip, with a small corner tag, rather than
+// a separate pill after the name). Basic renders plain text (quiet by design,
+// matches today). Pro gets a deep-sapphire-to-bright-blue gradient chip;
+// Premium a bronze-to-champagne gradient with a slow shimmer sweep (disabled
+// under prefers-reduced-motion via Tailwind's motion-reduce: variant). Hex
+// values match the approved mockup exactly, not Tailwind's stock blue/amber,
+// so the material reads as considered rather than a re-tinted default. ───────
+function TierName({ tier, name }) {
+  if (tier !== 'pro' && tier !== 'premium') return name
+  const isPremium = tier === 'premium'
+  return (
+    // Outer wrapper: positioning context ONLY, no overflow clipping — the
+    // corner tag pokes outside the chip's box and was getting clipped when
+    // this and the shimmer-clip lived on the same element (real bug, caught
+    // live: tag rendered invisible). Inner span owns the gradient + clips
+    // the shimmer; the tag is a sibling of it, not a child.
+    <span className="relative inline-flex isolate">
+      <span
+        className={`relative inline-flex items-center overflow-hidden px-2.5 py-0.5 rounded-lg font-bold ${
+          isPremium
+            ? 'text-[#3a2405] bg-gradient-to-br from-[#7a4a08] via-[#d99a1f] to-[#ffe9ad] shadow-[inset_0_1px_0_rgba(255,255,255,0.5),0_3px_10px_-3px_rgba(217,150,20,0.5)]'
+            : 'text-[#eaf1ff] bg-gradient-to-br from-[#14275c] via-[#2354c9] to-[#5b9dff] shadow-[inset_0_1px_0_rgba(255,255,255,0.25),0_3px_10px_-3px_rgba(37,99,235,0.5)]'
+        }`}
+      >
+        {name}
+        {isPremium && (
+          <span
+            aria-hidden="true"
+            className="absolute -inset-y-0.5 -inset-x-2 z-[1] bg-gradient-to-r from-transparent via-white/70 to-transparent -translate-x-[140%] animate-tier-shimmer motion-reduce:hidden"
+          />
+        )}
+      </span>
+      <span
+        className={`absolute -top-2 -right-2 z-[2] px-1.5 py-0.5 rounded-full text-[8px] font-extrabold leading-none bg-white dark:bg-gray-900 border ${
+          isPremium
+            ? 'text-[#854f0b] dark:text-[#f3c04a] border-[#d99a1f]'
+            : 'text-[#2354c9] dark:text-[#5b9dff] border-[#2354c9] dark:border-[#5b9dff]'
+        }`}
+      >
+        {isPremium ? 'PREMIUM' : 'PRO'}
+      </span>
+    </span>
+  )
+}
+
 // ── Logged-in layout ─────────────────────────────────────────────────────────
 function LoggedInHome() {
   const { user } = useAuth()
@@ -1124,7 +1171,8 @@ function LoggedInHome() {
           <div className="flex items-center justify-between mb-3 sm:mb-4 px-1 animate-fade-up flex-shrink-0">
             <div>
               <p className="text-sm font-semibold text-gray-800 dark:text-gray-200">
-                {getGreeting()}, {user?.name?.split(' ')[0] || 'Trader'}
+                {getGreeting()},{' '}
+                <TierName tier={user?.tier} name={user?.name?.split(' ')[0] || 'Trader'} />
               </p>
               <p className="text-[11px] text-gray-400 mt-0.5">{today}</p>
             </div>

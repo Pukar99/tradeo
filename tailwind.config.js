@@ -49,6 +49,10 @@ export default {
           '0%': { transform: 'scaleY(0)' },
           '100%': { transform: 'scaleY(1)' },
         },
+        'tier-shimmer': {
+          '0%, 55%': { transform: 'translateX(-140%)' },
+          '75%, 100%': { transform: 'translateX(140%)' },
+        },
       },
       animation: {
         'fade-up': 'fade-up 0.4s cubic-bezier(.22,1,.36,1) both',
@@ -61,6 +65,7 @@ export default {
         'soft-bounce': 'soft-bounce 0.6s ease both',
         'pulse-ring': 'pulse-ring 1.4s ease-out infinite',
         'candle-grow': 'candle-grow 0.6s cubic-bezier(.22,1,.36,1) both',
+        'tier-shimmer': 'tier-shimmer 4.5s ease-in-out infinite',
       },
       transitionTimingFunction: {
         // Same curve the entrance animations already use (fade-up, scale-in, etc.)
