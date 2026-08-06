@@ -25,6 +25,7 @@ import UpgradePrompt from '../components/UpgradePrompt'
 import AuthWall from '../components/AuthWall'
 import PageSkeleton from '../components/PageSkeleton'
 import { useCompactToolbar } from '../components/screen/ScreenToolbarAtoms'
+import { TIER_ACCENT, getDisplayTier } from '../components/common/TierMaterial'
 
 // ── Screen toolbar slot — EXACT same portal pattern as DataLabPage.useToolbarSlot ──
 // Context value is a stable useRef object; the hook forces one re-render after DOM
@@ -94,6 +95,7 @@ function SimpleContent({
   toggleRight,
 }) {
   const { user } = useAuth()
+  const accent = TIER_ACCENT[getDisplayTier(user)]
   const compact = useCompactToolbar()
   useEffect(() => {
     if (!compact || activeTab !== 'General') setMobilePanel(null)
@@ -146,6 +148,12 @@ function SimpleContent({
                         ${leftOpen ? 'w-[13%] min-w-[150px] max-w-[200px]' : 'w-0 min-w-0 max-w-0 overflow-hidden'}
                         ${!leftOpen ? 'screen-panel-collapsed' : ''}`}
           >
+            {accent && (
+              <div
+                aria-hidden="true"
+                className={`absolute top-0 left-0 right-0 h-0.5 bg-gradient-to-r ${accent.bar}`}
+              />
+            )}
             <div className="screen-panel-content flex flex-col h-full">
               <LeftPanel />
             </div>
@@ -222,6 +230,12 @@ function SimpleContent({
                         ${rightOpen ? 'w-[16%] min-w-[170px] max-w-[240px]' : 'w-0 min-w-0 max-w-0 overflow-hidden'}
                         ${!rightOpen ? 'screen-panel-collapsed' : ''}`}
           >
+            {accent && (
+              <div
+                aria-hidden="true"
+                className={`absolute top-0 left-0 right-0 h-0.5 bg-gradient-to-r ${accent.bar}`}
+              />
+            )}
             <div className="screen-panel-content flex flex-col h-full">
               <RightPanel />
             </div>

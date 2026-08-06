@@ -13,7 +13,7 @@ import { gCache } from '../../utils/globalCache'
 import { useContextMenu } from '../ContextMenu'
 import { IconTrash } from '../common/icons'
 import { useAuth } from '../../context/AuthContext'
-import { TIER_ACCENT, TierAccentOverlay } from '../common/TierMaterial'
+import { TIER_ACCENT, TierAccentOverlay, getDisplayTier } from '../common/TierMaterial'
 
 // ── SVG icons (no emojis) ─────────────────────────────────────────────────────
 const Icons = {
@@ -658,7 +658,7 @@ function TaskBar({ label, iconType = 'custom', done, onClick, onDelete }) {
 // ── Main component ────────────────────────────────────────────────────────────
 function TaskBoard({ initData, mindsetContent }) {
   const { user } = useAuth()
-  const accent = TIER_ACCENT[user?.tier]
+  const accent = TIER_ACCENT[getDisplayTier(user)]
   const [fixedTasks, setFixedTasks] = useState(
     FIXED_TASKS.map((task) => ({ ...task, completed: false }))
   )

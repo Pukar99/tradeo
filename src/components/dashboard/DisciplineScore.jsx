@@ -5,7 +5,7 @@ import { useState, useEffect } from 'react'
 import { getDiscipline } from '../../utils/globalCache'
 import { IconFlame } from '../common/icons'
 import { useAuth } from '../../context/AuthContext'
-import { TIER_ACCENT, TierAccentOverlay } from '../common/TierMaterial'
+import { TIER_ACCENT, TierAccentOverlay, getDisplayTier } from '../common/TierMaterial'
 
 const GRADE = (s) => {
   if (s >= 85) return { letter: 'A+', color: 'text-emerald-500', ring: '#10b981' }
@@ -90,7 +90,7 @@ function DimBar({ label, score, extra, noData }) {
 
 function DisciplineScore({ initData }) {
   const { user } = useAuth()
-  const accent = TIER_ACCENT[user?.tier]
+  const accent = TIER_ACCENT[getDisplayTier(user)]
   const [data, setData] = useState(initData || null)
   const [loading, setLoading] = useState(!initData)
   const [error, setError] = useState(null)

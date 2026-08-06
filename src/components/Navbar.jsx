@@ -19,7 +19,7 @@ import {
   markAllNotificationsRead,
 } from '../api/notifications'
 import PageSkeleton from './PageSkeleton'
-import { TIER_ACCENT, TIER_RING, TierName } from './common/TierMaterial'
+import { TIER_ACCENT, TIER_RING, TierName, getDisplayTier } from './common/TierMaterial'
 
 // =============================================================================
 // 1. LOGO
@@ -64,6 +64,7 @@ function getInitials(name) {
 
 function Navbar({ autoHide = false, hidden = false, onMouseEnter, onMouseLeave }) {
   const { user, logout, loading: authLoading } = useAuth()
+  const displayTier = getDisplayTier(user)
   const { isDark, toggleTheme } = useTheme()
   const { t, isNepali, toggleLang } = useLanguage()
   const location = useLocation()
@@ -283,8 +284,8 @@ function Navbar({ autoHide = false, hidden = false, onMouseEnter, onMouseLeave }
               {isActive(link.path) && (
                 <span
                   className={`absolute bottom-0 left-0 right-0 h-0.5 rounded-t-full animate-scale-x-in origin-left ${
-                    TIER_ACCENT[user?.tier]
-                      ? `bg-gradient-to-r ${TIER_ACCENT[user.tier].bar}`
+                    TIER_ACCENT[displayTier]
+                      ? `bg-gradient-to-r ${TIER_ACCENT[displayTier].bar}`
                       : 'bg-green-500'
                   }`}
                 />
@@ -304,8 +305,8 @@ function Navbar({ autoHide = false, hidden = false, onMouseEnter, onMouseLeave }
               {isActive('/admin') && (
                 <span
                   className={`absolute bottom-0 left-0 right-0 h-0.5 rounded-t-full animate-scale-x-in origin-left ${
-                    TIER_ACCENT[user?.tier]
-                      ? `bg-gradient-to-r ${TIER_ACCENT[user.tier].bar}`
+                    TIER_ACCENT[displayTier]
+                      ? `bg-gradient-to-r ${TIER_ACCENT[displayTier].bar}`
                       : 'bg-green-500'
                   }`}
                 />
@@ -470,7 +471,7 @@ function Navbar({ autoHide = false, hidden = false, onMouseEnter, onMouseLeave }
               className="flex items-center gap-2 px-2 min-h-[44px] rounded-lg hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors group"
             >
               <div
-                className={`w-7 h-7 rounded-full bg-green-500 flex items-center justify-center overflow-hidden flex-shrink-0 ${TIER_RING[user?.tier] || ''}`}
+                className={`w-7 h-7 rounded-full bg-green-500 flex items-center justify-center overflow-hidden flex-shrink-0 ${TIER_RING[displayTier] || ''}`}
               >
                 {user.avatar_url && !avatarError ? (
                   <img
@@ -484,7 +485,7 @@ function Navbar({ autoHide = false, hidden = false, onMouseEnter, onMouseLeave }
                 )}
               </div>
               <span className="hidden sm:inline text-sm text-gray-700 dark:text-gray-300 group-hover:text-gray-900 dark:group-hover:text-white font-medium">
-                <TierName tier={user?.tier} name={firstName} />
+                <TierName tier={displayTier} name={firstName} />
               </span>
               <svg
                 className={`w-3 h-3 text-gray-400 transition-transform ${dropdownOpen ? 'rotate-180' : ''}`}
@@ -646,7 +647,7 @@ function Navbar({ autoHide = false, hidden = false, onMouseEnter, onMouseLeave }
                 TIER_ACCENT.bar stops as the dashboard cards), plain green
                 (the original brand accent) for Basic/logged-out. */}
             <div
-              className={`h-0.5 bg-gradient-to-r ${TIER_ACCENT[user?.tier]?.bar || 'from-green-500 via-green-400 to-transparent'}`}
+              className={`h-0.5 bg-gradient-to-r ${TIER_ACCENT[displayTier]?.bar || 'from-green-500 via-green-400 to-transparent'}`}
             />
             {/* Identity header — mobile has no avatar/name display anywhere
                 else (unlike the desktop dropdown trigger), so this is the
@@ -654,7 +655,7 @@ function Navbar({ autoHide = false, hidden = false, onMouseEnter, onMouseLeave }
             {user && (
               <div className="flex items-center gap-3 px-4 py-3 border-b border-gray-100 dark:border-gray-800">
                 <div
-                  className={`w-9 h-9 rounded-full bg-green-500 flex items-center justify-center overflow-hidden flex-shrink-0 ${TIER_RING[user?.tier] || ''}`}
+                  className={`w-9 h-9 rounded-full bg-green-500 flex items-center justify-center overflow-hidden flex-shrink-0 ${TIER_RING[displayTier] || ''}`}
                 >
                   {user.avatar_url && !avatarError ? (
                     <img
@@ -669,7 +670,7 @@ function Navbar({ autoHide = false, hidden = false, onMouseEnter, onMouseLeave }
                 </div>
                 <div className="min-w-0">
                   <p className="text-sm font-semibold text-gray-900 dark:text-white truncate">
-                    <TierName tier={user?.tier} name={firstName} />
+                    <TierName tier={displayTier} name={firstName} />
                   </p>
                   <p className="text-[11px] text-gray-400 truncate">{user.email}</p>
                 </div>

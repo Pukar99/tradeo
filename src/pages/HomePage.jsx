@@ -23,7 +23,12 @@ import {
 } from '../components/common/icons'
 import WatchlistPanel from '../components/dashboard/watchlist/WatchlistPanel'
 import { generateSwingCandles } from '../utils/candlestickData'
-import { TIER_ACCENT, TierAccentOverlay, TierName } from '../components/common/TierMaterial'
+import {
+  TIER_ACCENT,
+  TierAccentOverlay,
+  TierName,
+  getDisplayTier,
+} from '../components/common/TierMaterial'
 
 const MOTIVATIONAL_QUOTES = [
   'The market is a device for transferring money from the impatient to the patient.',
@@ -479,7 +484,7 @@ const SEVERITY_ORDER = { danger: 0, warn: 1, success: 2, info: 3 }
 
 function AlertsWidget({ initData }) {
   const { user } = useAuth()
-  const accent = TIER_ACCENT[user?.tier]
+  const accent = TIER_ACCENT[getDisplayTier(user)]
   const navigate = useNavigate()
   const [showAllAlerts, setShowAllAlerts] = useState(false)
   const trades = initData?.trades || []
@@ -1129,7 +1134,10 @@ function LoggedInHome() {
             <div>
               <p className="text-sm font-semibold text-gray-800 dark:text-gray-200">
                 {getGreeting()},{' '}
-                <TierName tier={user?.tier} name={user?.name?.split(' ')[0] || 'Trader'} />
+                <TierName
+                  tier={getDisplayTier(user)}
+                  name={user?.name?.split(' ')[0] || 'Trader'}
+                />
               </p>
               <p className="text-[11px] text-gray-400 mt-0.5">{today}</p>
             </div>

@@ -9,6 +9,18 @@
 // blue-500/amber-500 — reuse verbatim, don't re-derive.
 // =============================================================================
 
+// getDisplayTier — the tier used for VISUAL purposes only. Admins always
+// display as Premium (owner decision) regardless of their actual
+// users.tier value — deliberately NOT written to the DB (tier is a billing
+// concept, admin is a role concept; conflating them would corrupt the
+// column for any future tier-based logic). Every consumer below should read
+// tier through this helper, not `user?.tier` directly, so admin-override
+// stays consistent everywhere instead of being re-implemented per call site.
+export function getDisplayTier(user) {
+  if (user?.is_admin) return 'premium'
+  return user?.tier
+}
+
 // TIER_ACCENT — consumed by TierAccentOverlay below. `null`/missing key (i.e.
 // Basic) renders nothing.
 export const TIER_ACCENT = {

@@ -6,7 +6,7 @@ import { IconPencil, IconTrash } from '../common/icons'
 import { useChatRefresh, useHighlightListener } from '../../utils/chatEvents'
 import { gCache } from '../../utils/globalCache'
 import { useAuth } from '../../context/AuthContext'
-import { TIER_ACCENT, TierAccentOverlay } from '../common/TierMaterial'
+import { TIER_ACCENT, TierAccentOverlay, getDisplayTier } from '../common/TierMaterial'
 
 // ── Date helpers ──────────────────────────────────────────────────────────────
 
@@ -144,7 +144,7 @@ const GOALS_DEFAULT_LIMIT = 4
 
 function MonthlyGoals({ initData }) {
   const { user } = useAuth()
-  const accent = TIER_ACCENT[user?.tier]
+  const accent = TIER_ACCENT[getDisplayTier(user)]
   const { onContextMenu, ContextMenuPortal } = useContextMenu()
   const [goals, setGoals] = useState(initData || [])
   const [loading, setLoading] = useState(!initData)
