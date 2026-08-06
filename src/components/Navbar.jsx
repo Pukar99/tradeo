@@ -19,6 +19,7 @@ import {
   markAllNotificationsRead,
 } from '../api/notifications'
 import PageSkeleton from './PageSkeleton'
+import { TIER_ACCENT, TIER_RING, TierName } from './common/TierMaterial'
 
 // =============================================================================
 // 1. LOGO
@@ -456,7 +457,9 @@ function Navbar({ autoHide = false, hidden = false, onMouseEnter, onMouseLeave }
               aria-label="Open user menu"
               className="flex items-center gap-2 px-2 min-h-[44px] rounded-lg hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors group"
             >
-              <div className="w-7 h-7 rounded-full bg-green-500 flex items-center justify-center overflow-hidden flex-shrink-0">
+              <div
+                className={`w-7 h-7 rounded-full bg-green-500 flex items-center justify-center overflow-hidden flex-shrink-0 ${TIER_RING[user?.tier] || ''}`}
+              >
                 {user.avatar_url && !avatarError ? (
                   <img
                     src={user.avatar_url}
@@ -469,7 +472,7 @@ function Navbar({ autoHide = false, hidden = false, onMouseEnter, onMouseLeave }
                 )}
               </div>
               <span className="hidden sm:inline text-sm text-gray-700 dark:text-gray-300 group-hover:text-gray-900 dark:group-hover:text-white font-medium">
-                {firstName}
+                <TierName tier={user?.tier} name={firstName} />
               </span>
               <svg
                 className={`w-3 h-3 text-gray-400 transition-transform ${dropdownOpen ? 'rotate-180' : ''}`}
@@ -627,8 +630,39 @@ function Navbar({ autoHide = false, hidden = false, onMouseEnter, onMouseLeave }
             document.body
           )}
           <div className="lg:hidden absolute top-full left-0 right-0 max-h-[calc(100vh-56px)] overflow-y-auto bg-white dark:bg-gray-950 border-b border-gray-200 dark:border-gray-800 shadow-2xl z-50 animate-slide-down">
-            {/* green accent bar at top */}
-            <div className="h-0.5 bg-gradient-to-r from-green-500 via-green-400 to-transparent" />
+            {/* Accent bar — tier gradient for Pro/Premium (reuses the same
+                TIER_ACCENT.bar stops as the dashboard cards), plain green
+                (the original brand accent) for Basic/logged-out. */}
+            <div
+              className={`h-0.5 bg-gradient-to-r ${TIER_ACCENT[user?.tier]?.bar || 'from-green-500 via-green-400 to-transparent'}`}
+            />
+            {/* Identity header — mobile has no avatar/name display anywhere
+                else (unlike the desktop dropdown trigger), so this is the
+                one place the tier ring + name chip can land on mobile. */}
+            {user && (
+              <div className="flex items-center gap-3 px-4 py-3 border-b border-gray-100 dark:border-gray-800">
+                <div
+                  className={`w-9 h-9 rounded-full bg-green-500 flex items-center justify-center overflow-hidden flex-shrink-0 ${TIER_RING[user?.tier] || ''}`}
+                >
+                  {user.avatar_url && !avatarError ? (
+                    <img
+                      src={user.avatar_url}
+                      alt={displayName}
+                      className="w-full h-full object-cover"
+                      onError={() => setAvatarError(true)}
+                    />
+                  ) : (
+                    <span className="text-white text-sm font-bold">{getInitials(user.name)}</span>
+                  )}
+                </div>
+                <div className="min-w-0">
+                  <p className="text-sm font-semibold text-gray-900 dark:text-white truncate">
+                    <TierName tier={user?.tier} name={firstName} />
+                  </p>
+                  <p className="text-[11px] text-gray-400 truncate">{user.email}</p>
+                </div>
+              </div>
+            )}
             <div className="px-4 py-3 space-y-1">
             {NAV_LINKS.map((link, i) => (
               <Link

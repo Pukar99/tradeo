@@ -12,6 +12,8 @@ import {
 import { gCache } from '../../utils/globalCache'
 import { useContextMenu } from '../ContextMenu'
 import { IconTrash } from '../common/icons'
+import { useAuth } from '../../context/AuthContext'
+import { TIER_ACCENT, TierAccentOverlay } from '../common/TierMaterial'
 
 // ── SVG icons (no emojis) ─────────────────────────────────────────────────────
 const Icons = {
@@ -655,6 +657,8 @@ function TaskBar({ label, iconType = 'custom', done, onClick, onDelete }) {
 
 // ── Main component ────────────────────────────────────────────────────────────
 function TaskBoard({ initData, mindsetContent }) {
+  const { user } = useAuth()
+  const accent = TIER_ACCENT[user?.tier]
   const [fixedTasks, setFixedTasks] = useState(
     FIXED_TASKS.map((task) => ({ ...task, completed: false }))
   )
@@ -794,7 +798,8 @@ function TaskBoard({ initData, mindsetContent }) {
         />
       )}
 
-      <div className="hp-card bg-white/70 dark:bg-gray-900/60 backdrop-blur-md rounded-2xl border border-white/60 dark:border-white/10 shadow-sm flex flex-col h-full overflow-hidden">
+      <div className="hp-card group relative bg-white/70 dark:bg-gray-900/60 backdrop-blur-md rounded-2xl border border-white/60 dark:border-white/10 shadow-sm flex flex-col h-full overflow-hidden">
+        <TierAccentOverlay accent={accent} />
         {/* Fixed header — never scrolls */}
         <div className="flex items-center justify-between px-4 pt-4 pb-2 flex-shrink-0">
           <h3 className="text-[11px] font-semibold uppercase tracking-widest text-gray-400 dark:text-gray-500">

@@ -5,6 +5,8 @@ import { useContextMenu } from '../ContextMenu'
 import { IconPencil, IconTrash } from '../common/icons'
 import { useChatRefresh, useHighlightListener } from '../../utils/chatEvents'
 import { gCache } from '../../utils/globalCache'
+import { useAuth } from '../../context/AuthContext'
+import { TIER_ACCENT, TierAccentOverlay } from '../common/TierMaterial'
 
 // ── Date helpers ──────────────────────────────────────────────────────────────
 
@@ -141,6 +143,8 @@ function monthLabel(year, month) {
 const GOALS_DEFAULT_LIMIT = 4
 
 function MonthlyGoals({ initData }) {
+  const { user } = useAuth()
+  const accent = TIER_ACCENT[user?.tier]
   const { onContextMenu, ContextMenuPortal } = useContextMenu()
   const [goals, setGoals] = useState(initData || [])
   const [loading, setLoading] = useState(!initData)
@@ -372,7 +376,8 @@ function MonthlyGoals({ initData }) {
   // ── Render ────────────────────────────────────────────────────────────────
 
   return (
-    <div className="hp-card bg-white/70 dark:bg-gray-900/60 backdrop-blur-md rounded-2xl border border-white/60 dark:border-white/10 shadow-sm overflow-hidden h-full flex flex-col min-h-0">
+    <div className="hp-card group relative bg-white/70 dark:bg-gray-900/60 backdrop-blur-md rounded-2xl border border-white/60 dark:border-white/10 shadow-sm overflow-hidden h-full flex flex-col min-h-0">
+      <TierAccentOverlay accent={accent} />
       <ContextMenuPortal />
 
       {/* ── Header ── */}
