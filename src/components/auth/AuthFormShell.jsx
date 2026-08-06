@@ -3,7 +3,10 @@
 // different bits (brand copy, feature lists, fields, spacing values) stay in the
 // pages — spacing differences arrive here as explicit class props so the rendered
 // DOM stays pixel-identical to the pre-extraction pages.
-import { Link } from 'react-router-dom'
+import { Link, useNavigate } from 'react-router-dom'
+import { GoogleLogin } from '@react-oauth/google'
+import { useAuth } from '../../context/AuthContext'
+import { googleAuth } from '../../api'
 
 export function EyeIcon() {
   return (
@@ -176,6 +179,40 @@ export function AuthSubmitButton({ loading, busyLabel, mt, children }) {
       )}
       {loading ? busyLabel : children}
     </button>
+  )
+}
+
+// Shared Google Sign-In button + divider — used identically by LoginPage/SignupPage.
+// Owns the API call + login + redirect itself (needs useAuth/useNavigate), so
+// callers just render <GoogleAuthSection onError={setServerError} /> and nothing else.
+export function GoogleAuthSection({ onError }) {
+  const { login } = useAuth()
+  const navigate = useNavigate()
+
+  const handleSuccess = async (credentialResponse) => {
+    try {
+      const { data } = await googleAuth({ credential: credentialResponse.credential })
+      login(data.user, data.token)
+      navigate('/')
+    } catch (err) {
+      onError?.(err.response?.data?.message || 'Google sign-in failed, please try again')
+    }
+  }
+
+  return (
+    <div className="mt-5">
+      <div className="flex items-center gap-3">
+        <div className="flex-1 h-px bg-gray-200 dark:bg-gray-700" />
+        <span className="text-xs text-gray-400">or</span>
+        <div className="flex-1 h-px bg-gray-200 dark:bg-gray-700" />
+      </div>
+      <div className="mt-4 flex justify-center">
+        <GoogleLogin
+          onSuccess={handleSuccess}
+          onError={() => onError?.('Google sign-in failed, please try again')}
+        />
+      </div>
+    </div>
   )
 }
 

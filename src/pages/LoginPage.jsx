@@ -12,6 +12,7 @@ import AuthFormShell, {
   PasswordToggle,
   AuthErrorBanner,
   AuthSubmitButton,
+  GoogleAuthSection,
 } from '../components/auth/AuthFormShell'
 import { suggestEmail, authFieldClass } from '../utils/authForm'
 
@@ -201,6 +202,10 @@ function LoginPage() {
       login(data.user, data.token)
       navigate(getRedirectFrom(), { replace: true })
     } catch (err) {
+      if (err.response?.data?.code === 'NOT_VERIFIED') {
+        navigate('/verify', { state: { email: err.response.data.email || email.trim() } })
+        return
+      }
       setServerError(err.response?.data?.message || 'Login failed. Please try again.')
     } finally {
       setLoading(false)
@@ -313,6 +318,8 @@ function LoginPage() {
           {t('loginPage.btn')}
         </AuthSubmitButton>
       </form>
+
+      <GoogleAuthSection onError={setServerError} />
 
       <p className="text-sm text-gray-400 mt-6 text-center">
         {t('loginPage.noAccount')}{' '}

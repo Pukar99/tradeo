@@ -32,6 +32,7 @@ const PortfolioPage = lazy(() => import('./pages/PortfolioPage'))
 const NotFoundPage = lazy(() => import('./pages/NotFoundPage'))
 const LoginPage = lazy(() => import('./pages/LoginPage'))
 const SignupPage = lazy(() => import('./pages/SignupPage'))
+const VerifyOtpPage = lazy(() => import('./pages/VerifyOtpPage'))
 const LogsPage = lazy(() => import('./pages/LogsPage'))
 const ResearchPage = lazy(() => import('./pages/ResearchPage'))
 const ResearchEditorPage = lazy(() => import('./pages/ResearchEditorPage'))
@@ -112,7 +113,7 @@ class ErrorBoundary extends Component {
 }
 
 // Auth-only pages that should not show the navbar
-const AUTH_ROUTES = ['/login', '/signup']
+const AUTH_ROUTES = ['/login', '/signup', '/verify']
 
 const HIDE_DELAY = 3000 // ms before navbar auto-hides on page open (no interaction yet)
 
@@ -360,6 +361,7 @@ function AppContent() {
             />
             <Route path="/login" element={<LoginPage />} />
             <Route path="/signup" element={<SignupPage />} />
+            <Route path="/verify" element={<VerifyOtpPage />} />
             <Route path="*" element={<NotFoundPage />} />
           </Routes>
         </Suspense>

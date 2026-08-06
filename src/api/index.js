@@ -183,6 +183,9 @@ axios.get(`${BASE_URL}/`, { timeout: 60000 }).catch(() => {})
 
 export const loginUser = (data) => API.post('/api/auth/login', data)
 export const signupUser = (data) => API.post('/api/auth/signup', data)
+export const verifyOtp = (data) => API.post('/api/auth/verify-otp', data)
+export const resendOtp = (data) => API.post('/api/auth/resend-otp', data)
+export const googleAuth = (data) => API.post('/api/auth/google', data)
 export const deleteAccount = (data) => API.delete('/api/auth/account', { data })
 
 // =============================================================================
