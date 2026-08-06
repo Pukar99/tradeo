@@ -77,7 +77,7 @@ const DangerIcon = (
 
 export default function SettingsPage() {
   return (
-    <div className="w-full px-3 sm:px-6 pt-4 sm:pt-6 pb-10 lg:pb-0 max-w-5xl mx-auto lg:h-[calc(100vh-60px)] lg:flex lg:flex-col lg:min-h-0">
+    <div className="w-full px-3 sm:px-6 pt-4 sm:pt-6 pb-10 lg:pb-0 max-w-[1800px] mx-auto lg:h-[calc(100vh-60px)] lg:flex lg:flex-col lg:min-h-0">
       <div className="mb-4">
         <h1 className="flex items-center gap-2 text-[17px] font-bold text-gray-900 dark:text-white tracking-tight">
           <span aria-hidden="true" className="w-6 h-6 shrink-0">

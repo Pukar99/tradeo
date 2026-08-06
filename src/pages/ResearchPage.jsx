@@ -309,7 +309,7 @@ function ResearchPage() {
 
   if (fetchError)
     return (
-      <div className="w-full px-3 sm:px-6 py-10 max-w-6xl mx-auto text-center">
+      <div className="w-full px-3 sm:px-6 py-10 max-w-[1800px] mx-auto text-center">
         <p className="text-[12px] text-red-400 mb-3">{fetchError}</p>
         <button
           onClick={() => {
@@ -336,7 +336,7 @@ function ResearchPage() {
   }
 
   return (
-    <div className="w-full px-3 sm:px-6 pt-4 sm:pt-6 pb-10 max-w-6xl mx-auto">
+    <div className="w-full px-3 sm:px-6 pt-4 sm:pt-6 pb-10 max-w-[1800px] mx-auto">
       {actionErr && (
         <div className="mb-4 flex items-center justify-between bg-red-50 dark:bg-red-900/20 border border-red-100 dark:border-red-800/50 rounded-xl px-4 py-2.5">
           <p className="text-[11px] text-red-500">{actionErr}</p>

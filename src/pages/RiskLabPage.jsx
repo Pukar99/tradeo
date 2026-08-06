@@ -908,7 +908,7 @@ function RiskLabPage() {
   const { t } = useLanguage()
 
   return (
-    <div className="max-w-5xl mx-auto px-3 sm:px-6 pt-4 sm:pt-6 pb-10 space-y-5">
+    <div className="max-w-[1800px] mx-auto px-3 sm:px-6 pt-4 sm:pt-6 pb-10 space-y-5">
       {/* Header */}
       <div>
         <h1 className="text-lg font-semibold text-gray-900 dark:text-white tracking-tight">

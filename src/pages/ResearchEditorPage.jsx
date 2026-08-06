@@ -167,13 +167,13 @@ function ResearchEditorPage() {
 
   if (loading)
     return (
-      <div className="w-full px-3 sm:px-6 py-6 max-w-4xl mx-auto">
+      <div className="w-full px-3 sm:px-6 py-6 max-w-[1800px] mx-auto">
         <p className="text-gray-400 text-sm">Loading editor...</p>
       </div>
     )
 
   return (
-    <div className="w-full px-3 sm:px-6 py-6 max-w-4xl mx-auto">
+    <div className="w-full px-3 sm:px-6 py-6 max-w-[1800px] mx-auto">
       {/* Header */}
       <div className="flex flex-wrap items-center justify-between gap-3 mb-5">
         <button

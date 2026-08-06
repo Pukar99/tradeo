@@ -476,7 +476,7 @@ function PortfolioPage() {
 
   if (loading)
     return (
-      <div className="max-w-7xl mx-auto px-3 sm:px-4 lg:px-6 pt-3 sm:pt-4 lg:pt-5 pb-14 space-y-4 animate-pulse">
+      <div className="max-w-[1800px] mx-auto px-3 sm:px-4 lg:px-6 pt-3 sm:pt-4 lg:pt-5 pb-14 space-y-4 animate-pulse">
         {/* header */}
         <div className="flex items-center justify-between">
           <div className="space-y-1.5">
@@ -530,7 +530,7 @@ function PortfolioPage() {
 
   if (fetchError)
     return (
-      <div className="max-w-7xl mx-auto px-6 py-6 flex items-center justify-center min-h-64">
+      <div className="max-w-[1800px] mx-auto px-6 py-6 flex items-center justify-center min-h-64">
         <div className="text-center space-y-3">
           <p className="text-[13px] text-red-400 font-medium">{fetchError}</p>
           <button
@@ -550,7 +550,7 @@ function PortfolioPage() {
   // ── Render ────────────────────────────────────────────────────────────────
 
   return (
-    <div className="max-w-7xl mx-auto px-3 sm:px-4 lg:px-6 pt-3 sm:pt-4 lg:pt-5 pb-14 space-y-4 sm:space-y-5">
+    <div className="max-w-[1800px] mx-auto px-3 sm:px-4 lg:px-6 pt-3 sm:pt-4 lg:pt-5 pb-14 space-y-4 sm:space-y-5">
       {/* ── Page header ─────────────────────────────────────────────────────── */}
       <div className="flex items-center justify-between">
         <div>

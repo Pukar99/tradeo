@@ -488,7 +488,7 @@ export default function LogsPage() {
           </div>
         )}
 
-        <div className="px-3 sm:px-5 py-4 pb-16 max-w-7xl mx-auto">
+        <div className="px-3 sm:px-5 py-4 pb-16 max-w-[1800px] mx-auto">
           {activeTab === 'trades' && (
             <TradeActionsTab
               positions={positions}

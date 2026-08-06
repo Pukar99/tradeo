@@ -230,7 +230,7 @@ function Navbar({ autoHide = false, hidden = false, onMouseEnter, onMouseLeave }
   return (
     <nav
       className={[
-        'glass-bar px-4 lg:px-6 py-0 flex justify-between items-center z-50',
+        'glass-bar px-4 lg:px-6 py-0 z-50',
         // When auto-hide is active: fixed + slide transition.
         // When normal: sticky (all other pages unchanged).
         autoHide
@@ -240,6 +240,14 @@ function Navbar({ autoHide = false, hidden = false, onMouseEnter, onMouseLeave }
       ].join(' ')}
       onMouseEnter={autoHide ? onMouseEnter : undefined}
     >
+      {/* Content cap — matches HomePage's max-w-[1800px] (wider than the
+          max-w-7xl used elsewhere — owner call: this is a trading OS, 27"
+          monitors are a real target). Without it, on 27"+ monitors the logo/
+          links pin to the far left and the icons/user menu pin to the far right
+          with a huge dead gap between them. The mobile dropdown below stays
+          OUTSIDE this wrapper (a sibling of it) so its absolute left-0/right-0
+          still spans the full nav, positioned relative to <nav> itself. */}
+      <div className="w-full max-w-[1800px] mx-auto flex justify-between items-center">
       {/* ── Left: Logo + Desktop nav links ─────────────────────────────────── */}
       <div className="flex items-center gap-6">
         <Link to="/" className="flex items-center gap-2.5 py-3 flex-shrink-0">
@@ -596,6 +604,7 @@ function Navbar({ autoHide = false, hidden = false, onMouseEnter, onMouseLeave }
             </svg>
           )}
         </button>
+      </div>
       </div>
 
       {/* ── Mobile menu drawer — slide-down on open ─────────────────────────── */}

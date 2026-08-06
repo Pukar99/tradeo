@@ -351,6 +351,10 @@ export default function DataLabPage() {
           transition: 'padding-top 300ms ease-in-out',
         }}
       >
+        {/* Content cap — matches every other page's max-w-[1800px] convention
+            (owner call: consistent even on this workspace-style page). Toolbar
+            and content stay aligned since both live inside this same wrapper. */}
+        <div className="w-full max-w-[1800px] mx-auto flex-1 min-h-0 flex flex-col">
         {/* ── Tab bar + inline toolbar ──
             Strategy: ONLY the slot scrolls horizontally. The outer row is a
             simple flex with hard shrink-0 on the chips and info button so they
@@ -423,6 +427,7 @@ export default function DataLabPage() {
           onMouseEnter={navHidden ? undefined : scheduleHide}
         >
           <TabContent activeTab={activeTab} />
+        </div>
         </div>
       </div>
       </DataLabControlsProvider>

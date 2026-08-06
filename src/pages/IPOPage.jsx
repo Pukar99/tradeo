@@ -1931,7 +1931,7 @@ function IPOPage({ isActive = true }) {
 
   if (initLoading)
     return (
-      <div className="px-3 sm:px-6 pt-10 max-w-6xl mx-auto space-y-2">
+      <div className="px-3 sm:px-6 pt-10 max-w-[1800px] mx-auto space-y-2">
         {[1, 2, 3].map((i) => (
           <div key={i} className="h-20 bg-gray-100 dark:bg-gray-800 rounded-2xl animate-pulse" />
         ))}
@@ -1940,7 +1940,7 @@ function IPOPage({ isActive = true }) {
 
   if (initError)
     return (
-      <div className="px-3 sm:px-6 pt-10 max-w-6xl mx-auto">
+      <div className="px-3 sm:px-6 pt-10 max-w-[1800px] mx-auto">
         <div className="flex items-center gap-3 border-l-2 border-red-500 bg-red-50 dark:bg-red-900/20 rounded-r-2xl px-5 py-4">
           <p className="text-[12px] text-red-600 dark:text-red-400 flex-1">{initError}</p>
           <button
@@ -2051,7 +2051,7 @@ function IPOPage({ isActive = true }) {
         onAddAcc={() => setShowAddModal(true)}
       />
 
-      <div className="px-3 sm:px-5 pt-3 pb-10 max-w-5xl mx-auto">
+      <div className="px-3 sm:px-5 pt-3 pb-10 max-w-[1800px] mx-auto">
         {/* ── Empty state — no accounts ── */}
         {!hasAccounts && (
           <div className="mt-6 bg-white dark:bg-gray-900 rounded-2xl border border-gray-100 dark:border-gray-800 p-12 text-center">

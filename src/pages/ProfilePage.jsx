@@ -86,7 +86,7 @@ function ProfilePage() {
 
   if (loading)
     return (
-      <div className="w-full px-3 sm:px-6 pt-4 sm:pt-6 pb-10 max-w-5xl mx-auto animate-pulse">
+      <div className="w-full px-3 sm:px-6 pt-4 sm:pt-6 pb-10 max-w-[1800px] mx-auto animate-pulse">
         {/* hero banner */}
         <div className="bg-gray-900 rounded-2xl overflow-hidden mb-6 p-4 sm:p-8">
           <div className="flex items-start justify-between flex-wrap gap-4">
@@ -149,7 +149,7 @@ function ProfilePage() {
   const level = getTraderLevel()
 
   return (
-    <div className="w-full px-3 sm:px-6 pt-4 sm:pt-6 pb-10 max-w-5xl mx-auto">
+    <div className="w-full px-3 sm:px-6 pt-4 sm:pt-6 pb-10 max-w-[1800px] mx-auto">
       {/* ── Hero Banner ── */}
       <div className="relative bg-gradient-to-br from-gray-900 via-blue-950 to-gray-900 rounded-2xl overflow-hidden mb-6 shadow-xl">
         <div className="absolute inset-0 opacity-10">

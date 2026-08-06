@@ -139,7 +139,7 @@ function SimpleContent({
         {!compact && (
           <div
             className={`hidden lg:flex flex-col shrink-0 overflow-y-auto relative
-                        bg-white/50 dark:bg-gray-950/60 backdrop-blur-2xl
+                        bg-white dark:bg-gray-900
                         shadow-[1px_0_0_rgba(255,255,255,0.18),2px_0_12px_rgba(0,0,0,0.06)]
                         dark:shadow-[1px_0_0_rgba(255,255,255,0.07),2px_0_16px_rgba(0,0,0,0.4)]
                         transition-all duration-200 ease-in-out
@@ -215,7 +215,7 @@ function SimpleContent({
         {!compact && (
           <div
             className={`hidden lg:flex flex-col shrink-0 overflow-y-auto relative
-                        bg-white/50 dark:bg-gray-950/60 backdrop-blur-2xl
+                        bg-white dark:bg-gray-900
                         shadow-[-1px_0_0_rgba(255,255,255,0.18),-2px_0_12px_rgba(0,0,0,0.06)]
                         dark:shadow-[-1px_0_0_rgba(255,255,255,0.07),-2px_0_16px_rgba(0,0,0,0.4)]
                         transition-all duration-200 ease-in-out
@@ -559,6 +559,13 @@ function ScreenInner() {
           transition: 'padding-top 300ms ease-in-out',
         }}
       >
+        {/* Content cap — matches every other page's max-w-[1800px] convention
+            (owner call: consistent even on this workspace-style page). The
+            collapsible side panels are already self-capped via their own
+            max-w-200px/240px, so this only bounds how wide the chart canvas
+            stretches on 27"+ monitors; toolbar and content stay aligned since
+            both live inside this same wrapper. */}
+        <div className="w-full max-w-[1800px] mx-auto flex-1 min-h-0 flex flex-col">
         {/* ── Toolbar strip ── */}
         {/* Single row at every breakpoint: [tabs (scroll) | divider | sub-tabs |
           divider | slot | badge]. On mobile the chart toolbar is compact
@@ -642,6 +649,7 @@ function ScreenInner() {
               <ComplexContent activeTab={complexTab} />
             </ComplexTabProvider>
           )}
+        </div>
         </div>
       </div>
     </ScreenToolbarSlotCtx.Provider>

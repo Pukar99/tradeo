@@ -1113,19 +1113,26 @@ function LoggedInHome() {
     <>
       {/* Use flex-col so side columns can stretch to remaining height without hardcoding greeting bar px */}
       <div className="w-full px-3 sm:px-4 py-3 sm:py-4 pb-safe min-h-[100dvh] flex flex-col bg-gradient-to-br from-slate-100 via-gray-50 to-blue-50/30 dark:from-gray-950 dark:via-gray-950 dark:to-slate-900">
-        {/* Greeting bar — shrinks to its content, never stretches */}
-        <div className="flex items-center justify-between mb-3 sm:mb-4 px-1 animate-fade-up flex-shrink-0">
-          <div>
-            <p className="text-sm font-semibold text-gray-800 dark:text-gray-200">
-              {getGreeting()}, {user?.name?.split(' ')[0] || 'Trader'}
-            </p>
-            <p className="text-[11px] text-gray-400 mt-0.5">{today}</p>
+        {/* Content cap — wider than LogsPage/PortfolioPage's max-w-7xl on purpose
+            (owner call: this is a trading OS, a 27" monitor is a real target, not
+            an edge case to shrink away from). Below ~1800px this is a no-op; above
+            it, stops the 12-col grid from linear-stretching into oversized cards
+            with huge dead space. Background gradient stays full-bleed on the outer
+            div above. */}
+        <div className="w-full max-w-[1800px] mx-auto flex flex-col flex-1 min-h-0">
+          {/* Greeting bar — shrinks to its content, never stretches */}
+          <div className="flex items-center justify-between mb-3 sm:mb-4 px-1 animate-fade-up flex-shrink-0">
+            <div>
+              <p className="text-sm font-semibold text-gray-800 dark:text-gray-200">
+                {getGreeting()}, {user?.name?.split(' ')[0] || 'Trader'}
+              </p>
+              <p className="text-[11px] text-gray-400 mt-0.5">{today}</p>
+            </div>
+            <MarketStatusChip />
           </div>
-          <MarketStatusChip />
-        </div>
 
-        {/* 3-Column Layout — flex-1 so it fills exactly the remaining height */}
-        <div className="flex-1 min-h-0 grid grid-cols-12 gap-3 sm:gap-4">
+          {/* 3-Column Layout — flex-1 so it fills exactly the remaining height */}
+          <div className="flex-1 min-h-0 grid grid-cols-12 gap-3 sm:gap-4">
           {/* CENTER — always first on mobile */}
           <div className="col-span-12 lg:col-span-6 order-1 lg:order-2 min-h-0">
             <CenterDashboard
@@ -1215,6 +1222,7 @@ function LoggedInHome() {
             </div>
           </div>
           {/* end mobile panels wrapper */}
+        </div>
         </div>
       </div>
     </>

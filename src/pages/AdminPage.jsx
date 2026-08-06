@@ -23,7 +23,7 @@ export default function AdminPage() {
 
   return (
     <div className="min-h-screen bg-gray-50 dark:bg-gray-950 pt-[56px]">
-      <div className="max-w-6xl mx-auto px-4 py-6">
+      <div className="max-w-[1800px] mx-auto px-4 py-6">
         {/* Header */}
         <div className="mb-4">
           <h1 className="text-lg font-bold text-gray-900 dark:text-white">Admin</h1>
