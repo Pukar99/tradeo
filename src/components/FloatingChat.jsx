@@ -54,6 +54,12 @@ function FloatingChat() {
   const dragStart = useRef({ mx: 0, my: 0, px: 0, py: 0 })
   const hasMoved = useRef(false)
   const fabRef = useRef(null)
+  // Whether the panel opens above or below the FAB — decided once when the
+  // panel opens, not re-evaluated on every render. Otherwise dragging the open
+  // panel (via its header) up past the flip threshold made it jump straight to
+  // the "open below" formula mid-drag, i.e. it snapped to the bottom of the
+  // screen instead of tracking your finger toward the navbar.
+  const openUpwardRef = useRef(true)
 
   // Clamp into the viewport on mount AND on resize. The mount clamp is the fix
   // for "the chat bubble disappeared": a position saved on a larger/rotated
@@ -95,6 +101,10 @@ function FloatingChat() {
       const moveEvt = isTouch ? 'touchmove' : 'mousemove'
       const endEvt = isTouch ? 'touchend' : 'mouseup'
       const onMove = (e) => {
+        // Touch must not be passive here: without preventDefault the browser's
+        // native page-scroll gesture fires alongside the drag, so the whole
+        // screen pans under your finger while moving the FAB/panel.
+        if (isTouch) e.preventDefault()
         const p = isTouch ? e.touches[0] : e
         moveTo(p.clientX, p.clientY)
       }
@@ -111,7 +121,7 @@ function FloatingChat() {
         })
       }
 
-      window.addEventListener(moveEvt, onMove, isTouch ? { passive: true } : undefined)
+      window.addEventListener(moveEvt, onMove, isTouch ? { passive: false } : undefined)
       window.addEventListener(endEvt, onEnd)
     },
     [pos]
@@ -163,6 +173,27 @@ function FloatingChat() {
     return () => window.removeEventListener('keydown', onKey)
   }, [isOpen])
 
+  // Lock background scroll while the panel is open — same convention as
+  // ScreenPage/AnalysisMobilePanels. Without this the message list's own
+  // scroll room is tiny, so a normal swipe blows past its boundary and the
+  // rest of the gesture scrolls the home page underneath instead.
+  useEffect(() => {
+    if (!isOpen) return
+    const previousOverflow = document.body.style.overflow
+    document.body.style.overflow = 'hidden'
+    return () => {
+      document.body.style.overflow = previousOverflow
+    }
+  }, [isOpen])
+
+  // Freeze the above/below placement decision for this open session — uses
+  // wherever the FAB was at the moment of opening, same as before, but never
+  // re-decides mid-drag.
+  useEffect(() => {
+    if (isOpen) openUpwardRef.current = pos.y - PANEL_H - 8 >= EDGE_PAD
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- only re-decide on open, not every pos change while dragging
+  }, [isOpen])
+
   if (location.pathname === '/chat') return null
   if (!user) return null
 
@@ -175,11 +206,15 @@ function FloatingChat() {
   // Horizontal: prefer aligning right edge of panel to right edge of FAB
   const panelX = clamp(panelLeft, EDGE_PAD, window.innerWidth - PANEL_W - EDGE_PAD)
 
-  // Vertical: prefer opening upward, fall back to downward
-  const openUpward = panelTop >= EDGE_PAD
-  const panelY = openUpward
-    ? panelTop
-    : clamp(panelBottom + 8, EDGE_PAD, window.innerHeight - PANEL_H - EDGE_PAD)
+  // Vertical: prefer opening upward, fall back to downward — frozen for this
+  // open session (openUpwardRef), so an active header-drag can't flip formulas
+  // mid-gesture. Still clamped into the viewport either way.
+  const openUpward = openUpwardRef.current
+  const panelY = clamp(
+    openUpward ? panelTop : panelBottom + 8,
+    EDGE_PAD,
+    window.innerHeight - PANEL_H - EDGE_PAD
+  )
 
   return (
     <>
@@ -209,7 +244,7 @@ function FloatingChat() {
       {!isOpen && (
       <div
         ref={fabRef}
-        className="fixed z-[60]"
+        className="fixed z-[60] touch-none"
         style={{ left: pos.x, top: pos.y, width: BUTTON_SIZE, height: BUTTON_SIZE }}
         onMouseDown={onMouseDown}
         onTouchStart={onTouchStart}

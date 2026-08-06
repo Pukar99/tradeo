@@ -607,7 +607,7 @@ function AIChat({ isFullPage = false, onClose, onDragStart }) {
         onTouchStart={isFloat ? onDragStart : undefined}
         className={`flex items-center justify-between shrink-0 border-b ${
           isFloat
-            ? 'px-3 py-2.5 bg-white/20 dark:bg-black/20 border-white/20 dark:border-white/8 cursor-move select-none'
+            ? 'px-3 py-2.5 bg-white/20 dark:bg-black/20 border-white/20 dark:border-white/8 cursor-move select-none touch-none'
             : 'px-4 py-3 bg-white dark:bg-gray-900 border-gray-100 dark:border-gray-800'
         }`}
       >
@@ -781,7 +781,7 @@ function AIChat({ isFullPage = false, onClose, onDragStart }) {
         <div
           ref={scrollBoxRef}
           onScroll={handleChatScroll}
-          className="h-full overflow-y-auto no-scrollbar px-3 py-3 space-y-3"
+          className="h-full overflow-y-auto overscroll-contain no-scrollbar px-3 py-3 space-y-3"
         >
           {/* Empty state */}
           {messages.length === 0 && !activeForm && (

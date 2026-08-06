@@ -467,12 +467,13 @@ export default function WatchlistPanel({
       )}
 
       <div className="hp-card bg-white/70 dark:bg-gray-900/60 backdrop-blur-md rounded-2xl border border-white/60 dark:border-white/10 shadow-sm overflow-hidden">
-        {/* Header row */}
-        <div className="flex items-center gap-2 px-3 py-2.5 border-b border-gray-100 dark:border-gray-800 overflow-x-auto no-scrollbar">
+        {/* Header row — wraps instead of hidden-scrolling on narrow phones, where
+            label + tabs + Select + Add don't all fit on one line (HOME mobile fix). */}
+        <div className="flex flex-wrap items-center gap-2 px-3 py-2.5 border-b border-gray-100 dark:border-gray-800">
           <p className="text-[10px] font-semibold uppercase tracking-widest text-gray-400 shrink-0">
             Watchlist
           </p>
-          <div className="flex-1 shrink-0 min-w-[8px]" />
+          <div className="hidden sm:block flex-1 shrink-0 min-w-[8px]" />
           {/* Tab pill group */}
           <div className="flex items-center bg-gray-100 dark:bg-gray-800 rounded-lg p-0.5 shrink-0">
             {[
@@ -506,36 +507,40 @@ export default function WatchlistPanel({
               </button>
             ))}
           </div>
-          {/* Select toggle — watch tabs only (HOME-16) */}
-          {watchlistTab !== 'positions' && filteredWatch.length > 0 && (
-            <button
-              onClick={() => (selectMode ? exitSelectMode() : setSelectMode(true))}
-              className={`px-2 py-0.5 rounded-md text-[10px] font-semibold transition-colors shrink-0 ${
-                selectMode
-                  ? 'bg-gray-200 dark:bg-gray-700 text-gray-700 dark:text-gray-200'
-                  : 'text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-300'
-              }`}
-            >
-              {selectMode ? 'Cancel' : 'Select'}
-            </button>
-          )}
-          {/* Add button — only on watchlist tabs, hidden in select mode */}
-          {watchAddState === null && watchlistTab !== 'positions' && !selectMode && (
-            <button
-              onClick={() => setWatchAddState('search')}
-              className="flex items-center gap-0.5 px-2 py-0.5 rounded-md text-[10px] font-semibold bg-blue-600 hover:bg-blue-700 active:bg-blue-800 text-white transition-colors shrink-0"
-            >
-              <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                  strokeWidth={2.5}
-                  d="M12 4v16m8-8H4"
-                />
-              </svg>
-              Add
-            </button>
-          )}
+          {/* Select + Add — grouped so they wrap to their own line together on
+              narrow phones, instead of Add dropping alone (HOME mobile fix). */}
+          <div className="flex items-center gap-2 shrink-0">
+            {/* Select toggle — watch tabs only (HOME-16) */}
+            {watchlistTab !== 'positions' && filteredWatch.length > 0 && (
+              <button
+                onClick={() => (selectMode ? exitSelectMode() : setSelectMode(true))}
+                className={`px-2 py-0.5 rounded-md text-[10px] font-semibold transition-colors shrink-0 ${
+                  selectMode
+                    ? 'bg-gray-200 dark:bg-gray-700 text-gray-700 dark:text-gray-200'
+                    : 'text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-300'
+                }`}
+              >
+                {selectMode ? 'Cancel' : 'Select'}
+              </button>
+            )}
+            {/* Add button — only on watchlist tabs, hidden in select mode */}
+            {watchAddState === null && watchlistTab !== 'positions' && !selectMode && (
+              <button
+                onClick={() => setWatchAddState('search')}
+                className="flex items-center gap-0.5 px-2 py-0.5 rounded-md text-[10px] font-semibold bg-blue-600 hover:bg-blue-700 active:bg-blue-800 text-white transition-colors shrink-0"
+              >
+                <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                    strokeWidth={2.5}
+                    d="M12 4v16m8-8H4"
+                  />
+                </svg>
+                Add
+              </button>
+            )}
+          </div>
         </div>
 
         {/* Symbol search panel */}
