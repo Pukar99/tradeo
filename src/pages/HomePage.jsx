@@ -6,7 +6,7 @@ import TaskBoard from '../components/dashboard/TaskBoard'
 import DisciplineScore from '../components/dashboard/DisciplineScore'
 import MonthlyGoals from '../components/dashboard/MonthlyGoals'
 import { Link, useNavigate } from 'react-router-dom'
-import { useState, useEffect, useCallback, useRef } from 'react'
+import { useState, useEffect, useCallback, useRef, useMemo } from 'react'
 import { useLocalStorage } from '../hooks/useLocalStorage'
 import NEPSEChart from '../components/NEPSEChart'
 import PageSkeleton from '../components/PageSkeleton'
@@ -22,6 +22,7 @@ import {
   IconBolt,
 } from '../components/common/icons'
 import WatchlistPanel from '../components/dashboard/watchlist/WatchlistPanel'
+import { generateSwingCandles } from '../utils/candlestickData'
 
 const MOTIVATIONAL_QUOTES = [
   'The market is a device for transferring money from the impatient to the patient.',
@@ -32,6 +33,74 @@ const MOTIVATIONAL_QUOTES = [
   'Discipline is the bridge between trading goals and trading reality.',
 ]
 
+// ── Hero feature-grid icons (line style, not emoji — HOME-15 precedent) ───────
+const heroIconProps = {
+  width: 18,
+  height: 18,
+  viewBox: '0 0 24 24',
+  fill: 'none',
+  stroke: 'currentColor',
+  strokeWidth: '1.8',
+  strokeLinecap: 'round',
+  strokeLinejoin: 'round',
+}
+// Trade Journal — same mark as Login/SignupPage BrandPanel.
+function HeroIconJournal() {
+  return (
+    <svg {...heroIconProps}>
+      <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z" />
+      <polyline points="14 2 14 8 20 8" />
+      <line x1="16" y1="13" x2="8" y2="13" />
+      <line x1="16" y1="17" x2="8" y2="17" />
+    </svg>
+  )
+}
+// Smart Watchlist — same mark as AuthFormShell's password-visibility eye.
+function HeroIconEye() {
+  return (
+    <svg {...heroIconProps}>
+      <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z" />
+      <circle cx="12" cy="12" r="3" />
+    </svg>
+  )
+}
+// Portfolio Tracker
+function HeroIconChart() {
+  return (
+    <svg {...heroIconProps}>
+      <line x1="18" y1="20" x2="18" y2="10" />
+      <line x1="12" y1="20" x2="12" y2="4" />
+      <line x1="6" y1="20" x2="6" y2="14" />
+    </svg>
+  )
+}
+// Discipline Score — same mark as Login/SignupPage BrandPanel.
+function HeroIconClock() {
+  return (
+    <svg {...heroIconProps}>
+      <circle cx="12" cy="12" r="10" />
+      <path d="M12 8v4l3 3" />
+    </svg>
+  )
+}
+// Tradeo AI — same mark as Login/SignupPage BrandPanel.
+function HeroIconChat() {
+  return (
+    <svg {...heroIconProps}>
+      <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z" />
+    </svg>
+  )
+}
+// Risk Lab
+function HeroIconFlask() {
+  return (
+    <svg {...heroIconProps}>
+      <path d="M9 2v6.5L4 18a2 2 0 0 0 1.7 3h12.6a2 2 0 0 0 1.7-3l-5-9.5V2" />
+      <line x1="9" y1="2" x2="15" y2="2" />
+    </svg>
+  )
+}
+
 // ── Logged-out landing ────────────────────────────────────────────────────────
 function LoggedOutHome() {
   const { t } = useLanguage()
@@ -40,36 +109,64 @@ function LoggedOutHome() {
   )
 
   const dummyStats = [
-    { label: 'Total P/L', value: '+Rs. 24,850', color: 'text-green-500' },
-    { label: 'Win Rate', value: '68%', color: 'text-blue-500' },
-    { label: 'Open Trades', value: '4', color: 'text-gray-900 dark:text-white' },
-    { label: 'Streak', value: '🔥 7 days', color: 'text-orange-500' },
+    { label: 'Total P/L Today', value: '+Rs. 24,850', color: 'text-green-500' },
+    { label: 'Realized P/L', value: '+Rs. 18,200', color: 'text-blue-500' },
+    { label: 'Win Rate', value: '68%', color: 'text-gray-900 dark:text-white' },
+    { label: 'Open Positions', value: '4', color: 'text-orange-500' },
   ]
   const dummyWatchlist = ['NABIL', 'NTC', 'SCB', 'EBL', 'NICA', 'HBL', 'NLIC', 'UPPER']
-  const dummyTrades = [
-    { symbol: 'NABIL', entry: 1240, ltp: 1310, pnl: '+Rs. 3,500', pct: '+5.6%' },
-    { symbol: 'NTC', entry: 890, ltp: 860, pnl: '-Rs. 1,200', pct: '-3.4%' },
-    { symbol: 'SCB', entry: 3100, ltp: 3280, pnl: '+Rs. 9,000', pct: '+5.8%' },
-    { symbol: 'EBL', entry: 1560, ltp: 1590, pnl: '+Rs. 1,500', pct: '+1.9%' },
-  ]
   const dummyTasks = [
     'Review morning briefing',
     'Check NABIL resistance',
     'Update trade journal',
     'Set SL for SCB',
   ]
-
-  // Candlestick motif for the brand backdrop (same asset as the auth BrandPanel).
-  const heroCandles = [
-    { x: 40, h: 80, t: 200, green: true },
-    { x: 90, h: 150, t: 150, green: false },
-    { x: 140, h: 60, t: 230, green: true },
-    { x: 190, h: 120, t: 170, green: true },
-    { x: 240, h: 190, t: 130, green: false },
-    { x: 290, h: 90, t: 210, green: true },
-    { x: 340, h: 140, t: 160, green: true },
-    { x: 390, h: 70, t: 235, green: false },
+  const dummyAlerts = [
+    { symbol: 'NABIL', note: 'Crossed Rs.1,300 — BUY zone', tone: 'green' },
+    { symbol: 'SCB', note: 'Approaching SL at Rs.3,050', tone: 'red' },
+    { symbol: 'EBL', note: 'Volume spike, +12% today', tone: 'green' },
   ]
+  const dummyDiscipline = [
+    ['Task Completion', 82],
+    ['Journal Rate', 75],
+    ['Win Rate', 68],
+  ]
+  // Small NEPSE-style candlestick strip for the center chart card preview —
+  // a real swinging price path (each candle connects to the next), not
+  // independent random bars.
+  // Random seed each mount (not fixed) so the pattern is fresh every page
+  // load, still generated by the same connected-swing algorithm so it never
+  // reads as noise. useMemo so it doesn't reshuffle on every incidental
+  // re-render — only once per visit.
+  const chartCandles = useMemo(
+    () =>
+      generateSwingCandles(19, {
+        seed: Math.floor(Math.random() * 1e6),
+        spacing: 15,
+        startX: 10,
+        baseline: 32,
+        amplitude: 14,
+        minBody: 4,
+        maxBody: 11,
+      }),
+    []
+  )
+
+  // Candlestick motif for the brand backdrop (same generator + look as the
+  // auth BrandPanel, tuned for this wider/shorter viewBox).
+  const heroCandles = useMemo(
+    () =>
+      generateSwingCandles(8, {
+        seed: Math.floor(Math.random() * 1e6),
+        spacing: 50,
+        startX: 40,
+        baseline: 140,
+        amplitude: 60,
+        minBody: 28,
+        maxBody: 58,
+      }),
+    []
+  )
 
   return (
     <div className="relative w-full min-h-[calc(100dvh-3.5rem)] overflow-hidden bg-gray-50 dark:bg-gray-950">
@@ -92,16 +189,16 @@ function LoggedOutHome() {
             >
               <line
                 x1={c.x}
-                y1={c.t - 22}
+                y1={c.t - 15}
                 x2={c.x}
-                y2={c.t + c.h + 22}
+                y2={c.t + c.h + 15}
                 stroke={c.green ? '#22c55e' : '#ef4444'}
                 strokeWidth="1.5"
               />
               <rect
-                x={c.x - 9}
+                x={c.x - 6}
                 y={c.t}
-                width="18"
+                width="12"
                 height={c.h}
                 fill={c.green ? '#22c55e' : '#ef4444'}
                 rx="2"
@@ -112,11 +209,15 @@ function LoggedOutHome() {
       </div>
 
       {/* Blurred dashboard preview — desktop only (intentional marketing mock per
-          design.md). Hidden on phones, where it read as a fake-data "vibecoded"
-          wall; phones get the clean brand backdrop above instead. */}
+          design.md), deliberately mirrors the REAL logged-in dashboard's layout
+          (LoggedInHome below): routine+goals left, stats+chart+watchlist center,
+          discipline+alerts right — same 3/6/3 grid, same column names/positions,
+          both side columns hidden below lg exactly like the real one. Hidden on
+          phones, where it read as a fake-data "vibecoded" wall; phones get the
+          clean brand backdrop above instead. */}
       <div className="hidden sm:flex absolute inset-0 select-none pointer-events-none px-4 py-4 flex-col gap-4 overflow-hidden">
         {/* Stats bar */}
-        <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 filter blur-[2px]">
+        <div className="grid grid-cols-4 gap-3 filter blur-[2px]">
           {dummyStats.map((s, i) => (
             <div
               key={i}
@@ -129,43 +230,27 @@ function LoggedOutHome() {
         </div>
 
         <div className="grid grid-cols-12 gap-4">
-          {/* Left column */}
+          {/* Left column — matches real TaskBoard + MonthlyGoals, desktop only */}
           <div className="hidden lg:flex col-span-3 flex-col gap-4">
             <div className="bg-white dark:bg-gray-800 rounded-2xl p-4 shadow-sm border border-gray-100 dark:border-gray-700 filter blur-[2px]">
-              <p className="text-xs font-semibold text-gray-500 mb-3">Discipline Score</p>
-              <div className="flex items-center justify-center">
-                <div className="relative w-24 h-24">
-                  <svg viewBox="0 0 36 36" className="w-full h-full -rotate-90">
-                    <circle cx="18" cy="18" r="15.9" fill="none" stroke="#e5e7eb" strokeWidth="3" />
-                    <circle
-                      cx="18"
-                      cy="18"
-                      r="15.9"
-                      fill="none"
-                      stroke="#22c55e"
-                      strokeWidth="3"
-                      strokeDasharray="68 32"
-                      strokeLinecap="round"
+              <p className="text-xs font-semibold text-gray-500 mb-3">Daily Routine</p>
+              <div className="space-y-2">
+                {dummyTasks.map((task, i) => (
+                  <div key={i} className="flex items-center gap-2">
+                    <div
+                      className={`w-3.5 h-3.5 rounded-full border-2 flex-shrink-0 ${i < 2 ? 'bg-green-400 border-green-400' : 'border-gray-300'}`}
                     />
-                  </svg>
-                  <div className="absolute inset-0 flex flex-col items-center justify-center">
-                    <span className="text-xl font-bold text-gray-900 dark:text-white">68</span>
-                    <span className="text-[10px] text-gray-400">/ 100</span>
-                  </div>
-                </div>
-              </div>
-              <div className="mt-3 space-y-1.5">
-                {['Consistency', 'Risk Mgmt', 'Journaling'].map((l, i) => (
-                  <div key={l} className="flex justify-between items-center">
-                    <span className="text-[10px] text-gray-400">{l}</span>
-                    <div className="w-20 h-1.5 bg-gray-100 dark:bg-gray-700 rounded-full overflow-hidden">
-                      <div
-                        className="h-full bg-green-400 rounded-full"
-                        style={{ width: `${[72, 60, 80][i]}%` }}
-                      />
-                    </div>
+                    <span
+                      className={`text-[11px] ${i < 2 ? 'line-through text-gray-300' : 'text-gray-600 dark:text-gray-300'}`}
+                    >
+                      {task}
+                    </span>
                   </div>
                 ))}
+              </div>
+              <div className="mt-3 pt-2 border-t border-gray-100 dark:border-gray-700 flex justify-between text-[10px] text-gray-400">
+                <span>2 / 4 done</span>
+                <span>50%</span>
               </div>
             </div>
             <div className="bg-white dark:bg-gray-800 rounded-2xl p-4 shadow-sm border border-gray-100 dark:border-gray-700 filter blur-[2px]">
@@ -193,41 +278,49 @@ function LoggedOutHome() {
             </div>
           </div>
 
-          {/* Center column */}
-          <div className="col-span-6 flex flex-col gap-4">
+          {/* Center column — full width until lg (matches the real dashboard:
+              CenterDashboard is the only column shown below lg), 6 of 12 once
+              both side columns reappear at lg */}
+          <div className="col-span-12 lg:col-span-6 flex flex-col gap-4">
             <div className="bg-white dark:bg-gray-800 rounded-2xl shadow-sm border border-gray-100 dark:border-gray-700 overflow-hidden filter blur-[2px]">
               <div className="flex items-center justify-between px-3 py-3 border-b border-gray-100 dark:border-gray-700">
-                <h3 className="text-sm font-semibold text-gray-900 dark:text-white">
-                  Open Positions
-                </h3>
-                <span className="text-xs text-gray-400">4 active</span>
+                <h3 className="text-sm font-semibold text-gray-900 dark:text-white">NEPSE</h3>
+                <div className="flex items-center bg-gray-100 dark:bg-gray-700 rounded-lg p-0.5">
+                  <span className="px-2 py-0.5 rounded-md text-[10px] font-semibold bg-white dark:bg-gray-600 text-gray-900 dark:text-white shadow-sm">
+                    Daily
+                  </span>
+                  <span className="px-2 py-0.5 rounded-md text-[10px] font-semibold text-gray-400">
+                    Weekly
+                  </span>
+                </div>
               </div>
-              <div className="divide-y divide-gray-50 dark:divide-gray-700">
-                {dummyTrades.map((t, i) => (
-                  <div key={i} className="flex items-center justify-between px-3 py-2.5">
-                    <div className="flex items-center gap-2">
-                      <StockAvatar symbol={t.symbol} size="w-7 h-7" />
-                      <div>
-                        <p className="text-xs font-semibold text-gray-900 dark:text-white">
-                          {t.symbol}
-                        </p>
-                        <p className="text-[10px] text-gray-400">Entry Rs.{t.entry}</p>
-                      </div>
-                    </div>
-                    <div className="text-right">
-                      <p
-                        className={`text-xs font-semibold ${t.pnl.startsWith('+') ? 'text-green-500' : 'text-red-500'}`}
-                      >
-                        {t.pnl}
-                      </p>
-                      <p
-                        className={`text-[10px] ${t.pct.startsWith('+') ? 'text-green-400' : 'text-red-400'}`}
-                      >
-                        {t.pct}
-                      </p>
-                    </div>
-                  </div>
-                ))}
+              <div className="px-3 pt-2 flex items-baseline gap-2">
+                <span className="text-sm font-bold text-gray-900 dark:text-white">2,667.97</span>
+                <span className="text-[10px] font-medium text-green-500">+0.18%</span>
+              </div>
+              <div className="px-2 pb-3">
+                <svg viewBox="0 0 300 65" className="w-full h-20">
+                  {chartCandles.map((c, i) => (
+                    <g key={i}>
+                      <line
+                        x1={c.x}
+                        y1={c.t - 3}
+                        x2={c.x}
+                        y2={c.t + c.h + 3}
+                        stroke={c.green ? '#22c55e' : '#ef4444'}
+                        strokeWidth="1"
+                      />
+                      <rect
+                        x={c.x - 2.5}
+                        y={c.t}
+                        width="5"
+                        height={c.h}
+                        fill={c.green ? '#22c55e' : '#ef4444'}
+                        rx="1"
+                      />
+                    </g>
+                  ))}
+                </svg>
               </div>
             </div>
             <div className="bg-white dark:bg-gray-800 rounded-2xl shadow-sm border border-gray-100 dark:border-gray-700 overflow-hidden filter blur-[2px]">
@@ -256,47 +349,41 @@ function LoggedOutHome() {
             </div>
           </div>
 
-          {/* Right column */}
-          <div className="col-span-3 flex flex-col gap-4">
+          {/* Right column — matches real DisciplineScore (compact) + AlertsWidget,
+              desktop only */}
+          <div className="hidden lg:flex col-span-3 flex-col gap-4">
             <div className="bg-white dark:bg-gray-800 rounded-2xl p-4 shadow-sm border border-gray-100 dark:border-gray-700 filter blur-[2px]">
-              <p className="text-xs font-semibold text-gray-500 mb-3">Today's Tasks</p>
+              <div className="flex items-center justify-between mb-3">
+                <p className="text-xs font-semibold text-gray-500">Discipline Score</p>
+                <span className="text-lg font-bold text-green-500">68</span>
+              </div>
               <div className="space-y-2">
-                {dummyTasks.map((task, i) => (
-                  <div key={i} className="flex items-center gap-2">
-                    <div
-                      className={`w-3.5 h-3.5 rounded-full border-2 flex-shrink-0 ${i < 2 ? 'bg-green-400 border-green-400' : 'border-gray-300'}`}
-                    />
-                    <span
-                      className={`text-[11px] ${i < 2 ? 'line-through text-gray-300' : 'text-gray-600 dark:text-gray-300'}`}
-                    >
-                      {task}
+                {dummyDiscipline.map(([l, pct]) => (
+                  <div key={l} className="flex justify-between items-center">
+                    <span className="text-[10px] text-gray-400">{l}</span>
+                    <span className="text-[10px] font-semibold text-gray-700 dark:text-gray-300">
+                      {pct}%
                     </span>
                   </div>
                 ))}
               </div>
-              <div className="mt-3 pt-2 border-t border-gray-100 dark:border-gray-700 flex justify-between text-[10px] text-gray-400">
-                <span>2 / 4 done</span>
-                <span>50%</span>
-              </div>
             </div>
             <div className="bg-white dark:bg-gray-800 rounded-2xl p-4 shadow-sm border border-gray-100 dark:border-gray-700 filter blur-[2px]">
-              <p className="text-xs font-semibold text-gray-500 mb-3">Tradeo AI</p>
+              <p className="text-xs font-semibold text-gray-500 mb-3">Alerts</p>
               <div className="space-y-2">
-                <div className="bg-gray-50 dark:bg-gray-700 rounded-xl px-3 py-2">
-                  <p className="text-[11px] text-gray-500">
-                    NABIL has broken resistance at 1300. Consider reviewing your SL.
-                  </p>
-                </div>
-                <div className="bg-blue-50 dark:bg-blue-900 rounded-xl px-3 py-2 ml-4">
-                  <p className="text-[11px] text-blue-600 dark:text-blue-300">
-                    What's my win rate this month?
-                  </p>
-                </div>
-                <div className="bg-gray-50 dark:bg-gray-700 rounded-xl px-3 py-2">
-                  <p className="text-[11px] text-gray-500">
-                    Your win rate is 68% with 17 trades closed this month.
-                  </p>
-                </div>
+                {dummyAlerts.map((a, i) => (
+                  <div key={i} className="flex items-start gap-2">
+                    <span
+                      className={`w-1.5 h-1.5 rounded-full mt-1.5 flex-shrink-0 ${a.tone === 'green' ? 'bg-green-400' : 'bg-red-400'}`}
+                    />
+                    <p className="text-[11px] text-gray-500 leading-snug">
+                      <span className="font-semibold text-gray-900 dark:text-white">
+                        {a.symbol}
+                      </span>{' '}
+                      {a.note}
+                    </p>
+                  </div>
+                ))}
               </div>
             </div>
           </div>
@@ -330,22 +417,25 @@ function LoggedOutHome() {
               <p className="text-gray-400 text-sm mt-2 leading-relaxed">{t('hero.sub')}</p>
             </div>
 
-            {/* Features grid — 2-up on all phone widths to keep the card short */}
+            {/* Features grid — 2-up on all phone widths to keep the card short.
+                Line icons, not emoji (HOME-15 precedent) — reuses the same Trade
+                Journal / Discipline Score / Tradeo AI marks as Login/SignupPage's
+                BrandPanel for cross-page consistency. */}
             <div className="px-5 sm:px-8 py-3.5 sm:py-5 grid grid-cols-2 gap-x-3 gap-y-2.5 sm:gap-3">
               {[
-                { icon: '📒', title: t('hero.feat1Title'), desc: t('hero.feat1Desc') },
-                { icon: '👁️', title: t('hero.feat2Title'), desc: t('hero.feat2Desc') },
-                { icon: '📊', title: t('hero.feat3Title'), desc: t('hero.feat3Desc') },
-                { icon: '🧠', title: t('hero.feat4Title'), desc: t('hero.feat4Desc') },
-                { icon: '🤖', title: t('hero.feat5Title'), desc: t('hero.feat5Desc') },
-                { icon: '⚗️', title: t('hero.feat6Title'), desc: t('hero.feat6Desc') },
+                { icon: <HeroIconJournal />, title: t('hero.feat1Title'), desc: t('hero.feat1Desc') },
+                { icon: <HeroIconEye />, title: t('hero.feat2Title'), desc: t('hero.feat2Desc') },
+                { icon: <HeroIconChart />, title: t('hero.feat3Title'), desc: t('hero.feat3Desc') },
+                { icon: <HeroIconClock />, title: t('hero.feat4Title'), desc: t('hero.feat4Desc') },
+                { icon: <HeroIconChat />, title: t('hero.feat5Title'), desc: t('hero.feat5Desc') },
+                { icon: <HeroIconFlask />, title: t('hero.feat6Title'), desc: t('hero.feat6Desc') },
               ].map((f, i) => (
                 <div
                   key={f.title}
                   className="flex items-start gap-2.5 animate-fade-up"
                   style={{ animationDelay: `${100 + i * 50}ms` }}
                 >
-                  <span className="text-base mt-0.5">{f.icon}</span>
+                  <span className="text-blue-500 dark:text-blue-400 mt-0.5">{f.icon}</span>
                   <div>
                     <p className="text-xs font-semibold text-gray-900 dark:text-white">{f.title}</p>
                     <p className="text-[11px] text-gray-400 leading-snug">{f.desc}</p>
@@ -363,13 +453,13 @@ function LoggedOutHome() {
             <div className="px-5 sm:px-8 py-3.5 sm:py-5 border-t border-gray-100 dark:border-gray-800 flex flex-col sm:flex-row gap-2.5 sm:gap-3">
               <Link
                 to="/signup"
-                className="active:scale-[0.98] flex-1 bg-green-500 hover:bg-green-400 text-white min-h-[48px] flex items-center justify-center py-3 rounded-xl text-sm font-semibold text-center transition-all shadow-sm shadow-green-500/20"
+                className="active:scale-[0.98] flex-1 bg-green-500 hover:bg-green-400 text-white min-h-[48px] flex items-center justify-center py-3 rounded-xl text-sm font-semibold text-center transition-all duration-200 ease-luxury shadow-sm shadow-green-500/20 hover:shadow-md hover:shadow-green-500/25"
               >
                 {t('hero.cta')}
               </Link>
               <Link
                 to="/login"
-                className="active:scale-[0.98] flex-1 bg-gray-100 dark:bg-gray-800 text-gray-700 dark:text-gray-300 min-h-[48px] flex items-center justify-center py-3 rounded-xl text-sm font-medium text-center hover:bg-gray-200 dark:hover:bg-gray-700 border border-gray-200 dark:border-gray-700 transition-all"
+                className="active:scale-[0.98] flex-1 bg-gray-100 dark:bg-gray-800 text-gray-700 dark:text-gray-300 min-h-[48px] flex items-center justify-center py-3 rounded-xl text-sm font-medium text-center hover:bg-gray-200 dark:hover:bg-gray-700 border border-gray-200 dark:border-gray-700 transition-all duration-200 ease-luxury"
               >
                 {t('hero.ctaLogin')}
               </Link>

@@ -62,6 +62,12 @@ export default {
         'pulse-ring': 'pulse-ring 1.4s ease-out infinite',
         'candle-grow': 'candle-grow 0.6s cubic-bezier(.22,1,.36,1) both',
       },
+      transitionTimingFunction: {
+        // Same curve the entrance animations already use (fade-up, scale-in, etc.)
+        // — extending it to hover/press transitions so interactive and entrance
+        // motion feel like one system instead of entrance-animated + default-eased.
+        luxury: 'cubic-bezier(.22,1,.36,1)',
+      },
     },
   },
   plugins: [],
