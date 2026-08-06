@@ -281,7 +281,13 @@ function Navbar({ autoHide = false, hidden = false, onMouseEnter, onMouseLeave }
               {link.label}
               {link.authOnly && !user && LockGlyph}
               {isActive(link.path) && (
-                <span className="absolute bottom-0 left-0 right-0 h-0.5 bg-green-500 rounded-t-full animate-scale-x-in origin-left" />
+                <span
+                  className={`absolute bottom-0 left-0 right-0 h-0.5 rounded-t-full animate-scale-x-in origin-left ${
+                    TIER_ACCENT[user?.tier]
+                      ? `bg-gradient-to-r ${TIER_ACCENT[user.tier].bar}`
+                      : 'bg-green-500'
+                  }`}
+                />
               )}
             </Link>
           ))}
@@ -296,7 +302,13 @@ function Navbar({ autoHide = false, hidden = false, onMouseEnter, onMouseLeave }
             >
               Admin
               {isActive('/admin') && (
-                <span className="absolute bottom-0 left-0 right-0 h-0.5 bg-green-500 rounded-t-full animate-scale-x-in origin-left" />
+                <span
+                  className={`absolute bottom-0 left-0 right-0 h-0.5 rounded-t-full animate-scale-x-in origin-left ${
+                    TIER_ACCENT[user?.tier]
+                      ? `bg-gradient-to-r ${TIER_ACCENT[user.tier].bar}`
+                      : 'bg-green-500'
+                  }`}
+                />
               )}
             </Link>
           )}
