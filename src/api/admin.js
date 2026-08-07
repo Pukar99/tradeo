@@ -33,6 +33,7 @@ export const getAllAdminFlags = () => API.get('/api/admin/flags')
 export const patchAdminFlag = (name, data) =>
   API.patch(`/api/admin/flags/${encodeURIComponent(name)}`, data)
 export const postAdminFlag = (data) => API.post('/api/admin/flags', data)
+export const deleteAdminFlag = (name) => API.delete(`/api/admin/flags/${encodeURIComponent(name)}`)
 
 // ── Broadcast ─────────────────────────────────────────────────────────────────
 export const getAdminAnnouncements = (params = {}) =>
