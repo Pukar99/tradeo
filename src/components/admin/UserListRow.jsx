@@ -44,7 +44,7 @@ function timeAgo(iso) {
   return `${Math.floor(hrs / 24)}d ago`
 }
 
-export default function UserListRow({ user: initialUser, onRefresh, dropUp = false }) {
+export default function UserListRow({ user: initialUser, onRefresh, onSelectUser, dropUp = false }) {
   const [user, setUser] = useState(initialUser)
   const [menuOpen, setMenuOpen] = useState(false)
   const [activeAction, setActiveAction] = useState(null) // 'tier' | 'suspend' | 'force-logout'
@@ -145,11 +145,21 @@ export default function UserListRow({ user: initialUser, onRefresh, dropUp = fal
           />
         </div>
 
-        {/* Name + email */}
+        {/* Name + email — name click opens per-user analytics (Analytics tab) */}
         <div className="flex-1 min-w-0">
-          <p className="text-sm font-semibold text-gray-900 dark:text-white truncate">
-            {user.name}
-          </p>
+          {onSelectUser ? (
+            <button
+              onClick={() => onSelectUser(user.id)}
+              title="View analytics"
+              className="text-sm font-semibold text-gray-900 dark:text-white truncate hover:text-emerald-600 dark:hover:text-emerald-400 hover:underline transition-colors text-left w-full"
+            >
+              {user.name}
+            </button>
+          ) : (
+            <p className="text-sm font-semibold text-gray-900 dark:text-white truncate">
+              {user.name}
+            </p>
+          )}
           <p className="text-xs text-gray-500 dark:text-gray-400 truncate">{user.email}</p>
         </div>
 

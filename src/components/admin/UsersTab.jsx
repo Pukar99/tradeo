@@ -21,7 +21,7 @@ function SkeletonRow() {
   )
 }
 
-export default function UsersTab() {
+export default function UsersTab({ onSelectUser }) {
   const [users, setUsers] = useState([])
   const [total, setTotal] = useState(0)
   const [page, setPage] = useState(1)
@@ -130,6 +130,7 @@ export default function UsersTab() {
               key={u.id}
               user={u}
               onRefresh={fetchUsers}
+              onSelectUser={onSelectUser}
               dropUp={users.length > 3 && i >= users.length - 2}
             />
           ))

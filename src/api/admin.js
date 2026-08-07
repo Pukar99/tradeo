@@ -47,3 +47,7 @@ export const getAdminAuditLog = (params = {}) => API.get('/api/admin/audit-log',
 
 // ── AI Usage ──────────────────────────────────────────────────────────────────
 export const getAiUsage = (params = {}) => API.get('/api/admin/ai-usage', { params })
+
+// ── Analytics ─────────────────────────────────────────────────────────────────
+export const getAdminAnalyticsOverview = () => API.get('/api/admin/analytics/overview')
+export const getAdminUserAnalytics = (id) => API.get(`/api/admin/analytics/users/${id}`)

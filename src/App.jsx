@@ -18,6 +18,7 @@ import { usePriceAlerts } from './hooks/usePriceAlerts'
 import { useAuth } from './context/AuthContext'
 import { useTheme } from './context/ThemeContext'
 import { useHotkeys } from './hooks/useHotkeys'
+import { usePageViewTracking } from './hooks/usePageViewTracking'
 import { runMeroshareAutoApplyOnLogin } from './api'
 import { getProfile } from './utils/globalCache'
 import Navbar from './components/Navbar'
@@ -127,6 +128,7 @@ function AppContent() {
   const navigate = useNavigate()
   const { toasts, addToast, dismissToast } = useAlertToasts()
   usePriceAlerts({ user, onAlert: addToast })
+  usePageViewTracking()
 
   // ── Navbar auto-hide state ────────────────────────────────────────────────
   const [autoHideActive, setAutoHideActive] = useState(false)

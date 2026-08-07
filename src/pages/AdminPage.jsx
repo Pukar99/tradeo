@@ -7,6 +7,7 @@ import FeatureFlagsTab from '../components/admin/FeatureFlagsTab'
 import BroadcastTab from '../components/admin/BroadcastTab'
 import AuditLogTab from '../components/admin/AuditLogTab'
 import AIUsageTab from '../components/admin/AIUsageTab'
+import AnalyticsTab from '../components/admin/AnalyticsTab'
 
 const TABS = [
   { id: 'users', label: 'Users' },
@@ -15,11 +16,20 @@ const TABS = [
   { id: 'flags', label: 'Feature Flags' },
   { id: 'broadcast', label: 'Broadcast' },
   { id: 'ai', label: 'AI Usage' },
+  { id: 'analytics', label: 'Analytics' },
   { id: 'audit', label: 'Audit Log' },
 ]
 
 export default function AdminPage() {
   const [tab, setTab] = useState('users')
+  // Lifted here (not local to AnalyticsTab) so clicking a user in the Users
+  // tab can jump straight to their analytics, pre-selected.
+  const [selectedUserId, setSelectedUserId] = useState(null)
+
+  function viewUserAnalytics(userId) {
+    setSelectedUserId(userId)
+    setTab('analytics')
+  }
 
   return (
     <div className="min-h-screen bg-gray-50 dark:bg-gray-950 pt-[56px]">
@@ -51,12 +61,18 @@ export default function AdminPage() {
           </div>
 
           {/* Tab content */}
-          {tab === 'users' && <UsersTab />}
+          {tab === 'users' && <UsersTab onSelectUser={viewUserAnalytics} />}
           {tab === 'content' && <ContentTab />}
           {tab === 'system' && <SystemTab />}
           {tab === 'flags' && <FeatureFlagsTab />}
           {tab === 'broadcast' && <BroadcastTab />}
           {tab === 'ai' && <AIUsageTab />}
+          {tab === 'analytics' && (
+            <AnalyticsTab
+              selectedUserId={selectedUserId}
+              onClearSelectedUser={() => setSelectedUserId(null)}
+            />
+          )}
           {tab === 'audit' && <AuditLogTab />}
         </div>
       </div>
