@@ -2,6 +2,7 @@
 import { useState } from 'react'
 import { patchUserSuspend } from '@api/admin'
 import toast from 'react-hot-toast'
+import ActionPanel, { PanelLabel } from './ActionPanel'
 
 export default function SuspendButton({ user, onClose, onSuccess }) {
   const isSuspended = user.is_suspended
@@ -25,48 +26,31 @@ export default function SuspendButton({ user, onClose, onSuccess }) {
   }
 
   return (
-    <div
-      className={`flex items-center justify-between gap-3 px-4 py-3 border-t ${
-        isSuspended
-          ? 'bg-green-50 dark:bg-green-900/15 border-green-100 dark:border-green-800/30'
-          : 'bg-red-50 dark:bg-red-900/15 border-red-100 dark:border-red-800/30'
-      }`}
+    <ActionPanel
+      tone={isSuspended ? 'green' : 'red'}
+      title={isSuspended ? 'Unsuspend account' : 'Suspend account'}
+      subject={user.name}
+      onCancel={onClose}
+      onConfirm={handleConfirm}
+      loading={loading}
+      confirmLabel={isSuspended ? 'Unsuspend' : 'Suspend'}
     >
-      <div className="flex items-center gap-3 flex-1 min-w-0">
-        <span
-          className={`text-xs font-medium whitespace-nowrap ${
-            isSuspended ? 'text-green-700 dark:text-green-400' : 'text-red-700 dark:text-red-400'
-          }`}
-        >
-          {isSuspended ? `Unsuspend ${user.name}?` : `Suspend ${user.name}?`}
-        </span>
-        {!isSuspended && (
+      {isSuspended ? (
+        <p className="text-[11px] text-gray-500 dark:text-gray-400">
+          They get access back immediately and can sign in as normal.
+        </p>
+      ) : (
+        <div>
+          <PanelLabel>Reason (optional)</PanelLabel>
           <input
             type="text"
             value={reason}
             onChange={(e) => setReason(e.target.value)}
-            placeholder="Reason (optional)"
-            className="flex-1 h-7 px-2 text-xs bg-white dark:bg-gray-800 border border-red-200 dark:border-red-800/50 rounded-lg text-gray-900 dark:text-white placeholder-gray-400 dark:placeholder-gray-500 focus:outline-none focus:ring-1 focus:ring-red-400"
+            placeholder="Recorded in the audit log"
+            className="w-full max-w-sm h-8 px-3 text-xs bg-gray-100 dark:bg-gray-800 border border-transparent rounded-lg text-gray-900 dark:text-white placeholder-gray-400 dark:placeholder-gray-500 transition-colors focus:outline-none focus:bg-white dark:focus:bg-gray-900 focus:border-gray-200 dark:focus:border-gray-700 focus:ring-4 focus:ring-red-500/10"
           />
-        )}
-      </div>
-      <div className="flex items-center gap-2 flex-shrink-0">
-        <button
-          onClick={onClose}
-          className="px-3 py-1.5 text-xs text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-200 transition-colors"
-        >
-          Cancel
-        </button>
-        <button
-          onClick={handleConfirm}
-          disabled={loading}
-          className={`px-3 py-1.5 text-xs font-semibold text-white rounded-lg disabled:opacity-40 transition-colors ${
-            isSuspended ? 'bg-green-600 hover:bg-green-700' : 'bg-red-600 hover:bg-red-700'
-          }`}
-        >
-          {loading ? 'Saving…' : 'Confirm'}
-        </button>
-      </div>
-    </div>
+        </div>
+      )}
+    </ActionPanel>
   )
 }

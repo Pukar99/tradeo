@@ -1,9 +1,11 @@
 // === UserListRow.jsx ===
 import { useState, useRef, useEffect } from 'react'
-import TierBadge from './TierBadge'
+import TierBadge, { effectiveTier } from './TierBadge'
 import StatusBadge from './StatusBadge'
+import { TIER_RING, TIER_ACCENT } from '../common/TierMaterial'
 import TierChangeDropdown from './TierChangeDropdown'
 import SuspendButton from './SuspendButton'
+import ActionPanel from './ActionPanel'
 import { patchUserForceLogout } from '@api/admin'
 import toast from 'react-hot-toast'
 
@@ -88,6 +90,16 @@ export default function UserListRow({ user: initialUser, onRefresh, onSelectUser
       ? `Last seen ${timeAgo(user.last_seen_at)}`
       : 'No activity recorded'
 
+  // The tier this row's user is actually on right now (expiry-aware — same
+  // rule as the badge, imported rather than re-derived). Drives the avatar
+  // ring and the hover accent bar. Note this is the TARGET user's real tier,
+  // deliberately not getDisplayTier() — that helper exists to make an admin
+  // *view themselves* as Premium in their own identity chrome, which would be
+  // wrong here: this table reports other people's billing state.
+  const rowTier = effectiveTier(user.tier, user.tier_expires_at)
+  const ringClass = TIER_RING[rowTier] || ''
+  const accentBar = TIER_ACCENT[rowTier]?.bar
+
   function selectAction(action) {
     setMenuOpen(false)
     setActiveAction((prev) => (prev === action ? null : action))
@@ -120,11 +132,23 @@ export default function UserListRow({ user: initialUser, onRefresh, onSelectUser
   return (
     <div>
       {/* Main row */}
-      <div className="flex items-center gap-3 px-4 py-3 hover:bg-gray-50 dark:hover:bg-gray-800/50 transition-colors">
+      <div className="group/row relative flex items-center gap-3 px-4 py-3.5 hover:bg-gray-50 dark:hover:bg-gray-800/50 transition-colors">
+        {/* Hover accent along the left edge — tier-coloured for Pro/Premium,
+            neutral otherwise. Same hover-reveal language as the dashboard
+            cards' TierAccentOverlay, rotated to the vertical edge. */}
+        <span
+          aria-hidden="true"
+          className={`pointer-events-none absolute left-0 top-0 bottom-0 w-[2px] opacity-0 group-hover/row:opacity-100 transition-opacity duration-300 ${
+            accentBar
+              ? `bg-gradient-to-b ${accentBar}`
+              : 'bg-gray-300 dark:bg-gray-600'
+          }`}
+        />
+
         {/* Avatar — photo when available, initials fallback otherwise */}
         <div className="relative flex-shrink-0" title={presenceLabel}>
           <div
-            className={`w-8 h-8 rounded-lg flex items-center justify-center overflow-hidden ${avatarColor(user.id)}`}
+            className={`w-9 h-9 rounded-xl flex items-center justify-center overflow-hidden ${avatarColor(user.id)} ${ringClass}`}
           >
             {user.avatar_url && !avatarError ? (
               <img
@@ -137,12 +161,19 @@ export default function UserListRow({ user: initialUser, onRefresh, onSelectUser
               <span className="text-white text-xs font-bold">{getInitials(user.name)}</span>
             )}
           </div>
-          {/* Presence dot */}
-          <span
-            className={`absolute -bottom-0.5 -right-0.5 w-2.5 h-2.5 rounded-full ring-2 ring-white dark:ring-gray-900 ${
-              isOnline ? 'bg-green-500' : 'bg-gray-300 dark:bg-gray-600'
-            }`}
-          />
+          {/* Presence dot — online gets a slow halo ping so "who's here" is
+              readable without parsing text. The ping is a sibling behind the
+              solid dot, not a ring on it, so the dot itself stays crisp. */}
+          <span className="absolute -bottom-0.5 -right-0.5 flex">
+            {isOnline && (
+              <span className="absolute inline-flex w-2.5 h-2.5 rounded-full bg-emerald-400 animate-pulse-ring motion-reduce:hidden" />
+            )}
+            <span
+              className={`relative w-2.5 h-2.5 rounded-full ring-2 ring-white dark:ring-gray-900 ${
+                isOnline ? 'bg-emerald-500' : 'bg-gray-300 dark:bg-gray-600'
+              }`}
+            />
+          </span>
         </div>
 
         {/* Name + email — name click opens per-user analytics (Analytics tab) */}
@@ -151,20 +182,20 @@ export default function UserListRow({ user: initialUser, onRefresh, onSelectUser
             <button
               onClick={() => onSelectUser(user.id)}
               title="View analytics"
-              className="text-sm font-semibold text-gray-900 dark:text-white truncate hover:text-emerald-600 dark:hover:text-emerald-400 hover:underline transition-colors text-left w-full"
+              className="block text-[13px] font-semibold tracking-[-0.005em] text-gray-900 dark:text-white truncate hover:text-emerald-600 dark:hover:text-emerald-400 hover:underline transition-colors text-left w-full"
             >
               {user.name}
             </button>
           ) : (
-            <p className="text-sm font-semibold text-gray-900 dark:text-white truncate">
+            <p className="text-[13px] font-semibold tracking-[-0.005em] text-gray-900 dark:text-white truncate">
               {user.name}
             </p>
           )}
-          <p className="text-xs text-gray-500 dark:text-gray-400 truncate">{user.email}</p>
+          <p className="text-[11px] text-gray-500 dark:text-gray-400 truncate">{user.email}</p>
         </div>
 
         {/* Tier */}
-        <div className="hidden sm:block w-20 flex-shrink-0">
+        <div className="hidden sm:block w-24 flex-shrink-0">
           <TierBadge tier={user.tier} expiresAt={user.tier_expires_at} />
         </div>
 
@@ -175,14 +206,15 @@ export default function UserListRow({ user: initialUser, onRefresh, onSelectUser
 
         {/* Joined */}
         <div className="hidden lg:block w-32 flex-shrink-0">
-          <span className="text-xs text-gray-500 dark:text-gray-400">{joined}</span>
+          <span className="text-[11px] tabular-nums text-gray-500 dark:text-gray-400">{joined}</span>
         </div>
 
-        {/* ⋮ actions menu */}
+        {/* ⋮ actions menu — dimmed until the row is hovered, but never below
+            full opacity on touch (no hover there) or when focused via keyboard. */}
         <div className="relative flex-shrink-0" ref={menuRef}>
           <button
             onClick={() => setMenuOpen((prev) => !prev)}
-            className="w-7 h-7 flex items-center justify-center rounded-lg text-gray-400 dark:text-gray-500 hover:text-gray-600 dark:hover:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors"
+            className="w-7 h-7 flex items-center justify-center rounded-lg text-gray-400 dark:text-gray-500 opacity-100 [@media(hover:hover)]:opacity-50 group-hover/row:opacity-100 focus-visible:opacity-100 hover:text-gray-600 dark:hover:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700 transition-all"
             aria-label="User actions"
           >
             <svg className="w-4 h-4" fill="currentColor" viewBox="0 0 24 24">
@@ -229,26 +261,20 @@ export default function UserListRow({ user: initialUser, onRefresh, onSelectUser
         <SuspendButton user={user} onClose={closeAction} onSuccess={handleSuccess} />
       )}
       {activeAction === 'force-logout' && (
-        <div className="flex items-center justify-between gap-3 px-4 py-3 bg-amber-50 dark:bg-amber-900/15 border-t border-amber-100 dark:border-amber-800/30">
-          <span className="text-xs text-amber-700 dark:text-amber-400 font-medium">
-            Force logout {user.name}? Their current session ends immediately.
-          </span>
-          <div className="flex items-center gap-2 flex-shrink-0">
-            <button
-              onClick={closeAction}
-              className="px-3 py-1.5 text-xs text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-200 transition-colors"
-            >
-              Cancel
-            </button>
-            <button
-              onClick={handleForceLogout}
-              disabled={forceLoading}
-              className="px-3 py-1.5 text-xs font-semibold bg-amber-600 hover:bg-amber-700 text-white rounded-lg disabled:opacity-40 transition-colors"
-            >
-              {forceLoading ? 'Logging out…' : 'Confirm'}
-            </button>
-          </div>
-        </div>
+        <ActionPanel
+          tone="amber"
+          title="Force logout"
+          subject={user.name}
+          onCancel={closeAction}
+          onConfirm={handleForceLogout}
+          loading={forceLoading}
+          loadingLabel="Logging out…"
+          confirmLabel="Log them out"
+        >
+          <p className="text-[11px] text-gray-500 dark:text-gray-400">
+            Their current session ends immediately. They can sign back in straight away.
+          </p>
+        </ActionPanel>
       )}
     </div>
   )
