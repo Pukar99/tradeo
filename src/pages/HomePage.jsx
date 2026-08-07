@@ -9,7 +9,6 @@ import { Link, useNavigate } from 'react-router-dom'
 import { useState, useEffect, useCallback, useRef, useMemo } from 'react'
 import { useLocalStorage } from '../hooks/useLocalStorage'
 import NEPSEChart from '../components/NEPSEChart'
-import PageSkeleton from '../components/PageSkeleton'
 import { getDashboardInit } from '../utils/globalCache'
 import { MarketStatusChip } from '../components/common/MarketStatusBadge'
 import StockAvatar from '../components/common/StockAvatar'
@@ -731,6 +730,53 @@ function StatCard({ label, value, color, sub }) {
   )
 }
 
+// ── Center dashboard skeleton — shared by CenterDashboard's own initData-loading
+// state and HomeSkeleton (HomePage's authLoading gate), so the two loading
+// phases render pixel-identical markup and the swap between them is invisible.
+function CenterDashboardSkeleton() {
+  return (
+    <div className="flex flex-col gap-3 sm:gap-4 animate-pulse">
+      {/* Stat cards */}
+      <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 sm:gap-2.5">
+        {[1, 2, 3, 4].map((i) => (
+          <div
+            key={i}
+            className="bg-white/70 dark:bg-gray-900/60 backdrop-blur-md rounded-xl sm:rounded-2xl border border-white/60 dark:border-white/10 shadow-sm px-3 py-2.5"
+          >
+            <div className="h-2 bg-gray-100 dark:bg-gray-800 rounded w-3/4 mb-2" />
+            <div className="h-5 bg-gray-100 dark:bg-gray-800 rounded w-1/2" />
+          </div>
+        ))}
+      </div>
+      {/* Chart placeholder */}
+      <div className="bg-white/70 dark:bg-gray-900/60 backdrop-blur-md rounded-2xl border border-white/60 dark:border-white/10 shadow-sm h-[200px] sm:h-[220px]" />
+      {/* Watchlist placeholder */}
+      <div className="bg-white/70 dark:bg-gray-900/60 backdrop-blur-md rounded-2xl border border-white/60 dark:border-white/10 shadow-sm">
+        <div className="h-10 border-b border-gray-100 dark:border-gray-800 px-3 flex items-center gap-2">
+          <div className="h-2 bg-gray-100 dark:bg-gray-800 rounded w-16" />
+          <div className="flex-1" />
+          <div className="h-6 bg-gray-100 dark:bg-gray-800 rounded-lg w-40" />
+        </div>
+        <div className="flex gap-2 p-2 overflow-x-hidden">
+          {[1, 2, 3, 4].map((i) => (
+            <div
+              key={i}
+              className="shrink-0 basis-[calc((100%-1rem)/3)] sm:basis-[calc((100%-1.5rem)/4)] bg-gray-50 dark:bg-gray-800/50 rounded-xl px-1.5 py-1.5 space-y-1.5"
+            >
+              <div className="flex items-center gap-1">
+                <div className="w-5 h-5 bg-gray-200 dark:bg-gray-700 rounded-lg flex-shrink-0" />
+                <div className="h-2.5 bg-gray-200 dark:bg-gray-700 rounded w-2/3" />
+              </div>
+              <div className="h-3 bg-gray-200 dark:bg-gray-700 rounded w-full" />
+              <div className="h-1.5 bg-gray-200 dark:bg-gray-700 rounded-full w-full" />
+            </div>
+          ))}
+        </div>
+      </div>
+    </div>
+  )
+}
+
 // ── Center dashboard (authenticated) ─────────────────────────────────────────
 function CenterDashboard({ navigate, initData, onRefresh, onDataReady, mobileTopTab, setMobileTopTab }) {
   const { t: tr } = useLanguage()
@@ -862,48 +908,7 @@ function CenterDashboard({ navigate, initData, onRefresh, onDataReady, mobileTop
 
   useChatRefresh(['trades', 'watchlist'], onRefresh)
 
-  if (loading)
-    return (
-      <div className="flex flex-col gap-3 sm:gap-4 animate-pulse">
-        {/* Stat cards */}
-        <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 sm:gap-2.5">
-          {[1, 2, 3, 4].map((i) => (
-            <div
-              key={i}
-              className="bg-white/70 dark:bg-gray-900/60 backdrop-blur-md rounded-xl sm:rounded-2xl border border-white/60 dark:border-white/10 shadow-sm px-3 py-2.5"
-            >
-              <div className="h-2 bg-gray-100 dark:bg-gray-800 rounded w-3/4 mb-2" />
-              <div className="h-5 bg-gray-100 dark:bg-gray-800 rounded w-1/2" />
-            </div>
-          ))}
-        </div>
-        {/* Chart placeholder */}
-        <div className="bg-white/70 dark:bg-gray-900/60 backdrop-blur-md rounded-2xl border border-white/60 dark:border-white/10 shadow-sm h-[200px] sm:h-[220px]" />
-        {/* Watchlist placeholder */}
-        <div className="bg-white/70 dark:bg-gray-900/60 backdrop-blur-md rounded-2xl border border-white/60 dark:border-white/10 shadow-sm">
-          <div className="h-10 border-b border-gray-100 dark:border-gray-800 px-3 flex items-center gap-2">
-            <div className="h-2 bg-gray-100 dark:bg-gray-800 rounded w-16" />
-            <div className="flex-1" />
-            <div className="h-6 bg-gray-100 dark:bg-gray-800 rounded-lg w-40" />
-          </div>
-          <div className="flex gap-2 p-2 overflow-x-hidden">
-            {[1, 2, 3, 4].map((i) => (
-              <div
-                key={i}
-                className="shrink-0 basis-[calc((100%-1rem)/3)] sm:basis-[calc((100%-1.5rem)/4)] bg-gray-50 dark:bg-gray-800/50 rounded-xl px-1.5 py-1.5 space-y-1.5"
-              >
-                <div className="flex items-center gap-1">
-                  <div className="w-5 h-5 bg-gray-200 dark:bg-gray-700 rounded-lg flex-shrink-0" />
-                  <div className="h-2.5 bg-gray-200 dark:bg-gray-700 rounded w-2/3" />
-                </div>
-                <div className="h-3 bg-gray-200 dark:bg-gray-700 rounded w-full" />
-                <div className="h-1.5 bg-gray-200 dark:bg-gray-700 rounded-full w-full" />
-              </div>
-            ))}
-          </div>
-        </div>
-      </div>
-    )
+  if (loading) return <CenterDashboardSkeleton />
 
   return (
     <div className="flex flex-col gap-3 sm:gap-4">
@@ -1245,6 +1250,61 @@ function LoggedInHome() {
   )
 }
 
+// ── Home skeleton — the authLoading gate's placeholder. Mirrors LoggedInHome's
+// own shell (greeting bar + 3-column grid) instead of the generic cross-page
+// PageSkeleton, so there's no shape change when LoggedInHome takes over —
+// previously the generic skeleton → this one was an visible seam on any slow
+// reload (cold cache / hard reload), since it only ever showed briefly enough
+// to go unnoticed on a warm reload. `user` isn't known yet at this point, so
+// the greeting text itself is a pulse bar rather than real content.
+function HomeSkeleton() {
+  return (
+    <div className="w-full px-3 sm:px-4 py-3 sm:py-4 pb-safe min-h-[100dvh] flex flex-col bg-gradient-to-br from-slate-100 via-gray-50 to-blue-50/30 dark:from-gray-950 dark:via-gray-950 dark:to-slate-900">
+      <div className="w-full max-w-[1800px] mx-auto flex flex-col flex-1 min-h-0">
+        {/* Greeting bar */}
+        <div className="flex items-center justify-between mb-3 sm:mb-4 px-1 flex-shrink-0 animate-pulse">
+          <div>
+            <div className="h-[18px] w-40 bg-gray-100 dark:bg-gray-800 rounded mb-1.5" />
+            <div className="h-[14px] w-52 bg-gray-100 dark:bg-gray-800 rounded" />
+          </div>
+          <div className="h-6 w-24 bg-gray-100 dark:bg-gray-800 rounded-full" />
+        </div>
+
+        {/* 3-Column Layout */}
+        <div className="flex-1 min-h-0 grid grid-cols-12 gap-3 sm:gap-4">
+          {/* CENTER — always first on mobile */}
+          <div className="col-span-12 lg:col-span-6 order-1 lg:order-2 min-h-0">
+            <CenterDashboardSkeleton />
+          </div>
+
+          {/* LEFT column — desktop only */}
+          <div
+            className="hidden lg:grid col-span-3 order-1 gap-3 min-h-0"
+            style={{ gridTemplateRows: '35fr 65fr' }}
+          >
+            <div className="rounded-2xl bg-gray-100 dark:bg-gray-800 animate-pulse min-h-[120px]" />
+            <div className="rounded-2xl bg-gray-100 dark:bg-gray-800 animate-pulse min-h-[200px]" />
+          </div>
+
+          {/* RIGHT column — desktop only */}
+          <div
+            className="hidden lg:grid col-span-3 order-3 gap-3 min-h-0"
+            style={{ gridTemplateRows: '35fr 65fr' }}
+          >
+            <div className="rounded-2xl bg-gray-100 dark:bg-gray-800 animate-pulse min-h-[120px]" />
+            <div className="rounded-2xl bg-gray-100 dark:bg-gray-800 animate-pulse min-h-[200px]" />
+          </div>
+
+          {/* MOBILE only */}
+          <div className="col-span-12 lg:hidden order-2">
+            <div className="rounded-2xl bg-gray-100 dark:bg-gray-800 animate-pulse min-h-[180px]" />
+          </div>
+        </div>
+      </div>
+    </div>
+  )
+}
+
 // ── Root ──────────────────────────────────────────────────────────────────────
 function HomePage() {
   const { user, loading } = useAuth()
@@ -1252,9 +1312,11 @@ function HomePage() {
     <div className="min-h-[100dvh] bg-gradient-to-br from-slate-100 via-gray-50 to-blue-50/30 dark:from-gray-950 dark:via-gray-950 dark:to-slate-900 transition-colors">
       {/* Wait for /api/auth/me before choosing a view. `/` is public, so without
           this gate `user` is null on reload and the logged-OUT landing flashes
-          for ~1s before flipping to LoggedInHome. Spinner matches PrivateRoute. */}
+          for ~1s before flipping to LoggedInHome. HomeSkeleton (not the generic
+          PageSkeleton) so the loading shape stays identical once LoggedInHome
+          takes over and shows its own initData-loading state. */}
       {loading ? (
-        <PageSkeleton />
+        <HomeSkeleton />
       ) : user ? (
         <LoggedInHome />
       ) : (

@@ -24,9 +24,12 @@ import Navbar from './components/Navbar'
 import FloatingChat from './components/FloatingChat'
 import PrivateRoute from './components/PrivateRoute'
 import AdminRoute from './components/AdminRoute'
+// Not lazy — it's the app's front door, everyone needs this chunk on first
+// load anyway, so code-splitting it only adds a Suspense spinner flash in
+// front of the page's own loading skeleton on cold/hard reloads for no gain.
+import HomePage from './pages/HomePage'
 
 // Lazy-loaded pages — each becomes its own JS chunk, reducing initial bundle size
-const HomePage = lazy(() => import('./pages/HomePage'))
 const ScreenPage = lazy(() => import('./pages/ScreenPage'))
 const PortfolioPage = lazy(() => import('./pages/PortfolioPage'))
 const NotFoundPage = lazy(() => import('./pages/NotFoundPage'))
