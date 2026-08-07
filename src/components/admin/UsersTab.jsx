@@ -3,7 +3,11 @@ import { useState, useEffect, useCallback } from 'react'
 import { getAdminUsers } from '@api/admin'
 import UserListRow from './UserListRow'
 import AdminSearchInput from '../common/AdminSearchInput'
+import AdminPagination from './AdminPagination'
+import AdminEmptyState from './AdminEmptyState'
 import { useSlidingIndicator } from '../../hooks/useSlidingIndicator'
+
+const PAGE_SIZE = 20
 
 // Each filter carries the swatch shown when it's the active one — the tier's
 // own colour, using the same hexes as TierBadge / TierMaterial. The active
@@ -44,35 +48,13 @@ function SkeletonRow() {
   )
 }
 
-function EmptyState({ query, tier }) {
-  const filtered = query || tier !== 'all'
-  return (
-    <div className="min-h-[420px] flex flex-col items-center justify-center gap-2 px-6 text-center">
-      <div className="w-11 h-11 rounded-2xl bg-gray-100 dark:bg-gray-800 flex items-center justify-center text-gray-400 dark:text-gray-500">
-        <svg
-          className="w-5 h-5"
-          viewBox="0 0 24 24"
-          fill="none"
-          stroke="currentColor"
-          strokeWidth="2"
-          strokeLinecap="round"
-          strokeLinejoin="round"
-          aria-hidden="true"
-        >
-          <path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2" />
-          <circle cx="9" cy="7" r="4" />
-          <path d="M22 11h-6" />
-        </svg>
-      </div>
-      <p className="text-sm font-semibold text-gray-700 dark:text-gray-200">No users found</p>
-      <p className="text-xs text-gray-400 dark:text-gray-500 max-w-[280px]">
-        {filtered
-          ? 'Nothing matches this search and filter. Try a different name, email, or tier.'
-          : 'Nobody has signed up yet.'}
-      </p>
-    </div>
-  )
-}
+const USERS_EMPTY_ICON = (
+  <>
+    <path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2" />
+    <circle cx="9" cy="7" r="4" />
+    <path d="M22 11h-6" />
+  </>
+)
 
 export default function UsersTab({ onSelectUser }) {
   const [users, setUsers] = useState([])
@@ -89,7 +71,7 @@ export default function UsersTab({ onSelectUser }) {
     async (silent = false) => {
       if (!silent) setLoading(true)
       try {
-        const params = { page, limit: 20 }
+        const params = { page, limit: PAGE_SIZE }
         if (query) params.search = query
         if (tier !== 'all') params.tier = tier
         const { data } = await getAdminUsers(params)
@@ -131,9 +113,6 @@ export default function UsersTab({ onSelectUser }) {
     indicatorStyle: filterIndicatorStyle,
     onPointerDown: onFilterPointerDown,
   } = useSlidingIndicator(tier, selectTier)
-
-  const from = total === 0 ? 0 : (page - 1) * 20 + 1
-  const to = Math.min(page * 20, total)
 
   return (
     <div className="flex flex-col gap-0">
@@ -207,7 +186,15 @@ export default function UsersTab({ onSelectUser }) {
         {loading ? (
           Array.from({ length: 8 }).map((_, i) => <SkeletonRow key={i} />)
         ) : users.length === 0 ? (
-          <EmptyState query={query} tier={tier} />
+          <AdminEmptyState
+            title="No users found"
+            icon={USERS_EMPTY_ICON}
+            hint={
+              query || tier !== 'all'
+                ? 'Nothing matches this search and filter. Try a different name, email, or tier.'
+                : 'Nobody has signed up yet.'
+            }
+          />
         ) : (
           users.map((u, i) => (
             <UserListRow
@@ -221,61 +208,13 @@ export default function UsersTab({ onSelectUser }) {
         )}
       </div>
 
-      {/* Pagination */}
-      {pages > 1 && (
-        <div className="flex items-center justify-between px-4 py-3 border-t border-gray-100 dark:border-gray-800">
-          <span className="text-[11px] tabular-nums text-gray-400 dark:text-gray-500">
-            Showing{' '}
-            <b className="font-semibold text-gray-700 dark:text-gray-200">
-              {from}–{to}
-            </b>{' '}
-            of <b className="font-semibold text-gray-700 dark:text-gray-200">{total}</b>
-          </span>
-          <div className="flex items-center gap-1">
-            <button
-              onClick={() => setPage((p) => Math.max(p - 1, 1))}
-              disabled={page === 1}
-              aria-label="Previous page"
-              className="w-7 h-7 flex items-center justify-center rounded-lg border border-gray-100 dark:border-gray-800 text-gray-500 dark:text-gray-400 disabled:opacity-35 enabled:hover:text-gray-900 dark:enabled:hover:text-white enabled:hover:border-gray-200 dark:enabled:hover:border-gray-700 transition-colors"
-            >
-              <svg
-                className="w-3.5 h-3.5"
-                viewBox="0 0 24 24"
-                fill="none"
-                stroke="currentColor"
-                strokeWidth="2.4"
-                strokeLinecap="round"
-                strokeLinejoin="round"
-                aria-hidden="true"
-              >
-                <path d="m15 5-7 7 7 7" />
-              </svg>
-            </button>
-            <span className="px-2 text-[11px] tabular-nums text-gray-500 dark:text-gray-400">
-              {page} / {pages}
-            </span>
-            <button
-              onClick={() => setPage((p) => Math.min(p + 1, pages))}
-              disabled={page === pages}
-              aria-label="Next page"
-              className="w-7 h-7 flex items-center justify-center rounded-lg border border-gray-100 dark:border-gray-800 text-gray-500 dark:text-gray-400 disabled:opacity-35 enabled:hover:text-gray-900 dark:enabled:hover:text-white enabled:hover:border-gray-200 dark:enabled:hover:border-gray-700 transition-colors"
-            >
-              <svg
-                className="w-3.5 h-3.5"
-                viewBox="0 0 24 24"
-                fill="none"
-                stroke="currentColor"
-                strokeWidth="2.4"
-                strokeLinecap="round"
-                strokeLinejoin="round"
-                aria-hidden="true"
-              >
-                <path d="m9 5 7 7-7 7" />
-              </svg>
-            </button>
-          </div>
-        </div>
-      )}
+      <AdminPagination
+        page={page}
+        pages={pages}
+        total={total}
+        limit={PAGE_SIZE}
+        onChange={setPage}
+      />
     </div>
   )
 }
