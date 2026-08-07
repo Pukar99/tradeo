@@ -16,6 +16,8 @@ import {
   ToolbarMenu,
   ToolbarMenuSection,
 } from '../components/screen/ScreenToolbarAtoms'
+import { useAuth } from '../context/AuthContext'
+import { TIER_TEXT, getDisplayTier } from '../components/common/TierMaterial'
 
 import TradeActionsTab from '../components/logs/TradeActionsTab'
 import AuditTab from '../components/logs/AuditTab'
@@ -42,6 +44,8 @@ function resolveTabParam(t) {
 }
 
 export default function LogsPage() {
+  const { user } = useAuth()
+  const displayTier = getDisplayTier(user)
   const [positions, setPositions] = useState([])
   const [ltpMap, setLtpMap] = useState({})
   const [loading, setLoading] = useState(true)
@@ -220,7 +224,7 @@ export default function LogsPage() {
           onClick={() => setView(v.key)}
           className={`flex-1 px-1.5 py-0.5 rounded text-[10px] font-semibold transition-colors whitespace-nowrap ${
             view === v.key
-              ? 'bg-white dark:bg-gray-700 text-gray-900 dark:text-white shadow-sm'
+              ? `bg-white dark:bg-gray-700 shadow-sm ${TIER_TEXT[displayTier] || 'text-gray-900 dark:text-white'}`
               : 'text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-300'
           }`}
         >
@@ -242,7 +246,7 @@ export default function LogsPage() {
               onClick={() => handleTabChange(tab.key)}
               className={`px-2 py-0.5 rounded-md text-[10px] font-semibold transition-all whitespace-nowrap ${
                 activeTab === tab.key
-                  ? 'bg-white dark:bg-gray-700 text-gray-900 dark:text-white shadow-sm'
+                  ? `bg-white dark:bg-gray-700 shadow-sm ${TIER_TEXT[displayTier] || 'text-gray-900 dark:text-white'}`
                   : 'text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-300'
               }`}
             >
