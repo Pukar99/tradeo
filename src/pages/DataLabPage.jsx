@@ -20,6 +20,7 @@ import ComingSoon from '../components/ComingSoon'
 import { useAuth } from '../context/AuthContext'
 import { safeSessionGet, safeSessionSet } from '../utils/safeSession'
 import { DataLabControlsProvider } from '../components/datalab/DataLabControls'
+import { TIER_TEXT, getDisplayTier } from '../components/common/TierMaterial'
 
 // ── Toolbar slot — portal approach ────────────────────────────────────────────
 // Parent passes a ref to the slot DOM node via context.
@@ -315,6 +316,7 @@ export default function DataLabPage() {
   )
   const slotRef = useRef(null)
   const { user, loading: authLoading } = useAuth()
+  const displayTier = getDisplayTier(user)
 
   // Opt into navbar auto-hide — activates on mount, restores on unmount
   useNavbarAutoHide()
@@ -376,7 +378,7 @@ export default function DataLabPage() {
                   onClick={() => handleTab(tab.id)}
                   className={`flex items-center gap-1 px-2 py-0.5 rounded-md text-[10px] font-semibold transition-all whitespace-nowrap ${
                     isActive
-                      ? 'bg-white dark:bg-gray-700 text-gray-900 dark:text-white shadow-sm'
+                      ? `bg-white dark:bg-gray-700 shadow-sm ${TIER_TEXT[displayTier] || 'text-gray-900 dark:text-white'}`
                       : 'text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-300'
                   }`}
                 >
