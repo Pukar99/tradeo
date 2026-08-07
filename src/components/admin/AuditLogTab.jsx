@@ -3,13 +3,17 @@ import { useState, useEffect, useCallback } from 'react'
 import { getAdminAuditLog } from '@api/admin'
 import AuditLogRow from './AuditLogRow'
 
+// Every action name logAdminAudit() is ever called with across routes/admin.js
+// and utils/tierExpiry.js — keep in sync when a new mutating route is added.
 const ACTIONS = [
   'tier_change',
+  'tier_auto_revert',
   'suspend',
   'unsuspend',
   'force_logout',
   'post_delete',
   'flag_toggle',
+  'flag_delete',
   'config_update',
   'scraper_trigger',
   'announcement_create',

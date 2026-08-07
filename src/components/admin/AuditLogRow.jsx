@@ -10,16 +10,26 @@ const CATEGORY_COLORS = {
 function actionCategory(action) {
   if (action.startsWith('post_')) return 'content'
   if (action.startsWith('announcement_') || action.startsWith('broadcast_')) return 'broadcast'
-  if (['flag_toggle', 'config_update', 'scraper_trigger'].includes(action)) return 'system'
-  return 'user' // tier_change, suspend, unsuspend, force_logout, delete_user
+  if (['flag_toggle', 'flag_delete', 'config_update', 'scraper_trigger'].includes(action)) {
+    return 'system'
+  }
+  return 'user' // tier_change, tier_auto_revert, suspend, unsuspend, force_logout, delete_user
 }
 
+// System-driven entries (currently just the tier-expiry cron sweep) are
+// attributed to the admin account since this is a single-admin system —
+// but they weren't a manual click, and that distinction matters when
+// reading the log. Keep in sync with utils/tierExpiry.js's action name.
+const AUTOMATED_ACTIONS = ['tier_auto_revert']
+
 // Renders a JSONB detail object as readable "key: value" text — never raw JSON/HTML.
+// Skips null/undefined values instead of printing the literal word "null".
 function formatDetail(detail) {
   if (!detail || typeof detail !== 'object' || Object.keys(detail).length === 0) return '—'
-  return Object.entries(detail)
-    .map(([k, v]) => `${k}: ${v && typeof v === 'object' ? JSON.stringify(v) : v}`)
-    .join('  ·  ')
+  const parts = Object.entries(detail)
+    .filter(([, v]) => v !== null && v !== undefined)
+    .map(([k, v]) => `${k}: ${typeof v === 'object' ? JSON.stringify(v) : v}`)
+  return parts.length ? parts.join('  ·  ') : '—'
 }
 
 export default function AuditLogRow({ log }) {
@@ -31,13 +41,22 @@ export default function AuditLogRow({ log }) {
         minute: '2-digit',
       })
     : '—'
+  const isAutomated = AUTOMATED_ACTIONS.includes(log.action)
 
   return (
     <div className="flex items-center gap-3 px-4 py-3 hover:bg-gray-50 dark:hover:bg-gray-800/50 transition-colors">
       {/* Admin */}
       <div className="w-32 flex-shrink-0">
-        <p className="text-xs font-semibold text-gray-900 dark:text-white truncate">
+        <p className="text-xs font-semibold text-gray-900 dark:text-white truncate flex items-center gap-1.5">
           {log.admin_name}
+          {isAutomated && (
+            <span
+              title="Ran automatically (cron), not a manual click"
+              className="px-1.5 py-0.5 text-[9px] font-semibold rounded-full bg-indigo-100 text-indigo-700 dark:bg-indigo-900/30 dark:text-indigo-400"
+            >
+              auto
+            </span>
+          )}
         </p>
       </div>
 
