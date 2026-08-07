@@ -155,7 +155,7 @@ export default function UserListRow({ user: initialUser, onRefresh, dropUp = fal
 
         {/* Tier */}
         <div className="hidden sm:block w-20 flex-shrink-0">
-          <TierBadge tier={user.tier} />
+          <TierBadge tier={user.tier} expiresAt={user.tier_expires_at} />
         </div>
 
         {/* Status */}

@@ -7,7 +7,8 @@ import { API } from './index'
 // ── Users ─────────────────────────────────────────────────────────────────────
 export const getAdminUsers = (params = {}) => API.get('/api/admin/users', { params })
 export const getAdminUser = (id) => API.get(`/api/admin/users/${id}`)
-export const patchUserTier = (id, tier) => API.patch(`/api/admin/users/${id}/tier`, { tier })
+export const patchUserTier = (id, tier, duration) =>
+  API.patch(`/api/admin/users/${id}/tier`, { tier, duration })
 export const patchUserSuspend = (id, data) => API.patch(`/api/admin/users/${id}/suspend`, data)
 export const patchUserForceLogout = (id) => API.patch(`/api/admin/users/${id}/force-logout`)
 
