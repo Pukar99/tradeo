@@ -1130,7 +1130,7 @@ function LoggedInHome() {
   return (
     <>
       {/* Use flex-col so side columns can stretch to remaining height without hardcoding greeting bar px */}
-      <div className="w-full px-3 sm:px-4 py-3 sm:py-4 pb-safe min-h-[100dvh] flex flex-col bg-gradient-to-br from-slate-100 via-gray-50 to-blue-50/30 dark:from-gray-950 dark:via-gray-950 dark:to-slate-900">
+      <div className="w-full px-3 sm:px-4 py-3 sm:py-4 pb-safe min-h-[100dvh] flex flex-col bg-gradient-to-br from-slate-100 via-gray-50 to-blue-50/30 dark:bg-none dark:bg-gray-950">
         {/* Content cap — wider than LogsPage/PortfolioPage's max-w-7xl on purpose
             (owner call: this is a trading OS, a 27" monitor is a real target, not
             an edge case to shrink away from). Below ~1800px this is a no-op; above
@@ -1259,7 +1259,7 @@ function LoggedInHome() {
 // the greeting text itself is a pulse bar rather than real content.
 function HomeSkeleton() {
   return (
-    <div className="w-full px-3 sm:px-4 py-3 sm:py-4 pb-safe min-h-[100dvh] flex flex-col bg-gradient-to-br from-slate-100 via-gray-50 to-blue-50/30 dark:from-gray-950 dark:via-gray-950 dark:to-slate-900">
+    <div className="w-full px-3 sm:px-4 py-3 sm:py-4 pb-safe min-h-[100dvh] flex flex-col bg-gradient-to-br from-slate-100 via-gray-50 to-blue-50/30 dark:bg-none dark:bg-gray-950">
       <div className="w-full max-w-[1800px] mx-auto flex flex-col flex-1 min-h-0">
         {/* Greeting bar */}
         <div className="flex items-center justify-between mb-3 sm:mb-4 px-1 flex-shrink-0 animate-pulse">
@@ -1309,7 +1309,7 @@ function HomeSkeleton() {
 function HomePage() {
   const { user, loading } = useAuth()
   return (
-    <div className="min-h-[100dvh] bg-gradient-to-br from-slate-100 via-gray-50 to-blue-50/30 dark:from-gray-950 dark:via-gray-950 dark:to-slate-900 transition-colors">
+    <div className="min-h-[100dvh] bg-gradient-to-br from-slate-100 via-gray-50 to-blue-50/30 dark:bg-none dark:bg-gray-950 transition-colors">
       {/* Wait for /api/auth/me before choosing a view. `/` is public, so without
           this gate `user` is null on reload and the logged-OUT landing flashes
           for ~1s before flipping to LoggedInHome. HomeSkeleton (not the generic
