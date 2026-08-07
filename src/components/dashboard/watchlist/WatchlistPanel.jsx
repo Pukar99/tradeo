@@ -6,6 +6,8 @@
 // beyond the cached symbol list for autocomplete.
 
 import { useState, useEffect, useRef, useMemo } from 'react'
+import { useAuth } from '../../../context/AuthContext'
+import { TIER_ACCENT, TierAccentOverlay, tierRingClass, getDisplayTier } from '../../common/TierMaterial'
 import { useContextMenu } from '../../ContextMenu'
 import { useEscapeKey } from '../../../hooks/useEscapeKey'
 import { useHighlightListener } from '../../../utils/chatEvents'
@@ -25,6 +27,9 @@ export default function WatchlistPanel({
   priceMapRef,
   navigate,
 }) {
+  const { user } = useAuth()
+  const displayTier = getDisplayTier(user)
+  const accent = TIER_ACCENT[displayTier]
   const [watchlistTab, setWatchlistTab] = useState('active')
   const { onContextMenu: watchCtx, ContextMenuPortal: WatchMenuPortal } = useContextMenu()
 
@@ -466,7 +471,10 @@ export default function WatchlistPanel({
         </div>
       )}
 
-      <div className="hp-card bg-white/70 dark:bg-gray-900/60 backdrop-blur-md rounded-2xl border border-white/60 dark:border-white/10 shadow-sm overflow-hidden">
+      <div
+        className={`hp-card group relative bg-white/70 dark:bg-gray-900/60 backdrop-blur-md rounded-2xl ${accent ? '' : 'border'} border-white/60 dark:border-white/10 overflow-hidden ${accent ? tierRingClass(displayTier) : 'shadow-sm'}`}
+      >
+        <TierAccentOverlay accent={accent} />
         {/* Header row — wraps instead of hidden-scrolling on narrow phones, where
             label + tabs + Select + Add don't all fit on one line (HOME mobile fix). */}
         <div className="flex flex-wrap items-center gap-2 px-3 py-2.5 border-b border-gray-100 dark:border-gray-800">

@@ -26,7 +26,8 @@ import { generateSwingCandles } from '../utils/candlestickData'
 import {
   TIER_ACCENT,
   TierAccentOverlay,
-  TierName,
+  tierRingClass,
+  TIER_TEXT,
   getDisplayTier,
 } from '../components/common/TierMaterial'
 
@@ -484,7 +485,8 @@ const SEVERITY_ORDER = { danger: 0, warn: 1, success: 2, info: 3 }
 
 function AlertsWidget({ initData }) {
   const { user } = useAuth()
-  const accent = TIER_ACCENT[getDisplayTier(user)]
+  const displayTier = getDisplayTier(user)
+  const accent = TIER_ACCENT[displayTier]
   const navigate = useNavigate()
   const [showAllAlerts, setShowAllAlerts] = useState(false)
   const trades = initData?.trades || []
@@ -654,7 +656,9 @@ function AlertsWidget({ initData }) {
     )
 
   return (
-    <div className="hp-card group relative bg-white/70 dark:bg-gray-900/60 backdrop-blur-md rounded-2xl border border-white/60 dark:border-white/10 shadow-sm overflow-hidden h-full flex flex-col min-h-0">
+    <div
+      className={`hp-card group relative bg-white/70 dark:bg-gray-900/60 backdrop-blur-md rounded-2xl ${accent ? '' : 'border'} border-white/60 dark:border-white/10 overflow-hidden h-full flex flex-col min-h-0 ${accent ? tierRingClass(displayTier) : 'shadow-sm'}`}
+    >
       <TierAccentOverlay accent={accent} />
       <div className="flex items-center justify-between px-4 py-3 border-b border-gray-100 dark:border-gray-800 flex-shrink-0">
         <h3 className="text-[10px] font-semibold text-gray-400 uppercase tracking-widest">
@@ -1134,10 +1138,9 @@ function LoggedInHome() {
             <div>
               <p className="text-sm font-semibold text-gray-800 dark:text-gray-200">
                 {getGreeting()},{' '}
-                <TierName
-                  tier={getDisplayTier(user)}
-                  name={user?.name?.split(' ')[0] || 'Trader'}
-                />
+                <span className={TIER_TEXT[getDisplayTier(user)] || ''}>
+                  {user?.name?.split(' ')[0] || 'Trader'}
+                </span>
               </p>
               <p className="text-[11px] text-gray-400 mt-0.5">{today}</p>
             </div>

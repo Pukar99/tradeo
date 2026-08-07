@@ -9,6 +9,8 @@
 import { memo, useEffect, useRef, useState } from 'react'
 import { getNepseChart as _getNepseChartCached, getNepseWeeklyChart } from '../utils/globalCache'
 import { useTheme } from '../context/ThemeContext'
+import { useAuth } from '../context/AuthContext'
+import { TIER_ACCENT, TierAccentOverlay, tierRingClass, getDisplayTier } from './common/TierMaterial'
 import { useLightweightChart } from '../hooks/useLightweightChart'
 import { candleSeriesOptions } from '../utils/chartTheme'
 
@@ -237,6 +239,9 @@ const NEPSEMiniChart = memo(function NEPSEMiniChart({
 
 function NEPSEChart({ fixed = false }) {
   const { isDark } = useTheme()
+  const { user } = useAuth()
+  const displayTier = getDisplayTier(user)
+  const accent = TIER_ACCENT[displayTier]
   const [range, setRange] = useState('1y')
   const [loading, setLoading] = useState(true)
   const [stats, setStats] = useState(null)
@@ -319,7 +324,10 @@ function NEPSEChart({ fixed = false }) {
 
   if (fixed) {
     return (
-      <div className="hp-card bg-white/70 dark:bg-gray-900/60 backdrop-blur-md rounded-2xl border border-white/60 dark:border-white/10 shadow-sm overflow-hidden">
+      <div
+        className={`hp-card group relative bg-white/70 dark:bg-gray-900/60 backdrop-blur-md rounded-2xl ${accent ? '' : 'border'} border-white/60 dark:border-white/10 overflow-hidden ${accent ? tierRingClass(displayTier) : 'shadow-sm'}`}
+      >
+        <TierAccentOverlay accent={accent} />
         {/* Mobile toggle — D / W pill, hidden on desktop */}
         <div className="flex items-center justify-between px-3 pt-2 pb-0 lg:hidden">
           <span className="text-[10px] font-semibold uppercase tracking-widest text-gray-400">

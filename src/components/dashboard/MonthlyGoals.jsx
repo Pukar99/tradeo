@@ -6,7 +6,7 @@ import { IconPencil, IconTrash } from '../common/icons'
 import { useChatRefresh, useHighlightListener } from '../../utils/chatEvents'
 import { gCache } from '../../utils/globalCache'
 import { useAuth } from '../../context/AuthContext'
-import { TIER_ACCENT, TierAccentOverlay, getDisplayTier } from '../common/TierMaterial'
+import { TIER_ACCENT, TierAccentOverlay, tierRingClass, getDisplayTier } from '../common/TierMaterial'
 
 // ── Date helpers ──────────────────────────────────────────────────────────────
 
@@ -144,7 +144,8 @@ const GOALS_DEFAULT_LIMIT = 4
 
 function MonthlyGoals({ initData }) {
   const { user } = useAuth()
-  const accent = TIER_ACCENT[getDisplayTier(user)]
+  const displayTier = getDisplayTier(user)
+  const accent = TIER_ACCENT[displayTier]
   const { onContextMenu, ContextMenuPortal } = useContextMenu()
   const [goals, setGoals] = useState(initData || [])
   const [loading, setLoading] = useState(!initData)
@@ -376,7 +377,9 @@ function MonthlyGoals({ initData }) {
   // ── Render ────────────────────────────────────────────────────────────────
 
   return (
-    <div className="hp-card group relative bg-white/70 dark:bg-gray-900/60 backdrop-blur-md rounded-2xl border border-white/60 dark:border-white/10 shadow-sm overflow-hidden h-full flex flex-col min-h-0">
+    <div
+      className={`hp-card group relative bg-white/70 dark:bg-gray-900/60 backdrop-blur-md rounded-2xl ${accent ? '' : 'border'} border-white/60 dark:border-white/10 overflow-hidden h-full flex flex-col min-h-0 ${accent ? tierRingClass(displayTier) : 'shadow-sm'}`}
+    >
       <TierAccentOverlay accent={accent} />
       <ContextMenuPortal />
 

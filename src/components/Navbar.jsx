@@ -19,26 +19,36 @@ import {
   markAllNotificationsRead,
 } from '../api/notifications'
 import PageSkeleton from './PageSkeleton'
-import { TIER_ACCENT, TIER_RING, TierName, getDisplayTier } from './common/TierMaterial'
+import { TIER_ACCENT, TIER_RING, TIER_TEXT, TierName, getDisplayTier } from './common/TierMaterial'
 
 // =============================================================================
 // 1. LOGO
 // =============================================================================
 
-function TradeoLogo() {
+// tier prop: candle colors (green/red) stay exactly as-is regardless of tier
+// — that's the market up/down visual language, not brand decoration. Wordmark
+// next to it stays plain (untouched by tier, per owner call — text color/font
+// never changes, only adjusts for light/dark theme like it always did). The
+// logo itself gets the same ring/glow token as the avatar (TIER_RING) — one
+// consistent "identity" visual language, not a separate technique. SVG needs
+// an HTML wrapper for the box-shadow ring to render reliably.
+function TradeoLogo({ tier }) {
+  const ring = TIER_RING[tier]
   return (
-    <svg width="34" height="34" viewBox="0 0 40 40" fill="none" xmlns="http://www.w3.org/2000/svg">
-      <rect width="40" height="40" rx="8" className="tradeo-logo-bg" strokeWidth="1" />
-      <rect x="6" y="18" width="6" height="14" rx="1.5" fill="#22c55e" />
-      <line x1="9" y1="12" x2="9" y2="18" stroke="#22c55e" strokeWidth="1.5" />
-      <line x1="9" y1="32" x2="9" y2="36" stroke="#22c55e" strokeWidth="1.5" />
-      <rect x="17" y="12" width="6" height="16" rx="1.5" fill="#ef4444" />
-      <line x1="20" y1="6" x2="20" y2="12" stroke="#ef4444" strokeWidth="1.5" />
-      <line x1="20" y1="28" x2="20" y2="32" stroke="#ef4444" strokeWidth="1.5" />
-      <rect x="28" y="14" width="6" height="12" rx="1.5" fill="#22c55e" />
-      <line x1="31" y1="8" x2="31" y2="14" stroke="#22c55e" strokeWidth="1.5" />
-      <line x1="31" y1="26" x2="31" y2="30" stroke="#22c55e" strokeWidth="1.5" />
-    </svg>
+    <span className={`inline-flex rounded-lg ${ring || ''}`}>
+      <svg width="34" height="34" viewBox="0 0 40 40" fill="none" xmlns="http://www.w3.org/2000/svg">
+        <rect width="40" height="40" rx="8" className="tradeo-logo-bg" strokeWidth="1" />
+        <rect x="6" y="18" width="6" height="14" rx="1.5" fill="#22c55e" />
+        <line x1="9" y1="12" x2="9" y2="18" stroke="#22c55e" strokeWidth="1.5" />
+        <line x1="9" y1="32" x2="9" y2="36" stroke="#22c55e" strokeWidth="1.5" />
+        <rect x="17" y="12" width="6" height="16" rx="1.5" fill="#ef4444" />
+        <line x1="20" y1="6" x2="20" y2="12" stroke="#ef4444" strokeWidth="1.5" />
+        <line x1="20" y1="28" x2="20" y2="32" stroke="#ef4444" strokeWidth="1.5" />
+        <rect x="28" y="14" width="6" height="12" rx="1.5" fill="#22c55e" />
+        <line x1="31" y1="8" x2="31" y2="14" stroke="#22c55e" strokeWidth="1.5" />
+        <line x1="31" y1="26" x2="31" y2="30" stroke="#22c55e" strokeWidth="1.5" />
+      </svg>
+    </span>
   )
 }
 
@@ -253,7 +263,7 @@ function Navbar({ autoHide = false, hidden = false, onMouseEnter, onMouseLeave }
       {/* ── Left: Logo + Desktop nav links ─────────────────────────────────── */}
       <div className="flex items-center gap-6">
         <Link to="/" className="flex items-center gap-2.5 py-3 flex-shrink-0">
-          <TradeoLogo />
+          <TradeoLogo tier={displayTier} />
           <div className="flex items-baseline gap-2">
             <span className="text-gray-900 dark:text-white font-bold text-lg tracking-tight">
               Tradeo
@@ -275,7 +285,7 @@ function Navbar({ autoHide = false, hidden = false, onMouseEnter, onMouseLeave }
               to={link.path}
               className={`relative px-3 py-4 text-sm font-medium transition-colors inline-flex items-center gap-1 ${
                 isActive(link.path)
-                  ? 'text-green-600 dark:text-white'
+                  ? TIER_TEXT[displayTier] || 'text-green-600 dark:text-white'
                   : 'text-gray-500 dark:text-gray-400 hover:text-gray-900 dark:hover:text-gray-200'
               }`}
             >
@@ -297,7 +307,7 @@ function Navbar({ autoHide = false, hidden = false, onMouseEnter, onMouseLeave }
               to="/admin"
               className={`relative px-3 py-4 text-sm font-medium transition-colors ${
                 isActive('/admin')
-                  ? 'text-green-600 dark:text-white'
+                  ? TIER_TEXT[displayTier] || 'text-green-600 dark:text-white'
                   : 'text-gray-500 dark:text-gray-400 hover:text-gray-900 dark:hover:text-gray-200'
               }`}
             >
@@ -669,7 +679,14 @@ function Navbar({ autoHide = false, hidden = false, onMouseEnter, onMouseLeave }
                   )}
                 </div>
                 <div className="min-w-0">
-                  <p className="text-sm font-semibold text-gray-900 dark:text-white truncate">
+                  {/* No `truncate` here (unlike the email line below) — it
+                      bundles `overflow: hidden`, which clipped TierName's
+                      corner tag: the tag pokes -8px above its own box via
+                      absolute positioning, and this <p> is its nearest
+                      overflow-hidden ancestor (real bug, caught live on
+                      mobile — tag rendered cut off). firstName is short
+                      enough that overflow isn't a real risk here. */}
+                  <p className="text-sm font-semibold text-gray-900 dark:text-white">
                     <TierName tier={displayTier} name={firstName} />
                   </p>
                   <p className="text-[11px] text-gray-400 truncate">{user.email}</p>

@@ -5,7 +5,7 @@ import { useState, useEffect } from 'react'
 import { getDiscipline } from '../../utils/globalCache'
 import { IconFlame } from '../common/icons'
 import { useAuth } from '../../context/AuthContext'
-import { TIER_ACCENT, TierAccentOverlay, getDisplayTier } from '../common/TierMaterial'
+import { TIER_ACCENT, TierAccentOverlay, tierRingClass, getDisplayTier } from '../common/TierMaterial'
 
 const GRADE = (s) => {
   if (s >= 85) return { letter: 'A+', color: 'text-emerald-500', ring: '#10b981' }
@@ -90,7 +90,8 @@ function DimBar({ label, score, extra, noData }) {
 
 function DisciplineScore({ initData }) {
   const { user } = useAuth()
-  const accent = TIER_ACCENT[getDisplayTier(user)]
+  const displayTier = getDisplayTier(user)
+  const accent = TIER_ACCENT[displayTier]
   const [data, setData] = useState(initData || null)
   const [loading, setLoading] = useState(!initData)
   const [error, setError] = useState(null)
@@ -157,7 +158,9 @@ function DisciplineScore({ initData }) {
   ]
 
   return (
-    <div className="hp-card group relative bg-white/70 dark:bg-gray-900/60 backdrop-blur-md rounded-2xl border border-white/60 dark:border-white/10 shadow-sm p-4 pb-3 flex flex-col gap-3 h-full min-h-0 overflow-y-auto">
+    <div
+      className={`hp-card group relative bg-white/70 dark:bg-gray-900/60 backdrop-blur-md rounded-2xl ${accent ? '' : 'border'} border-white/60 dark:border-white/10 p-4 pb-3 flex flex-col gap-3 h-full min-h-0 overflow-y-auto ${accent ? tierRingClass(displayTier) : 'shadow-sm'}`}
+    >
       <TierAccentOverlay accent={accent} />
       {/* Header */}
       <div className="flex items-center justify-between">
