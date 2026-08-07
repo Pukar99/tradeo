@@ -12,6 +12,7 @@ import { ALERT_PCT_THRESHOLD } from '../../utils/constants'
 import { apiError } from '../../utils/format'
 import { nptToday } from '../../utils/nepseCalendar'
 import { TIER_TEXT, getDisplayTier } from '../common/TierMaterial'
+import { useSlidingIndicator } from '../../hooks/useSlidingIndicator'
 
 // ── BUY / SELL Modal ──────────────────────────────────────────────────────────
 
@@ -521,6 +522,7 @@ export default function LeftPanel() {
   const [watchlist, setWatchlist] = useState([])
   const [pendingDelete, setPendingDelete] = useState(null)
   const [tab, setTab] = useState('portfolio')
+  const tabIndicator = useSlidingIndicator(tab, setTab)
   const [watchErr, setWatchErr] = useState(null)
   // Guests have no watchlist — start resolved so the panel shows its empty state
   // instead of a spinner (the fetch below is skipped for them).
@@ -680,17 +682,28 @@ export default function LeftPanel() {
       <div className="flex-1 flex flex-col min-h-0">
         {/* Tab bar */}
         <div className="flex gap-1 px-2 pt-2 pb-1.5 shrink-0">
-          <div className="flex gap-1 flex-1 bg-white/30 dark:bg-white/[0.05] backdrop-blur-sm rounded-xl p-0.5 border border-white/20 dark:border-white/[0.06]">
+          <div
+            ref={tabIndicator.containerRef}
+            onPointerDown={tabIndicator.onPointerDown}
+            className="relative flex gap-1 flex-1 bg-white/30 dark:bg-white/[0.05] backdrop-blur-sm rounded-xl p-0.5 border border-white/20 dark:border-white/[0.06]"
+          >
+            <div
+              aria-hidden="true"
+              className="absolute top-0 left-0 rounded-lg bg-white dark:bg-gray-700 shadow-sm transition-[transform,width,height] duration-300 ease-luxury pointer-events-none"
+              style={tabIndicator.indicatorStyle}
+            />
             {[
               ['portfolio', 'Portfolio', positions.length],
               ['watchlist', 'Watchlist', watchlist.length],
             ].map(([key, label, count]) => (
               <button
                 key={key}
+                data-indicator-active={tab === key || undefined}
+                data-indicator-key={key}
                 onClick={() => setTab(key)}
-                className={`flex-1 flex items-center justify-center gap-1 py-1.5 rounded-lg text-[10px] font-bold transition-all ${
+                className={`relative z-10 flex-1 flex items-center justify-center gap-1 py-1.5 rounded-lg text-[10px] font-bold transition-colors ${
                   tab === key
-                    ? `bg-white dark:bg-gray-700 shadow-sm ${TIER_TEXT[displayTier] || 'text-gray-900 dark:text-white'}`
+                    ? TIER_TEXT[displayTier] || 'text-gray-900 dark:text-white'
                     : 'text-gray-400 dark:text-gray-500 hover:text-gray-600 dark:hover:text-gray-400'
                 }`}
               >

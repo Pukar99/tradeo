@@ -14,6 +14,7 @@ import { useNavbarAutoHide, useNavbarState } from '../App'
 import { ScreenProvider } from '../context/ScreenContext'
 import { ComplexTabProvider } from '../hooks/useComplexTab.jsx'
 import { useLocalStorage } from '../hooks/useLocalStorage'
+import { useSlidingIndicator } from '../hooks/useSlidingIndicator'
 import { useAuth } from '../context/AuthContext'
 import StockChart from '../components/screen/StockChart'
 import MarketStatusBadge from '../components/common/MarketStatusBadge'
@@ -142,7 +143,7 @@ function SimpleContent({
   // General — chart + collapsible panels
   return (
     <>
-      <div className="flex-1 flex overflow-hidden min-h-0">
+      <div className="flex-1 flex overflow-hidden min-h-0 animate-tab-in">
         {/* Left panel — collapsible */}
         {!compact && (
           <div
@@ -150,7 +151,7 @@ function SimpleContent({
                         bg-white dark:bg-gray-900
                         shadow-[1px_0_0_rgba(255,255,255,0.18),2px_0_12px_rgba(0,0,0,0.06)]
                         dark:shadow-[1px_0_0_rgba(255,255,255,0.07),2px_0_16px_rgba(0,0,0,0.4)]
-                        transition-all duration-200 ease-in-out
+                        transition-all duration-300 ease-luxury
                         ${leftOpen ? 'w-[13%] min-w-[150px] max-w-[200px]' : 'w-0 min-w-0 max-w-0 overflow-hidden'}
                         ${!leftOpen ? 'screen-panel-collapsed' : ''}
                         ${accent ? tierRingClass(displayTier) : ''}`}
@@ -175,10 +176,10 @@ function SimpleContent({
                        rounded-r-lg shadow-sm text-gray-400 dark:text-gray-500
                        hover:bg-white dark:hover:bg-gray-700
                        hover:text-blue-500 dark:hover:text-blue-400
-                       transition-all duration-150"
+                       transition-all duration-200 ease-luxury"
           >
             <svg
-              className={`w-2.5 h-2.5 transition-transform duration-200 ${leftOpen ? '' : 'rotate-180'}`}
+              className={`w-2.5 h-2.5 transition-transform duration-300 ease-luxury ${leftOpen ? '' : 'rotate-180'}`}
               viewBox="0 0 24 24"
               fill="none"
               stroke="currentColor"
@@ -201,10 +202,10 @@ function SimpleContent({
                        rounded-l-lg shadow-sm text-gray-400 dark:text-gray-500
                        hover:bg-white dark:hover:bg-gray-700
                        hover:text-blue-500 dark:hover:text-blue-400
-                       transition-all duration-150"
+                       transition-all duration-200 ease-luxury"
           >
             <svg
-              className={`w-2.5 h-2.5 transition-transform duration-200 ${rightOpen ? 'rotate-180' : ''}`}
+              className={`w-2.5 h-2.5 transition-transform duration-300 ease-luxury ${rightOpen ? 'rotate-180' : ''}`}
               viewBox="0 0 24 24"
               fill="none"
               stroke="currentColor"
@@ -228,7 +229,7 @@ function SimpleContent({
                         bg-white dark:bg-gray-900
                         shadow-[-1px_0_0_rgba(255,255,255,0.18),-2px_0_12px_rgba(0,0,0,0.06)]
                         dark:shadow-[-1px_0_0_rgba(255,255,255,0.07),-2px_0_16px_rgba(0,0,0,0.4)]
-                        transition-all duration-200 ease-in-out
+                        transition-all duration-300 ease-luxury
                         ${rightOpen ? 'w-[16%] min-w-[170px] max-w-[240px]' : 'w-0 min-w-0 max-w-0 overflow-hidden'}
                         ${!rightOpen ? 'screen-panel-collapsed' : ''}
                         ${accent ? tierRingClass(displayTier) : ''}`}
@@ -457,21 +458,33 @@ function MobileSheet({ panel, onClose }) {
 function TabStrip({ tabs, active, onChange, lockedIds = [] }) {
   const { user } = useAuth()
   const displayTier = getDisplayTier(user)
+  const { containerRef, indicatorStyle, onPointerDown } = useSlidingIndicator(active, onChange)
   return (
-    <div className="flex items-center bg-gray-100/80 dark:bg-gray-800/80 rounded-lg p-0.5 gap-0.5">
+    <div
+      ref={containerRef}
+      onPointerDown={onPointerDown}
+      className="relative flex items-center bg-gray-100/80 dark:bg-gray-800/80 rounded-lg p-0.5 gap-0.5"
+    >
+      <div
+        aria-hidden="true"
+        className="absolute top-0 left-0 rounded-md bg-white dark:bg-gray-700 shadow-sm transition-[transform,width,height] duration-300 ease-luxury pointer-events-none"
+        style={indicatorStyle}
+      />
       {tabs.map((t) => {
         const locked = lockedIds.includes(t.id)
         const isActive = active === t.id
         return (
           <button
             key={t.id}
+            data-indicator-active={isActive || undefined}
+            data-indicator-key={t.id}
             onClick={() => onChange(t.id)}
-            className={`flex items-center gap-1 px-2.5 py-1 rounded-md text-[10px] font-semibold transition-all whitespace-nowrap ${
+            className={`relative z-10 flex items-center gap-1 px-2.5 py-1 rounded-md text-[10px] font-semibold transition-colors whitespace-nowrap ${
               isActive
-                ? `bg-white dark:bg-gray-700 shadow-sm animate-scale-in ${TIER_TEXT[displayTier] || 'text-gray-900 dark:text-white'}`
+                ? TIER_TEXT[displayTier] || 'text-gray-900 dark:text-white'
                 : locked
                   ? 'text-gray-300 dark:text-gray-600 cursor-pointer'
-                  : 'text-gray-400 dark:text-gray-500 hover:text-gray-700 dark:hover:text-gray-300 hover:bg-white/60 dark:hover:bg-gray-700/40'
+                  : 'text-gray-400 dark:text-gray-500 hover:text-gray-700 dark:hover:text-gray-300'
             }`}
           >
             <span className="hidden sm:inline">{t.label}</span>

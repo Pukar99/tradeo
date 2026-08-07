@@ -5,6 +5,7 @@ import { useState, useEffect, useCallback } from 'react'
 import { useScreen } from '../../context/ScreenContext'
 import { useNavbarState } from '../../App'
 import { useFixedDropdown } from '../common/useFixedDropdown'
+import { useSlidingIndicator } from '../../hooks/useSlidingIndicator'
 
 // ── ToolbarDivider ─────────────────────────────────────────────────────────────
 export function ToolbarDivider() {
@@ -27,15 +28,28 @@ export function ToolbarTimeframes({ frames = DEFAULT_TIMEFRAMES, onChange }) {
     [setTimeframe, onChange]
   )
 
+  const { containerRef, indicatorStyle, onPointerDown } = useSlidingIndicator(timeframe, handleClick)
+
   return (
-    <div className="flex items-center gap-0.5 bg-gray-100 dark:bg-gray-800 rounded-md p-0.5 shrink-0">
+    <div
+      ref={containerRef}
+      onPointerDown={onPointerDown}
+      className="relative flex items-center gap-0.5 bg-gray-100 dark:bg-gray-800 rounded-md p-0.5 shrink-0"
+    >
+      <div
+        aria-hidden="true"
+        className="absolute top-0 left-0 rounded bg-white dark:bg-gray-700 shadow-sm transition-[transform,width,height] duration-300 ease-luxury pointer-events-none"
+        style={indicatorStyle}
+      />
       {frames.map((tf) => (
         <button
           key={tf}
+          data-indicator-active={timeframe === tf || undefined}
+          data-indicator-key={tf}
           onClick={() => handleClick(tf)}
-          className={`px-1 py-0.5 rounded text-[9px] font-bold transition-colors whitespace-nowrap ${
+          className={`relative z-10 px-1 py-0.5 rounded text-[9px] font-bold transition-colors whitespace-nowrap ${
             timeframe === tf
-              ? 'bg-white dark:bg-gray-700 text-gray-900 dark:text-white shadow-sm'
+              ? 'text-gray-900 dark:text-white'
               : 'text-gray-400 dark:text-gray-500 hover:text-gray-700 dark:hover:text-gray-300'
           }`}
         >

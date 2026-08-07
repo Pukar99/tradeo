@@ -4,6 +4,7 @@ import { createPortal } from 'react-dom'
 import { getMarketDates, getDayFull, getMarketFeed, getTopMovers } from '../../utils/globalCache'
 import { useScreen } from '../../context/ScreenContext'
 import { useEscapeKey } from '../../hooks/useEscapeKey'
+import { useSlidingIndicator } from '../../hooks/useSlidingIndicator'
 import { safeUrl } from '../../utils/format'
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
@@ -463,6 +464,7 @@ export default function RightPanel() {
   const [selectedDate, setSelectedDate] = useState('')
   const [latestDate, setLatestDate] = useState('')
   const [moverTab, setMoverTab] = useState('gainers')
+  const moverTabIndicator = useSlidingIndicator(moverTab, setMoverTab)
   const [loading, setLoading] = useState(false)
   const [moversErr, setMoversErr] = useState(null)
   const [datesErr, setDatesErr] = useState(null)
@@ -670,14 +672,25 @@ export default function RightPanel() {
       </div>
 
       {/* ── Tab bar ───────────────────────────────────────────────────────── */}
-      <div className="flex gap-0.5 px-2 mb-2 shrink-0 bg-white/25 dark:bg-white/[0.06] backdrop-blur-sm rounded-xl p-0.5 border border-white/20 dark:border-white/[0.06]">
+      <div
+        ref={moverTabIndicator.containerRef}
+        onPointerDown={moverTabIndicator.onPointerDown}
+        className="relative flex gap-0.5 px-2 mb-2 shrink-0 bg-white/25 dark:bg-white/[0.06] backdrop-blur-sm rounded-xl p-0.5 border border-white/20 dark:border-white/[0.06]"
+      >
+        <div
+          aria-hidden="true"
+          className="absolute top-0 left-0 rounded-lg bg-white dark:bg-gray-700/90 shadow-sm transition-[transform,width,height] duration-300 ease-luxury pointer-events-none"
+          style={moverTabIndicator.indicatorStyle}
+        />
         {Object.entries(TAB_CONFIG).map(([key, cfg]) => (
           <button
             key={key}
+            data-indicator-active={moverTab === key || undefined}
+            data-indicator-key={key}
             onClick={() => setMoverTab(key)}
-            className={`flex-1 py-1.5 rounded-lg text-[10px] font-semibold transition-all ${
+            className={`relative z-10 flex-1 py-1.5 rounded-lg text-[10px] font-semibold transition-colors ${
               moverTab === key
-                ? `bg-white dark:bg-gray-700/90 ${cfg.color} shadow-sm animate-scale-in`
+                ? cfg.color
                 : 'text-gray-400 dark:text-gray-500 hover:text-gray-600 dark:hover:text-gray-300'
             }`}
           >

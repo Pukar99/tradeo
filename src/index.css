@@ -343,19 +343,22 @@ html {
   }
 }
 
-/* ── Tab content fade-in (Screen / SMC / PA tab switches) ───────────────────*/
+/* ── Tab content fade-in (Screen / SMC / PA tab switches) ───────────────────
+   Same cubic-bezier as the sliding tab indicator (ease-luxury) so the pill
+   sliding into place and the content settling in read as one motion, not two
+   separate animation systems running side by side. */
 @keyframes tabIn {
   from {
     opacity: 0;
-    transform: translateY(4px);
+    transform: translateY(8px) scale(0.99);
   }
   to {
     opacity: 1;
-    transform: translateY(0);
+    transform: translateY(0) scale(1);
   }
 }
 .animate-tab-in {
-  animation: tabIn 0.18s ease-out both;
+  animation: tabIn 0.32s cubic-bezier(0.22, 1, 0.36, 1) both;
 }
 
 /* ── Screen collapsible panel system ────────────────────────────────────────
