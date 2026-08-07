@@ -36,12 +36,18 @@ export default function UserListRow({ user: initialUser, onRefresh, dropUp = fal
   const [menuOpen, setMenuOpen] = useState(false)
   const [activeAction, setActiveAction] = useState(null) // 'tier' | 'suspend' | 'force-logout'
   const [forceLoading, setForceLoading] = useState(false)
+  const [avatarError, setAvatarError] = useState(false)
   const menuRef = useRef(null)
 
   // Sync local user when parent list re-fetches
   useEffect(() => {
     setUser(initialUser)
   }, [initialUser])
+
+  // Reset avatar error when the avatar URL changes
+  useEffect(() => {
+    setAvatarError(false)
+  }, [user.avatar_url])
 
   // Close dropdown on outside click
   useEffect(() => {
@@ -93,11 +99,20 @@ export default function UserListRow({ user: initialUser, onRefresh, dropUp = fal
     <div>
       {/* Main row */}
       <div className="flex items-center gap-3 px-4 py-3 hover:bg-gray-50 dark:hover:bg-gray-800/50 transition-colors">
-        {/* Initials avatar */}
+        {/* Avatar — photo when available, initials fallback otherwise */}
         <div
-          className={`w-8 h-8 rounded-lg flex items-center justify-center flex-shrink-0 ${avatarColor(user.id)}`}
+          className={`w-8 h-8 rounded-lg flex items-center justify-center overflow-hidden flex-shrink-0 ${avatarColor(user.id)}`}
         >
-          <span className="text-white text-xs font-bold">{getInitials(user.name)}</span>
+          {user.avatar_url && !avatarError ? (
+            <img
+              src={user.avatar_url}
+              alt={user.name}
+              className="w-full h-full object-cover"
+              onError={() => setAvatarError(true)}
+            />
+          ) : (
+            <span className="text-white text-xs font-bold">{getInitials(user.name)}</span>
+          )}
         </div>
 
         {/* Name + email */}
