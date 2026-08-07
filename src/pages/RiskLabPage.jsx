@@ -1,6 +1,8 @@
 // === RiskLabPage.jsx ===
 import { useState, useEffect } from 'react'
 import { useLanguage } from '../context/LanguageContext'
+import { useAuth } from '../context/AuthContext'
+import { TIER_TEXT, getDisplayTier } from '../components/common/TierMaterial'
 import {
   LineChart,
   Line,
@@ -906,6 +908,8 @@ function SIPCalculator() {
 function RiskLabPage() {
   const [activeTab, setActiveTab] = useState('nepse')
   const { t } = useLanguage()
+  const { user } = useAuth()
+  const displayTier = getDisplayTier(user)
 
   return (
     <div className="max-w-[1800px] mx-auto px-3 sm:px-6 pt-4 sm:pt-6 pb-10 space-y-5">
@@ -926,7 +930,7 @@ function RiskLabPage() {
             title={tab.desc}
             className={`px-2 py-0.5 rounded-md text-[10px] font-semibold transition-all whitespace-nowrap ${
               activeTab === tab.id
-                ? 'bg-white dark:bg-gray-700 text-gray-900 dark:text-white shadow-sm'
+                ? `bg-white dark:bg-gray-700 shadow-sm ${TIER_TEXT[displayTier] || 'text-gray-900 dark:text-white'}`
                 : 'text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-300'
             }`}
           >

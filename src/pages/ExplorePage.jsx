@@ -7,6 +7,7 @@ import ComingSoon from '../components/ComingSoon'
 import AuthWall from '../components/AuthWall'
 import PageSkeleton from '../components/PageSkeleton'
 import { useAuth } from '../context/AuthContext'
+import { TIER_TEXT, getDisplayTier } from '../components/common/TierMaterial'
 
 const IPOPage = lazy(() => import('./IPOPage'))
 const ResearchPage = lazy(() => import('./ResearchPage'))
@@ -131,6 +132,7 @@ export default function ExplorePage() {
   const navigate = useNavigate()
   const slotRef = useRef(null)
   const { user } = useAuth()
+  const displayTier = getDisplayTier(user)
 
   // Default to risklab for unauthenticated users if they land on a locked tab
   // (the bare /explore fallback follows the same rule — ipo is auth-locked)
@@ -191,7 +193,7 @@ export default function ExplorePage() {
                 onClick={() => handleTab(tab.id)}
                 className={`flex items-center gap-1 px-2 py-0.5 rounded-md text-[10px] font-semibold transition-all whitespace-nowrap relative ${
                   activeTab === tab.id
-                    ? 'bg-white dark:bg-gray-700 text-gray-900 dark:text-white shadow-sm'
+                    ? `bg-white dark:bg-gray-700 shadow-sm ${TIER_TEXT[displayTier] || 'text-gray-900 dark:text-white'}`
                     : isLocked(tab.id)
                       ? 'text-gray-400 dark:text-gray-600'
                       : 'text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-300'

@@ -2,6 +2,7 @@
 import { useState, useEffect, useCallback, useRef } from 'react'
 import { useAuth } from '../context/AuthContext'
 import { useExploreToolbarSlot } from './ExplorePage'
+import { TIER_TEXT, getDisplayTier } from '../components/common/TierMaterial'
 import AutoApplyActivity from '../components/AutoApplyActivity'
 import {
   getMeroshareDpList,
@@ -1482,6 +1483,7 @@ function IPOToolbar({
   selectedAcc,
   onSelectAcc,
   onAddAcc,
+  displayTier,
 }) {
   const portal = useExploreToolbarSlot(
     isActive ? (
@@ -1498,7 +1500,7 @@ function IPOToolbar({
               onClick={() => setActiveTab(tab.key)}
               className={`px-2 py-0.5 rounded-md text-[10px] font-semibold transition-all whitespace-nowrap ${
                 activeTab === tab.key
-                  ? 'bg-white dark:bg-gray-700 text-gray-900 dark:text-white shadow-sm'
+                  ? `bg-white dark:bg-gray-700 shadow-sm ${TIER_TEXT[displayTier] || 'text-gray-900 dark:text-white'}`
                   : 'text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-300'
               }`}
             >
@@ -1576,6 +1578,7 @@ function IPOToolbar({
 // ── Main Page ─────────────────────────────────────────────────────────────────
 function IPOPage({ isActive = true }) {
   const { user } = useAuth()
+  const displayTier = getDisplayTier(user)
   const [activeTab, setActiveTab] = useState('ipos')
   const [accounts, setAccounts] = useState([])
   const [dpList, setDpList] = useState([])
@@ -2049,6 +2052,7 @@ function IPOPage({ isActive = true }) {
         selectedAcc={selectedAcc}
         onSelectAcc={handleSelectAccount}
         onAddAcc={() => setShowAddModal(true)}
+        displayTier={displayTier}
       />
 
       <div className="px-3 sm:px-5 pt-3 pb-10 max-w-[1800px] mx-auto">
