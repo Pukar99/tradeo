@@ -21,6 +21,7 @@ import { useAuth } from '../context/AuthContext'
 import { safeSessionGet, safeSessionSet } from '../utils/safeSession'
 import { DataLabControlsProvider } from '../components/datalab/DataLabControls'
 import { TIER_TEXT, getDisplayTier } from '../components/common/TierMaterial'
+import { useSlidingIndicator } from '../hooks/useSlidingIndicator'
 
 // ── Toolbar slot — portal approach ────────────────────────────────────────────
 // Parent passes a ref to the slot DOM node via context.
@@ -326,6 +327,7 @@ export default function DataLabPage() {
     setActiveTab(id)
     safeSessionSet('tradeo_datalab_tab', id)
   }
+  const tabIndicator = useSlidingIndicator(activeTab, handleTab)
 
   // Whole shell is skeleton while /api/auth/me resolves — gating only the content
   // body would leave the real tab labels visible above the skeleton on reload.
@@ -384,16 +386,27 @@ export default function DataLabPage() {
           onMouseEnter={showNavbar}
         >
           {/* Compact tab chips — never compress */}
-          <div className="flex items-center gap-0.5 bg-gray-100 dark:bg-gray-800 rounded-lg p-0.5 shrink-0">
+          <div
+            ref={tabIndicator.containerRef}
+            onPointerDown={tabIndicator.onPointerDown}
+            className="relative flex items-center gap-0.5 bg-gray-100 dark:bg-gray-800 rounded-lg p-0.5 shrink-0"
+          >
+            <div
+              aria-hidden="true"
+              className="absolute top-0 left-0 rounded-md bg-white dark:bg-gray-700 shadow-sm transition-[transform,width,height] duration-300 ease-luxury pointer-events-none"
+              style={tabIndicator.indicatorStyle}
+            />
             {TABS.map((tab) => {
               const isActive = tab.id === activeTab
               return (
                 <button
                   key={tab.id}
+                  data-indicator-active={isActive || undefined}
+                  data-indicator-key={tab.id}
                   onClick={() => handleTab(tab.id)}
-                  className={`flex items-center gap-1 px-2 py-0.5 rounded-md text-[10px] font-semibold transition-all whitespace-nowrap ${
+                  className={`relative z-10 flex items-center gap-1 px-2 py-0.5 rounded-md text-[10px] font-semibold transition-colors whitespace-nowrap ${
                     isActive
-                      ? `bg-white dark:bg-gray-700 shadow-sm ${TIER_TEXT[displayTier] || 'text-gray-900 dark:text-white'}`
+                      ? TIER_TEXT[displayTier] || 'text-gray-900 dark:text-white'
                       : 'text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-300'
                   }`}
                 >

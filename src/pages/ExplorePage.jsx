@@ -8,6 +8,7 @@ import AuthWall from '../components/AuthWall'
 import PageSkeleton from '../components/PageSkeleton'
 import { useAuth } from '../context/AuthContext'
 import { TIER_TEXT, getDisplayTier } from '../components/common/TierMaterial'
+import { useSlidingIndicator } from '../hooks/useSlidingIndicator'
 
 const IPOPage = lazy(() => import('./IPOPage'))
 const ResearchPage = lazy(() => import('./ResearchPage'))
@@ -169,6 +170,7 @@ export default function ExplorePage() {
     // move between tabs as the sync effect above expects.
     navigate(`/explore/${id}`)
   }
+  const tabIndicator = useSlidingIndicator(activeTab, handleTab)
 
   const isLocked = (id) => !user && AUTH_REQUIRED_IDS.has(id)
 
@@ -223,14 +225,25 @@ export default function ExplorePage() {
             Only the slot overflows horizontally — tab chips never compress.    */}
         <div className="shrink-0 flex items-center gap-1.5 px-3 py-1 border-b border-gray-200 dark:border-gray-800 bg-white dark:bg-gray-900">
           {/* Compact tab chips — never compress */}
-          <div className="flex items-center gap-0.5 bg-gray-100 dark:bg-gray-800 rounded-lg p-0.5 shrink-0">
+          <div
+            ref={tabIndicator.containerRef}
+            onPointerDown={tabIndicator.onPointerDown}
+            className="relative flex items-center gap-0.5 bg-gray-100 dark:bg-gray-800 rounded-lg p-0.5 shrink-0"
+          >
+            <div
+              aria-hidden="true"
+              className="absolute top-0 left-0 rounded-md bg-white dark:bg-gray-700 shadow-sm transition-[transform,width,height] duration-300 ease-luxury pointer-events-none"
+              style={tabIndicator.indicatorStyle}
+            />
             {TABS.map((tab) => (
               <button
                 key={tab.id}
+                data-indicator-active={activeTab === tab.id || undefined}
+                data-indicator-key={tab.id}
                 onClick={() => handleTab(tab.id)}
-                className={`flex items-center gap-1 px-2 py-0.5 rounded-md text-[10px] font-semibold transition-all whitespace-nowrap relative ${
+                className={`relative z-10 flex items-center gap-1 px-2 py-0.5 rounded-md text-[10px] font-semibold transition-colors whitespace-nowrap ${
                   activeTab === tab.id
-                    ? `bg-white dark:bg-gray-700 shadow-sm ${TIER_TEXT[displayTier] || 'text-gray-900 dark:text-white'}`
+                    ? TIER_TEXT[displayTier] || 'text-gray-900 dark:text-white'
                     : isLocked(tab.id)
                       ? 'text-gray-400 dark:text-gray-600'
                       : 'text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-300'

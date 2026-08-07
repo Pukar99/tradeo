@@ -13,6 +13,15 @@
 // default position on mount, same reasoning as the toolbar-slot ref pattern
 // in ScreenPage.jsx/DataLabPage.jsx.
 //
+// containerRef is a CALLBACK ref, not a plain useRef — some callers (e.g.
+// LogsPage) render a loading skeleton first and only mount the real
+// container once data arrives, on a render where activeKey hasn't changed.
+// A plain ref + an effect keyed on [activeKey] would silently never
+// re-measure in that case (the container went from null to a real node, but
+// nothing in the effect's deps changed to say so). The callback fires
+// exactly when the node attaches, tracked here via a tick counter that's
+// also in the effect's deps, so attachment itself triggers a measurement.
+//
 // Drag (optional, pass onDragChange): press down anywhere in the row and
 // drag across other options — whichever one is under the pointer fires
 // onDragChange, and the existing CSS transition on the indicator (already
@@ -38,13 +47,19 @@
 import { useCallback, useLayoutEffect, useRef, useState } from 'react'
 
 export function useSlidingIndicator(activeKey, onDragChange) {
-  const containerRef = useRef(null)
+  const containerNodeRef = useRef(null)
   const [style, setStyle] = useState({ opacity: 0 })
+  const [attachTick, setAttachTick] = useState(0)
   const draggingRef = useRef(false)
   const lastFiredKeyRef = useRef(activeKey)
 
+  const containerRef = useCallback((node) => {
+    containerNodeRef.current = node
+    setAttachTick((t) => t + 1)
+  }, [])
+
   useLayoutEffect(() => {
-    const container = containerRef.current
+    const container = containerNodeRef.current
     if (!container) return
 
     const measure = () => {
@@ -71,14 +86,14 @@ export function useSlidingIndicator(activeKey, onDragChange) {
       ro.disconnect()
       window.removeEventListener('resize', measure)
     }
-  }, [activeKey])
+  }, [activeKey, attachTick])
 
   useLayoutEffect(() => {
     lastFiredKeyRef.current = activeKey
   }, [activeKey])
 
   const keyAt = useCallback((x, y) => {
-    const container = containerRef.current
+    const container = containerNodeRef.current
     if (!container) return null
     const el = document.elementFromPoint(x, y)
     const btn = el?.closest('[data-indicator-key]')

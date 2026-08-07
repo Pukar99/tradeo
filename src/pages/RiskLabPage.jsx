@@ -3,6 +3,7 @@ import { useState, useEffect } from 'react'
 import { useLanguage } from '../context/LanguageContext'
 import { useAuth } from '../context/AuthContext'
 import { TIER_TEXT, getDisplayTier } from '../components/common/TierMaterial'
+import { useSlidingIndicator } from '../hooks/useSlidingIndicator'
 import {
   LineChart,
   Line,
@@ -910,6 +911,7 @@ function RiskLabPage() {
   const { t } = useLanguage()
   const { user } = useAuth()
   const displayTier = getDisplayTier(user)
+  const tabIndicator = useSlidingIndicator(activeTab, setActiveTab)
 
   return (
     <div className="max-w-[1800px] mx-auto px-3 sm:px-6 pt-4 sm:pt-6 pb-10 space-y-5">
@@ -922,15 +924,26 @@ function RiskLabPage() {
       </div>
 
       {/* Tabs — compact pill token (design.md: page-level tabs are never large py-2 buttons) */}
-      <div className="inline-flex items-center gap-0.5 bg-gray-100 dark:bg-gray-800 rounded-lg p-0.5">
+      <div
+        ref={tabIndicator.containerRef}
+        onPointerDown={tabIndicator.onPointerDown}
+        className="relative inline-flex items-center gap-0.5 bg-gray-100 dark:bg-gray-800 rounded-lg p-0.5"
+      >
+        <div
+          aria-hidden="true"
+          className="absolute top-0 left-0 rounded-md bg-white dark:bg-gray-700 shadow-sm transition-[transform,width,height] duration-300 ease-luxury pointer-events-none"
+          style={tabIndicator.indicatorStyle}
+        />
         {TABS.map((tab) => (
           <button
             key={tab.id}
+            data-indicator-active={activeTab === tab.id || undefined}
+            data-indicator-key={tab.id}
             onClick={() => setActiveTab(tab.id)}
             title={tab.desc}
-            className={`px-2 py-0.5 rounded-md text-[10px] font-semibold transition-all whitespace-nowrap ${
+            className={`relative z-10 px-2 py-0.5 rounded-md text-[10px] font-semibold transition-colors whitespace-nowrap ${
               activeTab === tab.id
-                ? `bg-white dark:bg-gray-700 shadow-sm ${TIER_TEXT[displayTier] || 'text-gray-900 dark:text-white'}`
+                ? TIER_TEXT[displayTier] || 'text-gray-900 dark:text-white'
                 : 'text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-300'
             }`}
           >
