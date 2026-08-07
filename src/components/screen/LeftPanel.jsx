@@ -11,6 +11,7 @@ import { useEscapeKey } from '../../hooks/useEscapeKey'
 import { ALERT_PCT_THRESHOLD } from '../../utils/constants'
 import { apiError } from '../../utils/format'
 import { nptToday } from '../../utils/nepseCalendar'
+import { TIER_TEXT, getDisplayTier } from '../common/TierMaterial'
 
 // ── BUY / SELL Modal ──────────────────────────────────────────────────────────
 
@@ -495,6 +496,7 @@ export default function LeftPanel() {
     positionsLoading,
   } = useScreen()
   const { user } = useAuth()
+  const displayTier = getDisplayTier(user)
 
   const positions = useMemo(
     () =>
@@ -688,7 +690,7 @@ export default function LeftPanel() {
                 onClick={() => setTab(key)}
                 className={`flex-1 flex items-center justify-center gap-1 py-1.5 rounded-lg text-[10px] font-bold transition-all ${
                   tab === key
-                    ? 'bg-white dark:bg-gray-700 text-gray-900 dark:text-white shadow-sm'
+                    ? `bg-white dark:bg-gray-700 shadow-sm ${TIER_TEXT[displayTier] || 'text-gray-900 dark:text-white'}`
                     : 'text-gray-400 dark:text-gray-500 hover:text-gray-600 dark:hover:text-gray-400'
                 }`}
               >

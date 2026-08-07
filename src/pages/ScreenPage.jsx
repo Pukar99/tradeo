@@ -25,7 +25,13 @@ import UpgradePrompt from '../components/UpgradePrompt'
 import AuthWall from '../components/AuthWall'
 import PageSkeleton from '../components/PageSkeleton'
 import { useCompactToolbar } from '../components/screen/ScreenToolbarAtoms'
-import { TIER_ACCENT, getDisplayTier } from '../components/common/TierMaterial'
+import {
+  TIER_ACCENT,
+  TIER_TEXT,
+  TierAccentOverlay,
+  tierRingClass,
+  getDisplayTier,
+} from '../components/common/TierMaterial'
 
 // ── Screen toolbar slot — EXACT same portal pattern as DataLabPage.useToolbarSlot ──
 // Context value is a stable useRef object; the hook forces one re-render after DOM
@@ -95,7 +101,8 @@ function SimpleContent({
   toggleRight,
 }) {
   const { user } = useAuth()
-  const accent = TIER_ACCENT[getDisplayTier(user)]
+  const displayTier = getDisplayTier(user)
+  const accent = TIER_ACCENT[displayTier]
   const compact = useCompactToolbar()
   useEffect(() => {
     if (!compact || activeTab !== 'General') setMobilePanel(null)
@@ -140,20 +147,16 @@ function SimpleContent({
         {/* Left panel — collapsible */}
         {!compact && (
           <div
-            className={`hidden lg:flex flex-col shrink-0 overflow-y-auto relative
+            className={`hidden lg:flex flex-col shrink-0 overflow-y-auto relative group
                         bg-white dark:bg-gray-900
                         shadow-[1px_0_0_rgba(255,255,255,0.18),2px_0_12px_rgba(0,0,0,0.06)]
                         dark:shadow-[1px_0_0_rgba(255,255,255,0.07),2px_0_16px_rgba(0,0,0,0.4)]
                         transition-all duration-200 ease-in-out
                         ${leftOpen ? 'w-[13%] min-w-[150px] max-w-[200px]' : 'w-0 min-w-0 max-w-0 overflow-hidden'}
-                        ${!leftOpen ? 'screen-panel-collapsed' : ''}`}
+                        ${!leftOpen ? 'screen-panel-collapsed' : ''}
+                        ${accent ? tierRingClass(displayTier) : ''}`}
           >
-            {accent && (
-              <div
-                aria-hidden="true"
-                className={`absolute top-0 left-0 right-0 h-0.5 bg-gradient-to-r ${accent.bar}`}
-              />
-            )}
+            <TierAccentOverlay accent={accent} radius="" />
             <div className="screen-panel-content flex flex-col h-full">
               <LeftPanel />
             </div>
@@ -222,20 +225,16 @@ function SimpleContent({
         {/* Right panel — collapsible */}
         {!compact && (
           <div
-            className={`hidden lg:flex flex-col shrink-0 overflow-y-auto relative
+            className={`hidden lg:flex flex-col shrink-0 overflow-y-auto relative group
                         bg-white dark:bg-gray-900
                         shadow-[-1px_0_0_rgba(255,255,255,0.18),-2px_0_12px_rgba(0,0,0,0.06)]
                         dark:shadow-[-1px_0_0_rgba(255,255,255,0.07),-2px_0_16px_rgba(0,0,0,0.4)]
                         transition-all duration-200 ease-in-out
                         ${rightOpen ? 'w-[16%] min-w-[170px] max-w-[240px]' : 'w-0 min-w-0 max-w-0 overflow-hidden'}
-                        ${!rightOpen ? 'screen-panel-collapsed' : ''}`}
+                        ${!rightOpen ? 'screen-panel-collapsed' : ''}
+                        ${accent ? tierRingClass(displayTier) : ''}`}
           >
-            {accent && (
-              <div
-                aria-hidden="true"
-                className={`absolute top-0 left-0 right-0 h-0.5 bg-gradient-to-r ${accent.bar}`}
-              />
-            )}
+            <TierAccentOverlay accent={accent} radius="" />
             <div className="screen-panel-content flex flex-col h-full">
               <RightPanel />
             </div>
@@ -285,6 +284,8 @@ function ComplexContent({ activeTab }) {
 // ── Mobile bottom navigation ─────────────────────────────────────────────────
 
 function MobileBottomNav({ panel, setPanel }) {
+  const { user } = useAuth()
+  const displayTier = getDisplayTier(user)
   const tabs = [
     {
       id: null,
@@ -355,7 +356,7 @@ function MobileBottomNav({ panel, setPanel }) {
             onClick={() => setPanel(t.id)}
             className={`flex-1 flex flex-col items-center justify-center py-2.5 gap-0.5 transition-colors ${
               active
-                ? 'text-blue-600 dark:text-blue-400'
+                ? TIER_TEXT[displayTier] || 'text-blue-600 dark:text-blue-400'
                 : 'text-gray-400 dark:text-gray-500 hover:text-gray-600 dark:hover:text-gray-400'
             }`}
           >
@@ -371,6 +372,9 @@ function MobileBottomNav({ panel, setPanel }) {
 // ── Mobile slide-up sheet ────────────────────────────────────────────────────
 
 function MobileSheet({ panel, onClose }) {
+  const { user } = useAuth()
+  const displayTier = getDisplayTier(user)
+  const accent = TIER_ACCENT[displayTier]
   const dialogRef = useRef(null)
   useEffect(() => {
     if (!panel) return
@@ -419,9 +423,10 @@ function MobileSheet({ panel, onClose }) {
         role="dialog"
         aria-modal="true"
         aria-labelledby="screen-mobile-sheet-title"
-        className="lg:hidden fixed bottom-0 left-0 right-0 z-50 flex flex-col bg-white dark:bg-gray-900 rounded-t-2xl shadow-2xl border-t border-gray-200 dark:border-gray-800"
+        className={`lg:hidden fixed bottom-0 left-0 right-0 z-50 flex flex-col group relative bg-white dark:bg-gray-900 rounded-t-2xl shadow-2xl ${accent ? '' : 'border-t border-gray-200 dark:border-gray-800'} ${accent ? tierRingClass(displayTier) : ''}`}
         style={{ height: '68vh', paddingBottom: 'env(safe-area-inset-bottom, 0px)' }}
       >
+        <TierAccentOverlay accent={accent} />
         <div className="shrink-0 flex justify-center pt-2.5 pb-1">
           <div className="w-10 h-1 rounded-full bg-gray-300 dark:bg-gray-600" />
         </div>
@@ -451,6 +456,8 @@ function MobileSheet({ panel, onClose }) {
 // ── Tab bar strip ────────────────────────────────────────────────────────────
 
 function TabStrip({ tabs, active, onChange, lockedIds = [] }) {
+  const { user } = useAuth()
+  const displayTier = getDisplayTier(user)
   return (
     <div className="flex items-center bg-gray-100/80 dark:bg-gray-800/80 rounded-lg p-0.5 gap-0.5">
       {tabs.map((t) => {
@@ -462,7 +469,7 @@ function TabStrip({ tabs, active, onChange, lockedIds = [] }) {
             onClick={() => onChange(t.id)}
             className={`flex items-center gap-1 px-2.5 py-1 rounded-md text-[10px] font-semibold transition-all whitespace-nowrap ${
               isActive
-                ? 'bg-white dark:bg-gray-700 text-gray-900 dark:text-white shadow-sm animate-scale-in'
+                ? `bg-white dark:bg-gray-700 shadow-sm animate-scale-in ${TIER_TEXT[displayTier] || 'text-gray-900 dark:text-white'}`
                 : locked
                   ? 'text-gray-300 dark:text-gray-600 cursor-pointer'
                   : 'text-gray-400 dark:text-gray-500 hover:text-gray-700 dark:hover:text-gray-300 hover:bg-white/60 dark:hover:bg-gray-700/40'
