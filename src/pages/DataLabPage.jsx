@@ -329,13 +329,28 @@ export default function DataLabPage() {
 
   // Whole shell is skeleton while /api/auth/me resolves — gating only the content
   // body would leave the real tab labels visible above the skeleton on reload.
+  // Shaped like DataLab's own toolbar (chips + slot + info button), and reuses
+  // PageSkeleton's "tab" variant for the body since that's already the same
+  // shape TabLoader shows once a tab's lazy chunk is loading — no shape change
+  // on handoff either way.
   if (authLoading) {
     return (
       <div
-        className="flex flex-col overflow-hidden bg-white dark:bg-gray-900"
+        className="flex flex-col overflow-hidden bg-white dark:bg-gray-900 animate-pulse"
         style={{ height: '100dvh' }}
+        aria-hidden="true"
       >
-        <PageSkeleton toolbar />
+        <div className="w-full max-w-[1800px] mx-auto flex-1 min-h-0 flex flex-col">
+          <div className="shrink-0 flex items-center gap-1.5 px-3 py-1 border-b border-gray-200 dark:border-gray-800">
+            <div className="h-6 w-52 bg-gray-100 dark:bg-gray-800 rounded-lg shrink-0" />
+            <div className="w-px h-4 bg-gray-100 dark:bg-gray-800 shrink-0" />
+            <div className="flex-1" />
+            <div className="h-5 w-5 bg-gray-100 dark:bg-gray-800 rounded-full shrink-0" />
+          </div>
+          <div className="flex-1 min-h-0 flex flex-col">
+            <PageSkeleton variant="tab" />
+          </div>
+        </div>
       </div>
     )
   }

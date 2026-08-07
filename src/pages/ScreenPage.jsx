@@ -23,7 +23,6 @@ import ErrorBoundary from '../components/ErrorBoundary'
 import ComingSoon from '../components/ComingSoon'
 import UpgradePrompt from '../components/UpgradePrompt'
 import AuthWall from '../components/AuthWall'
-import PageSkeleton from '../components/PageSkeleton'
 import { useCompactToolbar } from '../components/screen/ScreenToolbarAtoms'
 import {
   TIER_ACCENT,
@@ -556,14 +555,31 @@ function ScreenInner() {
 
   // Whole shell is skeleton while /api/auth/me resolves — gating only the content
   // body would leave the real tab labels (Simple/Complex/SMC…) + market badge text
-  // visible above the skeleton on reload.
+  // visible above the skeleton on reload. Shaped like Screen's own toolbar +
+  // left/chart/right dock layout (not the generic cross-page PageSkeleton) so
+  // there's no shape change once the real shell mounts underneath.
   if (authLoading) {
     return (
       <div
-        className="flex flex-col overflow-hidden bg-white dark:bg-gray-900"
+        className="flex flex-col overflow-hidden bg-white dark:bg-gray-900 animate-pulse"
         style={{ height: '100dvh' }}
+        aria-hidden="true"
       >
-        <PageSkeleton toolbar />
+        <div className="w-full max-w-[1800px] mx-auto flex-1 min-h-0 flex flex-col">
+          <div className="flex flex-row items-center gap-1.5 lg:gap-2 px-3 py-1 border-b border-gray-100 dark:border-gray-800/80 shrink-0">
+            <div className="h-6 w-24 bg-gray-100 dark:bg-gray-800 rounded-lg shrink-0" />
+            <div className="w-px h-5 bg-gray-100 dark:bg-gray-800 shrink-0" />
+            <div className="hidden sm:block h-6 w-56 bg-gray-100 dark:bg-gray-800 rounded-lg shrink-0" />
+            <div className="hidden lg:block w-px h-5 bg-gray-100 dark:bg-gray-800 shrink-0" />
+            <div className="flex-1" />
+            <div className="hidden lg:block h-5 w-24 bg-gray-100 dark:bg-gray-800 rounded-full shrink-0" />
+          </div>
+          <div className="flex-1 flex overflow-hidden min-h-0">
+            <div className="hidden lg:block w-[13%] min-w-[150px] max-w-[200px] shrink-0 bg-gray-50 dark:bg-gray-800/40 border-r border-gray-100 dark:border-gray-800" />
+            <div className="flex-1 min-h-0 bg-gray-50 dark:bg-gray-800/40 m-3 rounded-xl" />
+            <div className="hidden lg:block w-[16%] min-w-[170px] max-w-[240px] shrink-0 bg-gray-50 dark:bg-gray-800/40 border-l border-gray-100 dark:border-gray-800" />
+          </div>
+        </div>
       </div>
     )
   }
