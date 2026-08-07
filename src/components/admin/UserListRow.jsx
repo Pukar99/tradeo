@@ -31,6 +31,19 @@ function avatarColor(id) {
   return AVATAR_COLORS[id % AVATAR_COLORS.length]
 }
 
+// A user counts as "online" if any authenticated request landed within this
+// window (see utils/presence.js on the backend — ~20s flush + ~25s admin poll).
+const ONLINE_THRESHOLD_MS = 90 * 1000
+
+function timeAgo(iso) {
+  const mins = Math.max(0, Math.floor((Date.now() - new Date(iso).getTime()) / 60000))
+  if (mins < 1) return 'just now'
+  if (mins < 60) return `${mins}m ago`
+  const hrs = Math.floor(mins / 60)
+  if (hrs < 24) return `${hrs}h ago`
+  return `${Math.floor(hrs / 24)}d ago`
+}
+
 export default function UserListRow({ user: initialUser, onRefresh, dropUp = false }) {
   const [user, setUser] = useState(initialUser)
   const [menuOpen, setMenuOpen] = useState(false)
@@ -66,6 +79,15 @@ export default function UserListRow({ user: initialUser, onRefresh, dropUp = fal
       })
     : '—'
 
+  const isOnline = user.last_seen_at
+    ? Date.now() - new Date(user.last_seen_at).getTime() < ONLINE_THRESHOLD_MS
+    : false
+  const presenceLabel = isOnline
+    ? 'Online'
+    : user.last_seen_at
+      ? `Last seen ${timeAgo(user.last_seen_at)}`
+      : 'No activity recorded'
+
   function selectAction(action) {
     setMenuOpen(false)
     setActiveAction((prev) => (prev === action ? null : action))
@@ -100,19 +122,27 @@ export default function UserListRow({ user: initialUser, onRefresh, dropUp = fal
       {/* Main row */}
       <div className="flex items-center gap-3 px-4 py-3 hover:bg-gray-50 dark:hover:bg-gray-800/50 transition-colors">
         {/* Avatar — photo when available, initials fallback otherwise */}
-        <div
-          className={`w-8 h-8 rounded-lg flex items-center justify-center overflow-hidden flex-shrink-0 ${avatarColor(user.id)}`}
-        >
-          {user.avatar_url && !avatarError ? (
-            <img
-              src={user.avatar_url}
-              alt={user.name}
-              className="w-full h-full object-cover"
-              onError={() => setAvatarError(true)}
-            />
-          ) : (
-            <span className="text-white text-xs font-bold">{getInitials(user.name)}</span>
-          )}
+        <div className="relative flex-shrink-0" title={presenceLabel}>
+          <div
+            className={`w-8 h-8 rounded-lg flex items-center justify-center overflow-hidden ${avatarColor(user.id)}`}
+          >
+            {user.avatar_url && !avatarError ? (
+              <img
+                src={user.avatar_url}
+                alt={user.name}
+                className="w-full h-full object-cover"
+                onError={() => setAvatarError(true)}
+              />
+            ) : (
+              <span className="text-white text-xs font-bold">{getInitials(user.name)}</span>
+            )}
+          </div>
+          {/* Presence dot */}
+          <span
+            className={`absolute -bottom-0.5 -right-0.5 w-2.5 h-2.5 rounded-full ring-2 ring-white dark:ring-gray-900 ${
+              isOnline ? 'bg-green-500' : 'bg-gray-300 dark:bg-gray-600'
+            }`}
+          />
         </div>
 
         {/* Name + email */}

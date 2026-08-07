@@ -30,25 +30,38 @@ export default function UsersTab() {
   const [tier, setTier] = useState('all')
   const [query, setQuery] = useState('') // debounced search
 
-  const fetchUsers = useCallback(async () => {
-    setLoading(true)
-    try {
-      const params = { page, limit: 20 }
-      if (query) params.search = query
-      if (tier !== 'all') params.tier = tier
-      const { data } = await getAdminUsers(params)
-      setUsers(data.users || [])
-      setTotal(data.total || 0)
-      setPages(data.pages || 1)
-    } catch {
-      setUsers([])
-    } finally {
-      setLoading(false)
-    }
-  }, [page, query, tier])
+  // silent=true skips the loading skeleton — used for background presence polls
+  // so the list doesn't flash every 25s.
+  const fetchUsers = useCallback(
+    async (silent = false) => {
+      if (!silent) setLoading(true)
+      try {
+        const params = { page, limit: 20 }
+        if (query) params.search = query
+        if (tier !== 'all') params.tier = tier
+        const { data } = await getAdminUsers(params)
+        setUsers(data.users || [])
+        setTotal(data.total || 0)
+        setPages(data.pages || 1)
+      } catch {
+        if (!silent) setUsers([])
+      } finally {
+        if (!silent) setLoading(false)
+      }
+    },
+    [page, query, tier]
+  )
 
   useEffect(() => {
     fetchUsers()
+  }, [fetchUsers])
+
+  // Poll for updated presence (last_seen_at) while the tab is open — keeps the
+  // online dot live-ish without a websocket. Doesn't disturb open row menus;
+  // UserListRow's own action/menu state is separate from the `user` prop.
+  useEffect(() => {
+    const id = setInterval(() => fetchUsers(true), 25 * 1000)
+    return () => clearInterval(id)
   }, [fetchUsers])
 
   return (
