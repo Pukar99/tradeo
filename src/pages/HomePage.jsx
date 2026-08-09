@@ -646,7 +646,7 @@ function AlertsWidget({ initData }) {
 
   if (!initData)
     return (
-      <div className="bg-white/70 dark:bg-gray-900/60 backdrop-blur-md rounded-2xl border border-white/60 dark:border-white/10 shadow-sm h-full animate-pulse p-4 space-y-2">
+      <div className="bg-white/70 dark:bg-gray-900/90 backdrop-blur-md dark:backdrop-blur-sm rounded-2xl border border-white/60 dark:border-white/10 shadow-sm h-full animate-pulse p-4 space-y-2">
         <div className="h-3 bg-gray-100 dark:bg-gray-800 rounded w-1/4" />
         {[1, 2, 3].map((i) => (
           <div key={i} className="h-8 bg-gray-100 dark:bg-gray-800 rounded-lg" />
@@ -656,7 +656,7 @@ function AlertsWidget({ initData }) {
 
   return (
     <div
-      className={`hp-card group relative bg-white/70 dark:bg-gray-900/60 backdrop-blur-md rounded-2xl ${accent ? '' : 'border'} border-white/60 dark:border-white/10 overflow-hidden h-full flex flex-col min-h-0 ${accent ? tierRingClass(displayTier) : 'shadow-sm'}`}
+      className={`hp-card group relative bg-white/70 dark:bg-gray-900/90 backdrop-blur-md dark:backdrop-blur-sm rounded-2xl ${accent ? '' : 'border'} border-white/60 dark:border-white/10 overflow-hidden h-full flex flex-col min-h-0 ${accent ? tierRingClass(displayTier) : 'shadow-sm'}`}
     >
       <TierAccentOverlay accent={accent} />
       <div className="flex items-center justify-between px-4 py-3 border-b border-gray-100 dark:border-gray-800 flex-shrink-0">
@@ -718,7 +718,7 @@ function AlertsWidget({ initData }) {
 // ── Stats bar ─────────────────────────────────────────────────────────────────
 function StatCard({ label, value, color, sub }) {
   return (
-    <div className="hp-stat bg-white/70 dark:bg-gray-900/60 backdrop-blur-md rounded-xl sm:rounded-2xl px-2 sm:px-4 py-1.5 sm:py-3 border border-white/60 dark:border-white/10 shadow-sm">
+    <div className="hp-stat bg-white/70 dark:bg-gray-900/90 backdrop-blur-md dark:backdrop-blur-sm rounded-xl sm:rounded-2xl px-2 sm:px-4 py-1.5 sm:py-3 border border-white/60 dark:border-white/10 shadow-sm">
       <p className="text-[8px] sm:text-[10px] font-medium text-gray-400 uppercase tracking-wide mb-0.5 sm:mb-1 truncate">
         {label}
       </p>
@@ -741,7 +741,7 @@ function CenterDashboardSkeleton() {
         {[1, 2, 3, 4].map((i) => (
           <div
             key={i}
-            className="bg-white/70 dark:bg-gray-900/60 backdrop-blur-md rounded-xl sm:rounded-2xl border border-white/60 dark:border-white/10 shadow-sm px-3 py-2.5"
+            className="bg-white/70 dark:bg-gray-900/90 backdrop-blur-md dark:backdrop-blur-sm rounded-xl sm:rounded-2xl border border-white/60 dark:border-white/10 shadow-sm px-3 py-2.5"
           >
             <div className="h-2 bg-gray-100 dark:bg-gray-800 rounded w-3/4 mb-2" />
             <div className="h-5 bg-gray-100 dark:bg-gray-800 rounded w-1/2" />
@@ -749,9 +749,9 @@ function CenterDashboardSkeleton() {
         ))}
       </div>
       {/* Chart placeholder */}
-      <div className="bg-white/70 dark:bg-gray-900/60 backdrop-blur-md rounded-2xl border border-white/60 dark:border-white/10 shadow-sm h-[200px] sm:h-[220px]" />
+      <div className="bg-white/70 dark:bg-gray-900/90 backdrop-blur-md dark:backdrop-blur-sm rounded-2xl border border-white/60 dark:border-white/10 shadow-sm h-[200px] sm:h-[220px]" />
       {/* Watchlist placeholder */}
-      <div className="bg-white/70 dark:bg-gray-900/60 backdrop-blur-md rounded-2xl border border-white/60 dark:border-white/10 shadow-sm">
+      <div className="bg-white/70 dark:bg-gray-900/90 backdrop-blur-md dark:backdrop-blur-sm rounded-2xl border border-white/60 dark:border-white/10 shadow-sm">
         <div className="h-10 border-b border-gray-100 dark:border-gray-800 px-3 flex items-center gap-2">
           <div className="h-2 bg-gray-100 dark:bg-gray-800 rounded w-16" />
           <div className="flex-1" />
@@ -919,7 +919,7 @@ function CenterDashboard({ navigate, initData, onRefresh, onDataReady, mobileTop
             {[1, 2, 3, 4].map((i) => (
               <div
                 key={i}
-                className="bg-white/70 dark:bg-gray-900/60 backdrop-blur-md rounded-xl sm:rounded-2xl border border-white/60 dark:border-white/10 shadow-sm px-2 sm:px-3 py-1.5 sm:py-2.5"
+                className="bg-white/70 dark:bg-gray-900/90 backdrop-blur-md dark:backdrop-blur-sm rounded-xl sm:rounded-2xl border border-white/60 dark:border-white/10 shadow-sm px-2 sm:px-3 py-1.5 sm:py-2.5"
               >
                 <div className="h-2 bg-gray-100 dark:bg-gray-800 rounded w-3/4 mb-1.5 sm:mb-2" />
                 <div className="h-3.5 sm:h-5 bg-gray-100 dark:bg-gray-800 rounded w-1/2" />
@@ -1165,10 +1165,12 @@ function LoggedInHome() {
             />
           </div>
 
-          {/* LEFT column — desktop only: stacked 35/65 rows, fills remaining height exactly */}
+          {/* LEFT column — desktop only: Daily Routine sizes to its own content (HOME-18 —
+              was a forced 35fr row, leaving dead space below its short task list), Monthly
+              Goals absorbs whatever height is left. */}
           <div
             className="hidden lg:grid col-span-3 order-1 gap-3 min-h-0"
-            style={{ gridTemplateRows: '35fr 65fr' }}
+            style={{ gridTemplateRows: 'auto 1fr' }}
           >
             {initData ? (
               <>
@@ -1177,21 +1179,22 @@ function LoggedInHome() {
               </>
             ) : (
               <>
-                <div className="rounded-2xl bg-gray-100 dark:bg-gray-800 animate-pulse min-h-[120px]" />
+                <div className="rounded-2xl bg-gray-100 dark:bg-gray-800 animate-pulse min-h-[170px]" />
                 <div className="rounded-2xl bg-gray-100 dark:bg-gray-800 animate-pulse min-h-[200px]" />
               </>
             )}
           </div>
 
-          {/* RIGHT column — desktop only: stacked 35/65 rows, fills remaining height exactly */}
+          {/* RIGHT column — desktop only: Discipline Score sizes to its own content (HOME-18 —
+              same forced-height issue as the left column), Alerts absorbs what's left. */}
           <div
             className="hidden lg:grid col-span-3 order-3 gap-3 min-h-0"
-            style={{ gridTemplateRows: '35fr 65fr' }}
+            style={{ gridTemplateRows: 'auto 1fr' }}
           >
             {initData ? (
               <DisciplineScore initData={initData.discipline} />
             ) : (
-              <div className="rounded-2xl bg-gray-100 dark:bg-gray-800 animate-pulse min-h-[120px]" />
+              <div className="rounded-2xl bg-gray-100 dark:bg-gray-800 animate-pulse min-h-[170px]" />
             )}
             {initData ? (
               <AlertsWidget initData={initData} />
@@ -1277,21 +1280,22 @@ function HomeSkeleton() {
             <CenterDashboardSkeleton />
           </div>
 
-          {/* LEFT column — desktop only */}
+          {/* LEFT column — desktop only. Rows match LoggedInHome's real auto/1fr split (HOME-18)
+              so the skeleton→real swap has no visible shape change. */}
           <div
             className="hidden lg:grid col-span-3 order-1 gap-3 min-h-0"
-            style={{ gridTemplateRows: '35fr 65fr' }}
+            style={{ gridTemplateRows: 'auto 1fr' }}
           >
-            <div className="rounded-2xl bg-gray-100 dark:bg-gray-800 animate-pulse min-h-[120px]" />
+            <div className="rounded-2xl bg-gray-100 dark:bg-gray-800 animate-pulse min-h-[170px]" />
             <div className="rounded-2xl bg-gray-100 dark:bg-gray-800 animate-pulse min-h-[200px]" />
           </div>
 
-          {/* RIGHT column — desktop only */}
+          {/* RIGHT column — desktop only. Same auto/1fr split as LoggedInHome (HOME-18). */}
           <div
             className="hidden lg:grid col-span-3 order-3 gap-3 min-h-0"
-            style={{ gridTemplateRows: '35fr 65fr' }}
+            style={{ gridTemplateRows: 'auto 1fr' }}
           >
-            <div className="rounded-2xl bg-gray-100 dark:bg-gray-800 animate-pulse min-h-[120px]" />
+            <div className="rounded-2xl bg-gray-100 dark:bg-gray-800 animate-pulse min-h-[170px]" />
             <div className="rounded-2xl bg-gray-100 dark:bg-gray-800 animate-pulse min-h-[200px]" />
           </div>
 

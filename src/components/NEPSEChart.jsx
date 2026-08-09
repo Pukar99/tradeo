@@ -325,7 +325,7 @@ function NEPSEChart({ fixed = false }) {
   if (fixed) {
     return (
       <div
-        className={`hp-card group relative bg-white/70 dark:bg-gray-900/60 backdrop-blur-md rounded-2xl ${accent ? '' : 'border'} border-white/60 dark:border-white/10 overflow-hidden ${accent ? tierRingClass(displayTier) : 'shadow-sm'}`}
+        className={`hp-card group relative bg-white/70 dark:bg-gray-900/90 backdrop-blur-md dark:backdrop-blur-sm rounded-2xl ${accent ? '' : 'border'} border-white/60 dark:border-white/10 overflow-hidden ${accent ? tierRingClass(displayTier) : 'shadow-sm'}`}
       >
         <TierAccentOverlay accent={accent} />
         {/* Mobile toggle — D / W pill, hidden on desktop */}

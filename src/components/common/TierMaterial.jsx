@@ -63,10 +63,15 @@ const HOVER_REVEAL =
 // it" gesture instead of the old constant-on state. hover:hover stays
 // gated behind the media query so it never fires from a mobile tap (some
 // mobile browsers apply a brief "sticky hover" after tap otherwise).
+// HOME-21 (2026-08-10, owner-flagged): dark-mode alpha used to be HIGHER than light's
+// (0.7/0.75 vs 0.55/0.6) — backwards. The same glow reads far more intense against a
+// near-black card than a white one, so dark was the more overpowering theme, not less.
+// Dark now stays BELOW light's alpha so the glow reads as an equally soft accent in
+// both themes.
 const TIER_RING_CLASS = {
-  pro: 'active:shadow-[0_10px_26px_-14px_rgba(35,84,201,0.55)] dark:active:shadow-[0_10px_26px_-14px_rgba(35,84,201,0.7)] [@media(hover:hover)]:hover:shadow-[0_10px_26px_-14px_rgba(35,84,201,0.55)] dark:[@media(hover:hover)]:hover:shadow-[0_10px_26px_-14px_rgba(35,84,201,0.7)] transition-shadow duration-300',
+  pro: 'active:shadow-[0_10px_26px_-14px_rgba(35,84,201,0.55)] dark:active:shadow-[0_10px_26px_-14px_rgba(35,84,201,0.28)] [@media(hover:hover)]:hover:shadow-[0_10px_26px_-14px_rgba(35,84,201,0.55)] dark:[@media(hover:hover)]:hover:shadow-[0_10px_26px_-14px_rgba(35,84,201,0.28)] transition-shadow duration-300',
   premium:
-    'active:shadow-[0_12px_30px_-14px_rgba(217,154,31,0.6)] dark:active:shadow-[0_12px_30px_-14px_rgba(217,154,31,0.75)] [@media(hover:hover)]:hover:shadow-[0_12px_30px_-14px_rgba(217,154,31,0.6)] dark:[@media(hover:hover)]:hover:shadow-[0_12px_30px_-14px_rgba(217,154,31,0.75)] transition-shadow duration-300',
+    'active:shadow-[0_12px_30px_-14px_rgba(217,154,31,0.6)] dark:active:shadow-[0_12px_30px_-14px_rgba(217,154,31,0.3)] [@media(hover:hover)]:hover:shadow-[0_12px_30px_-14px_rgba(217,154,31,0.6)] dark:[@media(hover:hover)]:hover:shadow-[0_12px_30px_-14px_rgba(217,154,31,0.3)] transition-shadow duration-300',
 }
 
 export function tierRingClass(tier) {

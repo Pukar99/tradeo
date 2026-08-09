@@ -346,7 +346,7 @@ function MonthlyGoals({ initData }) {
 
   if (loading)
     return (
-      <div className="bg-white/70 dark:bg-gray-900/60 backdrop-blur-md rounded-2xl border border-white/60 dark:border-white/10 shadow-sm p-4 h-full flex flex-col gap-3 animate-pulse">
+      <div className="bg-white/70 dark:bg-gray-900/90 backdrop-blur-md dark:backdrop-blur-sm rounded-2xl border border-white/60 dark:border-white/10 shadow-sm p-4 h-full flex flex-col gap-3 animate-pulse">
         <div className="flex items-center justify-between">
           <div className="h-3 bg-gray-100 dark:bg-gray-800 rounded w-1/3" />
           <div className="h-3 bg-gray-100 dark:bg-gray-800 rounded w-12" />
@@ -363,7 +363,7 @@ function MonthlyGoals({ initData }) {
   // MG13 fix: show error + retry instead of silent empty state
   if (fetchError)
     return (
-      <div className="bg-white/70 dark:bg-gray-900/60 backdrop-blur-md rounded-2xl border border-white/60 dark:border-white/10 shadow-sm p-4 flex flex-col items-center justify-center gap-3 min-h-[100px]">
+      <div className="bg-white/70 dark:bg-gray-900/90 backdrop-blur-md dark:backdrop-blur-sm rounded-2xl border border-white/60 dark:border-white/10 shadow-sm p-4 flex flex-col items-center justify-center gap-3 min-h-[100px]">
         <p className="text-[11px] text-red-400">{fetchError}</p>
         <button
           onClick={fetchGoals}
@@ -378,7 +378,7 @@ function MonthlyGoals({ initData }) {
 
   return (
     <div
-      className={`hp-card group relative bg-white/70 dark:bg-gray-900/60 backdrop-blur-md rounded-2xl ${accent ? '' : 'border'} border-white/60 dark:border-white/10 overflow-hidden h-full flex flex-col min-h-0 ${accent ? tierRingClass(displayTier) : 'shadow-sm'}`}
+      className={`hp-card group relative bg-white/70 dark:bg-gray-900/90 backdrop-blur-md dark:backdrop-blur-sm rounded-2xl ${accent ? '' : 'border'} border-white/60 dark:border-white/10 overflow-hidden h-full flex flex-col min-h-0 ${accent ? tierRingClass(displayTier) : 'shadow-sm'}`}
     >
       <TierAccentOverlay accent={accent} />
       <ContextMenuPortal />
