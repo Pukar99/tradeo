@@ -15,6 +15,7 @@
 // real state from the person moderating would be the wrong trade.
 import { useState } from 'react'
 import { deleteAdminPost, patchPostPin } from '@api/admin'
+import { clearAdminPostsCache } from '../../utils/adminCache'
 import toast from 'react-hot-toast'
 import ActionPanel from './ActionPanel'
 
@@ -57,6 +58,7 @@ export default function PostListRow({ post: initialPost, onRefresh }) {
     setPinLoading(true)
     try {
       const { data } = await patchPostPin(post.id)
+      clearAdminPostsCache()
       const pinned = data?.is_pinned ?? !post.is_pinned
       setPost((p) => ({ ...p, is_pinned: pinned }))
       toast.success(pinned ? 'Post distinguished' : 'Post no longer distinguished')
@@ -72,6 +74,9 @@ export default function PostListRow({ post: initialPost, onRefresh }) {
     setDeleteLoading(true)
     try {
       await deleteAdminPost(post.id)
+      // onRefresh refetches the list — drop the cache first or the deleted
+      // post would reappear from the pre-delete snapshot.
+      clearAdminPostsCache()
       toast.success('Post deleted')
       onRefresh?.()
     } catch {

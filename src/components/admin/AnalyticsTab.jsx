@@ -3,7 +3,8 @@
 // trend, tier distribution, signup growth. Per-user (via selectedUserId,
 // set by clicking a user in the Users tab): their top pages + time spent.
 import { useState, useEffect, useCallback } from 'react'
-import { getAdminAnalyticsOverview, getAdminUserAnalytics, getAdminUser } from '@api/admin'
+import { getAdminUser } from '@api/admin'
+import { getAdminAnalyticsOverview, getAdminUserAnalytics } from '../../utils/adminCache'
 import { useTheme } from '../../context/ThemeContext'
 import StatCard from './StatCard'
 import TierBadge from './TierBadge'

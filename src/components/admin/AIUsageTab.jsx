@@ -2,7 +2,7 @@
 // Admin AI Usage dashboard. Read-only over ai_usage_log via GET /api/admin/ai-usage.
 // Today/left cap + total calls (30d) + top users + filterable recent calls.
 import { useState, useEffect, useCallback } from 'react'
-import { getAiUsage } from '@api/admin'
+import { getAiUsage } from '../../utils/adminCache'
 import { pnlClass, apiError } from '../../utils/format'
 import { useTheme } from '../../context/ThemeContext'
 import StatCard from './StatCard'

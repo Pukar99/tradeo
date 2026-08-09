@@ -7,6 +7,7 @@ import TierChangeDropdown from './TierChangeDropdown'
 import SuspendButton from './SuspendButton'
 import ActionPanel from './ActionPanel'
 import { patchUserForceLogout } from '@api/admin'
+import { clearAdminUsersCache } from '../../utils/adminCache'
 import toast from 'react-hot-toast'
 
 function getInitials(name = '') {
@@ -120,6 +121,8 @@ export default function UserListRow({ user: initialUser, onRefresh, onSelectUser
     setForceLoading(true)
     try {
       await patchUserForceLogout(user.id)
+      // Writes an audit row, and ends their session so presence changes.
+      clearAdminUsersCache()
       toast.success(`${user.name} logged out`)
       setActiveAction(null)
     } catch {

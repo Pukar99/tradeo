@@ -1,12 +1,11 @@
 // === FeatureFlagsTab.jsx ===
 import { useState, useEffect, useCallback, useMemo } from 'react'
+import { patchAdminFlag, postAdminFlag, deleteAdminFlag } from '@api/admin'
 import {
   getAllAdminFlags,
-  patchAdminFlag,
-  postAdminFlag,
-  deleteAdminFlag,
   getAdminAnalyticsOverview,
-} from '@api/admin'
+  clearAdminFlagsCache,
+} from '../../utils/adminCache'
 import toast from 'react-hot-toast'
 
 const SCOPES = ['all', 'basic', 'pro', 'premium', 'beta']
@@ -307,6 +306,7 @@ export default function FeatureFlagsTab() {
   async function handleToggle(name, enabled) {
     try {
       await patchAdminFlag(name, { enabled })
+      clearAdminFlagsCache()
       setFlags((prev) => prev.map((f) => (f.name === name ? { ...f, enabled } : f)))
       toast.success(enabled ? `${name} enabled` : `${name} disabled`)
     } catch {
@@ -317,6 +317,7 @@ export default function FeatureFlagsTab() {
   async function handleScopeChange(name, scope) {
     try {
       await patchAdminFlag(name, { scope })
+      clearAdminFlagsCache()
       setFlags((prev) => prev.map((f) => (f.name === name ? { ...f, scope } : f)))
       toast.success(`${name} scope → ${scope}`)
     } catch {
@@ -327,6 +328,7 @@ export default function FeatureFlagsTab() {
   async function handleDescriptionChange(name, description) {
     try {
       await patchAdminFlag(name, { description })
+      clearAdminFlagsCache()
       setFlags((prev) => prev.map((f) => (f.name === name ? { ...f, description } : f)))
     } catch {
       toast.error('Failed to update description')
@@ -336,6 +338,7 @@ export default function FeatureFlagsTab() {
   async function handleDelete(name) {
     try {
       await deleteAdminFlag(name)
+      clearAdminFlagsCache()
       setFlags((prev) => prev.filter((f) => f.name !== name))
       toast.success(`${name} deleted`)
     } catch {
@@ -359,6 +362,9 @@ export default function FeatureFlagsTab() {
       setNewDescription('')
       setNewScope('all')
       setShowCreate(false)
+      // Must drop the cache BEFORE refetching, or fetchFlags() would be served
+      // the pre-create snapshot and the new flag wouldn't appear.
+      clearAdminFlagsCache()
       fetchFlags()
     } catch {
       toast.error('Failed to create flag')

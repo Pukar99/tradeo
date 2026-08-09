@@ -1,6 +1,7 @@
 // === TierChangeDropdown.jsx ===
 import { useState } from 'react'
 import { patchUserTier } from '@api/admin'
+import { clearAdminUsersCache } from '../../utils/adminCache'
 import toast from 'react-hot-toast'
 import ActionPanel, { PanelLabel } from './ActionPanel'
 
@@ -48,6 +49,9 @@ export default function TierChangeDropdown({ user, onClose, onSuccess }) {
     setLoading(true)
     try {
       const { data } = await patchUserTier(user.id, selected, needsDuration ? duration : undefined)
+      // onSuccess triggers the parent's list refetch — drop the cache first or
+      // it would be served the pre-change snapshot.
+      clearAdminUsersCache()
       const durationLabel = needsDuration
         ? DURATIONS.find((d) => d.value === duration)?.label
         : null

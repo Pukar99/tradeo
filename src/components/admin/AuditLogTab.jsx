@@ -1,6 +1,6 @@
 // === AuditLogTab.jsx ===
 import { useState, useEffect, useCallback } from 'react'
-import { getAdminAuditLog } from '@api/admin'
+import { getAdminAuditLog } from '../../utils/adminCache'
 import AuditLogRow from './AuditLogRow'
 
 // Every action name logAdminAudit() is ever called with across routes/admin.js

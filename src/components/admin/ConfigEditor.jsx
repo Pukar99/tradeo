@@ -6,6 +6,7 @@
 //     the same unlabelled button N times. Each now names its own key.
 import { useState } from 'react'
 import { patchSystemConfig } from '@api/admin'
+import { clearAdminConfigCache } from '../../utils/adminCache'
 import toast from 'react-hot-toast'
 
 function displayValue(value) {
@@ -34,6 +35,7 @@ function ConfigRow({ row, onSaved }) {
         parsed = draft
       }
       await patchSystemConfig(row.key, parsed)
+      clearAdminConfigCache()
       toast.success(`${row.key} updated`)
       onSaved(row.key, parsed)
       setEditing(false)

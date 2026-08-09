@@ -13,15 +13,18 @@
 // panel read one poll instead of two. Same endpoints, same 3s-while-running
 // cadence as before — ScraperPanel is presentational now.
 import { useState, useEffect, useCallback, useRef } from 'react'
+// Scraper status stays a direct call — it's polled every 3s while a scrape
+// runs, so a TTL cache would freeze the progress readout. Everything else on
+// this tab is cached; db-counts especially, at 22 COUNT(*) queries a visit.
+import { getSystemScraper, runSystemScraper } from '@api/admin'
 import {
   getSystemStats,
   getSystemDbCounts,
   getSystemConfig,
   getSystemSymbolHealth,
   getSystemJournalHealth,
-  getSystemScraper,
-  runSystemScraper,
-} from '@api/admin'
+  clearAdminSystemCache,
+} from '../../utils/adminCache'
 import toast from 'react-hot-toast'
 import StatsCards from './StatsCards'
 import SystemHealth from './SystemHealth'
@@ -108,6 +111,10 @@ export default function SystemTab() {
     try {
       await runSystemScraper()
       toast.success('Scraper triggered')
+      // A scrape changes row counts and both health checks. Drop the cached
+      // snapshots so the next visit reflects the new data instead of serving
+      // a pre-scrape copy for up to five minutes.
+      clearAdminSystemCache()
       await fetchScraper()
     } catch (err) {
       toast.error(err?.response?.data?.error || 'Failed to trigger scraper')

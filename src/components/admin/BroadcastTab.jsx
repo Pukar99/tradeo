@@ -1,11 +1,11 @@
 // === BroadcastTab.jsx ===
 import { useState, useEffect, useCallback } from 'react'
 import {
-  getAdminAnnouncements,
   postAdminAnnouncement,
   patchAdminAnnouncement,
   deleteAdminAnnouncement,
 } from '@api/admin'
+import { getAdminAnnouncements, clearAdminAnnouncementsCache } from '../../utils/adminCache'
 import toast from 'react-hot-toast'
 
 const TARGET_COLORS = {
@@ -205,6 +205,9 @@ export default function BroadcastTab() {
       setBody('')
       setTarget('all')
       setExpiresAt('')
+      // Drop the cache BEFORE refetching, or fetchAnnouncements() would be
+      // served the pre-create snapshot and the new item wouldn't appear.
+      clearAdminAnnouncementsCache()
       fetchAnnouncements()
     } catch {
       toast.error('Failed to create announcement')
@@ -216,6 +219,7 @@ export default function BroadcastTab() {
   async function handleToggle(id, isActive) {
     try {
       await patchAdminAnnouncement(id, { is_active: isActive })
+      clearAdminAnnouncementsCache()
       setItems((prev) => prev.map((a) => (a.id === id ? { ...a, is_active: isActive } : a)))
       toast.success(isActive ? 'Announcement activated' : 'Announcement deactivated')
     } catch {
@@ -226,6 +230,7 @@ export default function BroadcastTab() {
   async function handleDelete(id) {
     try {
       await deleteAdminAnnouncement(id)
+      clearAdminAnnouncementsCache()
       setItems((prev) => prev.filter((a) => a.id !== id))
       toast.success('Deleted')
     } catch {

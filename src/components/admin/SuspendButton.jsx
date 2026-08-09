@@ -1,6 +1,7 @@
 // === SuspendButton.jsx ===
 import { useState } from 'react'
 import { patchUserSuspend } from '@api/admin'
+import { clearAdminUsersCache } from '../../utils/adminCache'
 import toast from 'react-hot-toast'
 import ActionPanel, { PanelLabel } from './ActionPanel'
 
@@ -16,6 +17,7 @@ export default function SuspendButton({ user, onClose, onSuccess }) {
         suspended: !isSuspended,
         reason: !isSuspended ? reason.trim() || undefined : undefined,
       })
+      clearAdminUsersCache()
       toast.success(isSuspended ? `${user.name} unsuspended` : `${user.name} suspended`)
       onSuccess({ ...user, is_suspended: !isSuspended })
     } catch {

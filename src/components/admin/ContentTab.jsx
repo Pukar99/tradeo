@@ -1,6 +1,6 @@
 // === ContentTab.jsx ===
 import { useState, useEffect, useCallback } from 'react'
-import { getAdminPosts } from '@api/admin'
+import { getAdminPosts } from '../../utils/adminCache'
 import PostListRow from './PostListRow'
 import AdminSearchInput from '../common/AdminSearchInput'
 import AdminPagination from './AdminPagination'

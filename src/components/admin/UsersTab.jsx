@@ -1,6 +1,6 @@
 // === UsersTab.jsx ===
 import { useState, useEffect, useCallback } from 'react'
-import { getAdminUsers } from '@api/admin'
+import { getAdminUsers } from '../../utils/adminCache'
 import UserListRow from './UserListRow'
 import AdminSearchInput from '../common/AdminSearchInput'
 import AdminPagination from './AdminPagination'
@@ -74,7 +74,9 @@ export default function UsersTab({ onSelectUser }) {
         const params = { page, limit: PAGE_SIZE }
         if (query) params.search = query
         if (tier !== 'all') params.tier = tier
-        const { data } = await getAdminUsers(params)
+        // The silent presence poll must bypass the TTL cache, or the online
+        // dots would freeze on whatever snapshot the cache is holding.
+        const { data } = await getAdminUsers(params, silent)
         setUsers(data.users || [])
         setTotal(data.total || 0)
         setPages(data.pages || 1)
