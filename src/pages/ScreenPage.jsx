@@ -155,6 +155,7 @@ function SimpleContent({
         {/* Left panel — collapsible */}
         {!compact && (
           <div
+            data-side="left"
             className={`hidden lg:flex flex-col shrink-0 overflow-y-auto relative group
                         bg-white dark:bg-gray-900
                         shadow-[1px_0_0_rgba(255,255,255,0.18),2px_0_12px_rgba(0,0,0,0.06)]
@@ -233,12 +234,13 @@ function SimpleContent({
         {/* Right panel — collapsible */}
         {!compact && (
           <div
+            data-side="right"
             className={`hidden lg:flex flex-col shrink-0 overflow-y-auto relative group
                         bg-white dark:bg-gray-900
                         shadow-[-1px_0_0_rgba(255,255,255,0.18),-2px_0_12px_rgba(0,0,0,0.06)]
                         dark:shadow-[-1px_0_0_rgba(255,255,255,0.07),-2px_0_16px_rgba(0,0,0,0.4)]
                         transition-all duration-300 ease-luxury
-                        ${rightOpen ? 'w-[16%] min-w-[170px] max-w-[240px]' : 'w-0 min-w-0 max-w-0 overflow-hidden'}
+                        ${rightOpen ? 'w-[20%] min-w-[220px] max-w-[300px]' : 'w-0 min-w-0 max-w-0 overflow-hidden'}
                         ${!rightOpen ? 'screen-panel-collapsed' : ''}
                         ${accent ? tierRingClass(displayTier) : ''}`}
           >

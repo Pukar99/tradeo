@@ -364,13 +364,26 @@ html {
 /* ── Screen collapsible panel system ────────────────────────────────────────
    .screen-panel-collapsed hides content visually during width:0 transition
    .screen-panel-content prevents layout bleed while panel is animating
+   Content fade now matches the box's own 300ms ease-luxury exactly (was a
+   mismatched 150ms ease-out — content used to vanish well before the box
+   finished shrinking, reading as two separate motions instead of one slide).
+   A small translateX is added so the content visibly slides toward the
+   panel's own edge as it collapses, not just fades in place.
    ─────────────────────────────────────────────────────────────────────────── */
 .screen-panel-collapsed .screen-panel-content {
   opacity: 0;
   pointer-events: none;
 }
 .screen-panel-content {
-  transition: opacity 150ms ease-out;
+  transition:
+    opacity 300ms cubic-bezier(0.22, 1, 0.36, 1),
+    transform 300ms cubic-bezier(0.22, 1, 0.36, 1);
+}
+.screen-panel-collapsed[data-side='left'] .screen-panel-content {
+  transform: translateX(-8px);
+}
+.screen-panel-collapsed[data-side='right'] .screen-panel-content {
+  transform: translateX(8px);
 }
 
 /* ── HomePage interactive card system ───────────────────────────────────────

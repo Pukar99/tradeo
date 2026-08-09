@@ -463,7 +463,7 @@ export default function RightPanel() {
   const [dates, setDates] = useState([])
   const [selectedDate, setSelectedDate] = useState('')
   const [latestDate, setLatestDate] = useState('')
-  const [moverTab, setMoverTab] = useState('gainers')
+  const [moverTab, setMoverTab] = useState('summary')
   const moverTabIndicator = useSlidingIndicator(moverTab, setMoverTab)
   const [loading, setLoading] = useState(false)
   const [moversErr, setMoversErr] = useState(null)
@@ -599,22 +599,15 @@ export default function RightPanel() {
   const maxTurnover =
     volData.length > 0 && parseFloat(volData[0].t) > 0 ? parseFloat(volData[0].t) : 1
 
-  const TAB_LABELS = [
-    ['gainers', 'Gainers'],
-    ['losers', 'Losers'],
-    ['volume', 'Volume'],
-    ['summary', 'Summary'],
-  ]
-
   const TAB_CONFIG = {
+    summary: { label: 'Market', color: 'text-violet-500', dot: 'bg-violet-400' },
     gainers: { label: 'Gainers', color: 'text-emerald-500', dot: 'bg-emerald-400' },
     losers: { label: 'Losers', color: 'text-red-400', dot: 'bg-red-400' },
     volume: { label: 'Volume', color: 'text-blue-500', dot: 'bg-blue-400' },
-    summary: { label: 'Market', color: 'text-violet-500', dot: 'bg-violet-400' },
   }
 
   return (
-    <div className="flex flex-col h-full overflow-y-auto">
+    <div className="flex flex-col h-full overflow-hidden">
       {/* ── Date navigation ───────────────────────────────────────────────── */}
       <div className="px-2 pt-2 pb-1.5 shrink-0">
         {isPinned ? (
@@ -702,8 +695,11 @@ export default function RightPanel() {
         ))}
       </div>
 
-      {/* ── Tab content ───────────────────────────────────────────────────── */}
-      <div className="px-2 shrink-0">
+      {/* ── Tab content — bounded + independently scrollable (owner-caught: a tall
+        Market/summary tab used to push Market Intel below off-screen since the
+        whole panel scrolled as one unit) — this region owns its own scroll,
+        Market Intel stays pinned in its own space underneath. ── */}
+      <div className="px-2 flex-1 min-h-0 overflow-y-auto">
         {moverTab === 'summary' ? (
           <SummaryTab summary={summary} selectSymbol={selectSymbol} />
         ) : (
