@@ -664,6 +664,16 @@ function ChartHUDControls({ compact = false }) {
 
 // ── Chart Price Panel (HUD price + OHLC hover, merged into one card) ───────────
 
+// Compact K/M/B abbreviation for volume — matches the style shown on the chart's
+// own volume-axis labels (lightweight-charts' built-in histogram tick formatter).
+function fmtVolShort(v) {
+  const n = Math.abs(parseFloat(v) || 0)
+  if (n >= 1e9) return (n / 1e9).toFixed(2) + 'B'
+  if (n >= 1e6) return (n / 1e6).toFixed(2) + 'M'
+  if (n >= 1e3) return (n / 1e3).toFixed(2) + 'K'
+  return String(Math.round(n))
+}
+
 function ChartPricePanel({ latestClose, chartData, tooltip }) {
   const { selectedSymbol, selectedCompanyName } = useScreen()
 
@@ -700,8 +710,8 @@ function ChartPricePanel({ latestClose, chartData, tooltip }) {
             )}
           </div>
           {bar.open != null && (
-            <div className="grid grid-cols-4 gap-x-3 text-[10px]">
-              {['O', 'H', 'L', 'C'].map((l) => (
+            <div className="grid grid-cols-5 gap-x-3 text-[10px]">
+              {['O', 'H', 'L', 'C', 'Vol'].map((l) => (
                 <span key={l} className="text-gray-400">
                   {l}
                 </span>
@@ -713,6 +723,9 @@ function ChartPricePanel({ latestClose, chartData, tooltip }) {
               <span className="text-red-400">{bar.low?.toLocaleString()}</span>
               <span className="font-semibold text-gray-700 dark:text-gray-300">
                 {bar.close?.toLocaleString()}
+              </span>
+              <span className="text-gray-700 dark:text-gray-300">
+                {bar.volume != null ? fmtVolShort(bar.volume) : '—'}
               </span>
             </div>
           )}
@@ -1693,8 +1706,10 @@ export default function StockChart({
     seriesRef.current = {}
 
     const changeMap = {}
+    const volMap = {}
     chartData.forEach((d) => {
       changeMap[d.time] = d.diff_pct ?? d.per_change
+      volMap[d.time] = d.volume || d.turnover || 0
     })
 
     let cancelled = false
@@ -1945,7 +1960,7 @@ export default function StockChart({
         }
         const bar = param.seriesData?.get(priceSeries)
         if (!bar) return
-        setTooltip({ ...bar, time: param.time, change: changeMap[param.time] })
+        setTooltip({ ...bar, time: param.time, change: changeMap[param.time], volume: volMap[param.time] })
         // Movers data loads on click only — see subscribeClick below
       })
 
@@ -1954,7 +1969,7 @@ export default function StockChart({
         if (!param.time) return
         const bar = param.seriesData?.get(priceSeries)
         if (!bar) return
-        setTooltip({ ...bar, time: param.time, change: changeMap[param.time] })
+        setTooltip({ ...bar, time: param.time, change: changeMap[param.time], volume: volMap[param.time] })
         // Day-data (movers) load moved to right-click — see onContextMenu below.
       })
 
