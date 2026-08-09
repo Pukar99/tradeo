@@ -24,7 +24,7 @@ import ErrorBoundary from '../components/ErrorBoundary'
 import ComingSoon from '../components/ComingSoon'
 import UpgradePrompt from '../components/UpgradePrompt'
 import AuthWall from '../components/AuthWall'
-import { useCompactToolbar } from '../components/screen/ScreenToolbarAtoms'
+import { useCompactToolbar, LayoutIcon } from '../components/screen/ScreenToolbarAtoms'
 import {
   TIER_ACCENT,
   TIER_TEXT,
@@ -78,7 +78,6 @@ function TabSpinner() {
 
 const SIMPLE_TABS = [
   { id: 'General', label: 'General', short: 'Gen' },
-  { id: 'MultiChart', label: 'MultiChart', short: 'Multi' },
   { id: 'SMC', label: 'SMC', short: 'SMC' },
   { id: 'PriceAction', label: 'Price Action', short: 'PA' },
 ]
@@ -93,6 +92,9 @@ const ADVANCED_TABS = [
 
 function SimpleContent({
   activeTab,
+  multiOn,
+  multiLayout,
+  setMultiLayout,
   mobilePanel,
   setMobilePanel,
   leftOpen,
@@ -107,14 +109,6 @@ function SimpleContent({
   useEffect(() => {
     if (!compact || activeTab !== 'General') setMobilePanel(null)
   }, [compact, activeTab, setMobilePanel])
-  if (activeTab === 'MultiChart')
-    return (
-      <div key="MultiChart" className="flex-1 min-h-0 flex flex-col animate-tab-in">
-        <Suspense fallback={<TabSpinner />}>
-          <MultiChartPage />
-        </Suspense>
-      </div>
-    )
   if (activeTab === 'SMC')
     return (
       <div key="SMC" className="flex-1 min-h-0 flex flex-col animate-tab-in">
@@ -137,6 +131,20 @@ function SimpleContent({
             <PriceActionPage />
           </Suspense>
         )}
+      </div>
+    )
+
+  // General — MultiChart (full content area, no side panels) when toggled on.
+  // layout/setLayout are controlled from ScreenPage's persistent selector (see
+  // toolbar row below) so it drives the ALREADY-MOUNTED grid live, not just the
+  // initial panel count; hideLayoutSelector skips MultiChartPage's own 2/3/4
+  // icons since the persistent selector already covers that.
+  if (multiOn)
+    return (
+      <div key="Multi" className="flex-1 min-h-0 flex flex-col animate-tab-in">
+        <Suspense fallback={<TabSpinner />}>
+          <MultiChartPage layout={multiLayout} setLayout={setMultiLayout} hideLayoutSelector />
+        </Suspense>
       </div>
     )
 
@@ -530,11 +538,26 @@ function ScreenInner() {
   const [mobilePanel, setMobilePanel] = useState(null)
   const [leftOpen, setLeftOpen] = useLocalStorage('tradeo_screen_leftOpen', true)
   const [rightOpen, setRightOpen] = useLocalStorage('tradeo_screen_rightOpen', true)
+  // Multi (formerly the MultiChart tab) — merged into General as a permanent
+  // 1/2/3/4 layout selector in the toolbar (see below). No persistence (resets to
+  // off / layout 2 on reload), same as mobilePanel.
+  const [multiOn, setMultiOn] = useState(false)
+  const [multiLayout, setMultiLayout] = useState(2)
   const toolbarSlotRef = useRef(null)
   const { user, loading: authLoading } = useAuth()
 
   const toggleLeft = () => setLeftOpen((v) => !v)
   const toggleRight = () => setRightOpen((v) => !v)
+
+  // No explicit collapse/restore of leftOpen/rightOpen needed for Multi mode:
+  // SimpleContent's `multiOn` branch already skips rendering LeftPanel/RightPanel
+  // entirely (full-width grid), regardless of what leftOpen/rightOpen are set to —
+  // so there's nothing to force-collapse and nothing to restore. (An earlier version
+  // of this DID force them via setLeftOpen/setRightOpen, which are localStorage-
+  // backed — that created a real bug: reloading mid-Multi-mode left the panels
+  // permanently collapsed in normal view after Multi's own state reset to off on
+  // reload, with no restore trigger. Leaving leftOpen/rightOpen untouched avoids
+  // that entirely.)
 
   // Opt into navbar auto-hide — activates on mount, restores on unmount
   useNavbarAutoHide()
@@ -647,7 +670,7 @@ function ScreenInner() {
                   tabs={SIMPLE_TABS}
                   active={simpleTab}
                   onChange={handleSimpleTab}
-                  lockedIds={!user ? ['MultiChart', 'SMC', 'PriceAction'] : []}
+                  lockedIds={!user ? ['SMC', 'PriceAction'] : []}
                 />
               ) : (
                 <TabStrip tabs={ADVANCED_TABS} active={advancedTab} onChange={handleAdvancedTab} />
@@ -657,16 +680,71 @@ function ScreenInner() {
 
           <div className="hidden lg:block w-px h-5 bg-gray-300/80 dark:bg-gray-600/70 shrink-0 mx-0.5" />
 
-          {/* Toolbar slot — its own flex child so the symbol-search dropdown
-            (useFixedDropdown → fixed/portal, escapes overflow) never clips even
-            though the slot is overflow-x-auto. flex-1 so it takes the remaining
-            width and scrolls horizontally when a tab's toolbar is wide (SMC/PA
-            inject many controls here); the General tab's compact search+menu just
-            sits flush left with no scroll needed. */}
-          <div
-            ref={toolbarSlotRef}
-            className="flex-1 flex items-center gap-1.5 min-w-0 overflow-x-auto no-scrollbar"
-          />
+          {/* Toolbar slot row — flex-1 so it takes the remaining width and scrolls
+            horizontally when a tab's toolbar is wide (SMC/PA inject many controls
+            here). The portal target (toolbarSlotRef) and the persistent layout
+            selector are BOTH plain (non-flex-1) children inside this shared row, so
+            the selector sits flush after whatever gets portalled in instead of being
+            pushed to the far right by a second flex-1 element with dead space
+            between them. */}
+          <div className="flex-1 flex items-center gap-1.5 min-w-0 overflow-x-auto no-scrollbar">
+            <div ref={toolbarSlotRef} className="flex items-center gap-1.5 shrink-0" />
+
+            {/* Persistent layout selector — merged from the old MultiChart tab.
+              Placed right after the portalled controls (search/candlestick-line/
+              timeframe/indicators) per owner placement call, not mixed into the
+              tab-strip group. "1" = normal single-chart General, "2/3/4" =
+              MultiChart's grid at that panel count. Selecting 2/3/4 while already in
+              multi mode changes the live grid immediately (layout is controlled from
+              here, passed into MultiChartPage — see SimpleContent). Shares the exact
+              icon glyphs MultiChartPage's own selector used, now lifted to
+              ScreenToolbarAtoms so both can use it. Only meaningful on General. */}
+            {isSimple && simpleTab === 'General' && (
+              <div className="flex items-center gap-0.5 bg-gray-100 dark:bg-gray-800 rounded-md p-0.5 shrink-0">
+                {[1, 2, 3, 4].map((n) => {
+                  const active = n === 1 ? !multiOn : multiOn && multiLayout === n
+                  const locked = n > 1 && !user
+                  return (
+                    <button
+                      key={n}
+                      onClick={() => {
+                        if (n === 1) setMultiOn(false)
+                        else {
+                          setMultiLayout(n)
+                          setMultiOn(true)
+                        }
+                      }}
+                      aria-pressed={active}
+                      title={n === 1 ? 'General' : locked ? 'MultiChart — sign in to use' : 'MultiChart'}
+                      className={`relative flex items-center justify-center w-7 h-5 rounded transition-all ${
+                        active
+                          ? 'bg-white dark:bg-gray-700 shadow-sm text-gray-800 dark:text-white'
+                          : 'text-gray-400 dark:text-gray-500 hover:text-gray-600 dark:hover:text-gray-300'
+                      }`}
+                    >
+                      <LayoutIcon layout={n} />
+                      {locked && (
+                        <svg
+                          width="6"
+                          height="6"
+                          viewBox="0 0 24 24"
+                          fill="none"
+                          stroke="currentColor"
+                          strokeWidth="3"
+                          strokeLinecap="round"
+                          strokeLinejoin="round"
+                          className="absolute -top-0.5 -right-0.5 opacity-60"
+                        >
+                          <rect x="3" y="11" width="18" height="11" rx="2" ry="2" />
+                          <path d="M7 11V7a5 5 0 0 1 10 0v4" />
+                        </svg>
+                      )}
+                    </button>
+                  )
+                })}
+              </div>
+            )}
+          </div>
 
           <div className="hidden lg:block">
             <MarketStatusBadge />
@@ -679,11 +757,20 @@ function ScreenInner() {
           onMouseEnter={navHidden ? undefined : scheduleHide}
         >
           {isSimple ? (
-            !user && simpleTab !== 'General' ? (
-              <AuthWall feature={SIMPLE_TABS.find((t) => t.id === simpleTab)?.label || simpleTab} />
+            !user && (simpleTab !== 'General' || multiOn) ? (
+              <AuthWall
+                feature={
+                  simpleTab !== 'General'
+                    ? SIMPLE_TABS.find((t) => t.id === simpleTab)?.label || simpleTab
+                    : 'MultiChart'
+                }
+              />
             ) : (
               <SimpleContent
                 activeTab={simpleTab}
+                multiOn={multiOn}
+                multiLayout={multiLayout}
+                setMultiLayout={setMultiLayout}
                 mobilePanel={mobilePanel}
                 setMobilePanel={setMobilePanel}
                 leftOpen={leftOpen}

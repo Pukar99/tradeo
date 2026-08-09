@@ -4,7 +4,7 @@ import { ScreenProvider, useScreen } from '../../context/ScreenContext'
 import StockChart from './StockChart'
 import { useScreenToolbarSlot } from '../../pages/ScreenPage'
 import { getMarketSymbols } from '../../utils/globalCache'
-import { ToolbarDivider, ToolbarToggleChip } from './ScreenToolbarAtoms'
+import { ToolbarDivider, ToolbarToggleChip, LayoutIcon } from './ScreenToolbarAtoms'
 import SymbolSearch from '../common/SymbolSearch'
 
 // ── Constants ─────────────────────────────────────────────────────────────────
@@ -52,39 +52,6 @@ function saveState(s) {
   try {
     sessionStorage.setItem('multichart_state', JSON.stringify(s))
   } catch {}
-}
-
-// ── Layout icon (pure CSS) ────────────────────────────────────────────────────
-function LayoutIcon({ layout }) {
-  if (layout === 2)
-    return (
-      <div className="grid grid-cols-2 gap-px w-5 h-3.5 pointer-events-none">
-        <div className="rounded-sm bg-current opacity-70" />
-        <div className="rounded-sm bg-current opacity-70" />
-      </div>
-    )
-  if (layout === 3)
-    return (
-      <div
-        className="grid gap-px w-5 h-3.5 pointer-events-none"
-        style={{
-          gridTemplateColumns: '1fr 1fr',
-          gridTemplateRows: '1fr 1fr',
-          gridTemplateAreas: '"a b" "c c"',
-        }}
-      >
-        <div className="rounded-sm bg-current opacity-70" style={{ gridArea: 'a' }} />
-        <div className="rounded-sm bg-current opacity-70" style={{ gridArea: 'b' }} />
-        <div className="rounded-sm bg-current opacity-70" style={{ gridArea: 'c' }} />
-      </div>
-    )
-  return (
-    <div className="grid grid-cols-2 grid-rows-2 gap-px w-5 h-3.5 pointer-events-none">
-      {[0, 1, 2, 3].map((i) => (
-        <div key={i} className="rounded-sm bg-current opacity-70" />
-      ))}
-    </div>
-  )
 }
 
 // ── Per-panel header ──────────────────────────────────────────────────────────
@@ -306,10 +273,11 @@ function MultiChartToolbar({
   syncCross,
   setSyncCross,
   isMobile,
+  hideLayoutSelector,
 }) {
   return useScreenToolbarSlot(
     <div className="flex items-center gap-1.5 min-w-0">
-      {!isMobile && (
+      {!isMobile && !hideLayoutSelector && (
         <>
           <div className="flex items-center gap-0.5 bg-gray-100 dark:bg-gray-800 rounded-md p-0.5 shrink-0">
             {[2, 3, 4].map((n) => (
@@ -347,9 +315,18 @@ function MultiChartToolbar({
 }
 
 // ── MultiChartPage ────────────────────────────────────────────────────────────
-export default function MultiChartPage() {
+// `layout`/`setLayout` are optional — pass both to let a parent control the panel
+// count (e.g. ScreenPage's persistent toolbar selector) live, not just at mount.
+// Omit both and this manages its own layout exactly as before (sessionStorage-backed).
+export default function MultiChartPage({
+  layout: layoutProp,
+  setLayout: setLayoutProp,
+  hideLayoutSelector = false,
+} = {}) {
   // FIX MC03: lazy initialisers — loadState() runs once, not every render
-  const [layout, setLayout] = useState(() => loadState()?.layout ?? 2)
+  const [internalLayout, setInternalLayout] = useState(() => loadState()?.layout ?? 2)
+  const layout = layoutProp ?? internalLayout
+  const setLayout = setLayoutProp ?? setInternalLayout
   const [syncData, setSyncData] = useState(() => loadState()?.syncData ?? false)
   const [syncCross, setSyncCross] = useState(() => loadState()?.syncCross ?? false)
   const [activePanel, setActivePanel] = useState(0)
@@ -621,6 +598,7 @@ export default function MultiChartPage() {
         syncCross={syncCross}
         setSyncCross={setSyncCross}
         isMobile={isMobile}
+        hideLayoutSelector={hideLayoutSelector}
       />
 
       {isMobile ? (

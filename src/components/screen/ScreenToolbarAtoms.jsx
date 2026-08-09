@@ -12,6 +12,49 @@ export function ToolbarDivider() {
   return <div className="w-px h-3.5 bg-gray-200 dark:bg-gray-700 shrink-0" />
 }
 
+// ── LayoutIcon (pure CSS) ────────────────────────────────────────────────────
+// Shared glyph language for "how many chart panels" — used by both the persistent
+// layout selector in ScreenPage's toolbar and MultiChartPage's own grid. Lives here
+// (not in MultiChartPage.jsx) so ScreenPage can use it without pulling MultiChartPage
+// out of its lazy-loaded chunk.
+export function LayoutIcon({ layout }) {
+  if (layout === 1)
+    return (
+      <div className="w-5 h-3.5 pointer-events-none">
+        <div className="w-full h-full rounded-sm bg-current opacity-70" />
+      </div>
+    )
+  if (layout === 2)
+    return (
+      <div className="grid grid-cols-2 gap-px w-5 h-3.5 pointer-events-none">
+        <div className="rounded-sm bg-current opacity-70" />
+        <div className="rounded-sm bg-current opacity-70" />
+      </div>
+    )
+  if (layout === 3)
+    return (
+      <div
+        className="grid gap-px w-5 h-3.5 pointer-events-none"
+        style={{
+          gridTemplateColumns: '1fr 1fr',
+          gridTemplateRows: '1fr 1fr',
+          gridTemplateAreas: '"a b" "c c"',
+        }}
+      >
+        <div className="rounded-sm bg-current opacity-70" style={{ gridArea: 'a' }} />
+        <div className="rounded-sm bg-current opacity-70" style={{ gridArea: 'b' }} />
+        <div className="rounded-sm bg-current opacity-70" style={{ gridArea: 'c' }} />
+      </div>
+    )
+  return (
+    <div className="grid grid-cols-2 grid-rows-2 gap-px w-5 h-3.5 pointer-events-none">
+      {[0, 1, 2, 3].map((i) => (
+        <div key={i} className="rounded-sm bg-current opacity-70" />
+      ))}
+    </div>
+  )
+}
+
 // ── ToolbarTimeframes ──────────────────────────────────────────────────────────
 // Compact segmented timeframe control reading from ScreenContext.
 // Pass custom `frames` array to override defaults.
