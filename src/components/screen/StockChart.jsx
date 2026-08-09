@@ -662,9 +662,9 @@ function ChartHUDControls({ compact = false }) {
   )
 }
 
-// ── HUD Price + Symbol ─────────────────────────────────────────────────────────
+// ── Chart Price Panel (HUD price + OHLC hover, merged into one card) ───────────
 
-function ChartHUDPrice({ latestClose, chartData }) {
+function ChartPricePanel({ latestClose, chartData, tooltip }) {
   const { selectedSymbol, selectedCompanyName } = useScreen()
 
   const lastBar = chartData.length > 0 ? chartData[chartData.length - 1] : null
@@ -672,39 +672,81 @@ function ChartHUDPrice({ latestClose, chartData }) {
   const isPos = parseFloat(change) >= 0
   const close = latestClose ?? lastBar?.close
 
+  const bar = tooltip
+  const barChange = tooltip?.change
+  const isUp = bar ? (bar.close ?? bar.value) >= (bar.open ?? bar.value) : true
+
+  if (chartData.length === 0) return null
+
   return (
     <div
-      className="flex flex-col pointer-events-none px-2.5 py-1.5 rounded-xl
-                 bg-white/80 dark:bg-gray-950/85 backdrop-blur-md
-                 shadow-md border border-white/70 dark:border-white/[0.12]"
+      className="bg-white/80 dark:bg-gray-950/85 border border-white/70 dark:border-white/[0.12]
+                 rounded-xl px-2.5 py-1.5 shadow-md backdrop-blur-md"
       translate="no"
     >
-      <div className="flex items-baseline gap-2">
-        <span className="text-[11px] font-bold text-gray-500 dark:text-gray-400 tracking-wide">
-          {selectedSymbol}
-        </span>
-        {close != null && (
-          <>
-            <span className="text-[19px] font-black text-gray-900 dark:text-white tabular-nums leading-none">
-              {parseFloat(close).toLocaleString('en-NP', {
-                minimumFractionDigits: 2,
-                maximumFractionDigits: 2,
-              })}
+      {bar ? (
+        <>
+          <div className="text-[10px] text-gray-400 mb-1">{bar.time}</div>
+          <div className="flex items-baseline gap-2 mb-1">
+            <span
+              className={`text-[15px] font-bold ${isUp ? 'text-emerald-500' : 'text-red-400'}`}
+            >
+              {(bar.close ?? bar.value)?.toLocaleString()}
             </span>
-            {change != null && (
-              <span
-                className={`text-[11px] font-bold ${isPos ? 'text-emerald-500' : 'text-red-400'}`}
-              >
-                {isPos ? '▲' : '▼'} {Math.abs(parseFloat(change)).toFixed(2)}%
+            {barChange != null && (
+              <span className={`text-[10px] font-semibold ${pnlClass(barChange)}`}>
+                {barChange >= 0 ? '▲' : '▼'} {Math.abs(barChange).toFixed(2)}%
               </span>
             )}
-          </>
-        )}
-      </div>
-      {selectedCompanyName && (
-        <span className="text-[9px] text-gray-400 dark:text-gray-500 leading-tight mt-0.5 truncate max-w-[200px]">
-          {selectedCompanyName}
-        </span>
+          </div>
+          {bar.open != null && (
+            <div className="grid grid-cols-4 gap-x-3 text-[10px]">
+              {['O', 'H', 'L', 'C'].map((l) => (
+                <span key={l} className="text-gray-400">
+                  {l}
+                </span>
+              ))}
+              <span className="text-gray-700 dark:text-gray-300">
+                {bar.open?.toLocaleString()}
+              </span>
+              <span className="text-emerald-500">{bar.high?.toLocaleString()}</span>
+              <span className="text-red-400">{bar.low?.toLocaleString()}</span>
+              <span className="font-semibold text-gray-700 dark:text-gray-300">
+                {bar.close?.toLocaleString()}
+              </span>
+            </div>
+          )}
+        </>
+      ) : (
+        <>
+          <div className="flex items-baseline gap-2">
+            <span className="text-[11px] font-bold text-gray-500 dark:text-gray-400 tracking-wide">
+              {selectedSymbol}
+            </span>
+            {close != null && (
+              <>
+                <span className="text-[19px] font-black text-gray-900 dark:text-white tabular-nums leading-none">
+                  {parseFloat(close).toLocaleString('en-NP', {
+                    minimumFractionDigits: 2,
+                    maximumFractionDigits: 2,
+                  })}
+                </span>
+                {change != null && (
+                  <span
+                    className={`text-[11px] font-bold ${isPos ? 'text-emerald-500' : 'text-red-400'}`}
+                  >
+                    {isPos ? '▲' : '▼'} {Math.abs(parseFloat(change)).toFixed(2)}%
+                  </span>
+                )}
+              </>
+            )}
+          </div>
+          {selectedCompanyName && (
+            <span className="text-[9px] text-gray-400 dark:text-gray-500 leading-tight mt-0.5 truncate max-w-[200px] block">
+              {selectedCompanyName}
+            </span>
+          )}
+        </>
       )}
     </div>
   )
@@ -913,56 +955,6 @@ function PositionBadge({ positions, latestClose }) {
               </div>
             )
           })()}
-      </div>
-    </div>
-  )
-}
-
-// ── OHLC Tooltip ──────────────────────────────────────────────────────────────
-
-function OHLCTooltip({ bar, change }) {
-  const isUp = bar ? (bar.close ?? bar.value) >= (bar.open ?? bar.value) : true
-  return (
-    <div
-      className="absolute top-2 right-3 z-10 pointer-events-none"
-      style={{ opacity: bar ? 1 : 0, transition: 'opacity 0.12s ease-out' }}
-      translate="no"
-    >
-      <div className="bg-white/90 dark:bg-gray-950/90 border border-gray-200 dark:border-white/10 rounded-xl px-3 py-2 shadow-lg backdrop-blur-md">
-        {bar && (
-          <>
-            <div className="text-[10px] text-gray-400 mb-1">{bar.time}</div>
-            <div className="flex items-baseline gap-2 mb-1">
-              <span
-                className={`text-[15px] font-bold ${isUp ? 'text-emerald-500' : 'text-red-400'}`}
-              >
-                {(bar.close ?? bar.value)?.toLocaleString()}
-              </span>
-              {change != null && (
-                <span className={`text-[10px] font-semibold ${pnlClass(change)}`}>
-                  {change >= 0 ? '▲' : '▼'} {Math.abs(change).toFixed(2)}%
-                </span>
-              )}
-            </div>
-            {bar.open != null && (
-              <div className="grid grid-cols-4 gap-x-3 text-[10px]">
-                {['O', 'H', 'L', 'C'].map((l) => (
-                  <span key={l} className="text-gray-400">
-                    {l}
-                  </span>
-                ))}
-                <span className="text-gray-700 dark:text-gray-300">
-                  {bar.open?.toLocaleString()}
-                </span>
-                <span className="text-emerald-500">{bar.high?.toLocaleString()}</span>
-                <span className="text-red-400">{bar.low?.toLocaleString()}</span>
-                <span className="font-semibold text-gray-700 dark:text-gray-300">
-                  {bar.close?.toLocaleString()}
-                </span>
-              </div>
-            )}
-          </>
-        )}
       </div>
     </div>
   )
@@ -2618,17 +2610,15 @@ export default function StockChart({
           <ChartSkeleton />
         ) : (
           <div className="relative flex-1 flex flex-col min-h-0 overflow-hidden animate-chart-in">
-            {/* Price overlay top-left — key on symbol so it fades on symbol change */}
-            <div className="absolute top-2 left-3 z-20 pointer-events-none">
+            {/* Price panel top-right — key on symbol so it fades on symbol change; swaps
+                between HUD price (default) and OHLC hover detail (crosshair active) */}
+            <div className="absolute top-2 right-3 z-20 pointer-events-none">
               {chartData.length > 0 && (
                 <div key={selectedSymbol} className="animate-fade-up">
-                  <ChartHUDPrice latestClose={latestClose} chartData={chartData} />
+                  <ChartPricePanel latestClose={latestClose} chartData={chartData} tooltip={tooltip} />
                 </div>
               )}
             </div>
-
-            {/* OHLC tooltip */}
-            <OHLCTooltip bar={tooltip} change={tooltip?.change} />
 
             {/* Pinned hint — only shown for index charts */}
             {overlayData?.pinned && isIndex?.() && (
