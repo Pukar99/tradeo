@@ -688,77 +688,72 @@ function ChartPricePanel({ latestClose, chartData, tooltip }) {
 
   if (chartData.length === 0) return null
 
+  // Unified: identity (symbol + company) always on top, price+change always shown
+  // (source differs by state), OHLC/Vol grid only appears while hovering.
+  const priceColor = bar ? (isUp ? 'text-emerald-500' : 'text-red-400') : 'text-gray-900 dark:text-white'
+  const displayPrice = bar ? (bar.close ?? bar.value) : close != null ? parseFloat(close) : null
+  const displayChange = bar ? barChange : change != null ? parseFloat(change) : null
+  const displayIsPos = bar ? isUp : isPos
+
   return (
     <div
-      className="bg-white/80 dark:bg-gray-950/85 border border-white/70 dark:border-white/[0.12]
-                 rounded-xl px-2.5 py-1.5 shadow-md backdrop-blur-md"
+      className="min-w-[132px] bg-white/85 dark:bg-gray-950/90 border border-white/70 dark:border-white/[0.1]
+                 rounded-lg px-2 py-1.5 shadow-md backdrop-blur-md"
       translate="no"
     >
-      {bar ? (
-        <>
-          <div className="text-[10px] text-gray-400 mb-1">{bar.time}</div>
-          <div className="flex items-baseline gap-2 mb-1">
-            <span
-              className={`text-[15px] font-bold ${isUp ? 'text-emerald-500' : 'text-red-400'}`}
-            >
-              {(bar.close ?? bar.value)?.toLocaleString()}
-            </span>
-            {barChange != null && (
-              <span className={`text-[10px] font-semibold ${pnlClass(barChange)}`}>
-                {barChange >= 0 ? '▲' : '▼'} {Math.abs(barChange).toFixed(2)}%
-              </span>
-            )}
-          </div>
-          {bar.open != null && (
-            <div className="grid grid-cols-5 gap-x-3 text-[10px]">
-              {['O', 'H', 'L', 'C', 'Vol'].map((l) => (
-                <span key={l} className="text-gray-400">
-                  {l}
-                </span>
-              ))}
-              <span className="text-gray-700 dark:text-gray-300">
-                {bar.open?.toLocaleString()}
-              </span>
-              <span className="text-emerald-500">{bar.high?.toLocaleString()}</span>
-              <span className="text-red-400">{bar.low?.toLocaleString()}</span>
-              <span className="font-semibold text-gray-700 dark:text-gray-300">
-                {bar.close?.toLocaleString()}
-              </span>
-              <span className="text-gray-700 dark:text-gray-300">
-                {bar.volume != null ? fmtVolShort(bar.volume) : '—'}
-              </span>
-            </div>
-          )}
-        </>
-      ) : (
-        <>
-          <div className="flex items-baseline gap-2">
-            <span className="text-[11px] font-bold text-gray-500 dark:text-gray-400 tracking-wide">
-              {selectedSymbol}
-            </span>
-            {close != null && (
-              <>
-                <span className="text-[19px] font-black text-gray-900 dark:text-white tabular-nums leading-none">
-                  {parseFloat(close).toLocaleString('en-NP', {
-                    minimumFractionDigits: 2,
-                    maximumFractionDigits: 2,
-                  })}
-                </span>
-                {change != null && (
-                  <span
-                    className={`text-[11px] font-bold ${isPos ? 'text-emerald-500' : 'text-red-400'}`}
-                  >
-                    {isPos ? '▲' : '▼'} {Math.abs(parseFloat(change)).toFixed(2)}%
-                  </span>
-                )}
-              </>
-            )}
-          </div>
+      {/* Identity — symbol + company name (+ date once hovering), shown in both states */}
+      <div className="flex items-baseline justify-between gap-2 min-w-0">
+        <div className="flex items-baseline gap-1 min-w-0">
+          <span className="text-[10.5px] font-bold text-gray-800 dark:text-gray-100 tracking-wide shrink-0">
+            {selectedSymbol}
+          </span>
           {selectedCompanyName && (
-            <span className="text-[9px] text-gray-400 dark:text-gray-500 leading-tight mt-0.5 truncate max-w-[200px] block">
+            <span className="text-[8px] font-medium text-gray-400 dark:text-gray-500 truncate max-w-[80px]">
               {selectedCompanyName}
             </span>
           )}
+        </div>
+        {bar?.time && (
+          <span className="text-[8px] text-gray-400 dark:text-gray-500 shrink-0">{bar.time}</span>
+        )}
+      </div>
+
+      {/* Price + change */}
+      {displayPrice != null && (
+        <div className="flex items-baseline gap-1.5 mt-0.5">
+          <span className={`text-[14px] font-black tabular-nums leading-none ${priceColor}`}>
+            {displayPrice.toLocaleString('en-NP', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+          </span>
+          {displayChange != null && (
+            <span
+              className={`text-[9px] font-bold ${displayIsPos ? 'text-emerald-500' : 'text-red-400'}`}
+            >
+              {displayIsPos ? '▲' : '▼'} {Math.abs(displayChange).toFixed(2)}%
+            </span>
+          )}
+        </div>
+      )}
+
+      {/* OHLC + Volume — hover state only, stacked label/value cells */}
+      {bar?.open != null && (
+        <>
+          <div className="h-px bg-gray-100 dark:bg-white/[0.08] mt-1 mb-1" />
+          <div className="grid grid-cols-5 gap-x-1.5">
+            {[
+              ['O', bar.open?.toLocaleString(), 'text-gray-700 dark:text-gray-300'],
+              ['H', bar.high?.toLocaleString(), 'text-emerald-500'],
+              ['L', bar.low?.toLocaleString(), 'text-red-400'],
+              ['C', bar.close?.toLocaleString(), 'text-gray-700 dark:text-gray-300 font-semibold'],
+              ['Vol', bar.volume != null ? fmtVolShort(bar.volume) : '—', 'text-gray-700 dark:text-gray-300'],
+            ].map(([label, value, valueClass]) => (
+              <div key={label}>
+                <p className="text-[7px] text-gray-400 dark:text-gray-500 uppercase tracking-wide mb-0.5">
+                  {label}
+                </p>
+                <p className={`text-[8.5px] tabular-nums ${valueClass}`}>{value}</p>
+              </div>
+            ))}
+          </div>
         </>
       )}
     </div>
