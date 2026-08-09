@@ -11,7 +11,7 @@ import {
 } from 'react'
 import { useNavbarAutoHide, useNavbarState } from '../App'
 import { createPortal } from 'react-dom'
-import { ComplexTabProvider } from '../hooks/useComplexTab.jsx'
+import { AdvancedTabProvider } from '../hooks/useAdvancedTab.jsx'
 import ErrorBoundary from '../components/ErrorBoundary'
 import UpgradePrompt from '../components/UpgradePrompt'
 import AuthWall from '../components/AuthWall'
@@ -278,26 +278,26 @@ function TabContent({ activeTab }) {
     return user.tier === 'basic' && !user?.is_admin ? (
       <UpgradePrompt feature="Insight" />
     ) : (
-      <ComplexTabProvider>
+      <AdvancedTabProvider>
         <ErrorBoundary label="Insight">
           <Suspense fallback={<TabLoader />}>
             <InsightPage />
           </Suspense>
         </ErrorBoundary>
-      </ComplexTabProvider>
+      </AdvancedTabProvider>
     )
 
   if (activeTab === 'breakdown')
     return user.tier === 'basic' && !user?.is_admin ? (
       <UpgradePrompt feature="Breakdown" />
     ) : (
-      <ComplexTabProvider>
+      <AdvancedTabProvider>
         <ErrorBoundary label="Breakdown">
           <Suspense fallback={<TabLoader />}>
             <BreakdownPage />
           </Suspense>
         </ErrorBoundary>
-      </ComplexTabProvider>
+      </AdvancedTabProvider>
     )
 
   return null

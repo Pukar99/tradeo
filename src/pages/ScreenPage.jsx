@@ -1,4 +1,4 @@
-// === ScreenPage.jsx — screen page: simple/complex mode, tab routing, toolbar slot portal, auth gating, mobile sheet ===
+// === ScreenPage.jsx — screen page: simple/advanced mode, tab routing, toolbar slot portal, auth gating, mobile sheet ===
 import {
   useState,
   useEffect,
@@ -12,7 +12,7 @@ import {
 import { createPortal } from 'react-dom'
 import { useNavbarAutoHide, useNavbarState } from '../App'
 import { ScreenProvider } from '../context/ScreenContext'
-import { ComplexTabProvider } from '../hooks/useComplexTab.jsx'
+import { AdvancedTabProvider } from '../hooks/useAdvancedTab.jsx'
 import { useLocalStorage } from '../hooks/useLocalStorage'
 import { useSlidingIndicator } from '../hooks/useSlidingIndicator'
 import { useAuth } from '../context/AuthContext'
@@ -83,7 +83,7 @@ const SIMPLE_TABS = [
   { id: 'PriceAction', label: 'Price Action', short: 'PA' },
 ]
 
-const COMPLEX_TABS = [
+const ADVANCED_TABS = [
   { id: 'Backtesting', label: 'Backtesting', short: 'BT' },
   { id: 'Replay', label: 'Replay', short: 'Rep' },
   { id: 'StrategyLab', label: 'Strategy Lab', short: 'Strat' },
@@ -248,9 +248,9 @@ function SimpleContent({
   )
 }
 
-// ── Complex mode content ─────────────────────────────────────────────────────
+// ── Advanced mode content ────────────────────────────────────────────────────
 
-function ComplexContent({ activeTab }) {
+function AdvancedContent({ activeTab }) {
   const { user } = useAuth()
   if (activeTab === 'Backtesting')
     return user?.tier === 'basic' && !user?.is_admin ? (
@@ -517,15 +517,15 @@ function TabStrip({ tabs, active, onChange, lockedIds = [] }) {
 function ScreenInner() {
   const [mode, setMode] = useState(() => {
     const stored = sessionStorage.getItem('tradeo_screen_mode')
-    return stored === 'complex' ? 'complex' : 'simple'
+    return stored === 'advanced' ? 'advanced' : 'simple'
   })
   const [simpleTab, setSimpleTab] = useState(() => {
     const stored = sessionStorage.getItem('tradeo_screen_simpleTab')
     return SIMPLE_TABS.some((t) => t.id === stored) ? stored : 'General'
   })
-  const [complexTab, setComplexTab] = useState(() => {
-    const stored = sessionStorage.getItem('tradeo_screen_complexTab')
-    return COMPLEX_TABS.some((t) => t.id === stored) ? stored : 'Backtesting'
+  const [advancedTab, setAdvancedTab] = useState(() => {
+    const stored = sessionStorage.getItem('tradeo_screen_advancedTab')
+    return ADVANCED_TABS.some((t) => t.id === stored) ? stored : 'Backtesting'
   })
   const [mobilePanel, setMobilePanel] = useState(null)
   const [leftOpen, setLeftOpen] = useLocalStorage('tradeo_screen_leftOpen', true)
@@ -551,9 +551,9 @@ function ScreenInner() {
     setSimpleTab(t)
     sessionStorage.setItem('tradeo_screen_simpleTab', t)
   }
-  const handleComplexTab = (t) => {
-    setComplexTab(t)
-    sessionStorage.setItem('tradeo_screen_complexTab', t)
+  const handleAdvancedTab = (t) => {
+    setAdvancedTab(t)
+    sessionStorage.setItem('tradeo_screen_advancedTab', t)
   }
 
   useEffect(() => {
@@ -567,7 +567,7 @@ function ScreenInner() {
   const isSimple = mode === 'simple'
 
   // Whole shell is skeleton while /api/auth/me resolves — gating only the content
-  // body would leave the real tab labels (Simple/Complex/SMC…) + market badge text
+  // body would leave the real tab labels (Simple/Advanced/SMC…) + market badge text
   // visible above the skeleton on reload. Shaped like Screen's own toolbar +
   // left/chart/right dock layout (not the generic cross-page PageSkeleton) so
   // there's no shape change once the real shell mounts underneath.
@@ -632,11 +632,11 @@ function ScreenInner() {
             <TabStrip
               tabs={[
                 { id: 'simple', label: 'Simple', short: 'Sim' },
-                { id: 'complex', label: 'Complex', short: 'Cpx' },
+                { id: 'advanced', label: 'Advanced', short: 'Adv' },
               ]}
               active={mode}
               onChange={handleMode}
-              lockedIds={!user ? ['complex'] : []}
+              lockedIds={!user ? ['advanced'] : []}
             />
 
             <div className="w-px h-5 bg-gray-300/80 dark:bg-gray-600/70 shrink-0 mx-0.5" />
@@ -650,7 +650,7 @@ function ScreenInner() {
                   lockedIds={!user ? ['MultiChart', 'SMC', 'PriceAction'] : []}
                 />
               ) : (
-                <TabStrip tabs={COMPLEX_TABS} active={complexTab} onChange={handleComplexTab} />
+                <TabStrip tabs={ADVANCED_TABS} active={advancedTab} onChange={handleAdvancedTab} />
               )}
             </div>
           </div>
@@ -693,11 +693,11 @@ function ScreenInner() {
               />
             )
           ) : !user ? (
-            <AuthWall feature="Complex mode" />
+            <AuthWall feature="Advanced mode" />
           ) : (
-            <ComplexTabProvider>
-              <ComplexContent activeTab={complexTab} />
-            </ComplexTabProvider>
+            <AdvancedTabProvider>
+              <AdvancedContent activeTab={advancedTab} />
+            </AdvancedTabProvider>
           )}
         </div>
         </div>
