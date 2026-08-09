@@ -1,10 +1,13 @@
 // === TrendChart.jsx — shared small area-chart trend, used by Analytics + AI Usage tabs ===
+// Visual pass 2026-08-09: wrapper chrome moved to the house CARD/LABEL
+// tokens; recharts internals and the public prop shape are untouched, so
+// AnalyticsTab (round 7, not yet touched) inherits this automatically.
 import { AreaChart, Area, XAxis, Tooltip, ResponsiveContainer } from 'recharts'
 
 export default function TrendChart({ data, dataKey, color, isDark, label }) {
   return (
-    <div className="rounded-lg border border-gray-200 dark:border-gray-700 p-4">
-      <div className="text-xs uppercase tracking-wide text-gray-500 dark:text-gray-400 mb-2">
+    <div className="bg-white dark:bg-gray-900 rounded-xl border border-gray-100 dark:border-gray-800 px-3.5 py-3">
+      <div className="text-[10px] font-semibold uppercase tracking-widest text-gray-400 dark:text-gray-500 mb-2">
         {label}
       </div>
       {data.length === 0 ? (
@@ -25,9 +28,9 @@ export default function TrendChart({ data, dataKey, color, isDark, label }) {
               <Tooltip
                 contentStyle={{
                   fontSize: 10,
-                  background: isDark ? '#1f2937' : '#ffffff',
-                  border: isDark ? '1px solid #374151' : '1px solid #e5e7eb',
-                  borderRadius: 6,
+                  background: isDark ? '#111827' : '#ffffff',
+                  border: isDark ? '1px solid #1f2937' : '1px solid #f3f4f6',
+                  borderRadius: 8,
                   color: isDark ? '#e5e7eb' : '#111827',
                 }}
                 labelFormatter={(d) => d}
