@@ -2625,9 +2625,9 @@ export default function StockChart({
           <ChartSkeleton />
         ) : (
           <div className="relative flex-1 flex flex-col min-h-0 overflow-hidden animate-chart-in">
-            {/* Price panel top-right — key on symbol so it fades on symbol change; swaps
+            {/* Price panel top-left — key on symbol so it fades on symbol change; swaps
                 between HUD price (default) and OHLC hover detail (crosshair active) */}
-            <div className="absolute top-2 right-3 z-20 pointer-events-none">
+            <div className="absolute top-2 left-3 z-20 pointer-events-none">
               {chartData.length > 0 && (
                 <div key={selectedSymbol} className="animate-fade-up">
                   <ChartPricePanel latestClose={latestClose} chartData={chartData} tooltip={tooltip} />
