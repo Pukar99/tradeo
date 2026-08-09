@@ -1,13 +1,30 @@
 // === SystemTab.jsx ===
-import { useState, useEffect } from 'react'
+// Visual pass 2026-08-08 (owner picked option B — trim the duplicated stats):
+//
+// The tab used to open with five large stat tiles and bury the two health
+// checks under them in one line of 11px text. Health now leads.
+//
+// Four of those five tiles were a second rendering of rows already visible in
+// the Table Row Counts panel below them (users/research_posts/trade_log/
+// market_journal). Only `suspended` was unique — it's a filter, not a table.
+// The volume numbers now live once, in the panel built for them.
+//
+// Scraper status is lifted here from ScraperPanel so the health tile and the
+// panel read one poll instead of two. Same endpoints, same 3s-while-running
+// cadence as before — ScraperPanel is presentational now.
+import { useState, useEffect, useCallback, useRef } from 'react'
 import {
   getSystemStats,
   getSystemDbCounts,
   getSystemConfig,
   getSystemSymbolHealth,
   getSystemJournalHealth,
+  getSystemScraper,
+  runSystemScraper,
 } from '@api/admin'
+import toast from 'react-hot-toast'
 import StatsCards from './StatsCards'
+import SystemHealth from './SystemHealth'
 import ScraperPanel from './ScraperPanel'
 import DbCountsTable from './DbCountsTable'
 import ConfigEditor from './ConfigEditor'
@@ -20,6 +37,11 @@ export default function SystemTab() {
   const [config, setConfig] = useState(null)
   const [configLoading, setConfigLoading] = useState(true)
   const [health, setHealth] = useState(null)
+
+  const [scraper, setScraper] = useState(null)
+  const [scraperLoading, setScraperLoading] = useState(true)
+  const [triggering, setTriggering] = useState(false)
+  const pollRef = useRef(null)
 
   useEffect(() => {
     getSystemStats()
@@ -37,51 +59,77 @@ export default function SystemTab() {
       .catch(() => {})
       .finally(() => setConfigLoading(false))
 
-    // Health checks — non-critical, show inline
+    // Health checks — non-critical, surfaced in the status band above.
+    // `dangling` (the actual ticker list) rides along with the count in the
+    // same response and used to be discarded here.
     Promise.all([getSystemSymbolHealth(), getSystemJournalHealth()])
       .then(([sym, jrn]) =>
         setHealth({
-          dangling: sym.data.dangling_count,
+          danglingCount: sym.data.dangling_count,
+          danglingList: sym.data.dangling || [],
           nullClose: jrn.data.null_nepse_close_last_30d,
         })
       )
       .catch(() => {})
   }, [])
 
+  const fetchScraper = useCallback(async () => {
+    try {
+      const { data } = await getSystemScraper()
+      setScraper(data)
+      return data
+    } catch {
+      return null
+    } finally {
+      setScraperLoading(false)
+    }
+  }, [])
+
+  useEffect(() => {
+    fetchScraper()
+  }, [fetchScraper])
+
+  // Poll every 3s while the scraper is running (unchanged cadence).
+  useEffect(() => {
+    if (scraper?.running) {
+      pollRef.current = setInterval(async () => {
+        const s = await fetchScraper()
+        if (!s?.running) clearInterval(pollRef.current)
+      }, 3000)
+    } else {
+      clearInterval(pollRef.current)
+    }
+    return () => clearInterval(pollRef.current)
+  }, [scraper?.running, fetchScraper])
+
+  async function handleRunScraper() {
+    if (triggering || scraper?.running) return
+    setTriggering(true)
+    try {
+      await runSystemScraper()
+      toast.success('Scraper triggered')
+      await fetchScraper()
+    } catch (err) {
+      toast.error(err?.response?.data?.error || 'Failed to trigger scraper')
+    } finally {
+      setTriggering(false)
+    }
+  }
+
   return (
     <div className="flex flex-col gap-0">
-      {/* Stats cards */}
-      <StatsCards stats={stats} loading={statsLoading} />
+      <SystemHealth scraper={scraper} scraperLoading={scraperLoading} health={health} />
 
-      {/* Health row */}
-      {health && (
-        <div className="flex items-center gap-4 px-4 pb-2">
-          <div
-            className={`flex items-center gap-1.5 text-xs ${health.dangling > 0 ? 'text-amber-600 dark:text-amber-400' : 'text-green-600 dark:text-green-400'}`}
-          >
-            <span
-              className={`w-1.5 h-1.5 rounded-full ${health.dangling > 0 ? 'bg-amber-500' : 'bg-green-500'}`}
-            />
-            {health.dangling > 0
-              ? `${health.dangling} watchlist symbols missing from company_master`
-              : 'All watchlist symbols in company_master'}
-          </div>
-          <div
-            className={`flex items-center gap-1.5 text-xs ${health.nullClose > 0 ? 'text-amber-600 dark:text-amber-400' : 'text-green-600 dark:text-green-400'}`}
-          >
-            <span
-              className={`w-1.5 h-1.5 rounded-full ${health.nullClose > 0 ? 'bg-amber-500' : 'bg-green-500'}`}
-            />
-            {health.nullClose > 0
-              ? `${health.nullClose} market journal rows missing NEPSE close (last 30 days)`
-              : 'All market journal rows have NEPSE close'}
-          </div>
-        </div>
-      )}
+      <StatsCards stats={stats} loading={statsLoading} />
 
       {/* Scraper + DB counts side by side */}
       <div className="grid grid-cols-1 md:grid-cols-2 gap-4 px-4 pb-4">
-        <ScraperPanel />
+        <ScraperPanel
+          status={scraper}
+          loading={scraperLoading}
+          triggering={triggering}
+          onRun={handleRunScraper}
+        />
         <DbCountsTable tables={dbCounts} loading={dbLoading} />
       </div>
 
