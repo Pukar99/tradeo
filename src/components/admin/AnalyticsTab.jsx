@@ -2,6 +2,11 @@
 // App-wide + per-user analytics. Overview: most-visited pages, daily view
 // trend, tier distribution, signup growth. Per-user (via selectedUserId,
 // set by clicking a user in the Users tab): their top pages + time spent.
+//
+// Visual pass 2026-08-09: StatCard.jsx and TrendChart.jsx (shared with
+// AIUsageTab) were already fixed in round 6 — nothing to do there. This
+// round is the tab's own two components: Tier Distribution and the two
+// Top Pages lists (site-wide + per-user).
 import { useState, useEffect, useCallback } from 'react'
 import { getAdminUser } from '@api/admin'
 import { getAdminAnalyticsOverview, getAdminUserAnalytics } from '../../utils/adminCache'
@@ -20,55 +25,81 @@ function formatDuration(ms) {
   return m > 0 ? `${m}m ${s}s` : `${s}s`
 }
 
+// Thin track bar beside the value — the same "name + bar + value" shape
+// DbCountsTable's row counts and AI Usage's by-action list already settled
+// on, replacing the wash-behind-text pattern this list used to have. Two
+// similar view counts were hard to tell apart as washes; easy to tell apart
+// as bar lengths.
 function TopPagesList({ pages }) {
   const maxViews = Math.max(1, ...pages.map((p) => p.views))
   return (
-    <div className="rounded-lg border border-gray-200 dark:border-gray-700 divide-y divide-gray-100 dark:divide-gray-800">
+    <div>
       {pages.length === 0 && (
-        <div className="px-4 py-3 text-sm text-gray-500 dark:text-gray-400">No views yet.</div>
+        <div className="px-4 py-3 text-sm text-gray-400 dark:text-gray-500">No views yet.</div>
       )}
       {pages.map((p) => (
-        <div key={p.path} className="relative px-4 py-2.5 overflow-hidden">
-          <div
-            className="absolute inset-y-0 left-0 bg-emerald-50 dark:bg-emerald-900/10"
-            style={{ width: `${(p.views / maxViews) * 100}%` }}
-          />
-          <div className="relative flex items-center justify-between text-sm">
-            <span className="text-gray-800 dark:text-gray-200 font-mono text-xs">{p.path}</span>
-            <span className="tabular-nums text-gray-500 dark:text-gray-400 text-xs flex-shrink-0 ml-3">
-              {int(p.views)} views · avg {formatDuration(p.avgDurationMs)}
-            </span>
+        <div
+          key={p.path}
+          className="flex items-center gap-2.5 px-4 py-1.5 hover:bg-gray-50 dark:hover:bg-gray-800/50 transition-colors"
+        >
+          <span className="w-28 flex-shrink-0 font-mono text-[10.5px] font-semibold text-gray-900 dark:text-white truncate">
+            {p.path}
+          </span>
+          <div className="flex-1 h-[5px] rounded-full bg-gray-100 dark:bg-gray-800 overflow-hidden">
+            <div
+              className="h-full rounded-full bg-gradient-to-r from-emerald-600 to-emerald-400"
+              style={{ width: `${(p.views / maxViews) * 100}%` }}
+            />
           </div>
+          <span className="w-32 flex-shrink-0 text-right text-[10.5px] tabular-nums text-gray-500 dark:text-gray-400">
+            {int(p.views)} views · {formatDuration(p.avgDurationMs)}
+          </span>
         </div>
       ))}
     </div>
   )
 }
 
-const TIER_COLORS = { basic: 'bg-gray-400', pro: 'bg-blue-500', premium: 'bg-amber-500' }
+// Real tier material — the same gradients TierBadge/TierChangeDropdown/
+// FeatureFlagsTab already use, replacing the flat gray-400/blue-500/amber-500
+// Tailwind stock colours this bar had. Written as complete literal strings,
+// not assembled fragments (Tailwind only compiles literal class matches).
+const TIER_FILL = {
+  basic: 'bg-gray-400 dark:bg-gray-500',
+  pro: 'bg-gradient-to-r from-[#14275c] via-[#2354c9] to-[#5b9dff]',
+  premium: 'bg-gradient-to-r from-[#7a4a08] via-[#d99a1f] to-[#ffe9ad]',
+}
+const TIER_LABEL = { basic: 'Basic', pro: 'Pro', premium: 'Premium' }
 
 function TierDistribution({ dist }) {
   const total = Math.max(1, dist.basic + dist.pro + dist.premium)
   return (
-    <div className="rounded-lg border border-gray-200 dark:border-gray-700 p-4">
-      <div className="text-xs uppercase tracking-wide text-gray-500 dark:text-gray-400 mb-3">
-        Tier Distribution
-      </div>
+    <div className="bg-white dark:bg-gray-900 rounded-xl border border-gray-100 dark:border-gray-800 px-3.5 py-3">
+      <p className="text-[10px] font-semibold uppercase tracking-widest text-gray-400 dark:text-gray-500 mb-2.5">
+        Tier distribution
+      </p>
       <div className="space-y-2">
-        {['basic', 'pro', 'premium'].map((t) => (
-          <div key={t} className="flex items-center gap-2">
-            <span className="w-16 text-xs capitalize text-gray-600 dark:text-gray-300">{t}</span>
-            <div className="flex-1 h-2 rounded-full bg-gray-100 dark:bg-gray-800 overflow-hidden">
-              <div
-                className={`h-full ${TIER_COLORS[t]}`}
-                style={{ width: `${(dist[t] / total) * 100}%` }}
-              />
+        {['basic', 'pro', 'premium'].map((t) => {
+          const count = dist[t]
+          const share = Math.round((count / total) * 100)
+          return (
+            <div key={t} className="flex items-center gap-2.5">
+              <span className="w-16 flex-shrink-0 text-[11px] font-semibold text-gray-600 dark:text-gray-300">
+                {TIER_LABEL[t]}
+              </span>
+              <div className="flex-1 h-1.5 rounded-full bg-gray-100 dark:bg-gray-800 overflow-hidden">
+                <div
+                  className={`h-full rounded-full ${TIER_FILL[t]}`}
+                  style={{ width: `${(count / total) * 100}%` }}
+                />
+              </div>
+              <span className="w-16 flex-shrink-0 text-right text-[11px] tabular-nums">
+                <b className="font-bold text-gray-900 dark:text-white">{count}</b>
+                <span className="ml-1 text-[10px] text-gray-400 dark:text-gray-500">{share}%</span>
+              </span>
             </div>
-            <span className="w-8 text-right text-xs tabular-nums text-gray-500 dark:text-gray-400">
-              {dist[t]}
-            </span>
-          </div>
-        ))}
+          )
+        })}
       </div>
     </div>
   )
@@ -97,15 +128,17 @@ function UserAnalyticsView({ userId, onBack }) {
 
   return (
     <div className="p-4 space-y-4">
+      {/* Same quiet grey back-link ResearchViewPage.jsx already uses for
+          back-navigation, not an invented one-off green style. */}
       <button
         onClick={onBack}
-        className="text-xs text-emerald-600 dark:text-emerald-400 hover:underline"
+        className="text-[11px] text-gray-400 dark:text-gray-500 hover:underline"
       >
         ← Back to overview
       </button>
 
       {loading ? (
-        <div className="text-sm text-gray-500 dark:text-gray-400 animate-pulse">Loading…</div>
+        <div className="text-sm text-gray-400 dark:text-gray-500 animate-pulse">Loading…</div>
       ) : (
         <>
           <div className="flex items-center gap-3">
@@ -118,14 +151,16 @@ function UserAnalyticsView({ userId, onBack }) {
           </div>
 
           <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
-            <StatCard label="Page views (30d)" value={int(stats?.totalViews ?? 0)} />
-            <StatCard label="Sessions (30d)" value={int(stats?.totalSessions ?? 0)} />
+            <StatCard label="Page views" value={int(stats?.totalViews ?? 0)} />
+            <StatCard label="Sessions" value={int(stats?.totalSessions ?? 0)} />
           </div>
 
-          <div>
-            <h4 className="text-sm font-semibold text-gray-700 dark:text-gray-300 mb-2">
-              Top pages
-            </h4>
+          <div className="bg-white dark:bg-gray-900 rounded-xl border border-gray-100 dark:border-gray-800 overflow-hidden">
+            <div className="px-3.5 py-3 border-b border-gray-100 dark:border-gray-800">
+              <p className="text-[10px] font-semibold uppercase tracking-widest text-gray-400 dark:text-gray-500">
+                Top pages
+              </p>
+            </div>
             <TopPagesList pages={stats?.topPages || []} />
           </div>
         </>
@@ -159,47 +194,54 @@ export default function AnalyticsTab({ selectedUserId, onClearSelectedUser }) {
 
   if (loading && !data) {
     return (
-      <div className="p-6 text-sm text-gray-500 dark:text-gray-400 animate-pulse">
-        Loading analytics…
+      <div className="p-4 space-y-3">
+        <div className="grid grid-cols-3 gap-3">
+          <div className="h-16 bg-gray-100 dark:bg-gray-800/60 rounded-xl animate-pulse" />
+          <div className="h-16 bg-gray-100 dark:bg-gray-800/60 rounded-xl animate-pulse" />
+          <div className="h-16 bg-gray-100 dark:bg-gray-800/60 rounded-xl animate-pulse" />
+        </div>
+        <div className="h-24 bg-gray-100 dark:bg-gray-800/60 rounded-xl animate-pulse" />
       </div>
     )
   }
   if (error) {
-    return <div className="p-6 text-sm text-red-500">Failed to load analytics.</div>
+    return <div className="p-6 text-sm text-red-600 dark:text-red-400">Failed to load analytics.</div>
   }
   if (!data) return null
 
   return (
-    <div className="p-4 space-y-6">
+    <div className="p-4 space-y-3.5">
       <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
-        <StatCard label="Page views (30d)" value={int(data.totalViews)} />
-        <StatCard label="Unique sessions (30d)" value={int(data.uniqueSessions)} />
-        <StatCard label="Unique visitors (30d)" value={int(data.uniqueVisitors)} />
+        <StatCard label="Page views" value={int(data.totalViews)} />
+        <StatCard label="Unique sessions" value={int(data.uniqueSessions)} />
+        <StatCard label="Unique visitors" value={int(data.uniqueVisitors)} />
       </div>
 
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-3.5">
         <TrendChart
           data={data.dailyViews}
           dataKey="views"
           color="#10b981"
           isDark={isDark}
-          label="Daily page views (30d)"
+          label="Daily page views · 30d"
         />
         <TrendChart
           data={data.signupGrowth}
           dataKey="signups"
           color="#3b82f6"
           isDark={isDark}
-          label="New signups (30d)"
+          label="New signups · 30d"
         />
       </div>
 
       <TierDistribution dist={data.tierDistribution} />
 
-      <div>
-        <h3 className="text-sm font-semibold text-gray-700 dark:text-gray-300 mb-2">
-          Most visited pages (30d)
-        </h3>
+      <div className="bg-white dark:bg-gray-900 rounded-xl border border-gray-100 dark:border-gray-800 overflow-hidden">
+        <div className="px-3.5 py-3 border-b border-gray-100 dark:border-gray-800">
+          <p className="text-[10px] font-semibold uppercase tracking-widest text-gray-400 dark:text-gray-500">
+            Most visited pages · 30d
+          </p>
+        </div>
         <TopPagesList pages={data.topPages} />
       </div>
     </div>
