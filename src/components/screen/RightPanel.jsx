@@ -826,7 +826,11 @@ export default function RightPanel() {
                 {moverTab !== 'volume' && (
                   <button
                     onClick={() => setShowAllMovers(true)}
-                    className="text-[9px] font-bold text-white bg-blue-500 hover:bg-blue-600 px-2.5 py-1 rounded-lg transition-colors shadow-sm shadow-blue-500/30"
+                    className={`text-[9px] font-bold text-white px-2.5 py-1 rounded-lg transition-colors shadow-sm ${
+                      moverTab === 'gainers'
+                        ? 'bg-emerald-500 hover:bg-emerald-600 shadow-emerald-500/30'
+                        : 'bg-red-500 hover:bg-red-600 shadow-red-500/30'
+                    }`}
                   >
                     All →
                   </button>
