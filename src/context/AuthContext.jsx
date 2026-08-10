@@ -7,7 +7,17 @@ import { createContext, useContext, useState, useEffect, useRef, useCallback } f
 import { clearUserCache } from '../utils/globalCache'
 import { API } from '../api'
 
-const AuthContext = createContext()
+// Default value only matters when a component calls useAuth() outside
+// AuthProvider (e.g. a unit test rendering a leaf component in isolation) —
+// the real Provider below always overrides this in the running app, which
+// is mounted at the app root and covers every real render path.
+const AuthContext = createContext({
+  user: null,
+  login: () => {},
+  logout: () => {},
+  updateUser: () => {},
+  loading: false,
+})
 
 // Refresh 60 seconds before the 1-day JWT expires
 const REFRESH_BEFORE_EXPIRY_MS = 60 * 1000

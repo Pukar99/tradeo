@@ -172,14 +172,21 @@ function EvidenceRow({ label, value, state = 'wait', detail }) {
 // divide-y scroll list, matching the Admin panel's HealthTile language
 // (colored left edge + tinted icon badge + bold header) — owner-approved
 // mockup, 2026-08-11.
-function CardStack({ children }) {
+// `tiered` — the left panel is the top-level styled surface, so it owns its
+// own group/ring/overlay (tiered=true, default). The right panel has a tab
+// switcher ABOVE this scroll area, so ITS group/ring/overlay has to live on
+// the outer wrapper that contains both the tabs and this stack (otherwise
+// the hover accent bar renders below the tabs instead of at the panel's own
+// top edge) — pass tiered={false} there; the outer wrapper supplies it instead.
+function CardStack({ children, tiered = true }) {
   const { user } = useAuth()
   const displayTier = getDisplayTier(user)
   const accent = TIER_ACCENT[displayTier]
+  const base =
+    'flex-1 min-h-0 overflow-y-auto bg-white dark:bg-gray-900 p-2.5 space-y-2.5 animate-fade-up'
+  if (!tiered) return <div className={base}>{children}</div>
   return (
-    <div
-      className={`group relative flex-1 min-h-0 overflow-y-auto bg-gray-50 dark:bg-gray-950 p-2.5 space-y-2.5 animate-fade-up ${accent ? tierRingClass(displayTier) : ''}`}
-    >
+    <div className={`group relative ${base} ${accent ? tierRingClass(displayTier) : ''}`}>
       <TierAccentOverlay accent={accent} radius="" />
       {children}
     </div>
@@ -201,9 +208,12 @@ const CARD_ICON_TONE = {
   neutral: 'bg-gray-100 text-gray-500 dark:bg-gray-800 dark:text-gray-400',
 }
 
-function Card({ tone = 'neutral', icon, title, aside, children }) {
+function Card({ tone = 'neutral', icon, title, aside, index, children }) {
   return (
-    <div className="relative overflow-hidden rounded-xl border border-gray-100 dark:border-gray-800 bg-white dark:bg-gray-900 py-2.5 pl-3.5 pr-3 space-y-2">
+    <div
+      className="hp-card group relative overflow-hidden rounded-xl border border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-800 py-2.5 pl-3.5 pr-3 space-y-2 animate-fade-up transition-colors"
+      style={index != null ? { animationDelay: `${index * 40}ms` } : undefined}
+    >
       <span
         aria-hidden="true"
         className={`absolute left-0 top-0 bottom-0 w-[3px] ${CARD_STRIPE[tone] || CARD_STRIPE.neutral}`}
@@ -282,6 +292,32 @@ const CardIcon = {
       <line x1="18" y1="12" x2="22" y2="12" />
     </svg>
   ),
+}
+
+function CardSkeleton() {
+  return (
+    <div className="relative overflow-hidden rounded-xl border border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-800 py-2.5 pl-3.5 pr-3 space-y-2 animate-pulse">
+      <span className="absolute left-0 top-0 bottom-0 w-[3px] bg-gray-200 dark:bg-gray-700" />
+      <div className="flex items-center gap-2">
+        <span className="w-5 h-5 rounded-md bg-gray-200 dark:bg-gray-700" />
+        <span className="h-2.5 w-24 rounded bg-gray-200 dark:bg-gray-700" />
+      </div>
+      <div className="h-2 w-4/5 rounded bg-gray-200 dark:bg-gray-700" />
+      <div className="h-2 w-3/5 rounded bg-gray-200 dark:bg-gray-700" />
+    </div>
+  )
+}
+
+// Matches CardStack's own layout (padding/gap) so the swap-in to real cards
+// once data arrives doesn't shift anything.
+function CardStackSkeleton({ count = 4 }) {
+  return (
+    <div className="flex-1 min-h-0 overflow-y-auto bg-white dark:bg-gray-900 p-2.5 space-y-2.5">
+      {Array.from({ length: count }).map((_, i) => (
+        <CardSkeleton key={i} />
+      ))}
+    </div>
+  )
 }
 
 function EmptyPanel({ title }) {
@@ -440,8 +476,11 @@ const SMC_CONFIG_KEYS = {
   sweep: 'useSweep',
 }
 
-export function ProfessionalSMCLeftPanel({ smcData, chartData, currentPrice }) {
-  if (!smcData) return <EmptyPanel title="SMC context unavailable" />
+export function ProfessionalSMCLeftPanel({ smcData, chartData, currentPrice, loading }) {
+  if (!smcData) {
+    if (loading) return <CardStackSkeleton count={4} />
+    return <EmptyPanel title="SMC context unavailable" />
+  }
 
   const lastBOS = smcData.bos?.at(-1)
   const lastChoch = smcData.choch?.at(-1)
@@ -481,6 +520,7 @@ export function ProfessionalSMCLeftPanel({ smcData, chartData, currentPrice }) {
   return (
     <CardStack>
       <Card
+        index={0}
         tone={structureTone}
         icon={CardIcon.trend}
         title="Market context"
@@ -512,7 +552,7 @@ export function ProfessionalSMCLeftPanel({ smcData, chartData, currentPrice }) {
         />
       </Card>
 
-      <Card tone="neutral" icon={CardIcon.location} title="Current location" aside="selected scan range">
+      <Card index={1} tone="neutral" icon={CardIcon.location} title="Current location" aside="selected scan range">
         <div className="grid grid-cols-2 gap-1.5">
           <Metric
             label="Range position"
@@ -541,6 +581,7 @@ export function ProfessionalSMCLeftPanel({ smcData, chartData, currentPrice }) {
       </Card>
 
       <Card
+        index={2}
         tone={nearest ? 'info' : 'neutral'}
         icon={CardIcon.layers}
         title="Nearest detected zone"
@@ -570,7 +611,7 @@ export function ProfessionalSMCLeftPanel({ smcData, chartData, currentPrice }) {
         )}
       </Card>
 
-      <Card tone="neutral" icon={CardIcon.scope} title="Analysis scope">
+      <Card index={3} tone="neutral" icon={CardIcon.scope} title="Analysis scope">
         <div className="grid grid-cols-2 gap-1.5">
           <Metric label="Candles analyzed" value={smcData.candles ?? 0} />
           <Metric
@@ -592,33 +633,33 @@ export function ProfessionalSMCLeftPanel({ smcData, chartData, currentPrice }) {
 export function SMCShadowEvidence({ data, loading = false, error = '' }) {
   if (loading) {
     return (
-      <Section title="V2 shadow engine" aside="loading evidence">
+      <Card tone="neutral" icon={CardIcon.pulse} title="V2 shadow engine" aside="loading evidence">
         <div aria-label="Loading V2 shadow evidence" className="space-y-2 animate-pulse">
-          <div className="h-2 rounded bg-gray-100 dark:bg-gray-800" />
-          <div className="h-2 w-4/5 rounded bg-gray-100 dark:bg-gray-800" />
-          <div className="h-2 w-3/5 rounded bg-gray-100 dark:bg-gray-800" />
+          <div className="h-2 rounded bg-gray-200 dark:bg-gray-700" />
+          <div className="h-2 w-4/5 rounded bg-gray-200 dark:bg-gray-700" />
+          <div className="h-2 w-3/5 rounded bg-gray-200 dark:bg-gray-700" />
         </div>
-      </Section>
+      </Card>
     )
   }
 
   if (error) {
     return (
-      <Section title="V2 shadow engine">
+      <Card tone="warning" icon={CardIcon.pulse} title="V2 shadow engine">
         <Badge tone="warning">Shadow unavailable</Badge>
         <p className={MUTED}>{error}</p>
         <p className="text-[9px] text-gray-400 dark:text-gray-500">
           V1 evidence and chart overlays continue normally.
         </p>
-      </Section>
+      </Card>
     )
   }
 
   if (!data) {
     return (
-      <Section title="V2 shadow engine">
+      <Card tone="neutral" icon={CardIcon.pulse} title="V2 shadow engine">
         <p className={MUTED}>Waiting for the internal shadow scan.</p>
-      </Section>
+      </Card>
     )
   }
 
@@ -661,10 +702,20 @@ export function SMCShadowEvidence({ data, loading = false, error = '' }) {
         ? 'The available history did not pass the mandatory dataset checks.'
         : 'The dataset passed the current qualification checks.'
   const lead = data.decision?.leadSetup
+  const qualityTone =
+    qualityState === 'met' ? 'positive' : qualityState === 'conflict' ? 'negative' : 'warning'
+  const marketTone =
+    data.context?.structureBias === 'BULLISH'
+      ? 'positive'
+      : data.context?.structureBias === 'BEARISH'
+        ? 'negative'
+        : 'neutral'
+  const leadTone =
+    lead?.decisionState === 'ENTERED' ? 'positive' : lead?.decisionState === 'ARMED' ? 'warning' : 'neutral'
 
   return (
     <>
-      <Section title="V2 shadow engine" aside={data.asOf || undefined}>
+      <Card index={0} tone={decisionTone} icon={CardIcon.pulse} title="V2 shadow engine" aside={data.asOf || undefined}>
         <div className="flex flex-wrap items-center gap-1.5">
           <Badge tone={decisionTone}>{readableLabel(decisionState, 'Scanning')}</Badge>
           <Badge tone="warning">UNVALIDATED · HOLD</Badge>
@@ -680,9 +731,15 @@ export function SMCShadowEvidence({ data, loading = false, error = '' }) {
         <p className="text-[9px] font-semibold text-amber-600 dark:text-amber-400">
           SHADOW ONLY — internal evidence, not a trade recommendation.
         </p>
-      </Section>
+      </Card>
 
-      <Section title="V2 data quality" aside={`${data.candles || 0} candles`}>
+      <Card
+        index={1}
+        tone={qualityTone}
+        icon={CardIcon.checklist}
+        title="V2 data quality"
+        aside={`${data.candles || 0} candles`}
+      >
         <EvidenceRow label="Dataset" value={quality} state={qualityState} detail={qualityDetail} />
         <EvidenceRow
           label="Exploratory scan"
@@ -695,9 +752,9 @@ export function SMCShadowEvidence({ data, loading = false, error = '' }) {
           state="caution"
           detail="Engineering correctness is separate from future trading performance."
         />
-      </Section>
+      </Card>
 
-      <Section title="V2 market context">
+      <Card index={2} tone={marketTone} icon={CardIcon.trend} title="V2 market context">
         <EvidenceRow
           label="Structure"
           value={readableLabel(data.context?.structureBias, 'Not established')}
@@ -728,9 +785,15 @@ export function SMCShadowEvidence({ data, loading = false, error = '' }) {
           }
           detail={data.context?.execution?.explanation}
         />
-      </Section>
+      </Card>
 
-      <Section title="V2 evidence window" aside={`${activeTotal} bounded`}>
+      <Card
+        index={3}
+        tone="neutral"
+        icon={CardIcon.layers}
+        title="V2 evidence window"
+        aside={`${activeTotal} bounded`}
+      >
         <div className="grid grid-cols-2 gap-1.5">
           <Metric label="Recent structure" value={counts.structure} />
           <Metric label="Recent liquidity" value={counts.liquidity} />
@@ -756,10 +819,10 @@ export function SMCShadowEvidence({ data, loading = false, error = '' }) {
         ) : (
           <p className={MUTED}>No active OB, FVG or liquidity lifecycle evidence was returned.</p>
         )}
-      </Section>
+      </Card>
 
       {lead && (
-        <Section title="V2 lead setup">
+        <Card index={4} tone={leadTone} icon={CardIcon.target} title="V2 lead setup">
           <EvidenceRow
             label={readableLabel(lead.family, 'Setup family')}
             value={readableLabel(lead.decisionState || lead.status, 'Developing')}
@@ -777,7 +840,7 @@ export function SMCShadowEvidence({ data, loading = false, error = '' }) {
               ? `Needs: ${lead.nextConfirmation}`
               : 'No further confirmation is recorded in this shadow snapshot.'}
           </p>
-        </Section>
+        </Card>
       )}
     </>
   )
@@ -792,9 +855,17 @@ export function ProfessionalSMCRightPanel({
   shadowData,
   shadowLoading,
   shadowError,
+  loading,
 }) {
   const [tab, setTab] = useState('setup')
-  if (!smcData) return <EmptyPanel title="SMC setup unavailable" />
+  const { user } = useAuth()
+  if (!smcData) {
+    if (loading) return <CardStackSkeleton count={3} />
+    return <EmptyPanel title="SMC setup unavailable" />
+  }
+
+  const displayTier = getDisplayTier(user)
+  const accent = TIER_ACCENT[displayTier]
 
   const lastSignal = signals?.at(-1)
   const signalAge = eventAge(lastSignal?.date, chartData)
@@ -865,9 +936,12 @@ export function ProfessionalSMCRightPanel({
   const rr = risk > 0 && reward > 0 ? reward / risk : null
 
   return (
-    <div className="flex flex-1 min-h-0 flex-col bg-gray-50 dark:bg-gray-950">
-      <div className="p-2 bg-gray-50 dark:bg-gray-950">
-        <div className="flex gap-1 rounded-lg bg-gray-100 dark:bg-gray-900 border border-gray-100 dark:border-gray-800 p-1">
+    <div
+      className={`group relative flex flex-1 min-h-0 flex-col bg-white dark:bg-gray-900 ${accent ? tierRingClass(displayTier) : ''}`}
+    >
+      <TierAccentOverlay accent={accent} radius="" />
+      <div className="p-2 bg-white dark:bg-gray-900">
+        <div className="flex gap-1 rounded-lg bg-gray-100 dark:bg-gray-950 border border-gray-100 dark:border-gray-800 p-1">
           {[
             ['setup', 'Setup now'],
             ['history', 'Evidence'],
@@ -888,8 +962,8 @@ export function ProfessionalSMCRightPanel({
       </div>
       <div className="flex-1 min-h-0 overflow-y-auto">
         {tab === 'setup' ? (
-          <CardStack>
-            <Card tone={stage.tone} icon={CardIcon.pulse} title="Setup status" aside="buy-side workflow">
+          <CardStack tiered={false}>
+            <Card index={0} tone={stage.tone} icon={CardIcon.pulse} title="Setup status" aside="buy-side workflow">
               <Badge tone={stage.tone}>{stage.label}</Badge>
               <ConfluenceBar met={metConditions.length} total={enabledConditions.length} tone={stage.tone} />
               <p className={MUTED}>{stage.detail}</p>
@@ -899,6 +973,7 @@ export function ProfessionalSMCRightPanel({
             </Card>
 
             <Card
+              index={1}
               tone="neutral"
               icon={CardIcon.checklist}
               title="Decision evidence"
@@ -949,7 +1024,7 @@ export function ProfessionalSMCRightPanel({
               />
             </Card>
 
-            <Card tone="info" icon={CardIcon.target} title="Illustrative plan" aside="validate manually">
+            <Card index={2} tone="info" icon={CardIcon.target} title="Illustrative plan" aside="validate manually">
               {zone ? (
                 <>
                   <div className="grid grid-cols-2 gap-1.5">
@@ -992,9 +1067,9 @@ export function ProfessionalSMCRightPanel({
             </Card>
           </CardStack>
         ) : (
-          <PanelShell>
+          <CardStack tiered={false}>
             <SMCShadowEvidence data={shadowData} loading={shadowLoading} error={shadowError} />
-          </PanelShell>
+          </CardStack>
         )}
       </div>
     </div>
