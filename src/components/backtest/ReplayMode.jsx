@@ -14,6 +14,28 @@ import ModeToggle from './ModeToggle'
 import SymbolSearch from '../common/SymbolSearch'
 import { nptToday } from '../../utils/nepseCalendar'
 import { usePlaybackEngine } from '../../hooks/usePlaybackEngine'
+import { useAuth } from '../../context/AuthContext'
+import { TIER_ACCENT, getDisplayTier, TierAccentOverlay, tierRingClass } from '../common/TierMaterial'
+
+// Setup-card icon — same 12x12 stroke recipe as BacktestHome's ICONS /
+// ProfessionalAnalysisPanels' CardIcon (viewBox 0 0 24 24, stroke currentColor,
+// strokeWidth 2.4, w-3 h-3). A circular "history/replay" arrow — CardIcon has no
+// entry for this concept, so drawn fresh rather than borrowed.
+const REPLAY_ICON = (
+  <svg
+    viewBox="0 0 24 24"
+    fill="none"
+    stroke="currentColor"
+    strokeWidth={2.4}
+    strokeLinecap="round"
+    strokeLinejoin="round"
+    className="w-3 h-3"
+  >
+    <path d="M3 12a9 9 0 1 0 3-6.7" />
+    <path d="M3 4v5h5" />
+    <path d="M12 7v5l3.5 2" />
+  </svg>
+)
 
 // ── ReplayMode ────────────────────────────────────────────────────────────────
 // onExit — called when the mode toggle (shown only on the setup screen) is switched
@@ -24,6 +46,10 @@ export default function ReplayMode({ onExit }) {
   const [symbol, setSymbol] = useState('')
   const [startDate, setStartDate] = useState('')
   const [ready, setReady] = useState(false)
+
+  const { user } = useAuth()
+  const displayTier = getDisplayTier(user)
+  const accent = TIER_ACCENT[displayTier]
 
   // Playback state
   const [candles, setCandles] = useState([])
@@ -172,60 +198,78 @@ export default function ReplayMode({ onExit }) {
     return (
       <div className="flex-1 flex flex-col items-center justify-center gap-4 bg-white dark:bg-gray-950 px-4">
         <ModeToggle mode="replay" onChange={(m) => m === 'backtest' && onExit?.()} />
-        <div className="w-full max-w-sm bg-white dark:bg-gray-900 rounded-2xl border border-gray-100 dark:border-gray-800 shadow-sm p-6 flex flex-col gap-4">
-          <div>
-            <h2 className="text-[14px] font-bold text-gray-800 dark:text-gray-100 mb-0.5">
-              Chart Replay
-            </h2>
-            <p className="text-[11px] text-gray-400 dark:text-gray-500">
-              Watch candles unfold from a chosen date — no orders, just observation.
-            </p>
+        {/* Single well-designed Card-shell-styled panel — one form, not a list, so a
+            full CardStack of many cards would be overkill. Matches BacktestHome's new
+            visual weight (stripe + tinted icon badge + bold title) so switching modes
+            doesn't jump between two different design languages. */}
+        <div
+          className={`group relative w-full max-w-sm overflow-hidden rounded-2xl border border-gray-100 dark:border-gray-800 bg-gray-50 dark:bg-gray-800 shadow-sm animate-fade-up ${accent ? tierRingClass(displayTier) : ''}`}
+        >
+          <TierAccentOverlay accent={accent} radius="rounded-t-2xl" />
+          <span
+            aria-hidden="true"
+            className="absolute left-0 top-0 bottom-0 w-[3px] bg-blue-500"
+          />
+          <div className="pl-4 pr-5 py-5 flex flex-col gap-4">
+            <div className="flex items-center gap-2">
+              <span className="w-5 h-5 flex-shrink-0 rounded-md flex items-center justify-center bg-blue-50 text-blue-600 dark:bg-blue-500/10 dark:text-blue-400">
+                {REPLAY_ICON}
+              </span>
+              <div>
+                <h2 className="text-[13px] font-bold text-gray-800 dark:text-gray-100 leading-tight">
+                  Chart Replay
+                </h2>
+                <p className="text-[10px] text-gray-400 dark:text-gray-500 mt-0.5">
+                  Watch candles unfold from a chosen date — no orders, just observation.
+                </p>
+              </div>
+            </div>
+
+            <div className="flex flex-col gap-3">
+              <div>
+                <label className="block text-[10px] font-semibold text-gray-400 dark:text-gray-500 uppercase tracking-widest mb-1">
+                  Symbol
+                </label>
+                <SymbolSearch
+                  value={symbol}
+                  stocksOnly
+                  placeholder="Symbol (e.g. NABIL)"
+                  inputClassName="w-40"
+                  onSelect={(sym) => setSymbol(sym)}
+                />
+              </div>
+
+              <div>
+                <label className="block text-[10px] font-semibold text-gray-400 dark:text-gray-500 uppercase tracking-widest mb-1">
+                  Start Date
+                </label>
+                <input
+                  type="date"
+                  value={startDate}
+                  onChange={(e) => setStartDate(e.target.value)}
+                  max={nptToday()}
+                  className="w-full px-3 py-1.5 text-[12px] border border-gray-200 dark:border-gray-700 rounded-lg
+                             bg-white dark:bg-gray-900 text-gray-700 dark:text-gray-200 outline-none
+                             focus:ring-2 focus:ring-blue-500"
+                />
+              </div>
+            </div>
+
+            {error && (
+              <div className="px-3 py-2 rounded-lg bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 text-[11px] text-red-600 dark:text-red-400">
+                {error}
+              </div>
+            )}
+
+            <button
+              onClick={handleStart}
+              disabled={loading}
+              className="w-full py-2 text-[12px] font-semibold bg-blue-600 text-white rounded-lg
+                         hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+            >
+              {loading ? 'Loading…' : 'Start Replay'}
+            </button>
           </div>
-
-          <div className="flex flex-col gap-3">
-            <div>
-              <label className="block text-[10px] font-semibold text-gray-400 dark:text-gray-500 uppercase tracking-widest mb-1">
-                Symbol
-              </label>
-              <SymbolSearch
-                value={symbol}
-                stocksOnly
-                placeholder="Symbol (e.g. NABIL)"
-                inputClassName="w-40"
-                onSelect={(sym) => setSymbol(sym)}
-              />
-            </div>
-
-            <div>
-              <label className="block text-[10px] font-semibold text-gray-400 dark:text-gray-500 uppercase tracking-widest mb-1">
-                Start Date
-              </label>
-              <input
-                type="date"
-                value={startDate}
-                onChange={(e) => setStartDate(e.target.value)}
-                max={nptToday()}
-                className="w-full px-3 py-1.5 text-[12px] border border-gray-200 dark:border-gray-700 rounded-lg
-                           bg-gray-50 dark:bg-gray-800 text-gray-700 dark:text-gray-200 outline-none
-                           focus:ring-2 focus:ring-blue-500"
-              />
-            </div>
-          </div>
-
-          {error && (
-            <div className="px-3 py-2 rounded-lg bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 text-[11px] text-red-600 dark:text-red-400">
-              {error}
-            </div>
-          )}
-
-          <button
-            onClick={handleStart}
-            disabled={loading}
-            className="w-full py-2 text-[12px] font-semibold bg-blue-600 text-white rounded-lg
-                       hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
-          >
-            {loading ? 'Loading…' : 'Start Replay'}
-          </button>
         </div>
       </div>
     )

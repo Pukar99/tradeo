@@ -4,6 +4,8 @@ import { useState, useCallback } from 'react'
 import { btAddScript, btEndSession } from '../../api/backtest'
 import { pnlClass } from '../../utils/format'
 import { fmt, fmtPct } from './format'
+import { useAuth } from '../../context/AuthContext'
+import { TIER_ACCENT, getDisplayTier, TierAccentOverlay, tierRingClass } from '../common/TierMaterial'
 
 function PositionCard({ pos, currentCandle, onEditSLTP, onExit, onPartial }) {
   const ep = parseFloat(pos.entry_price) || 0
@@ -115,6 +117,10 @@ export default function BacktestActivePanel({
   const [confirmEnd, setConfirmEnd] = useState(false)
   const [endErr, setEndErr] = useState('')
 
+  const { user } = useAuth()
+  const displayTier = getDisplayTier(user)
+  const accent = TIER_ACCENT[displayTier]
+
   const allPositions = currentScript?.positions || []
   const openPositions = allPositions.filter((p) => p.status === 'OPEN' || p.status === 'PARTIAL')
 
@@ -180,7 +186,17 @@ export default function BacktestActivePanel({
   }, [session.id, onEndSession])
 
   return (
-    <div className="flex flex-col h-full overflow-hidden text-[10px]">
+    <div
+      className={`group relative flex flex-col h-full overflow-hidden text-[10px] ${accent ? tierRingClass(displayTier) : ''}`}
+    >
+      {/* Tier-accent hover treatment — same TierAccentOverlay/tierRingClass pattern
+          ScreenPage.jsx uses to wrap LeftPanel.jsx (the live-trading equivalent of
+          this panel): a hover-revealed top gradient bar + soft ambient ring, Pro/
+          Premium only, zero change for Basic. BacktestPage.jsx's own wrapper around
+          this component is a plain unstyled div (out of scope to touch here), so
+          this panel owns its own group/ring/overlay directly, same as CardStack's
+          `tiered=true` default for a panel with no outer wrapper supplying it. */}
+      <TierAccentOverlay accent={accent} radius="" />
       {/* ── Top: Script tabs ──────────────────────────────────────────────── */}
       <div className="flex items-center gap-1 px-2 py-1.5 border-b border-gray-100 dark:border-gray-800 shrink-0 flex-wrap">
         {session.scripts?.map((sc) => {
