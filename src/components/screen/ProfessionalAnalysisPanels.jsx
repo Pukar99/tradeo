@@ -1,16 +1,29 @@
 import { useMemo, useState } from 'react'
 import { createPortal } from 'react-dom'
 import { useScreen } from '../../context/ScreenContext'
+import { useAuth } from '../../context/AuthContext'
 import { getWatchlist, clearWatchlistCache } from '../../utils/globalCache'
 import { addToWatchlist, updateWatchlist } from '../../api'
 import TradeModal from './TradeModal'
+import {
+  TIER_ACCENT,
+  getDisplayTier,
+  TierAccentOverlay,
+  tierRingClass,
+} from '../common/TierMaterial'
 
 const LABEL = 'text-[9px] font-bold uppercase tracking-[0.14em] text-gray-400 dark:text-gray-500'
 const MUTED = 'text-[10px] leading-relaxed text-gray-500 dark:text-gray-400'
 
 function PanelShell({ children }) {
+  const { user } = useAuth()
+  const displayTier = getDisplayTier(user)
+  const accent = TIER_ACCENT[displayTier]
   return (
-    <div className="flex-1 min-h-0 overflow-y-auto bg-white dark:bg-gray-950 divide-y divide-gray-100 dark:divide-gray-800">
+    <div
+      className={`group relative flex-1 min-h-0 overflow-y-auto bg-white dark:bg-gray-950 divide-y divide-gray-100 dark:divide-gray-800 animate-fade-up ${accent ? tierRingClass(displayTier) : ''}`}
+    >
+      <TierAccentOverlay accent={accent} radius="" />
       {children}
     </div>
   )
@@ -75,7 +88,7 @@ function EvidenceRow({ label, value, state = 'wait', detail }) {
   }
   const style = states[state] || states.wait
   return (
-    <div className="flex items-start gap-2 py-0.5">
+    <div className="flex items-start gap-2 py-0.5 rounded-md transition-colors [@media(hover:hover)]:hover:bg-gray-50/60 dark:[@media(hover:hover)]:hover:bg-gray-800/30">
       <span className={`mt-1.5 h-1.5 w-1.5 shrink-0 rounded-full ${style.dot}`} />
       <div className="min-w-0 flex-1">
         <div className="flex items-center justify-between gap-2">
@@ -668,7 +681,7 @@ export function ProfessionalSMCRightPanel({
           <button
             key={id}
             onClick={() => setTab(id)}
-            className={`py-2 text-[10px] font-semibold ${tab === id ? 'border-b-2 border-blue-600 text-blue-600 dark:text-blue-400' : 'text-gray-400'}`}
+            className={`py-2 text-[10px] font-semibold ${tab === id ? 'border-b-2 border-blue-600 text-blue-600 dark:text-blue-400' : 'text-gray-400 dark:text-gray-500 hover:text-gray-600 dark:hover:text-gray-400 transition-colors'}`}
           >
             {label}
           </button>
@@ -994,7 +1007,7 @@ export function ProfessionalPARightPanel({ paData, kpis, chartData, currentPrice
           <button
             key={id}
             onClick={() => setTab(id)}
-            className={`py-2 text-[10px] font-semibold ${tab === id ? 'border-b-2 border-blue-600 text-blue-600 dark:text-blue-400' : 'text-gray-400'}`}
+            className={`py-2 text-[10px] font-semibold ${tab === id ? 'border-b-2 border-blue-600 text-blue-600 dark:text-blue-400' : 'text-gray-400 dark:text-gray-500 hover:text-gray-600 dark:hover:text-gray-400 transition-colors'}`}
           >
             {label}
           </button>
