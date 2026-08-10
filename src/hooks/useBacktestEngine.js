@@ -2,18 +2,24 @@
 // useBacktestEngine.js — Backtest candle-by-candle playback engine
 // =============================================================================
 // Sections:
-//   1. Refs             — playing, processing, speed, timer, cursor, candles
-//   2. processCandle    — SL/TP checks, settlement, cursor advance
-//   3. Public API       — play, pause, stepForward, stepBack, setSpeed
-//   4. Cleanup          — unmount timer teardown
+//   1. Refs             — session/script (business state only — the timer's own
+//                          playing/speed/timer/cursor/candles refs now live in
+//                          the shared usePlaybackEngine, see SCR-11)
+//   2. processCandle    — SL/TP checks, settlement, cursor advance (this file's
+//                          `onTick` callback for usePlaybackEngine)
+//   3. Engine wiring     — usePlaybackEngine + step-back guard
 // =============================================================================
-// All mutable state is in refs to avoid stale closures inside setInterval.
-// processingRef guards against concurrent processCandle calls from the interval.
 // SL takes priority over TP: if both hit on the same candle, SL closes first.
+// The processingRef guard against concurrent processCandle calls (interval
+// firing again before a previous async processCandle resolves) now lives
+// inside usePlaybackEngine (`guardConcurrent: true` below) — it is NOT dropped,
+// just centralized so Replay's identical-shaped timer doesn't have to
+// reimplement it.
 // =============================================================================
 
-import { useRef, useCallback, useEffect } from 'react'
+import { useRef, useCallback } from 'react'
 import { btExitOrder, btLogBehavior } from '../api/backtest'
+import { usePlaybackEngine } from './usePlaybackEngine'
 
 export function useBacktestEngine({
   session,
@@ -28,61 +34,35 @@ export function useBacktestEngine({
   onDataEnd,
   onActionError,
 }) {
-  const playingRef = useRef(false)
-  const processingRef = useRef(false) // guard against concurrent processCandle calls
-  const speedRef = useRef(1)
-  const timerRef = useRef(null)
-  const speedTimerRef = useRef(null) // pending setSpeed restart
-  const cursorRef = useRef(cursorIndex)
-  const candlesRef = useRef(candles)
   const sessionRef = useRef(session)
   const scriptRef = useRef(currentScript)
 
-  // Keep all refs in sync on every render
-  cursorRef.current = cursorIndex
-  candlesRef.current = candles
+  // Keep refs in sync on every render
   sessionRef.current = session
   scriptRef.current = currentScript
 
   // =============================================================================
-  // 1. REFS — all mutable playback state
+  // 2. PROCESS CANDLE — usePlaybackEngine's onTick callback
   // =============================================================================
+  // Called for every tick (interval-fired or a manual step). `pause` and `total`
+  // are handed in by usePlaybackEngine itself — see that file. This function no
+  // longer advances the timer or guards concurrency itself; usePlaybackEngine
+  // does both (the guard via `guardConcurrent: true` below).
 
-  // (declared above — keep refs section header here for readability)
-
-  // =============================================================================
-  // 2. PROCESS CANDLE
-  // =============================================================================
-
-  const pauseInternal = useCallback(() => {
-    playingRef.current = false
-    if (timerRef.current) {
-      clearInterval(timerRef.current)
-      timerRef.current = null
-    }
-  }, [])
-
-  // ── Process a single candle ───────────────────────────────────────────────────
   const processCandle = useCallback(
-    async (candle, index) => {
-      // Guard: skip if already processing a candle (prevents interval stacking)
-      if (processingRef.current) return
-      processingRef.current = true
-
+    async (candle, index, { total, pause }) => {
       const sess = sessionRef.current
       if (!sess || !candle) {
-        processingRef.current = false
         return
       }
 
       // 1. Settle positions whose settlement_date <= candle.date
       const settlementFailures = await settlePositions(candle.date)
       if (settlementFailures?.length) {
-        pauseInternal()
+        pause()
         onActionError?.(
           `Settlement failed repeatedly for ${settlementFailures.map((p) => p.symbol).join(', ')} — playback paused`
         )
-        processingRef.current = false
         return
       }
 
@@ -103,7 +83,7 @@ export function useBacktestEngine({
         if (sl !== null && candle.low <= sl) {
           if (!settled) {
             // Pre-settlement SL breach — prompt user
-            pauseInternal()
+            pause()
             onSLBreach({
               pos,
               candle,
@@ -142,7 +122,6 @@ export function useBacktestEngine({
                 { label: 'Keep Position', action: () => {} },
               ],
             })
-            processingRef.current = false
             return // pause — wait for user
           }
 
@@ -164,18 +143,17 @@ export function useBacktestEngine({
               // local state from the DB. Pause, surface the error, and stop processing
               // this candle so the user can retry rather than trade on a phantom fill.
               console.error('[Engine] AUTO SL exit failed for', pos.id, err?.message)
-              pauseInternal()
+              pause()
               onActionError?.(
                 err?.response?.data?.message ||
                   `Auto SL exit failed for ${pos.symbol} — playback paused`
               )
-              processingRef.current = false
               return
             }
           }
 
           if (sess.sl_mode === 'MANUAL') {
-            pauseInternal()
+            pause()
             onSLBreach({
               pos,
               candle,
@@ -217,7 +195,6 @@ export function useBacktestEngine({
                 },
               ],
             })
-            processingRef.current = false
             return // pause for user
           }
         }
@@ -225,7 +202,7 @@ export function useBacktestEngine({
         // ── TP check (only after settlement) ───────────────────────────────────────
         if (tp !== null && candle.high >= tp) {
           if (!settled) {
-            pauseInternal()
+            pause()
             onTPHit({
               pos,
               candle,
@@ -252,7 +229,6 @@ export function useBacktestEngine({
                 { label: 'Keep Position', action: () => {} },
               ],
             })
-            processingRef.current = false
             return
           }
 
@@ -269,12 +245,11 @@ export function useBacktestEngine({
             // TP hit but exit failed — pause and surface rather than silently
             // leaving the position open (it would re-trigger every candle).
             console.error('[Engine] TP exit failed for', pos.id, err?.message)
-            pauseInternal()
+            pause()
             onActionError?.(
               err?.response?.data?.message ||
                 `Auto TP exit failed for ${pos.symbol} — playback paused`
             )
-            processingRef.current = false
             return
           }
         }
@@ -284,77 +259,19 @@ export function useBacktestEngine({
       advanceCursor(index, candle.date)
 
       // 4. Check end of data
-      if (index >= candlesRef.current.length - 1) {
-        playingRef.current = false
-        if (timerRef.current) {
-          clearInterval(timerRef.current)
-          timerRef.current = null
-        }
+      if (index >= total - 1) {
+        pause()
         onDataEnd()
       }
-
-      processingRef.current = false
     },
-    [
-      settlePositions,
-      advanceCursor,
-      closePositionLocal,
-      onSLBreach,
-      onTPHit,
-      onDataEnd,
-      onActionError,
-      pauseInternal,
-    ]
+    [settlePositions, advanceCursor, closePositionLocal, onSLBreach, onTPHit, onDataEnd, onActionError]
   )
 
   // =============================================================================
-  // 3. PUBLIC API
+  // 3. ENGINE WIRING
   // =============================================================================
 
-  const play = useCallback(() => {
-    if (playingRef.current) return
-    if (cursorRef.current >= candlesRef.current.length - 1) return
-
-    playingRef.current = true
-    const ms = 1000 / parseFloat(speedRef.current)
-
-    timerRef.current = setInterval(async () => {
-      if (!playingRef.current) {
-        clearInterval(timerRef.current)
-        timerRef.current = null
-        return
-      }
-      const idx = cursorRef.current + 1
-      const candle = candlesRef.current[idx]
-      if (!candle) {
-        pauseInternal()
-        onDataEnd()
-        return
-      }
-      await processCandle(candle, idx)
-    }, ms)
-  }, [processCandle, pauseInternal, onDataEnd])
-
-  const pause = useCallback(() => {
-    playingRef.current = false
-    if (timerRef.current) {
-      clearInterval(timerRef.current)
-      timerRef.current = null
-    }
-  }, [])
-
-  const stepForward = useCallback(async () => {
-    if (playingRef.current) return
-    const idx = cursorRef.current + 1
-    const candle = candlesRef.current[idx]
-    if (!candle) {
-      onDataEnd()
-      return
-    }
-    await processCandle(candle, idx)
-  }, [processCandle, onDataEnd])
-
-  // ── Step back ───────────────────────────────────────────────────────────────
+  // ── Step back guard ────────────────────────────────────────────────────────
   // IMPORTANT: step-back is a CHART-VIEW REWIND ONLY. It decrements the cursor so
   // the user can re-examine the prior candle, but it does NOT undo side effects that
   // were already applied while advancing forward — settlements (btSettleOrder),
@@ -370,51 +287,15 @@ export function useBacktestEngine({
     return (scriptRef.current?.positions || []).length > 0
   }, [])
 
-  const canStepBack = useCallback(() => {
-    return !playingRef.current && cursorRef.current > 0 && !hasAnyPosition()
-  }, [hasAnyPosition])
-
-  const stepBack = useCallback(() => {
-    if (!canStepBack()) return
-    const idx = cursorRef.current
-    const newIndex = idx - 1
-    const candle = candlesRef.current[newIndex]
-    if (!candle) return
-    advanceCursor(newIndex, candle.date)
-  }, [advanceCursor, canStepBack])
-
-  const setSpeed = useCallback(
-    (s) => {
-      speedRef.current = parseFloat(s)
-      if (playingRef.current) {
-        pause()
-        // Cancel any pending restart from a previous speed change
-        if (speedTimerRef.current) clearTimeout(speedTimerRef.current)
-        speedTimerRef.current = setTimeout(() => {
-          speedTimerRef.current = null
-          play()
-        }, 50)
-      }
-    },
-    [pause, play]
-  )
-
-  // =============================================================================
-  // 4. CLEANUP
-  // =============================================================================
-
-  useEffect(() => {
-    return () => {
-      if (timerRef.current) {
-        clearInterval(timerRef.current)
-        timerRef.current = null
-      }
-      if (speedTimerRef.current) {
-        clearTimeout(speedTimerRef.current)
-        speedTimerRef.current = null
-      }
-    }
-  }, [])
+  const { play, pause, stepForward, stepBack, canStepBack, setSpeed } = usePlaybackEngine({
+    candles,
+    cursorIndex,
+    onTick: processCandle,
+    onEnd: onDataEnd,
+    onStepBack: (newIndex, candle) => advanceCursor(newIndex, candle.date),
+    canStepBack: () => !hasAnyPosition(),
+    guardConcurrent: true, // load-bearing — prevents interval-stacking around async processCandle
+  })
 
   return {
     play,

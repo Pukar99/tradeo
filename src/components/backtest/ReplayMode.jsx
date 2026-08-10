@@ -6,108 +6,14 @@
 // end-of-data banner) — the only addition is the `onExit` prop + the mode toggle shown
 // at the top of the setup screen only (hidden once a replay is actively running).
 
-import { useState, useCallback, useRef, useEffect } from 'react'
+import { useState, useCallback, useEffect } from 'react'
 import { btGetOHLCV } from '../../api/backtest'
 import BacktestChart from './BacktestChart'
 import BacktestControls from './BacktestControls'
 import ModeToggle from './ModeToggle'
 import SymbolSearch from '../common/SymbolSearch'
 import { nptToday } from '../../utils/nepseCalendar'
-
-// ── Minimal replay engine (no session, no orders) ────────────────────────────
-// Replicates the play/pause/step/speed logic from useBacktestEngine without
-// any SL/TP checks, settlement, or backend calls.
-// (SCR-11 will extract this into a shared usePlaybackEngine hook — untouched here.)
-
-function useReplayEngine({ candles, cursorIndex, onAdvance, onEnd }) {
-  const playingRef = useRef(false)
-  const speedRef = useRef(1)
-  const timerRef = useRef(null)
-  const speedTimerRef = useRef(null)
-  const cursorRef = useRef(cursorIndex)
-  const candlesRef = useRef(candles)
-
-  cursorRef.current = cursorIndex
-  candlesRef.current = candles
-
-  const pauseInternal = useCallback(() => {
-    playingRef.current = false
-    if (timerRef.current) {
-      clearInterval(timerRef.current)
-      timerRef.current = null
-    }
-  }, [])
-
-  const tick = useCallback(() => {
-    const idx = cursorRef.current
-    if (idx >= candlesRef.current.length - 1) {
-      pauseInternal()
-      onEnd()
-      return
-    }
-    const next = idx + 1
-    onAdvance(next, candlesRef.current[next]?.date || '')
-    if (next >= candlesRef.current.length - 1) {
-      pauseInternal()
-      onEnd()
-    }
-  }, [pauseInternal, onAdvance, onEnd])
-
-  const play = useCallback(() => {
-    if (playingRef.current) return
-    if (cursorRef.current >= candlesRef.current.length - 1) return
-    playingRef.current = true
-    const ms = 1000 / parseFloat(speedRef.current)
-    timerRef.current = setInterval(() => {
-      if (!playingRef.current) {
-        clearInterval(timerRef.current)
-        timerRef.current = null
-        return
-      }
-      tick()
-    }, ms)
-  }, [tick])
-
-  const pause = useCallback(() => {
-    pauseInternal()
-  }, [pauseInternal])
-
-  const stepForward = useCallback(() => {
-    if (playingRef.current) return
-    tick()
-  }, [tick])
-
-  const stepBack = useCallback(() => {
-    if (playingRef.current) return
-    const idx = cursorRef.current
-    if (idx <= 0) return
-    onAdvance(idx - 1, candlesRef.current[idx - 1]?.date || '')
-  }, [onAdvance])
-
-  const setSpeed = useCallback(
-    (s) => {
-      speedRef.current = parseFloat(s)
-      if (playingRef.current) {
-        pauseInternal()
-        if (speedTimerRef.current) clearTimeout(speedTimerRef.current)
-        speedTimerRef.current = setTimeout(() => {
-          speedTimerRef.current = null
-          play()
-        }, 50)
-      }
-    },
-    [pauseInternal, play]
-  )
-
-  useEffect(() => {
-    return () => {
-      if (timerRef.current) clearInterval(timerRef.current)
-      if (speedTimerRef.current) clearTimeout(speedTimerRef.current)
-    }
-  }, [])
-
-  return { play, pause, stepForward, stepBack, setSpeed, isPlayingRef: playingRef }
-}
+import { usePlaybackEngine } from '../../hooks/usePlaybackEngine'
 
 // ── ReplayMode ────────────────────────────────────────────────────────────────
 // onExit — called when the mode toggle (shown only on the setup screen) is switched
@@ -139,11 +45,27 @@ export default function ReplayMode({ onExit }) {
     setEnded(true)
   }, [])
 
-  const engine = useReplayEngine({
+  // Thin tick callback — no SL/TP, no settlement, no backend calls. Just advance
+  // the cursor and, if that lands on the last candle, stop immediately (via the
+  // `pause` usePlaybackEngine hands in) rather than waiting for the next tick to
+  // notice there's no candle left.
+  const handleTick = useCallback(
+    (candle, idx, { total, pause }) => {
+      handleAdvance(idx, candle?.date || '')
+      if (idx >= total - 1) {
+        pause()
+        handleEnd()
+      }
+    },
+    [handleAdvance, handleEnd]
+  )
+
+  const engine = usePlaybackEngine({
     candles,
     cursorIndex,
-    onAdvance: handleAdvance,
+    onTick: handleTick,
     onEnd: handleEnd,
+    onStepBack: (newIndex, candle) => handleAdvance(newIndex, candle?.date || ''),
   })
 
   // ── Load OHLCV ───────────────────────────────────────────────────────────────
