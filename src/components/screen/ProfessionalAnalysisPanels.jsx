@@ -165,6 +165,125 @@ function EvidenceRow({ label, value, state = 'wait', detail }) {
   )
 }
 
+// ── Card shell (SMC layout redesign) ────────────────────────────────────────
+// PanelShell/Section stay as-is below (still used by Price Action, unchanged
+// until its own redesign pass). CardStack/Card are the new SMC-only shell:
+// each section becomes its own bordered card instead of one continuous
+// divide-y scroll list, matching the Admin panel's HealthTile language
+// (colored left edge + tinted icon badge + bold header) — owner-approved
+// mockup, 2026-08-11.
+function CardStack({ children }) {
+  const { user } = useAuth()
+  const displayTier = getDisplayTier(user)
+  const accent = TIER_ACCENT[displayTier]
+  return (
+    <div
+      className={`group relative flex-1 min-h-0 overflow-y-auto bg-gray-50 dark:bg-gray-950 p-2.5 space-y-2.5 animate-fade-up ${accent ? tierRingClass(displayTier) : ''}`}
+    >
+      <TierAccentOverlay accent={accent} radius="" />
+      {children}
+    </div>
+  )
+}
+
+const CARD_STRIPE = {
+  positive: 'bg-emerald-500',
+  negative: 'bg-red-500',
+  warning: 'bg-amber-500',
+  info: 'bg-blue-500',
+  neutral: 'bg-gray-300 dark:bg-gray-600',
+}
+const CARD_ICON_TONE = {
+  positive: 'bg-emerald-50 text-emerald-600 dark:bg-emerald-500/10 dark:text-emerald-400',
+  negative: 'bg-red-50 text-red-600 dark:bg-red-500/10 dark:text-red-400',
+  warning: 'bg-amber-50 text-amber-600 dark:bg-amber-500/10 dark:text-amber-400',
+  info: 'bg-blue-50 text-blue-600 dark:bg-blue-500/10 dark:text-blue-400',
+  neutral: 'bg-gray-100 text-gray-500 dark:bg-gray-800 dark:text-gray-400',
+}
+
+function Card({ tone = 'neutral', icon, title, aside, children }) {
+  return (
+    <div className="relative overflow-hidden rounded-xl border border-gray-100 dark:border-gray-800 bg-white dark:bg-gray-900 py-2.5 pl-3.5 pr-3 space-y-2">
+      <span
+        aria-hidden="true"
+        className={`absolute left-0 top-0 bottom-0 w-[3px] ${CARD_STRIPE[tone] || CARD_STRIPE.neutral}`}
+      />
+      <div className="flex items-center gap-2">
+        <span
+          className={`w-5 h-5 flex-shrink-0 rounded-md flex items-center justify-center ${CARD_ICON_TONE[tone] || CARD_ICON_TONE.neutral}`}
+        >
+          {icon}
+        </span>
+        <p className="text-[11px] font-bold text-gray-800 dark:text-gray-100">{title}</p>
+        {aside && (
+          <span className="ml-auto text-[9px] font-semibold text-gray-400 dark:text-gray-500 whitespace-nowrap">
+            {aside}
+          </span>
+        )}
+      </div>
+      {children}
+    </div>
+  )
+}
+
+const iconProps = {
+  viewBox: '0 0 24 24',
+  fill: 'none',
+  stroke: 'currentColor',
+  strokeWidth: 2.4,
+  strokeLinecap: 'round',
+  strokeLinejoin: 'round',
+  className: 'w-3 h-3',
+}
+const CardIcon = {
+  trend: (
+    <svg {...iconProps}>
+      <path d="M7 17 17 7" />
+      <path d="M7 7h10v10" />
+    </svg>
+  ),
+  location: (
+    <svg {...iconProps}>
+      <path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0Z" />
+      <circle cx="12" cy="10" r="3" />
+    </svg>
+  ),
+  layers: (
+    <svg {...iconProps}>
+      <path d="M4 8h12v8H4z" />
+      <path d="M8 4h12v8" />
+    </svg>
+  ),
+  scope: (
+    <svg {...iconProps}>
+      <rect x="4" y="12" width="4" height="8" />
+      <rect x="10" y="7" width="4" height="13" />
+      <rect x="16" y="3" width="4" height="17" />
+    </svg>
+  ),
+  pulse: (
+    <svg {...iconProps}>
+      <polyline points="22 12 18 12 15 21 9 3 6 12 2 12" />
+    </svg>
+  ),
+  checklist: (
+    <svg {...iconProps}>
+      <rect x="3" y="3" width="18" height="18" rx="3" />
+      <polyline points="8 12 11 15 16 9" />
+    </svg>
+  ),
+  target: (
+    <svg {...iconProps}>
+      <circle cx="12" cy="12" r="8" />
+      <circle cx="12" cy="12" r="1.2" fill="currentColor" stroke="none" />
+      <line x1="12" y1="2" x2="12" y2="6" />
+      <line x1="12" y1="18" x2="12" y2="22" />
+      <line x1="2" y1="12" x2="6" y2="12" />
+      <line x1="18" y1="12" x2="22" y2="12" />
+    </svg>
+  ),
+}
+
 function EmptyPanel({ title }) {
   return (
     <div className="flex h-full items-center justify-center p-4 text-center">
@@ -360,16 +479,18 @@ export function ProfessionalSMCLeftPanel({ smcData, chartData, currentPrice }) {
         : 'neutral'
 
   return (
-    <PanelShell>
-      <Section title="Market context" aside="confirmed structure">
-        <div className="flex items-center justify-between gap-2">
-          <Badge tone={structureTone}>
-            {lastBOS
-              ? `${lastBOS.type === 'bullish' ? 'Bullish' : 'Bearish'} structure`
-              : 'No structure break'}
-          </Badge>
-          <span className="text-[9px] text-gray-400">{lastBOS?.date || '—'}</span>
-        </div>
+    <CardStack>
+      <Card
+        tone={structureTone}
+        icon={CardIcon.trend}
+        title="Market context"
+        aside={lastBOS?.date || undefined}
+      >
+        <Badge tone={structureTone}>
+          {lastBOS
+            ? `${lastBOS.type === 'bullish' ? 'Bullish' : 'Bearish'} structure`
+            : 'No structure break'}
+        </Badge>
         <EvidenceRow
           label="Last BOS"
           value={lastBOS ? `${fmt(lastBOS.level)} · ${lastBOS.type}` : 'Not detected'}
@@ -389,9 +510,9 @@ export function ProfessionalSMCLeftPanel({ smcData, chartData, currentPrice }) {
           }
           detail="CHoCH is treated as a warning, not a confirmed reversal."
         />
-      </Section>
+      </Card>
 
-      <Section title="Current location" aside="selected scan range">
+      <Card tone="neutral" icon={CardIcon.location} title="Current location" aside="selected scan range">
         <div className="grid grid-cols-2 gap-1.5">
           <Metric
             label="Range position"
@@ -417,9 +538,11 @@ export function ProfessionalSMCLeftPanel({ smcData, chartData, currentPrice }) {
           This is position inside the scanned high–low range, not a validated institutional dealing
           range.
         </p>
-      </Section>
+      </Card>
 
-      <Section
+      <Card
+        tone={nearest ? 'info' : 'neutral'}
+        icon={CardIcon.layers}
         title="Nearest detected zone"
         aside={
           nearest
@@ -445,9 +568,9 @@ export function ProfessionalSMCLeftPanel({ smcData, chartData, currentPrice }) {
             No bullish order block or unfilled bullish FVG was returned for this scan.
           </p>
         )}
-      </Section>
+      </Card>
 
-      <Section title="Analysis scope">
+      <Card tone="neutral" icon={CardIcon.scope} title="Analysis scope">
         <div className="grid grid-cols-2 gap-1.5">
           <Metric label="Candles analyzed" value={smcData.candles ?? 0} />
           <Metric
@@ -461,8 +584,8 @@ export function ProfessionalSMCLeftPanel({ smcData, chartData, currentPrice }) {
           The newest ten candles cannot form a confirmed pivot. Historical markers identify pivot
           dates, not the later date when confirmation became available.
         </p>
-      </Section>
-    </PanelShell>
+      </Card>
+    </CardStack>
   )
 }
 
@@ -742,34 +865,42 @@ export function ProfessionalSMCRightPanel({
   const rr = risk > 0 && reward > 0 ? reward / risk : null
 
   return (
-    <div className="flex flex-1 min-h-0 flex-col bg-white dark:bg-gray-950">
-      <div className="grid grid-cols-2 border-b border-gray-100 dark:border-gray-800">
-        {[
-          ['setup', 'Setup now'],
-          ['history', 'Evidence'],
-        ].map(([id, label]) => (
-          <button
-            key={id}
-            onClick={() => setTab(id)}
-            className={`py-2 text-[10px] font-semibold ${tab === id ? 'border-b-2 border-blue-600 text-blue-600 dark:text-blue-400' : 'text-gray-400 dark:text-gray-500 hover:text-gray-600 dark:hover:text-gray-400 transition-colors'}`}
-          >
-            {label}
-          </button>
-        ))}
+    <div className="flex flex-1 min-h-0 flex-col bg-gray-50 dark:bg-gray-950">
+      <div className="p-2 bg-gray-50 dark:bg-gray-950">
+        <div className="flex gap-1 rounded-lg bg-gray-100 dark:bg-gray-900 border border-gray-100 dark:border-gray-800 p-1">
+          {[
+            ['setup', 'Setup now'],
+            ['history', 'Evidence'],
+          ].map(([id, label]) => (
+            <button
+              key={id}
+              onClick={() => setTab(id)}
+              className={`flex-1 py-1.5 rounded-md text-[10px] font-bold transition-colors ${
+                tab === id
+                  ? 'bg-white dark:bg-gray-800 text-gray-800 dark:text-gray-100 shadow-sm'
+                  : 'text-gray-400 dark:text-gray-500 [@media(hover:hover)]:hover:text-gray-600 dark:[@media(hover:hover)]:hover:text-gray-400'
+              }`}
+            >
+              {label}
+            </button>
+          ))}
+        </div>
       </div>
       <div className="flex-1 min-h-0 overflow-y-auto">
         {tab === 'setup' ? (
-          <PanelShell>
-            <Section title="Setup status" aside="buy-side workflow">
+          <CardStack>
+            <Card tone={stage.tone} icon={CardIcon.pulse} title="Setup status" aside="buy-side workflow">
               <Badge tone={stage.tone}>{stage.label}</Badge>
               <ConfluenceBar met={metConditions.length} total={enabledConditions.length} tone={stage.tone} />
               <p className={MUTED}>{stage.detail}</p>
-              <p className="text-[9px] text-amber-600 dark:text-amber-400">
+              <p className="text-[9px] font-semibold text-amber-600 dark:text-amber-400">
                 Decision support only — not an automated trade recommendation.
               </p>
-            </Section>
+            </Card>
 
-            <Section
+            <Card
+              tone="neutral"
+              icon={CardIcon.checklist}
               title="Decision evidence"
               aside={`${metConditions.length}/${enabledConditions.length} enabled met`}
             >
@@ -816,9 +947,9 @@ export function ProfessionalSMCRightPanel({
                 }
                 state={lastSignal && signalAge != null && signalAge <= 3 ? 'met' : 'wait'}
               />
-            </Section>
+            </Card>
 
-            <Section title="Illustrative plan" aside="validate manually">
+            <Card tone="info" icon={CardIcon.target} title="Illustrative plan" aside="validate manually">
               {zone ? (
                 <>
                   <div className="grid grid-cols-2 gap-1.5">
@@ -858,8 +989,8 @@ export function ProfessionalSMCRightPanel({
                   constructed.
                 </p>
               )}
-            </Section>
-          </PanelShell>
+            </Card>
+          </CardStack>
         ) : (
           <PanelShell>
             <SMCShadowEvidence data={shadowData} loading={shadowLoading} error={shadowError} />
