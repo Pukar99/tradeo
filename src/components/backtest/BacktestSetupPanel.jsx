@@ -4,6 +4,7 @@ import { useState, useCallback } from 'react'
 import { btGetSymbols, btGetSymbolMeta, btCreateSession } from '../../api/backtest'
 import { isNepseWeekend } from '../../utils/nepseCalendar'
 import SymbolSearch from '../common/SymbolSearch'
+import { Card } from '../common/CardShell'
 
 const SPEEDS = ['0.5', '1', '2', '5', '10']
 const DEFAULT_CAPITAL = '100000' // Rs. 1 lakh
@@ -12,8 +13,59 @@ const DEFAULT_LOOKBACK_YEARS = 2
 // Design tokens (copied per-file per pm/docs/design.md — no shared ui.js)
 const LABEL =
   'text-[10px] font-semibold uppercase tracking-widest text-gray-400 dark:text-gray-500'
+// bg deliberately one shade darker than Card's own bg-gray-50/dark:bg-gray-800 so
+// fields read as "recessed" inside the tinted card instead of blending into it.
 const INPUT =
-  'mt-0.5 w-full px-2 py-1.5 text-[11px] rounded-md border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 dark:text-white outline-none focus:ring-1 focus:ring-blue-500'
+  'mt-0.5 w-full px-2 py-1.5 text-[11px] rounded-lg border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-900 dark:text-white outline-none focus:ring-1 focus:ring-blue-500'
+// Pill chip — used for the non-exclusive quick-action rows (date-range presets,
+// capital quick-amounts, play-speed) — rounded-full so they read as "shortcuts"
+// rather than form controls.
+const CHIP =
+  'px-2.5 py-1 text-[10px] font-semibold rounded-full border transition-colors'
+const CHIP_OFF =
+  'border-gray-200 dark:border-gray-700 text-gray-500 dark:text-gray-400 hover:border-blue-400 hover:text-blue-500 hover:bg-blue-50 dark:hover:bg-blue-500/10'
+const CHIP_ON = 'bg-blue-600 text-white border-blue-600 shadow-sm'
+// Segmented toggle — used for the two exclusive-choice fields (Run Mode, SL
+// Validation), matching ModeToggle.jsx's pill-container recipe (bg-gray-100
+// rounded-lg p-0.5, active segment gets its own filled color + shadow-sm).
+const TOGGLE_WRAP =
+  'flex items-center gap-0.5 bg-gray-100 dark:bg-gray-800/80 rounded-lg p-0.5'
+const TOGGLE_BTN_OFF =
+  'flex-1 py-1 text-[10px] font-semibold rounded-md text-gray-400 dark:text-gray-500 hover:text-gray-700 dark:hover:text-gray-300 transition-colors'
+
+// ── Icons (12x12 stroke glyphs — viewBox 0 0 24 24, stroke currentColor,
+// strokeWidth 2.4 — same recipe as ProfessionalAnalysisPanels' CardIcon, so the
+// section headers read like the same design system) ─────────────────────────
+const iconProps = {
+  viewBox: '0 0 24 24',
+  fill: 'none',
+  stroke: 'currentColor',
+  strokeWidth: 2.4,
+  strokeLinecap: 'round',
+  strokeLinejoin: 'round',
+  className: 'w-3 h-3',
+}
+const SectionIcon = {
+  search: (
+    <svg {...iconProps}>
+      <circle cx="10" cy="10" r="7" />
+      <line x1="21" y1="21" x2="15.5" y2="15.5" />
+    </svg>
+  ),
+  wallet: (
+    <svg {...iconProps}>
+      <rect x="3" y="6" width="18" height="14" rx="2" />
+      <path d="M3 10h18" />
+      <circle cx="17" cy="15" r="1.3" fill="currentColor" stroke="none" />
+    </svg>
+  ),
+  play: (
+    <svg {...iconProps}>
+      <circle cx="12" cy="12" r="9" />
+      <path d="M10 8.5 16 12l-6 3.5Z" fill="currentColor" stroke="none" />
+    </svg>
+  ),
+}
 
 // ── Date helpers ───────────────────────────────────────────────────────────────
 // Snap a date FORWARD to the next non-weekend day. NEPSE public holidays are
@@ -146,190 +198,185 @@ export default function BacktestSetupPanel({ onSessionStarted }) {
   }, [symbol, startDate, strategyName, capital, slMode, runMode, speed, onSessionStarted])
 
   return (
-    <div className="flex flex-col gap-3 p-3 h-full overflow-y-auto">
-      <div className={LABEL}>Backtest Setup</div>
+    <div className="flex flex-col gap-2.5 p-2.5 h-full overflow-y-auto">
+      {/* ── Market & Range ─────────────────────────────────────────────────── */}
+      <Card tone="info" icon={SectionIcon.search} title="Market & Range" index={0}>
+        {/* Script — type-ahead search (shared SymbolSearch; stocks-only, backtest API) */}
+        <div className="relative">
+          <label className={LABEL}>Script</label>
+          <SymbolSearch
+            value={symbol}
+            stocksOnly
+            defaultValue="NABIL"
+            fetchSymbols={() => btGetSymbols().then((r) => ({ stocks: r.data.symbols || [], indexes: [] }))}
+            onSelect={(sym) => handleSelectSymbol(sym)}
+            onLoadError={() => setSymbolsError('Failed to load symbols — check server')}
+            className="mt-0.5 w-full"
+            inputClassName="w-full"
+          />
+          {symbolsError && (
+            <div className="text-[10px] text-red-500 bg-red-50 dark:bg-red-900/20 rounded-md px-2 py-1.5 mt-1">
+              {symbolsError}
+            </div>
+          )}
+        </div>
 
-      {/* Script — type-ahead search (shared SymbolSearch; stocks-only, backtest API) */}
-      <div className="relative">
-        <label className={LABEL}>Script</label>
-        <SymbolSearch
-          value={symbol}
-          stocksOnly
-          defaultValue="NABIL"
-          fetchSymbols={() => btGetSymbols().then((r) => ({ stocks: r.data.symbols || [], indexes: [] }))}
-          onSelect={(sym) => handleSelectSymbol(sym)}
-          onLoadError={() => setSymbolsError('Failed to load symbols — check server')}
-          className="mt-0.5 w-full"
-          inputClassName="w-full"
-        />
-        {symbolsError && (
-          <div className="text-[10px] text-red-500 bg-red-50 dark:bg-red-900/20 rounded-md px-2 py-1.5 mt-1">
-            {symbolsError}
-          </div>
-        )}
-      </div>
+        {/* Start Date */}
+        <div>
+          <label className={LABEL}>Start Date</label>
+          <input
+            type="date"
+            value={startDate}
+            min={meta?.earliest_date}
+            max={meta?.latest_date}
+            disabled={!symbol || metaLoading}
+            onChange={(e) => handleDateChange(e.target.value)}
+            className={`${INPUT} disabled:opacity-50 disabled:cursor-not-allowed`}
+          />
+          {/* Quick range presets */}
+          {meta?.latest_date && (
+            <div className="mt-1 flex gap-1 flex-wrap">
+              {[
+                { label: '1Y', y: 1 },
+                { label: '2Y', y: 2 },
+                { label: '5Y', y: 5 },
+              ].map((p) => (
+                <button
+                  key={p.label}
+                  type="button"
+                  onClick={() => handleDateChange(computeDefaultStart(meta, p.y))}
+                  className={`${CHIP} ${CHIP_OFF}`}
+                >
+                  {p.label}
+                </button>
+              ))}
+              <button
+                type="button"
+                onClick={() => handleDateChange(meta.earliest_date)}
+                className={`${CHIP} ${CHIP_OFF}`}
+              >
+                Max
+              </button>
+            </div>
+          )}
+          {metaLoading && (
+            <div className="text-[10px] text-gray-400 mt-1">Loading date range…</div>
+          )}
+          {!metaLoading && dateNotice && (
+            <div className="text-[10px] text-gray-400 mt-1 leading-tight">{dateNotice}</div>
+          )}
+        </div>
+      </Card>
 
-      {/* Start Date */}
-      <div>
-        <label className={LABEL}>Start Date</label>
-        <input
-          type="date"
-          value={startDate}
-          min={meta?.earliest_date}
-          max={meta?.latest_date}
-          disabled={!symbol || metaLoading}
-          onChange={(e) => handleDateChange(e.target.value)}
-          className={`${INPUT} disabled:opacity-50 disabled:cursor-not-allowed`}
-        />
-        {/* Quick range presets */}
-        {meta?.latest_date && (
+      {/* ── Capital & Strategy ─────────────────────────────────────────────── */}
+      <Card tone="neutral" icon={SectionIcon.wallet} title="Capital & Strategy" index={1}>
+        {/* Initial Capital */}
+        <div>
+          <label className={LABEL}>Capital (NPR)</label>
+          <input
+            type="number"
+            value={capital}
+            min={10000}
+            step={1000}
+            autoComplete="off"
+            onChange={(e) => setCapital(e.target.value)}
+            className={INPUT}
+          />
           <div className="mt-1 flex gap-1 flex-wrap">
             {[
-              { label: '1Y', y: 1 },
-              { label: '2Y', y: 2 },
-              { label: '5Y', y: 5 },
+              { label: '1L', v: '100000' },
+              { label: '5L', v: '500000' },
+              { label: '10L', v: '1000000' },
             ].map((p) => (
               <button
                 key={p.label}
                 type="button"
-                onClick={() => handleDateChange(computeDefaultStart(meta, p.y))}
-                className="px-2 py-0.5 text-[10px] font-semibold rounded border border-gray-200 dark:border-gray-700 text-gray-500 dark:text-gray-400 hover:border-blue-400 hover:text-blue-500"
+                onClick={() => setCapital(p.v)}
+                className={`${CHIP} ${capital === p.v ? CHIP_ON : CHIP_OFF}`}
               >
                 {p.label}
               </button>
             ))}
-            <button
-              type="button"
-              onClick={() => handleDateChange(meta.earliest_date)}
-              className="px-2 py-0.5 text-[10px] font-semibold rounded border border-gray-200 dark:border-gray-700 text-gray-500 dark:text-gray-400 hover:border-blue-400 hover:text-blue-500"
-            >
-              Max
-            </button>
           </div>
-        )}
-        {metaLoading && (
-          <div className="text-[10px] text-gray-400 mt-0.5">Loading date range…</div>
-        )}
-        {!metaLoading && dateNotice && (
-          <div className="text-[10px] text-gray-400 mt-0.5 leading-tight">{dateNotice}</div>
-        )}
-      </div>
-
-      {/* Initial Capital */}
-      <div>
-        <label className={LABEL}>Capital (NPR)</label>
-        <input
-          type="number"
-          value={capital}
-          min={10000}
-          step={1000}
-          autoComplete="off"
-          onChange={(e) => setCapital(e.target.value)}
-          className={INPUT}
-        />
-        <div className="mt-1 flex gap-1 flex-wrap">
-          {[
-            { label: '1L', v: '100000' },
-            { label: '5L', v: '500000' },
-            { label: '10L', v: '1000000' },
-          ].map((p) => (
-            <button
-              key={p.label}
-              type="button"
-              onClick={() => setCapital(p.v)}
-              className={`px-2 py-0.5 text-[10px] font-semibold rounded border transition-colors ${
-                capital === p.v
-                  ? 'bg-blue-600 text-white border-blue-600'
-                  : 'border-gray-200 dark:border-gray-700 text-gray-500 dark:text-gray-400 hover:border-blue-400'
-              }`}
-            >
-              {p.label}
-            </button>
-          ))}
         </div>
-      </div>
 
-      {/* Strategy Name (optional) */}
-      <div>
-        <label className={LABEL}>Strategy Name</label>
-        <input
-          type="text"
-          value={strategyName}
-          onChange={(e) => setStrategyName(e.target.value)}
-          placeholder="strategy"
-          autoComplete="off"
-          className={INPUT}
-        />
-      </div>
-
-      {/* Run Mode */}
-      <div>
-        <label className={LABEL}>Run Mode</label>
-        <div className="mt-0.5 flex gap-2">
-          {['PLAY', 'MANUAL'].map((m) => (
-            <button
-              key={m}
-              onClick={() => setRunMode(m)}
-              className={`flex-1 py-1 text-[10px] font-semibold rounded-md border transition-colors ${
-                runMode === m
-                  ? 'bg-blue-600 text-white border-blue-600'
-                  : 'border-gray-200 dark:border-gray-700 text-gray-500 dark:text-gray-400 hover:border-blue-400'
-              }`}
-            >
-              {m === 'PLAY' ? '▶ Play' : '→ Manual'}
-            </button>
-          ))}
-        </div>
-      </div>
-
-      {/* Play Speed — only if PLAY */}
-      {runMode === 'PLAY' && (
+        {/* Strategy Name (optional) */}
         <div>
-          <label className={LABEL}>Play Speed</label>
-          <div className="mt-0.5 flex gap-1 flex-wrap">
-            {SPEEDS.map((s) => (
+          <label className={LABEL}>Strategy Name</label>
+          <input
+            type="text"
+            value={strategyName}
+            onChange={(e) => setStrategyName(e.target.value)}
+            placeholder="strategy"
+            autoComplete="off"
+            className={INPUT}
+          />
+        </div>
+      </Card>
+
+      {/* ── Execution ──────────────────────────────────────────────────────── */}
+      <Card tone="warning" icon={SectionIcon.play} title="Execution" index={2}>
+        {/* Run Mode */}
+        <div>
+          <label className={LABEL}>Run Mode</label>
+          <div className={`mt-0.5 ${TOGGLE_WRAP}`}>
+            {['PLAY', 'MANUAL'].map((m) => (
               <button
-                key={s}
-                onClick={() => setSpeed(s)}
-                className={`px-2 py-0.5 text-[10px] font-semibold rounded border transition-colors ${
-                  speed === s
-                    ? 'bg-blue-600 text-white border-blue-600'
-                    : 'border-gray-200 dark:border-gray-700 text-gray-500 dark:text-gray-400'
-                }`}
+                key={m}
+                onClick={() => setRunMode(m)}
+                className={runMode === m ? 'flex-1 py-1 text-[10px] font-semibold rounded-md bg-blue-600 text-white shadow-sm transition-colors' : TOGGLE_BTN_OFF}
               >
-                {s}×
+                {m === 'PLAY' ? '▶ Play' : '→ Manual'}
               </button>
             ))}
           </div>
         </div>
-      )}
 
-      {/* SL Validation Mode */}
-      <div>
-        <label className={LABEL}>SL Validation</label>
-        <div className="mt-0.5 flex gap-2">
-          {['MANUAL', 'AUTO'].map((m) => (
-            <button
-              key={m}
-              onClick={() => setSlMode(m)}
-              className={`flex-1 py-1 text-[10px] font-semibold rounded-md border transition-colors ${
-                slMode === m
-                  ? m === 'AUTO'
-                    ? 'bg-orange-500 text-white border-orange-500'
-                    : 'bg-blue-600 text-white border-blue-600'
-                  : 'border-gray-200 dark:border-gray-700 text-gray-500 dark:text-gray-400'
-              }`}
-            >
-              {m}
-            </button>
-          ))}
+        {/* Play Speed — only if PLAY */}
+        {runMode === 'PLAY' && (
+          <div>
+            <label className={LABEL}>Play Speed</label>
+            <div className="mt-1 flex gap-1 flex-wrap">
+              {SPEEDS.map((s) => (
+                <button
+                  key={s}
+                  onClick={() => setSpeed(s)}
+                  className={`${CHIP} ${speed === s ? CHIP_ON : CHIP_OFF}`}
+                >
+                  {s}×
+                </button>
+              ))}
+            </div>
+          </div>
+        )}
+
+        {/* SL Validation Mode */}
+        <div>
+          <label className={LABEL}>SL Validation</label>
+          <div className={`mt-0.5 ${TOGGLE_WRAP}`}>
+            {['MANUAL', 'AUTO'].map((m) => (
+              <button
+                key={m}
+                onClick={() => setSlMode(m)}
+                className={
+                  slMode === m
+                    ? `flex-1 py-1 text-[10px] font-semibold rounded-md text-white shadow-sm transition-colors ${
+                        m === 'AUTO' ? 'bg-orange-500' : 'bg-blue-600'
+                      }`
+                    : TOGGLE_BTN_OFF
+                }
+              >
+                {m}
+              </button>
+            ))}
+          </div>
+          <div className="text-[10px] text-gray-400 mt-1 leading-tight">
+            {slMode === 'AUTO'
+              ? 'System auto-closes when SL is hit after T+2'
+              : 'System asks you before closing on SL breach'}
+          </div>
         </div>
-        <div className="text-[10px] text-gray-400 mt-0.5 leading-tight">
-          {slMode === 'AUTO'
-            ? 'System auto-closes when SL is hit after T+2'
-            : 'System asks you before closing on SL breach'}
-        </div>
-      </div>
+      </Card>
 
       {error && (
         <div className="text-[10px] text-red-500 bg-red-50 dark:bg-red-900/20 rounded-md px-2 py-1.5">
@@ -340,7 +387,7 @@ export default function BacktestSetupPanel({ onSessionStarted }) {
       <button
         onClick={handleStart}
         disabled={loading}
-        className="mt-auto w-full py-2 text-[11px] font-bold rounded-md bg-blue-600 hover:bg-blue-700 disabled:opacity-50 text-white transition-colors"
+        className="mt-auto w-full py-2.5 text-[12px] font-bold rounded-xl bg-blue-600 hover:bg-blue-700 disabled:opacity-50 disabled:hover:shadow-sm text-white shadow-sm hover:shadow-md transition-all"
       >
         {loading ? 'Starting…' : runMode === 'PLAY' ? '▶ Start & Run' : 'Start Backtest'}
       </button>
