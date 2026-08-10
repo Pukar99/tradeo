@@ -749,7 +749,7 @@ export default function RightPanel() {
                 <div className="w-4 h-4 border-2 border-blue-400 border-t-transparent rounded-full animate-spin" />
               </div>
             ) : (
-              <div className="space-y-0">
+              <div className="space-y-0.5">
                 {moverTab === 'gainers' &&
                   gainers.slice(0, 10).map((s, i) => (
                     <MoverRow
