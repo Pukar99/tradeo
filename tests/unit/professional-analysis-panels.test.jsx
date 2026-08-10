@@ -191,7 +191,13 @@ describe('SMCShadowEvidence', () => {
 })
 
 describe('ProfessionalSMCRightPanel legacy boundary', () => {
-  it('hides V1 diagnostics by default and labels them when expanded', () => {
+  // t30-SCR 2026-08-10: the "Legacy V1 reference" block (expandable V1 diagnostics,
+  // kept only for historical comparison) was cut entirely — it made SMC's Evidence tab
+  // much heavier than Price Action's equivalent tab, with nothing on PA's side of
+  // comparable weight. This test used to assert it was hidden-by-default-then-expandable;
+  // it now asserts the block is gone outright, as a regression guard against it
+  // silently coming back.
+  it('does not render the removed Legacy V1 reference block', () => {
     render(
       <ProfessionalSMCRightPanel
         smcData={{
@@ -220,16 +226,8 @@ describe('ProfessionalSMCRightPanel legacy boundary', () => {
 
     fireEvent.click(screen.getByRole('button', { name: 'Evidence' }))
 
-    expect(screen.getByText('Legacy V1 reference')).toBeInTheDocument()
+    expect(screen.queryByText('Legacy V1 reference')).not.toBeInTheDocument()
     expect(screen.queryByText('V1 latest candidate')).not.toBeInTheDocument()
-
-    fireEvent.click(screen.getByRole('button', { name: 'Show legacy diagnostics' }))
-
-    expect(screen.getByText('V1 latest candidate')).toBeInTheDocument()
-    expect(screen.getByText('V1 candidate')).toBeInTheDocument()
-    expect(screen.getByRole('button', { name: 'Hide legacy diagnostics' })).toHaveAttribute(
-      'aria-expanded',
-      'true'
-    )
+    expect(screen.queryByRole('button', { name: 'Show legacy diagnostics' })).not.toBeInTheDocument()
   })
 })
