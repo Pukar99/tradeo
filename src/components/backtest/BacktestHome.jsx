@@ -241,10 +241,13 @@ function HistoryRowSkeleton() {
 function BacktestHomeSkeleton() {
   return (
     <div className="p-2.5 space-y-2.5">
-      <div className="grid grid-cols-2 md:grid-cols-4 gap-2.5">
-        {[0, 1, 2, 3].map((i) => (
-          <KpiSkeleton key={i} />
-        ))}
+      <div>
+        <div className="h-2.5 w-32 rounded bg-gray-100 dark:bg-gray-800 mb-2 animate-pulse" />
+        <div className="grid grid-cols-2 md:grid-cols-4 gap-2.5">
+          {[0, 1, 2, 3].map((i) => (
+            <KpiSkeleton key={i} />
+          ))}
+        </div>
       </div>
       <div>
         <div className="h-2.5 w-28 rounded bg-gray-100 dark:bg-gray-800 mb-2 animate-pulse" />
@@ -374,14 +377,14 @@ export default function BacktestHome({ onSessionStarted }) {
                       index={2}
                       label="Best Run"
                       icon={ICONS.pulse}
-                      tone="positive"
+                      tone={(summary?.best_session_pnl || 0) >= 0 ? 'positive' : 'neutral'}
                       value={fmtRs(summary?.best_session_pnl)}
                     />
                     <Kpi
                       index={3}
                       label="Worst Run"
                       icon={ICONS.trendDown}
-                      tone={(summary?.worst_session_pnl || 0) !== 0 ? 'negative' : 'neutral'}
+                      tone={(summary?.worst_session_pnl || 0) < 0 ? 'negative' : 'neutral'}
                       value={fmtRs(summary?.worst_session_pnl)}
                     />
                   </div>
