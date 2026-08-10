@@ -12,34 +12,7 @@ import {
   tierRingClass,
 } from '../common/TierMaterial'
 
-const LABEL = 'text-[9px] font-bold uppercase tracking-[0.14em] text-gray-400 dark:text-gray-500'
 const MUTED = 'text-[10px] leading-relaxed text-gray-500 dark:text-gray-400'
-
-function PanelShell({ children }) {
-  const { user } = useAuth()
-  const displayTier = getDisplayTier(user)
-  const accent = TIER_ACCENT[displayTier]
-  return (
-    <div
-      className={`group relative flex-1 min-h-0 overflow-y-auto bg-white dark:bg-gray-950 divide-y divide-gray-100 dark:divide-gray-800 animate-fade-up ${accent ? tierRingClass(displayTier) : ''}`}
-    >
-      <TierAccentOverlay accent={accent} radius="" />
-      {children}
-    </div>
-  )
-}
-
-function Section({ title, aside, children }) {
-  return (
-    <section className="p-3 space-y-2">
-      <div className="flex items-center justify-between gap-2">
-        <p className={LABEL}>{title}</p>
-        {aside && <span className="text-[9px] text-gray-400 dark:text-gray-500">{aside}</span>}
-      </div>
-      {children}
-    </section>
-  )
-}
 
 function Badge({ children, tone = 'neutral' }) {
   const tones = {
@@ -129,7 +102,7 @@ function RangeGauge({ low, high, current, lowLabel, highLabel, tone = 'neutral' 
     <div>
       <div className="h-1.5 w-full rounded-full bg-gray-100 dark:bg-gray-800 relative overflow-visible">
         <div
-          className={`absolute top-1/2 -translate-y-1/2 -translate-x-1/2 h-2.5 w-2.5 rounded-full border-2 border-white dark:border-gray-950 shadow-sm ${dotColors[tone] || dotColors.neutral}`}
+          className={`absolute top-1/2 -translate-y-1/2 -translate-x-1/2 h-2.5 w-2.5 rounded-full border-2 border-gray-50 dark:border-gray-800 shadow-sm ${dotColors[tone] || dotColors.neutral}`}
           style={{ left: `${pct}%` }}
         />
       </div>
@@ -941,7 +914,7 @@ export function ProfessionalSMCRightPanel({
     >
       <TierAccentOverlay accent={accent} radius="" />
       <div className="p-2 bg-white dark:bg-gray-900">
-        <div className="flex gap-1 rounded-lg bg-gray-100 dark:bg-gray-950 border border-gray-100 dark:border-gray-800 p-1">
+        <div className="flex gap-1 rounded-lg bg-gray-50 dark:bg-gray-900 border border-gray-200 dark:border-gray-700 p-1">
           {[
             ['setup', 'Setup now'],
             ['history', 'Evidence'],
@@ -1301,7 +1274,7 @@ export function ProfessionalPARightPanel({ paData, kpis, chartData, currentPrice
     >
       <TierAccentOverlay accent={accent} radius="" />
       <div className="p-2 bg-white dark:bg-gray-900">
-        <div className="flex gap-1 rounded-lg bg-gray-100 dark:bg-gray-950 border border-gray-100 dark:border-gray-800 p-1">
+        <div className="flex gap-1 rounded-lg bg-gray-50 dark:bg-gray-900 border border-gray-200 dark:border-gray-700 p-1">
           {[
             ['now', 'Decision view'],
             ['research', 'Research'],

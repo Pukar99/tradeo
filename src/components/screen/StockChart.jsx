@@ -707,7 +707,7 @@ function ChartPricePanel({ latestClose, chartData, tooltip, displayTier }) {
 
   return (
     <div
-      className={`relative group pointer-events-auto min-w-[132px] bg-white/85 dark:bg-gray-950/90 border border-white/70 dark:border-white/[0.1]
+      className={`relative group pointer-events-auto min-w-[132px] bg-white/85 dark:bg-gray-900/90 border border-white/70 dark:border-white/[0.1]
                  rounded-lg px-2 py-1.5 shadow-md backdrop-blur-md ${accent ? tierRingClass(displayTier) : ''}`}
       translate="no"
     >
