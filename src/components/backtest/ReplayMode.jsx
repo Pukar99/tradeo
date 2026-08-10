@@ -1,15 +1,23 @@
-// === ReplayPage.jsx — chart replay mode: symbol + date setup, candle-by-candle playback, keyboard controls ===
+// === ReplayMode.jsx — chart replay mode: symbol + date setup, candle-by-candle playback, keyboard controls ===
+// Moved from src/components/screen/ReplayPage.jsx (SCR-10, Wave 5): Replay is no longer
+// its own ScreenPage tab — it's a mode inside the merged "Backtesting" tab, toggled via
+// BacktestPage.jsx's `mode` state. This file keeps ALL of Replay's original behavior
+// byte-identical (setup screen, playback engine, keyboard shortcuts, Reset/New Replay,
+// end-of-data banner) — the only addition is the `onExit` prop + the mode toggle shown
+// at the top of the setup screen only (hidden once a replay is actively running).
 
 import { useState, useCallback, useRef, useEffect } from 'react'
 import { btGetOHLCV } from '../../api/backtest'
-import BacktestChart from '../backtest/BacktestChart'
-import BacktestControls from '../backtest/BacktestControls'
+import BacktestChart from './BacktestChart'
+import BacktestControls from './BacktestControls'
+import ModeToggle from './ModeToggle'
 import SymbolSearch from '../common/SymbolSearch'
 import { nptToday } from '../../utils/nepseCalendar'
 
 // ── Minimal replay engine (no session, no orders) ────────────────────────────
 // Replicates the play/pause/step/speed logic from useBacktestEngine without
 // any SL/TP checks, settlement, or backend calls.
+// (SCR-11 will extract this into a shared usePlaybackEngine hook — untouched here.)
 
 function useReplayEngine({ candles, cursorIndex, onAdvance, onEnd }) {
   const playingRef = useRef(false)
@@ -101,9 +109,11 @@ function useReplayEngine({ candles, cursorIndex, onAdvance, onEnd }) {
   return { play, pause, stepForward, stepBack, setSpeed, isPlayingRef: playingRef }
 }
 
-// ── ReplayPage ────────────────────────────────────────────────────────────────
+// ── ReplayMode ────────────────────────────────────────────────────────────────
+// onExit — called when the mode toggle (shown only on the setup screen) is switched
+// back to "Live Backtest". BacktestPage.jsx passes `() => setMode('backtest')`.
 
-export default function ReplayPage() {
+export default function ReplayMode({ onExit }) {
   // Setup state
   const [symbol, setSymbol] = useState('')
   const [startDate, setStartDate] = useState('')
@@ -234,11 +244,12 @@ export default function ReplayPage() {
   const currentCandle = candles[cursorIndex] || null
   const currentDate = currentCandle?.date || ''
 
-  // ── Setup screen ──────────────────────────────────────────────────────────────
+  // ── Setup screen — mode toggle shown here only (hidden once ready/playing) ───
 
   if (!ready) {
     return (
-      <div className="flex-1 flex items-center justify-center bg-white dark:bg-gray-950">
+      <div className="flex-1 flex flex-col items-center justify-center gap-4 bg-white dark:bg-gray-950 px-4">
+        <ModeToggle mode="replay" onChange={(m) => m === 'backtest' && onExit?.()} />
         <div className="w-full max-w-sm bg-white dark:bg-gray-900 rounded-2xl border border-gray-100 dark:border-gray-800 shadow-sm p-6 flex flex-col gap-4">
           <div>
             <h2 className="text-[14px] font-bold text-gray-800 dark:text-gray-100 mb-0.5">

@@ -12,6 +12,8 @@ import BuyOrderModal from './BuyOrderModal'
 import SLTPUpdateModal from './SLTPUpdateModal'
 import SLValidationPrompt from './SLValidationPrompt'
 import BacktestPartialExitModal from './BacktestPartialExitModal'
+import ModeToggle from './ModeToggle'
+import ReplayMode from './ReplayMode'
 import { btEndSession, btExitOrder } from '../../api/backtest'
 
 export default function BacktestPage() {
@@ -47,6 +49,17 @@ export default function BacktestPage() {
   // Exit/action error toast — set by manual exit and by engine auto SL/TP failures
   const [exitError, setExitError] = useState('')
   const endingRef = useRef(false)
+
+  // Backtesting/Replay mode toggle (SCR-10, Wave 5) — only meaningful when there's no
+  // active backtest session (see the `!session` render branch below); persisted the
+  // same way ScreenPage.jsx's ScreenInner persists mode/simpleTab/advancedTab.
+  const [mode, setModeState] = useState(() =>
+    sessionStorage.getItem('tradeo_backtest_mode') === 'replay' ? 'replay' : 'backtest'
+  )
+  const setMode = (m) => {
+    setModeState(m)
+    sessionStorage.setItem('tradeo_backtest_mode', m)
+  }
 
   // Load session on mount (restore if active)
   useEffect(() => {
@@ -267,8 +280,22 @@ export default function BacktestPage() {
     },
   }
 
-  // ── No active session → redesigned home (lifetime KPIs + history + setup) ───────
-  if (!session) return <BacktestHome onSessionStarted={sidePanelSetupProps.onSessionStarted} />
+  // ── No active session → mode toggle (Live Backtest / Replay) + the selected mode's
+  // own entry screen. An active BACKTEST session (checked above) always wins over
+  // `mode` — this branch only runs when there's no session to resume, so Replay mode
+  // is reachable. Replay mode renders its own toggle (top of its setup screen only,
+  // hidden once a replay is actively running) via ReplayMode's `onExit` prop.
+  if (!session) {
+    if (mode === 'replay') return <ReplayMode onExit={() => setMode('backtest')} />
+    return (
+      <div className="flex-1 flex flex-col min-h-0 overflow-hidden">
+        <div className="shrink-0 px-4 md:px-6 pt-4">
+          <ModeToggle mode={mode} onChange={setMode} />
+        </div>
+        <BacktestHome onSessionStarted={sidePanelSetupProps.onSessionStarted} />
+      </div>
+    )
+  }
 
   const sidePanelActiveProps = {
     session,

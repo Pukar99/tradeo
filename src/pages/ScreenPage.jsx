@@ -64,7 +64,6 @@ const MultiChartPage = lazy(() => import('../components/screen/MultiChartPage'))
 const SMCChartPage = lazy(() => import('../components/screen/SMCChartPage'))
 const PriceActionPage = lazy(() => import('../components/screen/PriceActionPage'))
 const BacktestPage = lazy(() => import('../components/backtest/BacktestPage'))
-const ReplayPage = lazy(() => import('../components/screen/ReplayPage'))
 
 function TabSpinner() {
   return (
@@ -84,7 +83,6 @@ const SIMPLE_TABS = [
 
 const ADVANCED_TABS = [
   { id: 'Backtesting', label: 'Backtesting', short: 'BT' },
-  { id: 'Replay', label: 'Replay', short: 'Rep' },
   { id: 'StrategyLab', label: 'Strategy Lab', short: 'Strat' },
 ]
 
@@ -262,6 +260,9 @@ function SimpleContent({
 
 function AdvancedContent({ activeTab }) {
   const { user } = useAuth()
+  // Backtesting tab — includes both Live Backtest and Replay (SCR-10, Wave 5: Replay
+  // merged into this tab as an internal mode toggle, see BacktestPage.jsx's `mode`
+  // state). One gate covers both modes since they were always gated identically.
   if (activeTab === 'Backtesting')
     return user?.tier === 'basic' && !user?.is_admin ? (
       <UpgradePrompt feature="Backtesting" />
@@ -269,16 +270,6 @@ function AdvancedContent({ activeTab }) {
       <Suspense fallback={<TabSpinner />}>
         <ErrorBoundary label="Backtesting">
           <BacktestPage />
-        </ErrorBoundary>
-      </Suspense>
-    )
-  if (activeTab === 'Replay')
-    return user?.tier === 'basic' && !user?.is_admin ? (
-      <UpgradePrompt feature="Replay" />
-    ) : (
-      <Suspense fallback={<TabSpinner />}>
-        <ErrorBoundary label="Replay">
-          <ReplayPage />
         </ErrorBoundary>
       </Suspense>
     )
