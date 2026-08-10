@@ -1,4 +1,9 @@
 import { useMemo, useState } from 'react'
+import { createPortal } from 'react-dom'
+import { useScreen } from '../../context/ScreenContext'
+import { getWatchlist, clearWatchlistCache } from '../../utils/globalCache'
+import { addToWatchlist, updateWatchlist } from '../../api'
+import TradeModal from './TradeModal'
 
 const LABEL = 'text-[9px] font-bold uppercase tracking-[0.14em] text-gray-400 dark:text-gray-500'
 const MUTED = 'text-[10px] leading-relaxed text-gray-500 dark:text-gray-400'
@@ -101,6 +106,81 @@ function EmptyPanel({ title }) {
 function fmt(value) {
   const number = Number(value)
   return Number.isFinite(number) ? number.toFixed(2) : '—'
+}
+
+// ── Setup action buttons (Buy + Set Alert) ──────────────────────────────────
+// Shared by SMC's "Illustrative plan" and Price Action's "Scenarios" sections —
+// both are read-only analysis panels that can now act on the setup they detect.
+// Owns its own state so it can be conditionally rendered by its callers (only
+// when there's a usable zone/level) without touching the parent panel's hook order.
+function SetupActionButtons({ symbol, entry, sl, tp }) {
+  const { refreshPositions } = useScreen()
+  const [tradeModal, setTradeModal] = useState(false)
+  const [alertStatus, setAlertStatus] = useState(null) // { type: 'loading'|'success'|'error', message }
+
+  const handleSetAlert = async () => {
+    setAlertStatus({ type: 'loading', message: 'Saving alert…' })
+    try {
+      const res = await getWatchlist()
+      const list = res.data || []
+      const existing = list.find((w) => w.symbol?.toUpperCase() === symbol?.toUpperCase())
+      if (existing) {
+        await updateWatchlist(existing.id, { price_alert: entry })
+      } else {
+        await addToWatchlist({ symbol, price_alert: entry, category: 'active' })
+      }
+      clearWatchlistCache()
+      setAlertStatus({ type: 'success', message: 'Alert set' })
+    } catch {
+      setAlertStatus({ type: 'error', message: 'Failed to set alert' })
+    } finally {
+      setTimeout(() => setAlertStatus(null), 2500)
+    }
+  }
+
+  return (
+    <>
+      <div className="mt-2 flex items-center gap-1.5">
+        <button
+          onClick={() => setTradeModal(true)}
+          className="flex-1 rounded-lg border border-emerald-200 dark:border-emerald-800 bg-emerald-50 dark:bg-emerald-950/30 px-2 py-1.5 text-[9px] font-bold text-emerald-700 dark:text-emerald-400 hover:bg-emerald-100 dark:hover:bg-emerald-900/40 transition-colors"
+        >
+          Buy
+        </button>
+        <button
+          onClick={handleSetAlert}
+          disabled={alertStatus?.type === 'loading'}
+          className="flex-1 rounded-lg border border-blue-200 dark:border-blue-800 bg-blue-50 dark:bg-blue-950/30 px-2 py-1.5 text-[9px] font-bold text-blue-700 dark:text-blue-400 hover:bg-blue-100 dark:hover:bg-blue-900/40 transition-colors disabled:opacity-50"
+        >
+          Set Alert
+        </button>
+      </div>
+      {alertStatus && (
+        <p
+          className={`mt-1 text-[9px] font-semibold ${
+            alertStatus.type === 'error'
+              ? 'text-red-500'
+              : alertStatus.type === 'success'
+                ? 'text-emerald-500'
+                : 'text-gray-400'
+          }`}
+        >
+          {alertStatus.message}
+        </p>
+      )}
+      {tradeModal &&
+        createPortal(
+          <TradeModal
+            side="BUY"
+            symbol={symbol}
+            initialValues={{ entry_price: entry, sl, tp }}
+            onClose={() => setTradeModal(false)}
+            onSaved={() => refreshPositions()}
+          />,
+          document.body
+        )}
+    </>
+  )
 }
 
 function readableLabel(value, fallback = 'Unclassified pattern') {
@@ -656,30 +736,38 @@ export function ProfessionalSMCRightPanel({
 
             <Section title="Illustrative plan" aside="validate manually">
               {zone ? (
-                <div className="grid grid-cols-2 gap-1.5">
-                  <Metric
-                    label="Entry area"
-                    value={`${fmt(zoneBottom)}–${fmt(zoneTop)}`}
-                    tone="info"
+                <>
+                  <div className="grid grid-cols-2 gap-1.5">
+                    <Metric
+                      label="Entry area"
+                      value={`${fmt(zoneBottom)}–${fmt(zoneTop)}`}
+                      tone="info"
+                    />
+                    <Metric
+                      label="Invalidation"
+                      value={fmt(zoneBottom)}
+                      sub="close below zone"
+                      tone="negative"
+                    />
+                    <Metric
+                      label="Next supply"
+                      value={fmt(target)}
+                      sub={target ? 'detected bearish OB' : 'not available'}
+                    />
+                    <Metric
+                      label="Indicative R:R"
+                      value={rr ? `${rr.toFixed(1)}R` : '—'}
+                      sub="before fees/slippage"
+                      tone={rr >= 2 ? 'positive' : rr ? 'warning' : 'neutral'}
+                    />
+                  </div>
+                  <SetupActionButtons
+                    symbol={smcData.symbol}
+                    entry={currentPrice}
+                    sl={zoneBottom}
+                    tp={target}
                   />
-                  <Metric
-                    label="Invalidation"
-                    value={fmt(zoneBottom)}
-                    sub="close below zone"
-                    tone="negative"
-                  />
-                  <Metric
-                    label="Next supply"
-                    value={fmt(target)}
-                    sub={target ? 'detected bearish OB' : 'not available'}
-                  />
-                  <Metric
-                    label="Indicative R:R"
-                    value={rr ? `${rr.toFixed(1)}R` : '—'}
-                    sub="before fees/slippage"
-                    tone={rr >= 2 ? 'positive' : rr ? 'warning' : 'neutral'}
-                  />
-                </div>
+                </>
               ) : (
                 <p className={MUTED}>
                   No usable bullish zone is available, so an entry and invalidation plan cannot be
@@ -1003,6 +1091,14 @@ export function ProfessionalPARightPanel({ paData, kpis, chartData, currentPrice
                 state="wait"
                 detail="Inside the range, avoid treating every candle pattern as a new setup."
               />
+              {derived.demand && derived.resistance && (
+                <SetupActionButtons
+                  symbol={paData.symbol}
+                  entry={currentPrice}
+                  sl={derived.demand.bottom}
+                  tp={derived.resistance.price}
+                />
+              )}
             </Section>
 
             <Section title="Room and risk">
