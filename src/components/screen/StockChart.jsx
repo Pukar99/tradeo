@@ -3,6 +3,7 @@ import { useEffect, useRef, useState, useCallback } from 'react'
 import { createPortal } from 'react-dom'
 import { useTheme } from '../../context/ThemeContext'
 import { useScreen } from '../../context/ScreenContext'
+import { useAuth } from '../../context/AuthContext'
 import { getIndexChart, getStockChart, triggerBackfill } from '../../api'
 import { fmtRsSigned, pnlClass } from '../../utils/format'
 import { getTradeHistory, getTopMovers } from '../../utils/globalCache'
@@ -10,6 +11,13 @@ import { nptNow, expectedLatestTradingDate } from '../../utils/nepseCalendar'
 import { useScreenToolbarSlot } from '../../pages/ScreenPage'
 import { useFixedDropdown } from '../common/useFixedDropdown'
 import SymbolSearch from '../common/SymbolSearch'
+import {
+  TIER_ACCENT,
+  TIER_TEXT,
+  TierAccentOverlay,
+  tierRingClass,
+  getDisplayTier,
+} from '../common/TierMaterial'
 
 // ── Module-level caches (survive re-renders, shared across StockChart instances) ─
 const _chartCache = new Map() // `sym:tf` or `idx:id:tf` → { data, latest, ts }
@@ -389,6 +397,7 @@ function ChartIndicatorDropdown({
   onClearDrawings,
   drawCount,
   compact = false,
+  displayTier,
 }) {
   const {
     activeIndicators: _ai,
@@ -409,11 +418,11 @@ function ChartIndicatorDropdown({
       <button
         ref={triggerRef}
         onClick={() => setOpen((p) => !p)}
-        className={`flex items-center gap-1 px-2 py-1 rounded-lg text-[10px] font-semibold border transition-all ${
+        className={`flex items-center gap-1 px-2 py-1 rounded-lg text-[10px] font-semibold border transition-all active:scale-95 ${
           open || totalActive > 0
             ? 'bg-blue-500 border-blue-500 text-white shadow-sm'
             : 'bg-gray-50 dark:bg-gray-800 border-gray-200 dark:border-gray-700 text-gray-500 dark:text-gray-400 hover:border-blue-300 dark:hover:border-blue-600 hover:text-blue-500'
-        }`}
+        } ${tierRingClass(displayTier)}`}
       >
         <svg
           className="w-3 h-3"
@@ -612,7 +621,7 @@ function ChartIndicatorDropdown({
 }
 
 // Essential controls: chart type + timeframes only
-function ChartHUDControls({ compact = false }) {
+function ChartHUDControls({ compact = false, displayTier }) {
   const { chartType, setChartType, timeframe, setTimeframe } = useScreen() || {}
 
   // Compact (mobile): the inline toolbar is just search + menu; chart-type and
@@ -631,9 +640,9 @@ function ChartHUDControls({ compact = false }) {
             key={type}
             onClick={() => setChartType(type)}
             title={type}
-            className={`px-1.5 py-0.5 rounded text-[10px] transition-colors ${
+            className={`px-1.5 py-0.5 rounded text-[10px] transition-all active:scale-95 ${
               chartType === type
-                ? 'bg-white dark:bg-gray-700 shadow-sm'
+                ? `bg-white dark:bg-gray-700 shadow-sm ${TIER_TEXT[displayTier] || ''}`
                 : 'text-gray-400 dark:text-gray-500 hover:text-gray-700 dark:hover:text-gray-300'
             }`}
           >
@@ -674,8 +683,9 @@ function fmtVolShort(v) {
   return String(Math.round(n))
 }
 
-function ChartPricePanel({ latestClose, chartData, tooltip }) {
+function ChartPricePanel({ latestClose, chartData, tooltip, displayTier }) {
   const { selectedSymbol, selectedCompanyName } = useScreen()
+  const accent = TIER_ACCENT[displayTier]
 
   const lastBar = chartData.length > 0 ? chartData[chartData.length - 1] : null
   const change = lastBar ? (lastBar.diff_pct ?? lastBar.per_change ?? null) : null
@@ -697,10 +707,11 @@ function ChartPricePanel({ latestClose, chartData, tooltip }) {
 
   return (
     <div
-      className="min-w-[132px] bg-white/85 dark:bg-gray-950/90 border border-white/70 dark:border-white/[0.1]
-                 rounded-lg px-2 py-1.5 shadow-md backdrop-blur-md"
+      className={`relative group pointer-events-auto min-w-[132px] bg-white/85 dark:bg-gray-950/90 border border-white/70 dark:border-white/[0.1]
+                 rounded-lg px-2 py-1.5 shadow-md backdrop-blur-md ${accent ? tierRingClass(displayTier) : ''}`}
       translate="no"
     >
+      <TierAccentOverlay accent={accent} radius="rounded-t-lg" />
       {/* Identity — symbol + company name (+ date once hovering), shown in both states */}
       <div className="flex items-baseline justify-between gap-2 min-w-0">
         <div className="flex items-baseline gap-1 min-w-0">
@@ -777,9 +788,10 @@ const ENTRY_TEXT_COLORS = [
   'text-pink-400',
 ]
 
-function PositionBadge({ positions, latestClose }) {
+function PositionBadge({ positions, latestClose, displayTier }) {
   if (!positions?.length) return null
 
+  const accent = TIER_ACCENT[displayTier]
   const close = parseFloat(latestClose) || 0
   const totalQty = positions.reduce((s, p) => s + (p.remaining_quantity ?? p.quantity ?? 0), 0)
   const avgEntry =
@@ -804,7 +816,10 @@ function PositionBadge({ positions, latestClose }) {
 
   return (
     <div className="absolute bottom-16 left-3 z-20 pointer-events-none" translate="no">
-      <div className="bg-white/96 dark:bg-gray-900/96 backdrop-blur-sm border border-gray-200 dark:border-gray-700 rounded-2xl shadow-lg overflow-hidden w-56">
+      <div
+        className={`relative group pointer-events-auto bg-white/96 dark:bg-gray-900/96 backdrop-blur-sm border border-gray-200 dark:border-gray-700 rounded-2xl shadow-lg overflow-hidden w-56 ${accent ? tierRingClass(displayTier) : ''}`}
+      >
+        <TierAccentOverlay accent={accent} />
         {/* Header */}
         <div
           className={`flex items-center justify-between px-3 py-1.5 ${isLong ? 'bg-blue-50 dark:bg-blue-950/40' : 'bg-red-50 dark:bg-red-950/40'}`}
@@ -1019,6 +1034,8 @@ export default function StockChart({
   paToggles = null,
 }) {
   const { isDark } = useTheme()
+  const { user } = useAuth()
+  const displayTier = getDisplayTier(user)
   const {
     selectedSymbol,
     selectedIndexId,
@@ -1539,7 +1556,7 @@ export default function StockChart({
             <div className="w-px h-4 bg-gray-200 dark:bg-gray-700 shrink-0" />
             {/* Chart type + timeframes — scrollable section */}
             <div className="flex-1 overflow-x-auto min-w-0 no-scrollbar">
-              <ChartHUDControls compact={compactToolbar} />
+              <ChartHUDControls compact={compactToolbar} displayTier={displayTier} />
             </div>
           </>
         )}
@@ -1549,6 +1566,7 @@ export default function StockChart({
           activeTool={activeTool}
           setActiveTool={setActiveTool}
           compact={compactToolbar}
+          displayTier={displayTier}
           drawCount={drawingsRef.current.length}
           onClearDrawings={() => {
             drawingsRef.current = []
@@ -2614,7 +2632,13 @@ export default function StockChart({
 
         {/* ── Chart area ── */}
         {/* Position badge — hidden while loading; needs latestClose for P&L */}
-        {!loading && <PositionBadge positions={activePositions} latestClose={latestClose} />}
+        {!loading && (
+          <PositionBadge
+            positions={activePositions}
+            latestClose={latestClose}
+            displayTier={displayTier}
+          />
+        )}
 
         {loading ? (
           <ChartSkeleton />
@@ -2625,7 +2649,12 @@ export default function StockChart({
             <div className="absolute top-2 left-3 z-20 pointer-events-none">
               {chartData.length > 0 && (
                 <div key={selectedSymbol} className="animate-fade-up">
-                  <ChartPricePanel latestClose={latestClose} chartData={chartData} tooltip={tooltip} />
+                  <ChartPricePanel
+                    latestClose={latestClose}
+                    chartData={chartData}
+                    tooltip={tooltip}
+                    displayTier={displayTier}
+                  />
                 </div>
               )}
             </div>
