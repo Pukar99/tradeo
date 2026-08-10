@@ -14,6 +14,7 @@ import { nptToday } from '../../utils/nepseCalendar'
 import { TIER_TEXT, getDisplayTier } from '../common/TierMaterial'
 import { useSlidingIndicator } from '../../hooks/useSlidingIndicator'
 import TradeModal from './TradeModal'
+import { IconBell } from '../common/icons'
 
 // ── Close Position Confirm ────────────────────────────────────────────────────
 
@@ -352,6 +353,17 @@ const WatchlistCard = memo(function WatchlistCard({ w, selected, onSelect, onEdi
                     High <span className="text-emerald-500 font-semibold">{w.watch_high}</span>
                   </span>
                 )}
+              </div>
+            )}
+            {w.price_alert && (
+              <div
+                className="flex items-center gap-1 mt-1 text-[9px] text-amber-500 dark:text-amber-400"
+                translate="no"
+              >
+                <IconBell className="w-2.5 h-2.5 shrink-0" />
+                <span className="font-semibold">
+                  Alert @ Rs.{parseFloat(w.price_alert).toLocaleString()}
+                </span>
               </div>
             )}
             {w.notes && <p className="text-[9px] text-gray-400 mt-0.5 truncate">{w.notes}</p>}
