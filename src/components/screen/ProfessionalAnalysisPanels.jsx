@@ -1076,8 +1076,11 @@ export function ProfessionalSMCRightPanel({
   )
 }
 
-export function ProfessionalPALeftPanel({ paData, currentPrice }) {
-  if (!paData) return <EmptyPanel title="Price Action context unavailable" />
+export function ProfessionalPALeftPanel({ paData, currentPrice, loading }) {
+  if (!paData) {
+    if (loading) return <CardStackSkeleton count={4} />
+    return <EmptyPanel title="Price Action context unavailable" />
+  }
   const {
     structure,
     support_resistance: levels = [],
@@ -1105,9 +1108,11 @@ export function ProfessionalPALeftPanel({ paData, currentPrice }) {
         ? 'negative'
         : 'neutral'
 
+  const zonesTone = demand || supply ? 'info' : 'neutral'
+
   return (
-    <PanelShell>
-      <Section title="Market map" aside="confirmed pivots">
+    <CardStack>
+      <Card index={0} tone={trendTone} icon={CardIcon.trend} title="Market map" aside="confirmed pivots">
         <div className="flex items-center justify-between">
           <Badge tone={trendTone}>{structure?.trend || 'Undetermined'}</Badge>
           <span className="text-[9px] text-gray-400">{swings.length} recent swings</span>
@@ -1125,9 +1130,9 @@ export function ProfessionalPALeftPanel({ paData, currentPrice }) {
         <p className={MUTED}>
           Pivots require ten later candles to confirm, so the newest market turn may not appear yet.
         </p>
-      </Section>
+      </Card>
 
-      <Section title="Nearest levels" aside={`price ${fmt(currentPrice)}`}>
+      <Card index={1} tone="neutral" icon={CardIcon.location} title="Nearest levels" aside={`price ${fmt(currentPrice)}`}>
         <EvidenceRow
           label="Resistance"
           value={
@@ -1154,9 +1159,9 @@ export function ProfessionalPALeftPanel({ paData, currentPrice }) {
             support ? `${support.touches} clustered touches · ${support.strength}` : undefined
           }
         />
-      </Section>
+      </Card>
 
-      <Section title="Detected zones" aside="not trade signals">
+      <Card index={2} tone={zonesTone} icon={CardIcon.layers} title="Detected zones" aside="not trade signals">
         <EvidenceRow
           label="Nearest demand"
           value={demand ? `${fmt(demand.bottom)}–${fmt(demand.top)}` : 'None'}
@@ -1181,20 +1186,21 @@ export function ProfessionalPALeftPanel({ paData, currentPrice }) {
           Zone invalidation is currently checked for a limited forward window; older zones should be
           manually verified.
         </p>
-      </Section>
+      </Card>
 
-      <Section title="Analysis scope">
+      <Card index={3} tone="neutral" icon={CardIcon.scope} title="Analysis scope">
         <div className="grid grid-cols-2 gap-1.5">
           <Metric label="Candles analyzed" value={paData.candles ?? 0} />
           <Metric label="Confirmation lag" value="10 candles" tone="warning" />
         </div>
-      </Section>
-    </PanelShell>
+      </Card>
+    </CardStack>
   )
 }
 
-export function ProfessionalPARightPanel({ paData, kpis, chartData, currentPrice }) {
+export function ProfessionalPARightPanel({ paData, kpis, chartData, currentPrice, loading }) {
   const [tab, setTab] = useState('now')
+  const { user } = useAuth()
   const derived = useMemo(() => {
     if (!paData) return null
     const levels = paData.support_resistance || []
@@ -1235,7 +1241,13 @@ export function ProfessionalPARightPanel({ paData, kpis, chartData, currentPrice
     }
   }, [paData, chartData, currentPrice])
 
-  if (!paData || !derived) return <EmptyPanel title="Price Action decision view unavailable" />
+  if (!paData || !derived) {
+    if (loading) return <CardStackSkeleton count={4} />
+    return <EmptyPanel title="Price Action decision view unavailable" />
+  }
+
+  const displayTier = getDisplayTier(user)
+  const accent = TIER_ACCENT[displayTier]
   const trend = paData.structure?.trend
   const bullishBias = trend === 'uptrend'
   const bearishBias = trend === 'downtrend'
@@ -1281,35 +1293,46 @@ export function ProfessionalPARightPanel({ paData, kpis, chartData, currentPrice
     derived.recentVolume?.type === 'bull',
   ].filter(Boolean).length
 
+  const patternTone = kpis ? (kpis.winRate >= 50 ? 'positive' : 'warning') : 'neutral'
+
   return (
-    <div className="flex flex-1 min-h-0 flex-col bg-white dark:bg-gray-950">
-      <div className="grid grid-cols-2 border-b border-gray-100 dark:border-gray-800">
-        {[
-          ['now', 'Decision view'],
-          ['research', 'Research'],
-        ].map(([id, label]) => (
-          <button
-            key={id}
-            onClick={() => setTab(id)}
-            className={`py-2 text-[10px] font-semibold ${tab === id ? 'border-b-2 border-blue-600 text-blue-600 dark:text-blue-400' : 'text-gray-400 dark:text-gray-500 hover:text-gray-600 dark:hover:text-gray-400 transition-colors'}`}
-          >
-            {label}
-          </button>
-        ))}
+    <div
+      className={`group relative flex flex-1 min-h-0 flex-col bg-white dark:bg-gray-900 ${accent ? tierRingClass(displayTier) : ''}`}
+    >
+      <TierAccentOverlay accent={accent} radius="" />
+      <div className="p-2 bg-white dark:bg-gray-900">
+        <div className="flex gap-1 rounded-lg bg-gray-100 dark:bg-gray-950 border border-gray-100 dark:border-gray-800 p-1">
+          {[
+            ['now', 'Decision view'],
+            ['research', 'Research'],
+          ].map(([id, label]) => (
+            <button
+              key={id}
+              onClick={() => setTab(id)}
+              className={`flex-1 py-1.5 rounded-md text-[10px] font-bold transition-colors ${
+                tab === id
+                  ? 'bg-white dark:bg-gray-800 text-gray-800 dark:text-gray-100 shadow-sm'
+                  : 'text-gray-400 dark:text-gray-500 [@media(hover:hover)]:hover:text-gray-600 dark:[@media(hover:hover)]:hover:text-gray-400'
+              }`}
+            >
+              {label}
+            </button>
+          ))}
+        </div>
       </div>
       <div className="flex-1 min-h-0 overflow-y-auto">
         {tab === 'now' ? (
-          <PanelShell>
-            <Section title="Decision snapshot">
+          <CardStack tiered={false}>
+            <Card index={0} tone={state.tone} icon={CardIcon.pulse} title="Decision snapshot">
               <Badge tone={state.tone}>{state.label}</Badge>
               <ConfluenceBar met={confluenceMet} total={4} tone={state.tone} />
               <p className={MUTED}>{state.detail}</p>
-              <p className="text-[9px] text-amber-600 dark:text-amber-400">
+              <p className="text-[9px] font-semibold text-amber-600 dark:text-amber-400">
                 Contextual analysis only — not an automated entry signal.
               </p>
-            </Section>
+            </Card>
 
-            <Section title="Confluence">
+            <Card index={1} tone="neutral" icon={CardIcon.checklist} title="Confluence">
               <EvidenceRow
                 label="Structure"
                 value={trend || 'Undetermined'}
@@ -1352,9 +1375,9 @@ export function ProfessionalPARightPanel({ paData, kpis, chartData, currentPrice
                       : 'wait'
                 }
               />
-            </Section>
+            </Card>
 
-            <Section title="Scenarios" aside="close-based">
+            <Card index={2} tone="info" icon={CardIcon.target} title="Scenarios" aside="close-based">
               <EvidenceRow
                 label="Bullish"
                 value={
@@ -1397,9 +1420,9 @@ export function ProfessionalPARightPanel({ paData, kpis, chartData, currentPrice
                   tp={derived.resistance.price}
                 />
               )}
-            </Section>
+            </Card>
 
-            <Section title="Room and risk">
+            <Card index={3} tone="info" icon={CardIcon.location} title="Room and risk">
               <RangeGauge
                 low={derived.support?.price}
                 high={derived.resistance?.price}
@@ -1430,11 +1453,17 @@ export function ProfessionalPARightPanel({ paData, kpis, chartData, currentPrice
                   tone="negative"
                 />
               </div>
-            </Section>
-          </PanelShell>
+            </Card>
+          </CardStack>
         ) : (
-          <PanelShell>
-            <Section title="Bullish pattern study" aside="historical heuristic">
+          <CardStack tiered={false}>
+            <Card
+              index={0}
+              tone={patternTone}
+              icon={CardIcon.scope}
+              title="Bullish pattern study"
+              aside="historical heuristic"
+            >
               {kpis ? (
                 <div className="grid grid-cols-2 gap-1.5">
                   <Metric
@@ -1458,9 +1487,9 @@ export function ProfessionalPARightPanel({ paData, kpis, chartData, currentPrice
                 This is not a page-wide strategy win rate. It studies bullish candle patterns using
                 +3% versus −2% thresholds over ten later candles.
               </p>
-            </Section>
+            </Card>
 
-            <Section title="Recent evidence">
+            <Card index={1} tone="neutral" icon={CardIcon.checklist} title="Recent evidence">
               {[...(paData.patterns || [])]
                 .filter(Boolean)
                 .reverse()
@@ -1479,15 +1508,15 @@ export function ProfessionalPARightPanel({ paData, kpis, chartData, currentPrice
                     }
                   />
                 ))}
-            </Section>
+            </Card>
 
-            <Section title="Interpretation limits">
+            <Card index={2} tone="neutral" icon={CardIcon.layers} title="Interpretation limits">
               <p className={MUTED}>
                 Same-candle target/stop ambiguity, fees, liquidity and out-of-sample validation are
                 not included. Treat these statistics as descriptive research only.
               </p>
-            </Section>
-          </PanelShell>
+            </Card>
+          </CardStack>
         )}
       </div>
     </div>

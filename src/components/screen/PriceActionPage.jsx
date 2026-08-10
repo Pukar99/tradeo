@@ -373,6 +373,7 @@ function PAInner() {
               paData={isStock ? paData : null}
               chartData={chartData}
               currentPrice={currentPrice}
+              loading={loading}
             />
           </div>
         </div>
@@ -463,6 +464,7 @@ function PAInner() {
               kpis={kpis}
               chartData={chartData}
               currentPrice={currentPrice}
+              loading={loading}
             />
           </div>
         </div>
@@ -475,6 +477,7 @@ function PAInner() {
             paData={isStock ? paData : null}
             chartData={chartData}
             currentPrice={currentPrice}
+            loading={loading}
           />
         }
         right={
@@ -483,6 +486,7 @@ function PAInner() {
             kpis={kpis}
             chartData={chartData}
             currentPrice={currentPrice}
+            loading={loading}
           />
         }
       />
