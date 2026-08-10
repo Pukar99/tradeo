@@ -79,6 +79,68 @@ function Metric({ label, value, sub, tone = 'neutral' }) {
   )
 }
 
+function ConfluenceBar({ met, total, tone = 'neutral' }) {
+  if (!total) return null
+  const textColors = {
+    positive: 'text-emerald-600 dark:text-emerald-400',
+    negative: 'text-red-500 dark:text-red-400',
+    warning: 'text-amber-600 dark:text-amber-400',
+    info: 'text-blue-600 dark:text-blue-400',
+    neutral: 'text-gray-500 dark:text-gray-400',
+  }
+  const fillColors = {
+    positive: 'bg-emerald-500',
+    negative: 'bg-red-500',
+    warning: 'bg-amber-500',
+    info: 'bg-blue-500',
+    neutral: 'bg-gray-300 dark:bg-gray-600',
+  }
+  const pct = Math.min(100, Math.max(0, (met / total) * 100))
+  return (
+    <div>
+      <div className="flex items-center justify-between gap-2">
+        <span className="text-[9px] text-gray-400 dark:text-gray-500">Confluence</span>
+        <span className={`text-[9px] font-semibold ${textColors[tone] || textColors.neutral}`}>
+          {met}/{total}
+        </span>
+      </div>
+      <div className="mt-1 h-1.5 w-full rounded-full bg-gray-100 dark:bg-gray-800 overflow-hidden">
+        <div
+          className={`h-full rounded-full transition-all duration-300 ${fillColors[tone] || fillColors.neutral}`}
+          style={{ width: `${pct}%` }}
+        />
+      </div>
+    </div>
+  )
+}
+
+function RangeGauge({ low, high, current, lowLabel, highLabel, tone = 'neutral' }) {
+  if (![low, high, current].every((n) => Number.isFinite(Number(n))) || Number(high) <= Number(low))
+    return null
+  const dotColors = {
+    positive: 'bg-emerald-500',
+    negative: 'bg-red-500',
+    warning: 'bg-amber-500',
+    info: 'bg-blue-500',
+    neutral: 'bg-gray-300 dark:bg-gray-600',
+  }
+  const pct = Math.min(100, Math.max(0, ((Number(current) - Number(low)) / (Number(high) - Number(low))) * 100))
+  return (
+    <div>
+      <div className="h-1.5 w-full rounded-full bg-gray-100 dark:bg-gray-800 relative overflow-visible">
+        <div
+          className={`absolute top-1/2 -translate-y-1/2 -translate-x-1/2 h-2.5 w-2.5 rounded-full border-2 border-white dark:border-gray-950 shadow-sm ${dotColors[tone] || dotColors.neutral}`}
+          style={{ left: `${pct}%` }}
+        />
+      </div>
+      <div className="mt-1 flex items-center justify-between">
+        <span className="text-[8px] text-gray-400 dark:text-gray-500">{lowLabel}</span>
+        <span className="text-[8px] text-gray-400 dark:text-gray-500">{highLabel}</span>
+      </div>
+    </div>
+  )
+}
+
 function EvidenceRow({ label, value, state = 'wait', detail }) {
   const states = {
     met: { dot: 'bg-emerald-500', text: 'text-emerald-600 dark:text-emerald-400' },
@@ -290,6 +352,12 @@ export function ProfessionalSMCLeftPanel({ smcData, chartData, currentPrice }) {
           : 'Mid range'
   const structureTone =
     lastBOS?.type === 'bullish' ? 'positive' : lastBOS?.type === 'bearish' ? 'negative' : 'neutral'
+  const rangeTone =
+    rangePct != null && rangePct <= 35
+      ? 'positive'
+      : rangePct != null && rangePct >= 65
+        ? 'warning'
+        : 'neutral'
 
   return (
     <PanelShell>
@@ -329,13 +397,7 @@ export function ProfessionalSMCLeftPanel({ smcData, chartData, currentPrice }) {
             label="Range position"
             value={rangePct == null ? '—' : `${rangePct.toFixed(0)}%`}
             sub={rangeLabel}
-            tone={
-              rangePct != null && rangePct <= 35
-                ? 'positive'
-                : rangePct != null && rangePct >= 65
-                  ? 'warning'
-                  : 'neutral'
-            }
+            tone={rangeTone}
           />
           <Metric
             label="Current price"
@@ -343,6 +405,14 @@ export function ProfessionalSMCLeftPanel({ smcData, chartData, currentPrice }) {
             sub={`L ${fmt(rangeLow)} · H ${fmt(rangeHigh)}`}
           />
         </div>
+        <RangeGauge
+          low={rangeLow}
+          high={rangeHigh}
+          current={currentPrice}
+          lowLabel={fmt(rangeLow)}
+          highLabel={fmt(rangeHigh)}
+          tone={rangeTone}
+        />
         <p className={MUTED}>
           This is position inside the scanned high–low range, not a validated institutional dealing
           range.
@@ -692,6 +762,7 @@ export function ProfessionalSMCRightPanel({
           <PanelShell>
             <Section title="Setup status" aside="buy-side workflow">
               <Badge tone={stage.tone}>{stage.label}</Badge>
+              <ConfluenceBar met={metConditions.length} total={enabledConditions.length} tone={stage.tone} />
               <p className={MUTED}>{stage.detail}</p>
               <p className="text-[9px] text-amber-600 dark:text-amber-400">
                 Decision support only — not an automated trade recommendation.
@@ -997,6 +1068,13 @@ export function ProfessionalPARightPanel({ paData, kpis, chartData, currentPrice
       detail: 'Bearish structure or confirmation weakens the bullish case.',
     }
 
+  const confluenceMet = [
+    bullishBias,
+    derived.atDemand,
+    !!confirmation && !activeBearPattern,
+    derived.recentVolume?.type === 'bull',
+  ].filter(Boolean).length
+
   return (
     <div className="flex flex-1 min-h-0 flex-col bg-white dark:bg-gray-950">
       <div className="grid grid-cols-2 border-b border-gray-100 dark:border-gray-800">
@@ -1018,6 +1096,7 @@ export function ProfessionalPARightPanel({ paData, kpis, chartData, currentPrice
           <PanelShell>
             <Section title="Decision snapshot">
               <Badge tone={state.tone}>{state.label}</Badge>
+              <ConfluenceBar met={confluenceMet} total={4} tone={state.tone} />
               <p className={MUTED}>{state.detail}</p>
               <p className="text-[9px] text-amber-600 dark:text-amber-400">
                 Contextual analysis only — not an automated entry signal.
@@ -1115,6 +1194,14 @@ export function ProfessionalPARightPanel({ paData, kpis, chartData, currentPrice
             </Section>
 
             <Section title="Room and risk">
+              <RangeGauge
+                low={derived.support?.price}
+                high={derived.resistance?.price}
+                current={currentPrice}
+                lowLabel={derived.support ? fmt(derived.support.price) : ''}
+                highLabel={derived.resistance ? fmt(derived.resistance.price) : ''}
+                tone="info"
+              />
               <div className="grid grid-cols-2 gap-1.5">
                 <Metric
                   label="Room to resistance"

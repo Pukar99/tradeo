@@ -366,7 +366,7 @@ function PAInner() {
                         shadow-[1px_0_0_rgba(255,255,255,0.18),2px_0_12px_rgba(0,0,0,0.06)]
                         dark:shadow-[1px_0_0_rgba(255,255,255,0.07),2px_0_16px_rgba(0,0,0,0.4)]
                         transition-all duration-200 ease-in-out
-                        ${leftOpen ? 'w-[13%] min-w-[150px] max-w-[200px]' : 'w-0 min-w-0 max-w-0 overflow-hidden'} ${!leftOpen ? 'screen-panel-collapsed' : ''}`}
+                        ${leftOpen ? 'w-[16%] min-w-[190px] max-w-[240px]' : 'w-0 min-w-0 max-w-0 overflow-hidden'} ${!leftOpen ? 'screen-panel-collapsed' : ''}`}
         >
           <div className="screen-panel-content flex flex-col h-full">
             <ProfessionalPALeftPanel
@@ -455,7 +455,7 @@ function PAInner() {
                         shadow-[-1px_0_0_rgba(255,255,255,0.18),-2px_0_12px_rgba(0,0,0,0.06)]
                         dark:shadow-[-1px_0_0_rgba(255,255,255,0.07),-2px_0_16px_rgba(0,0,0,0.4)]
                         transition-all duration-200 ease-in-out
-                        ${rightOpen ? 'w-[15%] min-w-[160px] max-w-[240px]' : 'w-0 min-w-0 max-w-0 overflow-hidden'} ${!rightOpen ? 'screen-panel-collapsed' : ''}`}
+                        ${rightOpen ? 'w-[18%] min-w-[220px] max-w-[300px]' : 'w-0 min-w-0 max-w-0 overflow-hidden'} ${!rightOpen ? 'screen-panel-collapsed' : ''}`}
         >
           <div className="screen-panel-content flex flex-col h-full">
             <ProfessionalPARightPanel
