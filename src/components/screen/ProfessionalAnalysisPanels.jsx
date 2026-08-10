@@ -508,7 +508,6 @@ export function ProfessionalSMCRightPanel({
   shadowError,
 }) {
   const [tab, setTab] = useState('setup')
-  const [legacyOpen, setLegacyOpen] = useState(false)
   if (!smcData) return <EmptyPanel title="SMC setup unavailable" />
 
   const lastSignal = signals?.at(-1)
@@ -692,59 +691,6 @@ export function ProfessionalSMCRightPanel({
         ) : (
           <PanelShell>
             <SMCShadowEvidence data={shadowData} loading={shadowLoading} error={shadowError} />
-            <Section title="Legacy V1 reference" aside="heuristic">
-              <p className={MUTED}>
-                Older V1 candidates are kept only for comparison. They have not passed the V2
-                mandatory gates.
-              </p>
-              <button
-                type="button"
-                aria-expanded={legacyOpen}
-                onClick={() => setLegacyOpen((open) => !open)}
-                className="text-[10px] font-semibold text-blue-600 hover:underline dark:text-blue-400"
-              >
-                {legacyOpen ? 'Hide legacy diagnostics' : 'Show legacy diagnostics'}
-              </button>
-            </Section>
-            {legacyOpen && (
-              <>
-                <Section title="V1 latest candidate">
-                  {lastSignal ? (
-                    <>
-                      <div className="flex items-center justify-between">
-                        <Badge tone="info">V1 candidate</Badge>
-                        <span className="text-[9px] text-gray-400">{lastSignal.date}</span>
-                      </div>
-                      <p className={MUTED}>
-                        Entry reference {fmt(lastSignal.entryPrice)} · {signalAge ?? '—'} candles
-                        ago
-                      </p>
-                    </>
-                  ) : (
-                    <p className={MUTED}>No configured V1 candidate in the analyzed period.</p>
-                  )}
-                </Section>
-                <Section title="V1 recent structure events">
-                  {[...(smcData.bos || []), ...(smcData.choch || [])]
-                    .sort((a, b) => b.date.localeCompare(a.date))
-                    .slice(0, 6)
-                    .map((event, index) => (
-                      <EvidenceRow
-                        key={`${event.date}-${index}`}
-                        label={smcData.choch?.includes(event) ? 'V1 structure shift' : 'V1 BOS'}
-                        value={`${event.type} · ${event.date}`}
-                        state={event.type === 'bullish' ? 'met' : 'conflict'}
-                      />
-                    ))}
-                </Section>
-                <Section title="V1 interpretation limits">
-                  <p className={MUTED}>
-                    V1 signals are heuristic and historical pivot confirmation is delayed.
-                    Order-block invalidation and calibrated outcome probability are not available.
-                  </p>
-                </Section>
-              </>
-            )}
           </PanelShell>
         )}
       </div>
