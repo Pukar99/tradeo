@@ -196,79 +196,80 @@ export default function ReplayMode({ onExit }) {
 
   if (!ready) {
     return (
-      <div className="flex-1 flex flex-col items-center justify-center gap-4 bg-white dark:bg-gray-950 px-4">
-        <ModeToggle mode="replay" onChange={(m) => m === 'backtest' && onExit?.()} />
-        {/* Single well-designed Card-shell-styled panel — one form, not a list, so a
-            full CardStack of many cards would be overkill. Matches BacktestHome's new
-            visual weight (stripe + tinted icon badge + bold title) so switching modes
-            doesn't jump between two different design languages. */}
-        <div
-          className={`group relative w-full max-w-sm overflow-hidden rounded-2xl border border-gray-100 dark:border-gray-800 bg-gray-50 dark:bg-gray-800 shadow-sm animate-fade-up ${accent ? tierRingClass(displayTier) : ''}`}
-        >
-          <TierAccentOverlay accent={accent} radius="rounded-t-2xl" />
-          <span
-            aria-hidden="true"
-            className="absolute left-0 top-0 bottom-0 w-[3px] bg-blue-500"
-          />
-          <div className="pl-4 pr-5 py-5 flex flex-col gap-4">
-            <div className="flex items-center gap-2">
-              <span className="w-5 h-5 flex-shrink-0 rounded-md flex items-center justify-center bg-blue-50 text-blue-600 dark:bg-blue-500/10 dark:text-blue-400">
-                {REPLAY_ICON}
-              </span>
-              <div>
-                <h2 className="text-[13px] font-bold text-gray-800 dark:text-gray-100 leading-tight">
-                  Chart Replay
-                </h2>
-                <p className="text-[10px] text-gray-400 dark:text-gray-500 mt-0.5">
-                  Watch candles unfold from a chosen date — no orders, just observation.
-                </p>
-              </div>
-            </div>
+      // Page shell matches BacktestHome's exact tokens (bg-gray-50/50 dark:bg-gray-950,
+      // top-anchored max-w-5xl container) — the old version used bg-white + a fully
+      // vertically-centered layout, which mismatched BacktestHome's background in light
+      // mode and made switching modes jump the content to the vertical middle of the
+      // screen instead of staying anchored near the top like every other tab. Card
+      // styling below now matches BacktestSetupPanel's ticket language (right-aligned
+      // tabular fields, blue-600 accent, icon+text CTA) instead of the old stripe+badge
+      // card, so the two setup forms in this merged tab read as one family.
+      <div className="flex-1 overflow-y-auto bg-gray-50/50 dark:bg-gray-950">
+        <div className="max-w-5xl mx-auto p-4 md:p-6 flex flex-col items-center gap-4">
+          <div className="w-full max-w-sm">
+            <ModeToggle mode="replay" onChange={(m) => m === 'backtest' && onExit?.()} />
+          </div>
 
-            <div className="flex flex-col gap-3">
-              <div>
-                <label className="block text-[10px] font-semibold text-gray-400 dark:text-gray-500 uppercase tracking-widest mb-1">
-                  Symbol
-                </label>
+          <div
+            className={`group relative w-full max-w-sm overflow-hidden rounded-2xl border border-gray-100 dark:border-gray-800 bg-white dark:bg-gray-900 shadow-sm animate-fade-up ${accent ? tierRingClass(displayTier) : ''}`}
+          >
+            <TierAccentOverlay accent={accent} radius="rounded-t-2xl" />
+            <div className="px-4 pt-4 pb-3.5">
+              <div className="flex items-center gap-1.5 mb-3">
+                <span className="text-blue-600 dark:text-blue-400">{REPLAY_ICON}</span>
+                <span className="text-[10px] font-semibold uppercase tracking-widest text-gray-400 dark:text-gray-500">
+                  Chart Replay
+                </span>
+              </div>
+              <p className="text-[10px] text-gray-400 dark:text-gray-500 -mt-1.5 mb-3.5 leading-relaxed">
+                Watch candles unfold from a chosen date — no orders, just observation.
+              </p>
+
+              <div className="flex items-baseline justify-between gap-2.5 mb-3">
+                <span className="text-[11px] text-gray-600 dark:text-gray-400">Symbol</span>
                 <SymbolSearch
                   value={symbol}
                   stocksOnly
-                  placeholder="Symbol (e.g. NABIL)"
-                  inputClassName="w-40"
+                  placeholder="e.g. NABIL"
+                  inputClassName="w-32 text-right"
                   onSelect={(sym) => setSymbol(sym)}
                 />
               </div>
 
-              <div>
-                <label className="block text-[10px] font-semibold text-gray-400 dark:text-gray-500 uppercase tracking-widest mb-1">
-                  Start Date
-                </label>
+              <div className="flex items-baseline justify-between gap-2.5">
+                <span className="text-[11px] text-gray-600 dark:text-gray-400">Start date</span>
                 <input
                   type="date"
                   value={startDate}
                   onChange={(e) => setStartDate(e.target.value)}
                   max={nptToday()}
-                  className="w-full px-3 py-1.5 text-[12px] border border-gray-200 dark:border-gray-700 rounded-lg
-                             bg-white dark:bg-gray-900 text-gray-700 dark:text-gray-200 outline-none
-                             focus:ring-2 focus:ring-blue-500"
+                  className="flex-1 min-w-0 bg-transparent border-0 border-b border-gray-100 dark:border-gray-800 focus:border-blue-500 outline-none text-right text-[12.5px] font-semibold tabular-nums text-gray-900 dark:text-white py-1"
                 />
               </div>
+
+              {error && (
+                <div className="mt-3 px-3 py-2 rounded-lg bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 text-[11px] text-red-600 dark:text-red-400">
+                  {error}
+                </div>
+              )}
             </div>
 
-            {error && (
-              <div className="px-3 py-2 rounded-lg bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 text-[11px] text-red-600 dark:text-red-400">
-                {error}
-              </div>
-            )}
-
-            <button
-              onClick={handleStart}
-              disabled={loading}
-              className="w-full py-2 text-[12px] font-semibold bg-blue-600 text-white rounded-lg
-                         hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
-            >
-              {loading ? 'Loading…' : 'Start Replay'}
-            </button>
+            <div className="px-4 pb-4">
+              <button
+                onClick={handleStart}
+                disabled={loading}
+                className="w-full flex items-center justify-center gap-2 py-2.5 text-[12px] font-bold rounded-lg bg-blue-600 hover:bg-blue-700 disabled:opacity-50 text-white shadow-sm hover:shadow-md transition-all"
+              >
+                {loading ? (
+                  'Loading…'
+                ) : (
+                  <>
+                    <span className="w-3.5 h-3.5 shrink-0">{REPLAY_ICON}</span>
+                    Start Replay
+                  </>
+                )}
+              </button>
+            </div>
           </div>
         </div>
       </div>
