@@ -338,8 +338,20 @@ export default function BacktestHome({ onSessionStarted }) {
           </button>
         </div>
 
-        {/* ── Two columns: KPIs+history (tier-accented card frame) + setup ────── */}
-        <div className="flex gap-4 items-start">
+        {/* ── Two columns: setup (left) + KPIs+history (tier-accented card frame,
+            right) — items-stretch (flex default) so both columns match the taller
+            one's height instead of each sizing to its own content. ────────────── */}
+        <div className="flex gap-4">
+          {/* Setup — desktop side card */}
+          <div className={`${CARD} hidden lg:flex w-[300px] shrink-0 flex-col overflow-hidden`}>
+            <div className="px-3 py-2.5 border-b border-gray-100 dark:border-gray-800">
+              <span className="text-[11px] font-semibold text-gray-700 dark:text-gray-200">
+                New Backtest
+              </span>
+            </div>
+            <BacktestSetupPanel onSessionStarted={onSessionStarted} />
+          </div>
+
           {/* KPIs + History — one bordered card frame owns the tier ring/overlay;
               CardStack inside is mounted tiered={false} so its own ring doesn't
               double up (and doesn't get clipped by this frame's overflow-hidden —
@@ -412,7 +424,7 @@ export default function BacktestHome({ onSessionStarted }) {
                         No backtests yet
                       </div>
                       <div className="text-[11px] text-gray-400 mt-1 max-w-[280px] mx-auto leading-relaxed">
-                        Set one up on the right — we default to NABIL, the last 2 years, and Rs. 1 lakh.
+                        Set one up on the left — we default to NABIL, the last 2 years, and Rs. 1 lakh.
                         Your completed runs and their analytics will show here.
                       </div>
                     </div>
@@ -444,16 +456,6 @@ export default function BacktestHome({ onSessionStarted }) {
                 </div>
               </CardStack>
             )}
-          </div>
-
-          {/* Setup — desktop side card */}
-          <div className={`${CARD} hidden lg:flex w-[300px] shrink-0 flex-col overflow-hidden`}>
-            <div className="px-3 py-2.5 border-b border-gray-100 dark:border-gray-800">
-              <span className="text-[11px] font-semibold text-gray-700 dark:text-gray-200">
-                New Backtest
-              </span>
-            </div>
-            <BacktestSetupPanel onSessionStarted={onSessionStarted} />
           </div>
         </div>
       </div>
