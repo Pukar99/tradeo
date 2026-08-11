@@ -1,7 +1,7 @@
 // === BacktestActivePanel.jsx — active session panel (positions, equity, script tabs, end session) ===
 
 import { useState, useCallback } from 'react'
-import { btAddScript, btEndSession } from '../../api/backtest'
+import { btAddScript } from '../../api/backtest'
 import { pnlClass } from '../../utils/format'
 import { fmt, fmtPct } from './format'
 import { useAuth } from '../../context/AuthContext'
@@ -176,14 +176,12 @@ export default function BacktestActivePanel({
 
   const handleEndSession = useCallback(async () => {
     setEndErr('')
-    try {
-      await btEndSession(session.id)
-      onEndSession()
-    } catch (err) {
-      setEndErr(err.response?.data?.message || 'Failed to end session. Please try again.')
+    const ok = await onEndSession()
+    if (!ok) {
+      setEndErr('Failed to end session. Please try again.')
       setConfirmEnd(false) // reset so user can retry
     }
-  }, [session.id, onEndSession])
+  }, [onEndSession])
 
   return (
     <div

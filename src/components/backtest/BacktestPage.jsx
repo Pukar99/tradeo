@@ -204,16 +204,21 @@ export default function BacktestPage() {
   // ── End session ───────────────────────────────────────────────────────────────
   // Mirrors handleDataEnd: a manual end must COMPLETE the backend session (status→COMPLETED),
   // not just show the report — otherwise the session stays ACTIVE and loadSession() restores it.
+  // Returns true/false (never throws) so callers (BacktestActivePanel's own end-session
+  // button) can react to success/failure without making their own duplicate btEndSession
+  // call — the error toast here (exitError) already covers the failure case.
   const handleEndSession = useCallback(async () => {
     handlePause()
-    if (!session || endingRef.current) return
+    if (!session || endingRef.current) return false
     endingRef.current = true
     try {
       await flushPersist()
       await btEndSession(session.id)
       setShowReport(true)
+      return true
     } catch (err) {
       setExitError(err.response?.data?.message || 'Failed to complete the session. Please retry.')
+      return false
     } finally {
       endingRef.current = false
     }
