@@ -117,9 +117,15 @@ export function useBacktestEngine({
                       symbol: pos.symbol,
                       detail: { sl, low: candle.low },
                     }).catch(() => {})
+                    advanceCursor(index, candle.date)
                   },
                 },
-                { label: 'Keep Position', action: () => {} },
+                {
+                  label: 'Keep Position',
+                  action: () => {
+                    advanceCursor(index, candle.date)
+                  },
+                },
               ],
             })
             return // pause — wait for user
@@ -191,6 +197,7 @@ export function useBacktestEngine({
                       symbol: pos.symbol,
                       detail: { sl, low: candle.low },
                     }).catch(() => {})
+                    advanceCursor(index, candle.date)
                   },
                 },
               ],
@@ -226,7 +233,12 @@ export function useBacktestEngine({
                     }).catch(() => {})
                   },
                 },
-                { label: 'Keep Position', action: () => {} },
+                {
+                  label: 'Keep Position',
+                  action: () => {
+                    advanceCursor(index, candle.date)
+                  },
+                },
               ],
             })
             return

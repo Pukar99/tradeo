@@ -126,4 +126,29 @@ describe('useBacktestEngine candle ordering', () => {
     })
     expect(options.closePositionLocal).toHaveBeenCalledWith('order-1', { status: 'CLOSED' })
   })
+
+  test('advances the cursor when the user keeps a position through a pre-settlement SL breach', async () => {
+    const position = {
+      id: 'order-1',
+      symbol: 'NABIL',
+      status: 'OPEN',
+      settled: false,
+      sl: 99,
+    }
+    const options = props({ currentScript: { id: 's1', positions: [position] } })
+    const { result } = renderHook(() => useBacktestEngine(options))
+
+    await act(async () => result.current.stepForward())
+
+    expect(options.onSLBreach).toHaveBeenCalled()
+    expect(options.advanceCursor).not.toHaveBeenCalled()
+
+    const breach = options.onSLBreach.mock.calls[0][0]
+    const keepOption = breach.options.find((o) => o.label === 'Keep Position')
+    expect(keepOption).toBeDefined()
+
+    await act(async () => keepOption.action())
+
+    expect(options.advanceCursor).toHaveBeenCalledWith(1, '2025-01-02')
+  })
 })
