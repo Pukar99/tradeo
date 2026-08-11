@@ -1,70 +1,171 @@
 // === BacktestSetupPanel.jsx — session setup form (symbol, date, capital, mode, SL) ===
+// SCR-15 (2026-08-11): "trade ticket" redesign — replaces the earlier card-per-group
+// pass (07a8f04) that reused the same stripe+tinted-icon language as every other panel
+// in the app. This form is functionally a ticket (you fill in the terms of a session
+// before it runs), so it's built like one: dashed perforations between the three field
+// groups instead of separate bordered cards, right-aligned tabular-nums value rows
+// instead of boxed inputs, and punch-style checkbox toggles instead of pill toggles.
+// Root stays borderless/boundary-less — both call sites in BacktestHome.jsx already
+// supply their own outer card border + "New Backtest" header, so no ticket-head row
+// or outer border lives in this file.
 
 import { useState, useCallback } from 'react'
 import { btGetSymbols, btGetSymbolMeta, btCreateSession } from '../../api/backtest'
 import { isNepseWeekend } from '../../utils/nepseCalendar'
 import SymbolSearch from '../common/SymbolSearch'
-import { Card } from '../common/CardShell'
 
 const SPEEDS = ['0.5', '1', '2', '5', '10']
 const DEFAULT_CAPITAL = '100000' // Rs. 1 lakh
 const DEFAULT_LOOKBACK_YEARS = 2
 
 // Design tokens (copied per-file per pm/docs/design.md — no shared ui.js)
-const LABEL =
-  'text-[10px] font-semibold uppercase tracking-widest text-gray-400 dark:text-gray-500'
-// bg deliberately one shade darker than Card's own bg-gray-50/dark:bg-gray-800 so
-// fields read as "recessed" inside the tinted card instead of blending into it.
-const INPUT =
-  'mt-0.5 w-full px-2 py-1.5 text-[11px] rounded-lg border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-900 dark:text-white outline-none focus:ring-1 focus:ring-blue-500'
-// Pill chip — used for the non-exclusive quick-action rows (date-range presets,
-// capital quick-amounts, play-speed) — rounded-full so they read as "shortcuts"
-// rather than form controls.
-const CHIP =
-  'px-2.5 py-1 text-[10px] font-semibold rounded-full border transition-colors'
-const CHIP_OFF =
-  'border-gray-200 dark:border-gray-700 text-gray-500 dark:text-gray-400 hover:border-blue-400 hover:text-blue-500 hover:bg-blue-50 dark:hover:bg-blue-500/10'
-const CHIP_ON = 'bg-blue-600 text-white border-blue-600 shadow-sm'
-// Segmented toggle — used for the two exclusive-choice fields (Run Mode, SL
-// Validation), matching ModeToggle.jsx's pill-container recipe (bg-gray-100
-// rounded-lg p-0.5, active segment gets its own filled color + shadow-sm).
-const TOGGLE_WRAP =
-  'flex items-center gap-0.5 bg-gray-100 dark:bg-gray-800/80 rounded-lg p-0.5'
-const TOGGLE_BTN_OFF =
-  'flex-1 py-1 text-[10px] font-semibold rounded-md text-gray-400 dark:text-gray-500 hover:text-gray-700 dark:hover:text-gray-300 transition-colors'
+const FIELD_NAME = 'text-[11px] text-gray-600 dark:text-gray-400'
+const FIELD_ROW = 'flex items-baseline justify-between gap-2.5'
+// Underlined, right-aligned, tabular value field — replaces the old full-box INPUT so
+// fields read as ticket line items rather than form boxes.
+const VALUE_INPUT =
+  'flex-1 min-w-0 bg-transparent border-0 border-b border-gray-100 dark:border-gray-800 focus:border-blue-500 outline-none text-right text-[12.5px] font-semibold tabular-nums text-gray-900 dark:text-white py-1 placeholder-gray-300 dark:placeholder-gray-600'
+const GROUP = 'py-3.5 border-b border-dashed border-gray-100 dark:border-gray-800'
+const GROUP_LAST = 'py-3.5'
 
-// ── Icons (12x12 stroke glyphs — viewBox 0 0 24 24, stroke currentColor,
-// strokeWidth 2.4 — same recipe as ProfessionalAnalysisPanels' CardIcon, so the
-// section headers read like the same design system) ─────────────────────────
+// Punch-toggle active tint — border + light fill (NOT a solid fill; that treatment is
+// reserved for the chip presets below, matching the mockup's distinction between the
+// two control types).
+const PUNCH_ON = {
+  blue: 'border-blue-600 bg-blue-50 dark:bg-blue-950/20 text-blue-600 dark:text-blue-400',
+  orange: 'border-orange-500 bg-orange-50 dark:bg-orange-950/20 text-orange-500 dark:text-orange-400',
+}
+const PUNCH_OFF =
+  'border-gray-200 dark:border-gray-700 text-gray-400 dark:text-gray-500 hover:border-gray-300 dark:hover:border-gray-600'
+
+// ── Icons (viewBox 0 0 24 24, stroke currentColor, strokeWidth 2.2 — paths copied
+// verbatim from the approved mockup) ─────────────────────────────────────────────
 const iconProps = {
   viewBox: '0 0 24 24',
   fill: 'none',
   stroke: 'currentColor',
-  strokeWidth: 2.4,
+  strokeWidth: 2.2,
   strokeLinecap: 'round',
   strokeLinejoin: 'round',
-  className: 'w-3 h-3',
+  className: 'w-3.5 h-3.5',
 }
 const SectionIcon = {
   search: (
     <svg {...iconProps}>
-      <circle cx="10" cy="10" r="7" />
-      <line x1="21" y1="21" x2="15.5" y2="15.5" />
+      <circle cx="11" cy="11" r="7" />
+      <path d="m21 21-4.3-4.3" />
     </svg>
   ),
   wallet: (
     <svg {...iconProps}>
-      <rect x="3" y="6" width="18" height="14" rx="2" />
-      <path d="M3 10h18" />
-      <circle cx="17" cy="15" r="1.3" fill="currentColor" stroke="none" />
+      <rect x="2.5" y="6" width="19" height="13" rx="1.5" />
+      <path d="M2.5 10h19" />
+      <circle cx="16.5" cy="14.2" r="1.3" fill="currentColor" stroke="none" />
     </svg>
   ),
   play: (
     <svg {...iconProps}>
       <circle cx="12" cy="12" r="9" />
-      <path d="M10 8.5 16 12l-6 3.5Z" fill="currentColor" stroke="none" />
+      <path d="M10 8.5v7l6-3.5-6-3.5Z" fill="currentColor" stroke="none" />
     </svg>
   ),
+}
+// Start & Run button icon — plain play-triangle, replaces the old "▶" character.
+const PlayTriangleIcon = (
+  <svg
+    viewBox="0 0 24 24"
+    fill="none"
+    stroke="currentColor"
+    strokeWidth={2.4}
+    strokeLinecap="round"
+    strokeLinejoin="round"
+    className="w-3.5 h-3.5 shrink-0"
+  >
+    <path d="M8 5v14l11-7L8 5Z" fill="currentColor" stroke="none" />
+  </svg>
+)
+
+// ── Small local components (this file's own tokens, not shared — see comment above) ──
+function GroupLabel({ icon, tone = 'blue', children }) {
+  return (
+    <div className="flex items-center gap-1.5 mb-3">
+      <span className={tone === 'orange' ? 'text-orange-500 dark:text-orange-400' : 'text-blue-600 dark:text-blue-400'}>
+        {icon}
+      </span>
+      <span className="text-[10px] font-semibold uppercase tracking-widest text-gray-400 dark:text-gray-500">
+        {children}
+      </span>
+    </div>
+  )
+}
+
+// Chip preset — used for the non-exclusive quick-action rows (date-range presets,
+// capital quick-amounts, play-speed). Active state is a solid filled blue-600, distinct
+// from the punch-toggle's lighter border+tint treatment.
+function Chip({ active, className = '', ...props }) {
+  return (
+    <button
+      type="button"
+      className={`px-2.5 py-1 text-[10px] font-semibold tabular-nums rounded-md border transition-colors ${
+        active
+          ? 'bg-blue-600 text-white border-blue-600 shadow-sm'
+          : 'border-gray-200 dark:border-gray-700 text-gray-500 dark:text-gray-400 hover:border-blue-400 hover:text-blue-500 hover:bg-blue-50 dark:hover:bg-blue-500/10'
+      } ${className}`}
+      {...props}
+    />
+  )
+}
+
+// Play-speed chip — same active/off language as Chip but flex-1 so the row of five
+// spans the full group width evenly, matching the mockup's speed-row.
+function SpeedChip({ active, className = '', ...props }) {
+  return (
+    <button
+      type="button"
+      className={`flex-1 text-center px-0 py-1 text-[10px] font-semibold tabular-nums rounded-md border transition-colors ${
+        active
+          ? 'bg-blue-600 text-white border-blue-600 shadow-sm'
+          : 'border-gray-200 dark:border-gray-700 text-gray-500 dark:text-gray-400 hover:border-blue-400 hover:text-blue-500'
+      } ${className}`}
+      {...props}
+    />
+  )
+}
+
+// Punch-style checkbox glyph — empty box, gains a checkmark path when active.
+function PunchBox({ active }) {
+  return (
+    <svg
+      viewBox="0 0 24 24"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth={2.4}
+      strokeLinecap="round"
+      strokeLinejoin="round"
+      className="w-3 h-3 shrink-0"
+    >
+      <rect x="3" y="3" width="18" height="18" rx="3" />
+      {active && <path d="M9 12.5l2 2 4-4.5" />}
+    </svg>
+  )
+}
+
+// Punch-style toggle option — replaces the old segmented-pill toggle for Run Mode / SL
+// Validation. `tone` picks the active border+tint color (blue for Run Mode, orange for
+// SL Validation, matching the mockup's `.group.warn` treatment).
+function PunchOption({ active, tone = 'blue', onClick, children }) {
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      className={`flex-1 flex items-center gap-1.5 px-2.5 py-1.5 rounded-md border text-[11px] font-medium text-left transition-colors ${
+        active ? PUNCH_ON[tone] : PUNCH_OFF
+      }`}
+    >
+      <PunchBox active={active} />
+      {children}
+    </button>
+  )
 }
 
 // ── Date helpers ───────────────────────────────────────────────────────────────
@@ -198,12 +299,16 @@ export default function BacktestSetupPanel({ onSessionStarted }) {
   }, [symbol, startDate, strategyName, capital, slMode, runMode, speed, onSessionStarted])
 
   return (
-    <div className="flex flex-col gap-2.5 p-2.5 h-full overflow-y-auto">
+    <div className="flex flex-col h-full overflow-y-auto px-3">
       {/* ── Market & Range ─────────────────────────────────────────────────── */}
-      <Card tone="info" icon={SectionIcon.search} title="Market & Range" index={0}>
-        {/* Script — type-ahead search (shared SymbolSearch; stocks-only, backtest API) */}
-        <div className="relative">
-          <label className={LABEL}>Script</label>
+      <div className={GROUP}>
+        <GroupLabel icon={SectionIcon.search}>Market &amp; Range</GroupLabel>
+
+        {/* Script — type-ahead search (shared SymbolSearch; stocks-only, backtest API).
+            SymbolSearch owns its own pill styling internally and isn't forked here —
+            only its width/wrapping props are adjusted to sit flush in the ticket. */}
+        <div className="mb-3">
+          <div className={`${FIELD_NAME} mb-1`}>Script</div>
           <SymbolSearch
             value={symbol}
             stocksOnly
@@ -211,8 +316,8 @@ export default function BacktestSetupPanel({ onSessionStarted }) {
             fetchSymbols={() => btGetSymbols().then((r) => ({ stocks: r.data.symbols || [], indexes: [] }))}
             onSelect={(sym) => handleSelectSymbol(sym)}
             onLoadError={() => setSymbolsError('Failed to load symbols — check server')}
-            className="mt-0.5 w-full"
-            inputClassName="w-full"
+            className="w-full"
+            inputClassName="w-full text-right"
           />
           {symbolsError && (
             <div className="text-[10px] text-red-500 bg-red-50 dark:bg-red-900/20 rounded-md px-2 py-1.5 mt-1">
@@ -223,177 +328,163 @@ export default function BacktestSetupPanel({ onSessionStarted }) {
 
         {/* Start Date */}
         <div>
-          <label className={LABEL}>Start Date</label>
-          <input
-            type="date"
-            value={startDate}
-            min={meta?.earliest_date}
-            max={meta?.latest_date}
-            disabled={!symbol || metaLoading}
-            onChange={(e) => handleDateChange(e.target.value)}
-            className={`${INPUT} disabled:opacity-50 disabled:cursor-not-allowed`}
-          />
+          <div className={FIELD_ROW}>
+            <span className={FIELD_NAME}>Start date</span>
+            <input
+              type="date"
+              value={startDate}
+              min={meta?.earliest_date}
+              max={meta?.latest_date}
+              disabled={!symbol || metaLoading}
+              onChange={(e) => handleDateChange(e.target.value)}
+              className={`${VALUE_INPUT} disabled:opacity-40 disabled:cursor-not-allowed`}
+            />
+          </div>
           {/* Quick range presets */}
           {meta?.latest_date && (
-            <div className="mt-1 flex gap-1 flex-wrap">
+            <div className="mt-1.5 flex gap-1 flex-wrap justify-end">
               {[
                 { label: '1Y', y: 1 },
                 { label: '2Y', y: 2 },
                 { label: '5Y', y: 5 },
               ].map((p) => (
-                <button
-                  key={p.label}
-                  type="button"
-                  onClick={() => handleDateChange(computeDefaultStart(meta, p.y))}
-                  className={`${CHIP} ${CHIP_OFF}`}
-                >
+                <Chip key={p.label} onClick={() => handleDateChange(computeDefaultStart(meta, p.y))}>
                   {p.label}
-                </button>
+                </Chip>
               ))}
-              <button
-                type="button"
-                onClick={() => handleDateChange(meta.earliest_date)}
-                className={`${CHIP} ${CHIP_OFF}`}
-              >
-                Max
-              </button>
+              <Chip onClick={() => handleDateChange(meta.earliest_date)}>Max</Chip>
             </div>
           )}
           {metaLoading && (
-            <div className="text-[10px] text-gray-400 mt-1">Loading date range…</div>
+            <div className="text-[10px] text-gray-400 mt-1.5">Loading date range…</div>
           )}
           {!metaLoading && dateNotice && (
-            <div className="text-[10px] text-gray-400 mt-1 leading-tight">{dateNotice}</div>
+            <div className="text-[10px] text-gray-400 mt-1.5 leading-tight">{dateNotice}</div>
           )}
         </div>
-      </Card>
+      </div>
 
       {/* ── Capital & Strategy ─────────────────────────────────────────────── */}
-      <Card tone="neutral" icon={SectionIcon.wallet} title="Capital & Strategy" index={1}>
+      <div className={GROUP}>
+        <GroupLabel icon={SectionIcon.wallet}>Capital &amp; Strategy</GroupLabel>
+
         {/* Initial Capital */}
-        <div>
-          <label className={LABEL}>Capital (NPR)</label>
-          <input
-            type="number"
-            value={capital}
-            min={10000}
-            step={1000}
-            autoComplete="off"
-            onChange={(e) => setCapital(e.target.value)}
-            className={INPUT}
-          />
-          <div className="mt-1 flex gap-1 flex-wrap">
+        <div className="mb-3">
+          <div className={FIELD_ROW}>
+            <span className={FIELD_NAME}>Capital (NPR)</span>
+            <input
+              type="number"
+              value={capital}
+              min={10000}
+              step={1000}
+              autoComplete="off"
+              onChange={(e) => setCapital(e.target.value)}
+              className={VALUE_INPUT}
+            />
+          </div>
+          <div className="mt-1.5 flex gap-1 flex-wrap justify-end">
             {[
               { label: '1L', v: '100000' },
               { label: '5L', v: '500000' },
               { label: '10L', v: '1000000' },
             ].map((p) => (
-              <button
-                key={p.label}
-                type="button"
-                onClick={() => setCapital(p.v)}
-                className={`${CHIP} ${capital === p.v ? CHIP_ON : CHIP_OFF}`}
-              >
+              <Chip key={p.label} active={capital === p.v} onClick={() => setCapital(p.v)}>
                 {p.label}
-              </button>
+              </Chip>
             ))}
           </div>
         </div>
 
         {/* Strategy Name (optional) */}
         <div>
-          <label className={LABEL}>Strategy Name</label>
-          <input
-            type="text"
-            value={strategyName}
-            onChange={(e) => setStrategyName(e.target.value)}
-            placeholder="strategy"
-            autoComplete="off"
-            className={INPUT}
-          />
+          <div className={FIELD_ROW}>
+            <span className={FIELD_NAME}>Strategy name</span>
+            <input
+              type="text"
+              value={strategyName}
+              onChange={(e) => setStrategyName(e.target.value)}
+              placeholder="strategy"
+              autoComplete="off"
+              className={VALUE_INPUT}
+            />
+          </div>
         </div>
-      </Card>
+      </div>
 
       {/* ── Execution ──────────────────────────────────────────────────────── */}
-      <Card tone="warning" icon={SectionIcon.play} title="Execution" index={2}>
-        {/* Run Mode */}
-        <div>
-          <label className={LABEL}>Run Mode</label>
-          <div className={`mt-0.5 ${TOGGLE_WRAP}`}>
-            {['PLAY', 'MANUAL'].map((m) => (
-              <button
-                key={m}
-                onClick={() => setRunMode(m)}
-                className={runMode === m ? 'flex-1 py-1 text-[10px] font-semibold rounded-md bg-blue-600 text-white shadow-sm transition-colors' : TOGGLE_BTN_OFF}
-              >
-                {m === 'PLAY' ? '▶ Play' : '→ Manual'}
-              </button>
-            ))}
-          </div>
-        </div>
+      <div className={GROUP_LAST}>
+        <GroupLabel icon={SectionIcon.play} tone="orange">Execution</GroupLabel>
 
-        {/* Play Speed — only if PLAY */}
-        {runMode === 'PLAY' && (
-          <div>
-            <label className={LABEL}>Play Speed</label>
-            <div className="mt-1 flex gap-1 flex-wrap">
+        {/* Run Mode */}
+        <div className="mb-3">
+          <div className={`${FIELD_NAME} mb-1.5`}>Run mode</div>
+          <div className="flex gap-1.5">
+            <PunchOption active={runMode === 'PLAY'} tone="blue" onClick={() => setRunMode('PLAY')}>
+              Play
+            </PunchOption>
+            <PunchOption active={runMode === 'MANUAL'} tone="blue" onClick={() => setRunMode('MANUAL')}>
+              Manual
+            </PunchOption>
+          </div>
+
+          {/* Play Speed — only if PLAY */}
+          {runMode === 'PLAY' && (
+            <div className="mt-2 flex gap-1">
               {SPEEDS.map((s) => (
-                <button
-                  key={s}
-                  onClick={() => setSpeed(s)}
-                  className={`${CHIP} ${speed === s ? CHIP_ON : CHIP_OFF}`}
-                >
+                <SpeedChip key={s} active={speed === s} onClick={() => setSpeed(s)}>
                   {s}×
-                </button>
+                </SpeedChip>
               ))}
             </div>
-          </div>
-        )}
+          )}
+        </div>
 
         {/* SL Validation Mode */}
         <div>
-          <label className={LABEL}>SL Validation</label>
-          <div className={`mt-0.5 ${TOGGLE_WRAP}`}>
-            {['MANUAL', 'AUTO'].map((m) => (
-              <button
-                key={m}
-                onClick={() => setSlMode(m)}
-                className={
-                  slMode === m
-                    ? `flex-1 py-1 text-[10px] font-semibold rounded-md text-white shadow-sm transition-colors ${
-                        m === 'AUTO' ? 'bg-orange-500' : 'bg-blue-600'
-                      }`
-                    : TOGGLE_BTN_OFF
-                }
-              >
-                {m}
-              </button>
-            ))}
+          <div className={`${FIELD_NAME} mb-1.5`}>SL validation</div>
+          <div className="flex gap-1.5">
+            <PunchOption active={slMode === 'MANUAL'} tone="orange" onClick={() => setSlMode('MANUAL')}>
+              Manual
+            </PunchOption>
+            <PunchOption active={slMode === 'AUTO'} tone="orange" onClick={() => setSlMode('AUTO')}>
+              Auto
+            </PunchOption>
           </div>
-          <div className="text-[10px] text-gray-400 mt-1 leading-tight">
+          <div className="text-[10px] text-gray-400 mt-1.5 leading-tight">
             {slMode === 'AUTO'
               ? 'System auto-closes when SL is hit after T+2'
               : 'System asks you before closing on SL breach'}
           </div>
         </div>
-      </Card>
+      </div>
 
       {error && (
-        <div className="text-[10px] text-red-500 bg-red-50 dark:bg-red-900/20 rounded-md px-2 py-1.5">
+        <div className="text-[10px] text-red-500 bg-red-50 dark:bg-red-900/20 rounded-md px-2 py-1.5 mb-3">
           {error}
         </div>
       )}
 
-      <button
-        onClick={handleStart}
-        disabled={loading}
-        className="mt-auto w-full py-2.5 text-[12px] font-bold rounded-xl bg-blue-600 hover:bg-blue-700 disabled:opacity-50 disabled:hover:shadow-sm text-white shadow-sm hover:shadow-md transition-all"
-      >
-        {loading ? 'Starting…' : runMode === 'PLAY' ? '▶ Start & Run' : 'Start Backtest'}
-      </button>
+      <div className="mt-auto pb-3.5">
+        <button
+          onClick={handleStart}
+          disabled={loading}
+          className="w-full flex items-center justify-center gap-2 py-2.5 text-[12px] font-bold rounded-lg bg-blue-600 hover:bg-blue-700 disabled:opacity-50 disabled:hover:shadow-sm text-white shadow-sm hover:shadow-md transition-all"
+        >
+          {loading ? (
+            'Starting…'
+          ) : runMode === 'PLAY' ? (
+            <>
+              {PlayTriangleIcon}
+              Start &amp; Run
+            </>
+          ) : (
+            'Start Backtest'
+          )}
+        </button>
 
-      <div className="text-[10px] text-gray-400 text-center leading-tight">
-        NEPSE · Long only · T+2 settlement · No intraday
+        <div className="text-[10px] text-gray-400 text-center leading-tight mt-2">
+          NEPSE · Long only · T+2 settlement · No intraday
+        </div>
       </div>
     </div>
   )
