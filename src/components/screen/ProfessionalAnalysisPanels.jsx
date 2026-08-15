@@ -225,10 +225,11 @@ function fmt(value) {
 // both are read-only analysis panels that can now act on the setup they detect.
 // Owns its own state so it can be conditionally rendered by its callers (only
 // when there's a usable zone/level) without touching the parent panel's hook order.
-function SetupActionButtons({ symbol, entry, sl, tp }) {
+function SetupActionButtons({ symbol, entry, sl, tp, side = 'BUY' }) {
   const { refreshPositions } = useScreen()
   const [tradeModal, setTradeModal] = useState(false)
   const [alertStatus, setAlertStatus] = useState(null) // { type: 'loading'|'success'|'error', message }
+  const isShort = side === 'SELL'
 
   const handleSetAlert = async () => {
     setAlertStatus({ type: 'loading', message: 'Saving alert…' })
@@ -255,9 +256,13 @@ function SetupActionButtons({ symbol, entry, sl, tp }) {
       <div className="mt-2 flex items-center gap-1.5">
         <button
           onClick={() => setTradeModal(true)}
-          className="flex-1 rounded-lg border border-emerald-200 dark:border-emerald-800 bg-emerald-50 dark:bg-emerald-950/30 px-2 py-1.5 text-[9px] font-bold text-emerald-700 dark:text-emerald-400 hover:bg-emerald-100 dark:hover:bg-emerald-900/40 transition-colors"
+          className={
+            isShort
+              ? 'flex-1 rounded-lg border border-red-200 dark:border-red-800 bg-red-50 dark:bg-red-950/30 px-2 py-1.5 text-[9px] font-bold text-red-700 dark:text-red-400 hover:bg-red-100 dark:hover:bg-red-900/40 transition-colors'
+              : 'flex-1 rounded-lg border border-emerald-200 dark:border-emerald-800 bg-emerald-50 dark:bg-emerald-950/30 px-2 py-1.5 text-[9px] font-bold text-emerald-700 dark:text-emerald-400 hover:bg-emerald-100 dark:hover:bg-emerald-900/40 transition-colors'
+          }
         >
-          Buy
+          {isShort ? 'Short' : 'Buy'}
         </button>
         <button
           onClick={handleSetAlert}
@@ -283,7 +288,7 @@ function SetupActionButtons({ symbol, entry, sl, tp }) {
       {tradeModal &&
         createPortal(
           <TradeModal
-            side="BUY"
+            side={side}
             symbol={symbol}
             initialValues={{ entry_price: entry, sl, tp }}
             onClose={() => setTradeModal(false)}
@@ -762,6 +767,11 @@ export function ProfessionalSMCRightPanel({
   ]
   const zone = nearestZone(currentPrice, bullishZones)
   const nearZone = zoneDistance(currentPrice, zone) <= 2
+  const bearishZones = [
+    ...(smcData.order_blocks || []).filter((zone) => zone.type === 'bearish'),
+    ...(smcData.fvg || []).filter((zone) => zone.type === 'bearish' && !zone.mitigated),
+  ]
+  const shortZone = nearestZone(currentPrice, bearishZones)
   const enabledConditions = Object.entries(SMC_CONFIG_KEYS).filter(
     ([, configKey]) => config?.[configKey] !== false
   )
@@ -816,6 +826,15 @@ export function ProfessionalSMCRightPanel({
   const risk = currentPrice > zoneBottom ? currentPrice - zoneBottom : null
   const reward = Number(target) > currentPrice ? Number(target) - currentPrice : null
   const rr = risk > 0 && reward > 0 ? reward / risk : null
+
+  const shortZoneBottom = Number(shortZone?.bottom ?? shortZone?.low)
+  const shortZoneTop = Number(shortZone?.top ?? shortZone?.high)
+  const shortTarget = (smcData.order_blocks || [])
+    .filter((candidate) => candidate.type === 'bullish' && Number(candidate.high) < currentPrice)
+    .sort((a, b) => Number(b.high) - Number(a.high))[0]?.high
+  const shortRisk = shortZoneTop > currentPrice ? shortZoneTop - currentPrice : null
+  const shortReward = Number(shortTarget) < currentPrice ? currentPrice - Number(shortTarget) : null
+  const shortRR = shortRisk > 0 && shortReward > 0 ? shortReward / shortRisk : null
 
   return (
     <div
@@ -907,7 +926,7 @@ export function ProfessionalSMCRightPanel({
             </Card>
 
             <Card index={2} tone="info" icon={CardIcon.target} title="Illustrative plan" aside="validate manually">
-              {zone ? (
+              {zone && (
                 <>
                   <div className="grid grid-cols-2 gap-1.5">
                     <Metric
@@ -938,11 +957,51 @@ export function ProfessionalSMCRightPanel({
                     entry={currentPrice}
                     sl={zoneBottom}
                     tp={target}
+                    side="BUY"
                   />
                 </>
-              ) : (
+              )}
+              {zone && shortZone && (
+                <div className="my-2.5 border-t border-gray-200 dark:border-gray-700" />
+              )}
+              {shortZone && (
+                <>
+                  <div className="grid grid-cols-2 gap-1.5">
+                    <Metric
+                      label="Entry area"
+                      value={`${fmt(shortZoneBottom)}–${fmt(shortZoneTop)}`}
+                      tone="info"
+                    />
+                    <Metric
+                      label="Invalidation"
+                      value={fmt(shortZoneTop)}
+                      sub="close above zone"
+                      tone="negative"
+                    />
+                    <Metric
+                      label="Next demand"
+                      value={fmt(shortTarget)}
+                      sub={shortTarget ? 'detected bullish OB' : 'not available'}
+                    />
+                    <Metric
+                      label="Indicative R:R"
+                      value={shortRR ? `${shortRR.toFixed(1)}R` : '—'}
+                      sub="before fees/slippage"
+                      tone={shortRR >= 2 ? 'positive' : shortRR ? 'warning' : 'neutral'}
+                    />
+                  </div>
+                  <SetupActionButtons
+                    symbol={smcData.symbol}
+                    entry={currentPrice}
+                    sl={shortZoneTop}
+                    tp={shortTarget}
+                    side="SELL"
+                  />
+                </>
+              )}
+              {!zone && !shortZone && (
                 <p className={MUTED}>
-                  No usable bullish zone is available, so an entry and invalidation plan cannot be
+                  No usable zone is available, so an entry and invalidation plan cannot be
                   constructed.
                 </p>
               )}
@@ -1133,6 +1192,7 @@ export function ProfessionalPARightPanel({ paData, kpis, chartData, currentPrice
   const trend = paData.structure?.trend
   const bullishBias = trend === 'uptrend'
   const bearishBias = trend === 'downtrend'
+  const shortTargetLevel = derived.support?.price ?? derived.demand?.bottom
   const confirmation = derived.recentBullPattern
   const bullAge = eventAge(derived.recentBullPattern?.date, chartData) ?? Infinity
   const bearAge = eventAge(derived.recentBearPattern?.date, chartData) ?? Infinity
@@ -1294,12 +1354,28 @@ export function ProfessionalPARightPanel({ paData, kpis, chartData, currentPrice
                 state="wait"
                 detail="Inside the range, avoid treating every candle pattern as a new setup."
               />
+              <EvidenceRow
+                label="Bearish"
+                value={shortTargetLevel ? `Below ${fmt(shortTargetLevel)}` : 'No target level'}
+                state="met"
+                detail="A close below support/demand would support continuation lower."
+              />
               {derived.demand && derived.resistance && (
                 <SetupActionButtons
                   symbol={paData.symbol}
                   entry={currentPrice}
                   sl={derived.demand.bottom}
                   tp={derived.resistance.price}
+                  side="BUY"
+                />
+              )}
+              {derived.resistance && shortTargetLevel && (
+                <SetupActionButtons
+                  symbol={paData.symbol}
+                  entry={currentPrice}
+                  sl={derived.resistance.price}
+                  tp={shortTargetLevel}
+                  side="SELL"
                 />
               )}
             </Card>
