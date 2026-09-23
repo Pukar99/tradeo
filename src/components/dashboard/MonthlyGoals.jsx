@@ -2,8 +2,11 @@
 import { useState, useEffect, useCallback, useMemo, useRef } from 'react'
 import { getGoals, addGoal, updateGoal, deleteGoal } from '../../api'
 import { useContextMenu } from '../ContextMenu'
+import { IconPencil, IconTrash } from '../common/icons'
 import { useChatRefresh, useHighlightListener } from '../../utils/chatEvents'
 import { gCache } from '../../utils/globalCache'
+import { useAuth } from '../../context/AuthContext'
+import { TIER_ACCENT, TierAccentOverlay, tierRingClass, getDisplayTier } from '../common/TierMaterial'
 
 // ── Date helpers ──────────────────────────────────────────────────────────────
 
@@ -19,10 +22,18 @@ function lastDayOfMonth(year, month) {
   return new Date(year, month + 1, 0)
 }
 
+// Owner rule (3.0): a new goal defaults to the LAST day of the current month —
+// same default the chatbot ADD_GOAL uses, so both entry paths agree.
 function defaultDeadline() {
   const d = new Date()
-  d.setDate(d.getDate() + 15)
-  return toLocalDateStr(d)
+  return toLocalDateStr(lastDayOfMonth(d.getFullYear(), d.getMonth()))
+}
+
+// Dates before the current month make a goal vanish from the card (it only
+// shows current + next month) — both date inputs are floored to the 1st.
+function minGoalDate() {
+  const d = new Date()
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-01`
 }
 
 function autoDeadlineForMonth(year, month) {
@@ -132,6 +143,9 @@ function monthLabel(year, month) {
 const GOALS_DEFAULT_LIMIT = 4
 
 function MonthlyGoals({ initData }) {
+  const { user } = useAuth()
+  const displayTier = getDisplayTier(user)
+  const accent = TIER_ACCENT[displayTier]
   const { onContextMenu, ContextMenuPortal } = useContextMenu()
   const [goals, setGoals] = useState(initData || [])
   const [loading, setLoading] = useState(!initData)
@@ -240,6 +254,11 @@ function MonthlyGoals({ initData }) {
 
   const handleAdd = async (e) => {
     e.preventDefault()
+    // min= on the input doesn't stop a hand-typed past date — guard here too.
+    if (form.target_date && form.target_date < minGoalDate()) {
+      setMutateErr('Deadline cannot be before this month')
+      return
+    }
     setAdding(true)
     setMutateErr(null)
     try {
@@ -304,6 +323,10 @@ function MonthlyGoals({ initData }) {
 
   const handleSaveEdit = async (id) => {
     if (!editForm.title.trim()) return
+    if (editForm.target_date && editForm.target_date < minGoalDate()) {
+      setMutateErr('Deadline cannot be before this month')
+      return
+    }
     setSaving(true)
     setMutateErr(null)
     try {
@@ -323,7 +346,7 @@ function MonthlyGoals({ initData }) {
 
   if (loading)
     return (
-      <div className="bg-white/70 dark:bg-gray-900/60 backdrop-blur-md rounded-2xl border border-white/60 dark:border-white/10 shadow-sm p-4 h-full flex flex-col gap-3 animate-pulse">
+      <div className="bg-white/70 dark:bg-gray-900/90 backdrop-blur-md dark:backdrop-blur-sm rounded-2xl border border-white/60 dark:border-white/10 shadow-sm p-4 h-full flex flex-col gap-3 animate-pulse">
         <div className="flex items-center justify-between">
           <div className="h-3 bg-gray-100 dark:bg-gray-800 rounded w-1/3" />
           <div className="h-3 bg-gray-100 dark:bg-gray-800 rounded w-12" />
@@ -340,7 +363,7 @@ function MonthlyGoals({ initData }) {
   // MG13 fix: show error + retry instead of silent empty state
   if (fetchError)
     return (
-      <div className="bg-white/70 dark:bg-gray-900/60 backdrop-blur-md rounded-2xl border border-white/60 dark:border-white/10 shadow-sm p-4 flex flex-col items-center justify-center gap-3 min-h-[100px]">
+      <div className="bg-white/70 dark:bg-gray-900/90 backdrop-blur-md dark:backdrop-blur-sm rounded-2xl border border-white/60 dark:border-white/10 shadow-sm p-4 flex flex-col items-center justify-center gap-3 min-h-[100px]">
         <p className="text-[11px] text-red-400">{fetchError}</p>
         <button
           onClick={fetchGoals}
@@ -354,7 +377,10 @@ function MonthlyGoals({ initData }) {
   // ── Render ────────────────────────────────────────────────────────────────
 
   return (
-    <div className="hp-card bg-white/70 dark:bg-gray-900/60 backdrop-blur-md rounded-2xl border border-white/60 dark:border-white/10 shadow-sm overflow-hidden h-full flex flex-col min-h-0">
+    <div
+      className={`hp-card group relative bg-white/70 dark:bg-gray-900/90 backdrop-blur-md dark:backdrop-blur-sm rounded-2xl ${accent ? '' : 'border'} border-white/60 dark:border-white/10 overflow-hidden h-full flex flex-col min-h-0 ${accent ? tierRingClass(displayTier) : 'shadow-sm'}`}
+    >
+      <TierAccentOverlay accent={accent} />
       <ContextMenuPortal />
 
       {/* ── Header ── */}
@@ -457,6 +483,7 @@ function MonthlyGoals({ initData }) {
                 <input
                   type="date"
                   value={form.target_date}
+                  min={minGoalDate()}
                   onChange={(e) => setForm((f) => ({ ...f, target_date: e.target.value }))}
                   className="w-full bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-700 rounded-lg px-2.5 py-1.5 text-xs text-gray-600 dark:text-gray-300 focus:outline-none focus:ring-1 focus:ring-indigo-400 dark:focus:ring-indigo-600 transition-all"
                 />
@@ -506,6 +533,7 @@ function MonthlyGoals({ initData }) {
             <input
               type="date"
               value={editForm.target_date}
+              min={minGoalDate()}
               onChange={(e) => setEditForm((f) => ({ ...f, target_date: e.target.value }))}
               className="flex-1 bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-700 rounded-lg px-2.5 py-1.5 text-xs text-gray-600 dark:text-gray-300 focus:outline-none focus:ring-1 focus:ring-indigo-400 transition-all"
             />
@@ -628,9 +656,9 @@ function GoalRow({
     <div
       ref={rowRef}
       onContextMenu={onContextMenu([
-        { label: 'Edit', icon: '✏️', action: () => onStartEdit(goal) },
+        { label: 'Edit', icon: <IconPencil />, action: () => onStartEdit(goal) },
         { separator: true },
-        { label: 'Delete', icon: '🗑️', danger: true, action: () => onDelete(goal.id) },
+        { label: 'Delete', icon: <IconTrash />, danger: true, action: () => onDelete(goal.id) },
       ])}
       className={`flex items-start gap-2.5 px-2.5 py-2 rounded-xl transition-colors ${
         isEditing

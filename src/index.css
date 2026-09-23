@@ -26,6 +26,10 @@ body {
 /* ── Global font size: 110% = 17.6px base — matches the "looks right at 110% zoom" point ── */
 html {
   font-size: 110%;
+  /* Smooth in-page anchor scrolling (e.g. the Settings rail/pill jumps). Motion-sensitive
+     users get instant jumps instead — the reduced-motion block below forces this back to
+     `auto !important`. */
+  scroll-behavior: smooth;
 }
 
 /* ── BlockNote dark theme ───────────────────────────────────────────────── */
@@ -339,31 +343,47 @@ html {
   }
 }
 
-/* ── Tab content fade-in (Screen / SMC / PA tab switches) ───────────────────*/
+/* ── Tab content fade-in (Screen / SMC / PA tab switches) ───────────────────
+   Same cubic-bezier as the sliding tab indicator (ease-luxury) so the pill
+   sliding into place and the content settling in read as one motion, not two
+   separate animation systems running side by side. */
 @keyframes tabIn {
   from {
     opacity: 0;
-    transform: translateY(4px);
+    transform: translateY(8px) scale(0.99);
   }
   to {
     opacity: 1;
-    transform: translateY(0);
+    transform: translateY(0) scale(1);
   }
 }
 .animate-tab-in {
-  animation: tabIn 0.18s ease-out both;
+  animation: tabIn 0.32s cubic-bezier(0.22, 1, 0.36, 1) both;
 }
 
 /* ── Screen collapsible panel system ────────────────────────────────────────
    .screen-panel-collapsed hides content visually during width:0 transition
    .screen-panel-content prevents layout bleed while panel is animating
+   Content fade now matches the box's own 300ms ease-luxury exactly (was a
+   mismatched 150ms ease-out — content used to vanish well before the box
+   finished shrinking, reading as two separate motions instead of one slide).
+   A small translateX is added so the content visibly slides toward the
+   panel's own edge as it collapses, not just fades in place.
    ─────────────────────────────────────────────────────────────────────────── */
 .screen-panel-collapsed .screen-panel-content {
   opacity: 0;
   pointer-events: none;
 }
 .screen-panel-content {
-  transition: opacity 150ms ease-out;
+  transition:
+    opacity 300ms cubic-bezier(0.22, 1, 0.36, 1),
+    transform 300ms cubic-bezier(0.22, 1, 0.36, 1);
+}
+.screen-panel-collapsed[data-side='left'] .screen-panel-content {
+  transform: translateX(-8px);
+}
+.screen-panel-collapsed[data-side='right'] .screen-panel-content {
+  transform: translateX(8px);
 }
 
 /* ── HomePage interactive card system ───────────────────────────────────────
@@ -443,6 +463,12 @@ html {
       0 8px 22px rgba(0, 0, 0, 0.4),
       0 2px 6px rgba(0, 0, 0, 0.25),
       inset 0 1px 0 rgba(255, 255, 255, 0.1);
+  }
+  /* HOME-21 (2026-08-10, owner-flagged): the light-mode 12% white diagonal sheen is a
+     nice gloss on a white card, but the same wash sits on top of dark-mode's lighter
+     text and blurs it — cut well down so hover no longer degrades text contrast. */
+  .dark .hp-card:hover::before {
+    background: linear-gradient(135deg, rgba(255, 255, 255, 0.04) 0%, transparent 60%);
   }
 
   .hp-stat {

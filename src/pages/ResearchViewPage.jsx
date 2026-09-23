@@ -137,7 +137,7 @@ function ResearchViewPage() {
 
   if (loading)
     return (
-      <div className="w-full px-3 sm:px-6 py-6 max-w-3xl mx-auto">
+      <div className="w-full px-3 sm:px-6 py-6 max-w-[1800px] mx-auto">
         <div className="bg-white dark:bg-gray-900 rounded-2xl border border-gray-100 dark:border-gray-800 p-6 animate-pulse">
           <div className="h-5 bg-gray-100 dark:bg-gray-800 rounded w-3/4 mb-4" />
           <div className="h-3 bg-gray-100 dark:bg-gray-800 rounded w-1/3 mb-8" />
@@ -156,7 +156,7 @@ function ResearchViewPage() {
 
   if (fetchError)
     return (
-      <div className="w-full px-3 sm:px-6 py-6 max-w-3xl mx-auto text-center pt-20">
+      <div className="w-full px-3 sm:px-6 py-6 max-w-[1800px] mx-auto text-center pt-20">
         <p className="text-[12px] text-red-400 mb-3">{fetchError}</p>
         <button
           onClick={() => {
@@ -179,7 +179,7 @@ function ResearchViewPage() {
 
   if (!post)
     return (
-      <div className="w-full px-3 sm:px-6 py-6 max-w-3xl mx-auto text-center pt-20">
+      <div className="w-full px-3 sm:px-6 py-6 max-w-[1800px] mx-auto text-center pt-20">
         <p className="text-[12px] text-gray-400 mb-3">Post not found</p>
         <button
           onClick={() => navigate('/research')}
@@ -191,7 +191,7 @@ function ResearchViewPage() {
     )
 
   return (
-    <div className="w-full px-3 sm:px-6 py-6 max-w-3xl mx-auto space-y-4">
+    <div className="w-full px-3 sm:px-6 py-6 max-w-[1800px] mx-auto space-y-4">
       {actionErr && (
         <div className="flex items-center justify-between bg-red-50 dark:bg-red-900/20 border border-red-100 dark:border-red-800/50 rounded-xl px-4 py-2.5">
           <p className="text-[11px] text-red-500">{actionErr}</p>

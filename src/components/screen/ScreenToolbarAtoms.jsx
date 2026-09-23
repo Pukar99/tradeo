@@ -5,10 +5,54 @@ import { useState, useEffect, useCallback } from 'react'
 import { useScreen } from '../../context/ScreenContext'
 import { useNavbarState } from '../../App'
 import { useFixedDropdown } from '../common/useFixedDropdown'
+import { useSlidingIndicator } from '../../hooks/useSlidingIndicator'
 
 // ── ToolbarDivider ─────────────────────────────────────────────────────────────
 export function ToolbarDivider() {
   return <div className="w-px h-3.5 bg-gray-200 dark:bg-gray-700 shrink-0" />
+}
+
+// ── LayoutIcon (pure CSS) ────────────────────────────────────────────────────
+// Shared glyph language for "how many chart panels" — used by both the persistent
+// layout selector in ScreenPage's toolbar and MultiChartPage's own grid. Lives here
+// (not in MultiChartPage.jsx) so ScreenPage can use it without pulling MultiChartPage
+// out of its lazy-loaded chunk.
+export function LayoutIcon({ layout }) {
+  if (layout === 1)
+    return (
+      <div className="w-5 h-3.5 pointer-events-none">
+        <div className="w-full h-full rounded-sm bg-current opacity-70" />
+      </div>
+    )
+  if (layout === 2)
+    return (
+      <div className="grid grid-cols-2 gap-px w-5 h-3.5 pointer-events-none">
+        <div className="rounded-sm bg-current opacity-70" />
+        <div className="rounded-sm bg-current opacity-70" />
+      </div>
+    )
+  if (layout === 3)
+    return (
+      <div
+        className="grid gap-px w-5 h-3.5 pointer-events-none"
+        style={{
+          gridTemplateColumns: '1fr 1fr',
+          gridTemplateRows: '1fr 1fr',
+          gridTemplateAreas: '"a b" "c c"',
+        }}
+      >
+        <div className="rounded-sm bg-current opacity-70" style={{ gridArea: 'a' }} />
+        <div className="rounded-sm bg-current opacity-70" style={{ gridArea: 'b' }} />
+        <div className="rounded-sm bg-current opacity-70" style={{ gridArea: 'c' }} />
+      </div>
+    )
+  return (
+    <div className="grid grid-cols-2 grid-rows-2 gap-px w-5 h-3.5 pointer-events-none">
+      {[0, 1, 2, 3].map((i) => (
+        <div key={i} className="rounded-sm bg-current opacity-70" />
+      ))}
+    </div>
+  )
 }
 
 // ── ToolbarTimeframes ──────────────────────────────────────────────────────────
@@ -27,15 +71,28 @@ export function ToolbarTimeframes({ frames = DEFAULT_TIMEFRAMES, onChange }) {
     [setTimeframe, onChange]
   )
 
+  const { containerRef, indicatorStyle, onPointerDown } = useSlidingIndicator(timeframe, handleClick)
+
   return (
-    <div className="flex items-center gap-0.5 bg-gray-100 dark:bg-gray-800 rounded-md p-0.5 shrink-0">
+    <div
+      ref={containerRef}
+      onPointerDown={onPointerDown}
+      className="relative flex items-center gap-0.5 bg-gray-100 dark:bg-gray-800 rounded-md p-0.5 shrink-0"
+    >
+      <div
+        aria-hidden="true"
+        className="absolute top-0 left-0 rounded bg-white dark:bg-gray-700 shadow-sm transition-[transform,width,height] duration-300 ease-luxury pointer-events-none"
+        style={indicatorStyle}
+      />
       {frames.map((tf) => (
         <button
           key={tf}
+          data-indicator-active={timeframe === tf || undefined}
+          data-indicator-key={tf}
           onClick={() => handleClick(tf)}
-          className={`px-1 py-0.5 rounded text-[9px] font-bold transition-colors whitespace-nowrap ${
+          className={`relative z-10 px-1 py-0.5 rounded text-[9px] font-bold transition-colors whitespace-nowrap ${
             timeframe === tf
-              ? 'bg-white dark:bg-gray-700 text-gray-900 dark:text-white shadow-sm'
+              ? 'text-gray-900 dark:text-white'
               : 'text-gray-400 dark:text-gray-500 hover:text-gray-700 dark:hover:text-gray-300'
           }`}
         >

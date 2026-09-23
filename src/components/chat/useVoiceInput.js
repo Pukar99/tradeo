@@ -21,12 +21,20 @@ export default function useVoiceInput({ input, setInput, inputRef, onSend }) {
   const streamRef = useRef(null)
 
   // ── Voice helpers ──────────────────────────────────────────────────────────
-  function stopVoiceRecording() {
+  async function stopVoiceRecording() {
     clearTimeout(silenceTimerRef.current)
     clearInterval(recordTickRef.current)
     cancelAnimationFrame(silenceFrameRef.current)
-    if (mediaRecorderRef.current?.state !== 'inactive') {
-      mediaRecorderRef.current?.stop()
+    const recorder = mediaRecorderRef.current
+    if (recorder?.state !== 'inactive') {
+      await new Promise((resolve) => {
+        recorder.addEventListener('stop', resolve, { once: true })
+        try {
+          recorder.stop()
+        } catch {
+          resolve()
+        }
+      })
     }
     streamRef.current?.getTracks().forEach((t) => t.stop())
     audioCtxRef.current?.close().catch(() => {})
@@ -76,7 +84,7 @@ export default function useVoiceInput({ input, setInput, inputRef, onSend }) {
   const handleVoice = async () => {
     // Stop if already recording
     if (voiceState === 'listening') {
-      stopVoiceRecording()
+      await stopVoiceRecording()
       const chunks = [...audioChunksRef.current]
       audioChunksRef.current = []
       setVoiceState('idle')
@@ -113,9 +121,6 @@ export default function useVoiceInput({ input, setInput, inputRef, onSend }) {
     analyserRef.current = analyser
     const dataArr = new Uint8Array(analyser.frequencyBinCount)
 
-    let silentSince = Date.now()
-    let hasSpeech = false
-
     function checkSilence() {
       analyser.getByteTimeDomainData(dataArr)
       // RMS of signal around 128 (silence baseline)
@@ -124,12 +129,10 @@ export default function useVoiceInput({ input, setInput, inputRef, onSend }) {
       const rms = sum / dataArr.length
 
       if (rms > SILENCE_THRESHOLD) {
-        silentSince = Date.now()
-        hasSpeech = true
         clearTimeout(silenceTimerRef.current)
         silenceTimerRef.current = setTimeout(async () => {
           // 4 s of silence after speech → auto-stop + auto-send
-          stopVoiceRecording()
+          await stopVoiceRecording()
           const chunks = [...audioChunksRef.current]
           audioChunksRef.current = []
           setVoiceState('idle')
@@ -161,7 +164,7 @@ export default function useVoiceInput({ input, setInput, inputRef, onSend }) {
   // voice half of the old AIChat unmount cleanup (line 1890 effect)
   useEffect(() => {
     return () => stopVoiceRecording()
-  }, []) // eslint-disable-line react-hooks/exhaustive-deps
+  }, [])
 
   return { voiceState, voiceError, voiceSeconds, handleVoice }
 }

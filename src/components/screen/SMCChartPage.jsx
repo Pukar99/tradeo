@@ -1,10 +1,12 @@
 // === SMCChartPage.jsx — SMC chart tab: StockChart + SMC overlays (BOS/CHoCH/OB/FVG/Sweeps/Entry), left/right panels, toolbar ===
 import { useState, useEffect, useCallback, useMemo } from 'react'
 import { ScreenProvider, useScreen } from '../../context/ScreenContext'
+import AnalysisMobilePanels from './AnalysisMobilePanels'
+import { ProfessionalSMCLeftPanel, ProfessionalSMCRightPanel } from './ProfessionalAnalysisPanels'
 import { useLocalStorage } from '../../hooks/useLocalStorage'
 import StockChart from './StockChart'
 import { useScreenToolbarSlot } from '../../pages/ScreenPage'
-import { getSMCScan } from '../../api'
+import { getSMCScan, getSMCV2Shadow } from '../../api'
 import { getMarketSymbols } from '../../utils/globalCache'
 import SymbolSearch from '../common/SymbolSearch'
 import {
@@ -98,81 +100,81 @@ function SMCToolbar({ toggles, setToggles, config, setConfig, symbols }) {
       <ToolbarConfigTitle>Signal Configuration</ToolbarConfigTitle>
 
       <ToolbarConfigSection label="Min confluence score">
-          <div className="flex gap-1">
-            {[1, 2, 3, 4, 5, 6].map((n) => (
-              <button
-                key={n}
-                onClick={() => updateConfig('minScore', n)}
-                className={`w-8 h-8 rounded text-[10px] font-bold transition-colors ${
-                  config.minScore === n
-                    ? 'bg-blue-600 text-white'
-                    : 'bg-gray-100 dark:bg-gray-800 text-gray-500 dark:text-gray-400 hover:bg-gray-200 dark:hover:bg-gray-700'
-                }`}
-              >
-                {n}
-              </button>
-            ))}
-          </div>
-        </ToolbarConfigSection>
+        <div className="flex gap-1">
+          {[1, 2, 3, 4, 5, 6].map((n) => (
+            <button
+              key={n}
+              onClick={() => updateConfig('minScore', n)}
+              className={`w-8 h-8 rounded text-[10px] font-bold transition-colors ${
+                config.minScore === n
+                  ? 'bg-blue-600 text-white'
+                  : 'bg-gray-100 dark:bg-gray-800 text-gray-500 dark:text-gray-400 hover:bg-gray-200 dark:hover:bg-gray-700'
+              }`}
+            >
+              {n}
+            </button>
+          ))}
+        </div>
+      </ToolbarConfigSection>
 
-        <ToolbarConfigSection label="Active conditions">
-          <div className="space-y-1.5">
-            {[
-              { key: 'useBOS', label: 'Bullish BOS' },
-              { key: 'useCHoCH', label: 'Bullish CHoCH' },
-              { key: 'useOB', label: 'OB Mitigation' },
-              { key: 'useSweep', label: 'Liquidity Sweep' },
-            ].map(({ key, label }) => (
-              <label key={key} className="flex items-center gap-2 cursor-pointer">
-                <input
-                  type="checkbox"
-                  checked={config[key]}
-                  onChange={(e) => updateConfig(key, e.target.checked)}
-                  className="w-3 h-3 rounded accent-blue-600"
-                />
-                <span className="text-[11px] text-gray-700 dark:text-gray-300">{label}</span>
-              </label>
-            ))}
-            <label className="flex items-center gap-2 cursor-pointer">
+      <ToolbarConfigSection label="Active conditions">
+        <div className="space-y-1.5">
+          {[
+            { key: 'useBOS', label: 'Bullish BOS' },
+            { key: 'useCHoCH', label: 'Bullish CHoCH' },
+            { key: 'useOB', label: 'OB Mitigation' },
+            { key: 'useSweep', label: 'Liquidity Sweep' },
+          ].map(({ key, label }) => (
+            <label key={key} className="flex items-center gap-2 cursor-pointer">
               <input
                 type="checkbox"
-                checked={config.useDiscount}
-                onChange={(e) => updateConfig('useDiscount', e.target.checked)}
+                checked={config[key]}
+                onChange={(e) => updateConfig(key, e.target.checked)}
                 className="w-3 h-3 rounded accent-blue-600"
               />
-              <span className="text-[11px] text-gray-700 dark:text-gray-300">Discount zone ≤</span>
-              <input
-                type="number"
-                value={config.discountPct}
-                min={10}
-                max={50}
-                step={5}
-                onChange={(e) => updateConfig('discountPct', parseInt(e.target.value) || 40)}
-                className="w-8 text-[10px] text-center border border-gray-200 dark:border-gray-700 rounded px-1 py-0.5 bg-white dark:bg-gray-800 text-gray-700 dark:text-gray-200"
-              />
-              <span className="text-[10px] text-gray-400">%</span>
+              <span className="text-[11px] text-gray-700 dark:text-gray-300">{label}</span>
             </label>
-            <label className="flex items-center gap-2 cursor-pointer">
-              <input
-                type="checkbox"
-                checked={config.useFVG}
-                onChange={(e) => updateConfig('useFVG', e.target.checked)}
-                className="w-3 h-3 rounded accent-blue-600"
-              />
-              <span className="text-[11px] text-gray-700 dark:text-gray-300">FVG fill ≤</span>
-              <input
-                type="number"
-                value={config.fvgMaxDistPct}
-                min={1}
-                max={10}
-                step={1}
-                onChange={(e) => updateConfig('fvgMaxDistPct', parseInt(e.target.value) || 3)}
-                className="w-8 text-[10px] text-center border border-gray-200 dark:border-gray-700 rounded px-1 py-0.5 bg-white dark:bg-gray-800 text-gray-700 dark:text-gray-200"
-              />
-              <span className="text-[10px] text-gray-400">%</span>
-            </label>
-          </div>
-        </ToolbarConfigSection>
+          ))}
+          <label className="flex items-center gap-2 cursor-pointer">
+            <input
+              type="checkbox"
+              checked={config.useDiscount}
+              onChange={(e) => updateConfig('useDiscount', e.target.checked)}
+              className="w-3 h-3 rounded accent-blue-600"
+            />
+            <span className="text-[11px] text-gray-700 dark:text-gray-300">Discount zone ≤</span>
+            <input
+              type="number"
+              value={config.discountPct}
+              min={10}
+              max={50}
+              step={5}
+              onChange={(e) => updateConfig('discountPct', parseInt(e.target.value) || 40)}
+              className="w-8 text-[10px] text-center border border-gray-200 dark:border-gray-700 rounded px-1 py-0.5 bg-white dark:bg-gray-800 text-gray-700 dark:text-gray-200"
+            />
+            <span className="text-[10px] text-gray-400">%</span>
+          </label>
+          <label className="flex items-center gap-2 cursor-pointer">
+            <input
+              type="checkbox"
+              checked={config.useFVG}
+              onChange={(e) => updateConfig('useFVG', e.target.checked)}
+              className="w-3 h-3 rounded accent-blue-600"
+            />
+            <span className="text-[11px] text-gray-700 dark:text-gray-300">FVG fill ≤</span>
+            <input
+              type="number"
+              value={config.fvgMaxDistPct}
+              min={1}
+              max={10}
+              step={1}
+              onChange={(e) => updateConfig('fvgMaxDistPct', parseInt(e.target.value) || 3)}
+              className="w-8 text-[10px] text-center border border-gray-200 dark:border-gray-700 rounded px-1 py-0.5 bg-white dark:bg-gray-800 text-gray-700 dark:text-gray-200"
+            />
+            <span className="text-[10px] text-gray-400">%</span>
+          </label>
+        </div>
+      </ToolbarConfigSection>
 
       <button
         onClick={() => {
@@ -197,7 +199,9 @@ function SMCToolbar({ toggles, setToggles, config, setConfig, symbols }) {
           symbols={symbols}
           stocksOnly
           value={selectedSymbol}
-          onSelect={(symbol, indexId, companyName) => selectSymbol(symbol, indexId, null, companyName)}
+          onSelect={(symbol, indexId, companyName) =>
+            selectSymbol(symbol, indexId, null, companyName)
+          }
         />
         <div className="flex-1 min-w-0" />
         <ToolbarMenu activeCount={activeCount}>
@@ -217,7 +221,9 @@ function SMCToolbar({ toggles, setToggles, config, setConfig, symbols }) {
           symbols={symbols}
           stocksOnly
           value={selectedSymbol}
-          onSelect={(symbol, indexId, companyName) => selectSymbol(symbol, indexId, null, companyName)}
+          onSelect={(symbol, indexId, companyName) =>
+            selectSymbol(symbol, indexId, null, companyName)
+          }
         />
         <ToolbarDivider />
         <ToolbarTimeframes frames={SMC_TIMEFRAMES} />
@@ -227,327 +233,6 @@ function SMCToolbar({ toggles, setToggles, config, setConfig, symbols }) {
         <ToolbarConfigButton>{configBody}</ToolbarConfigButton>
       </div>
     )
-  )
-}
-
-// ── SMC Left Panel ────────────────────────────────────────────────────────────
-function SMCLeftPanel({ smcData, chartData, currentPrice }) {
-  if (!smcData)
-    return (
-      <div className="flex-1 overflow-y-auto p-3 space-y-3">
-        <p className="text-[10px] font-semibold uppercase tracking-widest text-gray-400">
-          How to use
-        </p>
-        <div className="space-y-2">
-          {[
-            { step: '1', text: 'Search a stock in the toolbar above' },
-            { step: '2', text: 'Select a timeframe (6M, 1Y, 3Y…)' },
-            { step: '3', text: 'Toggle BOS, OB, FVG to see overlays' },
-            { step: '4', text: 'Turn on Entry for buy signal markers' },
-            { step: '5', text: 'Use Config to tune signal sensitivity' },
-          ].map(({ step, text }) => (
-            <div key={step} className="flex gap-2">
-              <span className="shrink-0 w-4 h-4 rounded-full bg-blue-100 dark:bg-blue-900/40 text-blue-600 dark:text-blue-400 text-[9px] font-bold flex items-center justify-center">
-                {step}
-              </span>
-              <p className="text-[10px] text-gray-500 dark:text-gray-400 leading-relaxed">{text}</p>
-            </div>
-          ))}
-        </div>
-        <div className="pt-2 border-t border-gray-100 dark:border-gray-800">
-          <p className="text-[10px] font-semibold uppercase tracking-widest text-gray-400 mb-1.5">
-            Overlays
-          </p>
-          {[
-            { color: '#22c55e', label: 'BOS — Break of Structure' },
-            { color: '#f59e0b', label: 'CHoCH — Trend reversal' },
-            { color: '#22c55e', label: 'OB — Order Block zone' },
-            { color: '#3b82f6', label: 'FVG — Fair Value Gap' },
-            { color: '#a78bfa', label: 'Sweeps — Liquidity' },
-            { color: '#10b981', label: 'Entry — Buy signals' },
-          ].map(({ color, label }) => (
-            <div key={label} className="flex items-center gap-1.5 mb-1">
-              <div className="w-2 h-2 rounded-sm shrink-0" style={{ backgroundColor: color }} />
-              <p className="text-[10px] text-gray-500 dark:text-gray-400">{label}</p>
-            </div>
-          ))}
-        </div>
-      </div>
-    )
-
-  const { bos, choch, order_blocks, fvg, sweeps } = smcData
-
-  const lastBOS = [...bos].pop()
-  const lastChoch = choch[choch.length - 1]
-  const bullOB = order_blocks.filter((o) => o.type === 'bullish')
-  const bearOB = order_blocks.filter((o) => o.type === 'bearish')
-  const bullFVG = fvg.filter((f) => f.type === 'bullish' && !f.mitigated)
-  const buySweeps = sweeps.filter((s) => s.type === 'buy_side')
-
-  // Zone position using full chart range — stable, matches signal computation
-  const rangeHigh = chartData?.length ? Math.max(...chartData.map((d) => d.high)) : 0
-  const rangeLow = chartData?.length ? Math.min(...chartData.map((d) => d.low)) : 0
-  const posPct =
-    rangeHigh > rangeLow && currentPrice
-      ? Math.round(((currentPrice - rangeLow) / (rangeHigh - rangeLow)) * 100)
-      : null
-  const posLabel =
-    posPct === null ? null : posPct <= 35 ? 'DISCOUNT' : posPct >= 65 ? 'PREMIUM' : 'EQUILIBRIUM'
-
-  const LABEL =
-    'text-[10px] font-semibold uppercase tracking-widest text-gray-400 dark:text-gray-500'
-  const SUB = 'text-[10px] text-gray-500 dark:text-gray-400'
-  const ROW = 'flex items-center justify-between py-0.5'
-
-  return (
-    <div className="flex-1 overflow-y-auto min-h-0 bg-white dark:bg-gray-950 divide-y divide-gray-100 dark:divide-gray-800">
-      {/* Section 1 — Market Structure */}
-      <div className="p-3 space-y-2">
-        <p className={LABEL}>Structure</p>
-
-        {/* Last BOS */}
-        <div className={ROW}>
-          <span className={SUB}>Last BOS</span>
-          {lastBOS ? (
-            <span
-              className={`text-[10px] font-semibold ${lastBOS.type === 'bullish' ? 'text-green-600 dark:text-green-400' : 'text-red-500'}`}
-            >
-              {lastBOS.type === 'bullish' ? '▲' : '▼'}{' '}
-              {lastBOS.type === 'bullish' ? 'Bull' : 'Bear'}
-            </span>
-          ) : (
-            <span className={SUB}>—</span>
-          )}
-        </div>
-        {lastBOS && (
-          <p className="text-[9px] text-gray-400 -mt-1.5">
-            {lastBOS.date} · {parseFloat(lastBOS.level).toFixed(2)}
-          </p>
-        )}
-
-        {/* Last CHoCH */}
-        <div className={ROW}>
-          <span className={SUB}>Last CHoCH</span>
-          {lastChoch ? (
-            <span
-              className={`text-[10px] font-semibold ${lastChoch.type === 'bullish' ? 'text-amber-500' : 'text-red-500'}`}
-            >
-              {lastChoch.type === 'bullish' ? '▲' : '▼'}{' '}
-              {lastChoch.type === 'bullish' ? 'Bull' : 'Bear'}
-            </span>
-          ) : (
-            <span className={SUB}>—</span>
-          )}
-        </div>
-        {lastChoch && <p className="text-[9px] text-gray-400 -mt-1.5">{lastChoch.date}</p>}
-      </div>
-
-      {/* Section 2 — Zone Position */}
-      <div className="p-3 space-y-2">
-        <p className={LABEL}>Zone Position</p>
-        {posLabel ? (
-          <div className="flex items-center justify-between">
-            <span
-              className={`text-[10px] font-bold px-2 py-0.5 rounded-full ${
-                posLabel === 'DISCOUNT'
-                  ? 'bg-green-100 dark:bg-green-900/30 text-green-700 dark:text-green-400'
-                  : posLabel === 'PREMIUM'
-                    ? 'bg-red-100 dark:bg-red-900/30 text-red-500'
-                    : 'bg-gray-100 dark:bg-gray-800 text-gray-500 dark:text-gray-400'
-              }`}
-            >
-              {posLabel}
-            </span>
-            <span className="text-[10px] font-semibold tabular-nums text-gray-600 dark:text-gray-300">
-              {posPct}%
-            </span>
-          </div>
-        ) : (
-          <span className={SUB}>—</span>
-        )}
-        <div className="flex justify-between">
-          <span className={SUB}>H: {rangeHigh ? rangeHigh.toFixed(2) : '—'}</span>
-          <span className={SUB}>L: {rangeLow ? rangeLow.toFixed(2) : '—'}</span>
-        </div>
-      </div>
-
-      {/* Section 3 — Active Zones */}
-      <div className="p-3 space-y-1.5">
-        <p className={LABEL}>Active Zones</p>
-        <div className={ROW}>
-          <span className={SUB}>Bull OB</span>
-          <span className="text-[10px] font-semibold text-green-600 dark:text-green-400">
-            {bullOB.length}
-          </span>
-        </div>
-        <div className={ROW}>
-          <span className={SUB}>Bear OB</span>
-          <span className="text-[10px] font-semibold text-red-500">{bearOB.length}</span>
-        </div>
-        <div className={ROW}>
-          <span className={SUB}>Bull FVG</span>
-          <span className="text-[10px] font-semibold text-blue-600 dark:text-blue-400">
-            {bullFVG.length}
-          </span>
-        </div>
-        <div className={ROW}>
-          <span className={SUB}>Buy Sweeps</span>
-          <span className="text-[10px] font-semibold text-purple-600 dark:text-purple-400">
-            {buySweeps.length}
-          </span>
-        </div>
-      </div>
-    </div>
-  )
-}
-
-// ── SMC Right Panel ───────────────────────────────────────────────────────────
-function SMCRightPanel({ smcData, signals }) {
-  const LABEL =
-    'text-[10px] font-semibold uppercase tracking-widest text-gray-400 dark:text-gray-500'
-  const SUB = 'text-[10px] text-gray-500 dark:text-gray-400'
-  const VAL = 'text-[11px] font-semibold tabular-nums text-gray-800 dark:text-gray-100'
-  const ROW = 'flex items-center justify-between py-0.5'
-
-  const CONDITIONS = [
-    { key: 'bos', label: 'BOS', color: '#22c55e' },
-    { key: 'choch', label: 'CHoCH', color: '#f59e0b' },
-    { key: 'discount', label: 'Discount', color: '#3b82f6' },
-    { key: 'ob', label: 'OB', color: '#22c55e' },
-    { key: 'fvg', label: 'FVG', color: '#3b82f6' },
-    { key: 'sweep', label: 'Sweep', color: '#a78bfa' },
-  ]
-
-  if (!smcData)
-    return (
-      <div className="flex-1 flex items-center justify-center p-3">
-        <p className="text-[10px] text-gray-400 text-center">No data</p>
-      </div>
-    )
-
-  const lastSignal = signals?.[signals.length - 1]
-  const recentSignals = signals?.slice(-8).reverse() || []
-  const bullOBs = smcData.order_blocks
-    .filter((o) => o.type === 'bullish')
-    .slice(-5)
-    .reverse()
-  const bullFVGs = smcData.fvg
-    .filter((f) => f.type === 'bullish' && !f.mitigated)
-    .slice(-5)
-    .reverse()
-
-  return (
-    <div className="flex-1 overflow-y-auto min-h-0 bg-white dark:bg-gray-950 divide-y divide-gray-100 dark:divide-gray-800">
-      {/* Last Signal */}
-      <div className="p-3 space-y-2">
-        <p className={LABEL}>Last Signal</p>
-        {lastSignal ? (
-          <>
-            <div className="flex items-center justify-between">
-              <span className="text-[11px] font-bold text-green-600 dark:text-green-400">
-                ▲ BUY
-              </span>
-              <span className="text-[10px] font-bold bg-green-100 dark:bg-green-900/30 text-green-700 dark:text-green-400 px-1.5 py-0.5 rounded-full">
-                {lastSignal.score}/6
-              </span>
-            </div>
-            <p className={SUB}>{lastSignal.date}</p>
-            <p className="text-[10px] font-mono text-gray-500 dark:text-gray-400">
-              @ {lastSignal.entryPrice?.toFixed(2)}
-            </p>
-            {/* Condition dots — lit = met, dim = not met */}
-            <div className="flex flex-wrap gap-1 pt-0.5">
-              {CONDITIONS.map(({ key, label, color }) => (
-                <span
-                  key={key}
-                  className="text-[9px] font-semibold px-1.5 py-0.5 rounded-full border"
-                  style={
-                    lastSignal.conditions[key]
-                      ? { color, borderColor: color + '60', background: color + '18' }
-                      : { color: '#9ca3af', borderColor: '#e5e7eb', background: 'transparent' }
-                  }
-                >
-                  {label}
-                </span>
-              ))}
-            </div>
-          </>
-        ) : (
-          <p className={SUB}>No signals in period</p>
-        )}
-      </div>
-
-      {/* Signal History */}
-      <div className="p-3 space-y-1">
-        <p className={LABEL}>History</p>
-        {recentSignals.length ? (
-          recentSignals.map((sig, i) => (
-            <div key={i} className={ROW}>
-              <span className={SUB}>{sig.date}</span>
-              <span className="text-[10px] font-semibold text-green-600 dark:text-green-400">
-                {sig.score}/6
-              </span>
-            </div>
-          ))
-        ) : (
-          <p className={SUB}>—</p>
-        )}
-        {signals?.length > 8 && (
-          <p className="text-[9px] text-gray-400 pt-0.5">{signals.length} total in period</p>
-        )}
-      </div>
-
-      {/* Zone Stats */}
-      <div className="p-3 space-y-1.5">
-        <p className={LABEL}>Zone Stats</p>
-        <div className={ROW}>
-          <span className={SUB}>Buy signals</span>
-          <span className={VAL}>{signals?.length ?? 0}</span>
-        </div>
-        <div className={ROW}>
-          <span className={SUB}>Active OBs</span>
-          <span className="text-[11px] font-semibold text-green-600 dark:text-green-400">
-            {bullOBs.length}
-          </span>
-        </div>
-        <div className={ROW}>
-          <span className={SUB}>Active FVGs</span>
-          <span className="text-[11px] font-semibold text-blue-600 dark:text-blue-400">
-            {bullFVGs.length}
-          </span>
-        </div>
-      </div>
-
-      {/* Bullish OB list */}
-      {bullOBs.length > 0 && (
-        <div className="p-3 space-y-1">
-          <p className={LABEL}>Bull Order Blocks</p>
-          {bullOBs.map((ob, i) => (
-            <div key={i} className={ROW}>
-              <span className="text-[10px] font-mono text-green-600 dark:text-green-400">
-                {parseFloat(ob.low).toFixed(2)}–{parseFloat(ob.high).toFixed(2)}
-              </span>
-              <span className={SUB}>{ob.date?.slice(5)}</span>
-            </div>
-          ))}
-        </div>
-      )}
-
-      {/* Bullish FVG list */}
-      {bullFVGs.length > 0 && (
-        <div className="p-3 space-y-1">
-          <p className={LABEL}>Bull FVGs</p>
-          {bullFVGs.map((f, i) => (
-            <div key={i} className={ROW}>
-              <span className="text-[10px] font-mono text-blue-600 dark:text-blue-400">
-                {parseFloat(f.bottom).toFixed(2)}–{parseFloat(f.top).toFixed(2)}
-              </span>
-              <span className={SUB}>{f.date?.slice(5)}</span>
-            </div>
-          ))}
-        </div>
-      )}
-    </div>
   )
 }
 
@@ -646,18 +331,24 @@ function SMCInner() {
   const toggleRight = () => setRightOpen((v) => !v)
 
   const [smcData, setSmcData] = useState(null)
+  const [shadowData, setShadowData] = useState(null)
+  const [shadowLoading, setShadowLoading] = useState(false)
+  const [shadowError, setShadowError] = useState('')
   const [loading, setLoading] = useState(false)
   const [chartData, setChartData] = useState([]) // state (not ref) so useMemo reacts
   const [toggles, setToggles] = useState(DEFAULT_TOGGLES)
   const [config, setConfig] = useState(() => loadConfig())
   const [symbols, setSymbols] = useState(null)
+  const [scanError, setScanError] = useState('')
+  const [symbolError, setSymbolError] = useState('')
+  const [mobilePanel, setMobilePanel] = useState(null)
 
   useEffect(() => {
     getMarketSymbols()
       .then((r) => {
         if (r.data?.stocks?.length) setSymbols(r.data)
       })
-      .catch(() => {})
+      .catch(() => setSymbolError('Symbol search is temporarily unavailable.'))
   }, [])
 
   const isStock = !isIndex?.()
@@ -670,19 +361,53 @@ function SMCInner() {
   useEffect(() => {
     if (!selectedSymbol || !isStock) {
       setSmcData(null)
+      setScanError('')
       return
     }
     let cancelled = false
     setLoading(true)
+    setScanError('')
     getSMCScan({ symbol: selectedSymbol, days })
       .then((res) => {
         if (!cancelled) setSmcData(res.data)
       })
-      .catch(() => {
-        if (!cancelled) setSmcData(null)
+      .catch((err) => {
+        if (!cancelled) {
+          setSmcData(null)
+          setScanError(err.response?.data?.error || 'SMC scan failed. Please retry.')
+        }
       })
       .finally(() => {
         if (!cancelled) setLoading(false)
+      })
+    return () => {
+      cancelled = true
+    }
+  }, [selectedSymbol, days, isStock])
+
+  // V2 remains an independent shadow read. Its failure must never remove V1 data or chart overlays.
+  useEffect(() => {
+    if (!selectedSymbol || !isStock) {
+      setShadowData(null)
+      setShadowError('')
+      setShadowLoading(false)
+      return
+    }
+    let cancelled = false
+    setShadowLoading(true)
+    setShadowError('')
+    getSMCV2Shadow({ symbol: selectedSymbol, days })
+      .then((res) => {
+        if (!cancelled) setShadowData(res.data)
+      })
+      .catch(() => {
+        if (!cancelled) {
+          setShadowData(null)
+          setShadowError('V2 shadow evidence is temporarily unavailable.')
+        }
+      })
+      .finally(() => {
+        if (!cancelled) setShadowLoading(false)
       })
     return () => {
       cancelled = true
@@ -738,14 +463,15 @@ function SMCInner() {
                         shadow-[1px_0_0_rgba(255,255,255,0.18),2px_0_12px_rgba(0,0,0,0.06)]
                         dark:shadow-[1px_0_0_rgba(255,255,255,0.07),2px_0_16px_rgba(0,0,0,0.4)]
                         transition-all duration-200 ease-in-out
-                        ${leftOpen ? 'w-[13%] min-w-[150px] max-w-[200px]' : 'w-0 min-w-0 max-w-0 overflow-hidden'} ${!leftOpen ? 'screen-panel-collapsed' : ''}`}
+                        ${leftOpen ? 'w-[16%] min-w-[190px] max-w-[240px]' : 'w-0 min-w-0 max-w-0 overflow-hidden'} ${!leftOpen ? 'screen-panel-collapsed' : ''}`}
         >
           <div className="screen-panel-content flex flex-col h-full">
             {/* scanData (not full chartData) — zone position must use the same range as signal scoring */}
-            <SMCLeftPanel
+            <ProfessionalSMCLeftPanel
               smcData={isStock ? smcData : null}
               chartData={scanData}
               currentPrice={currentPrice}
+              loading={loading}
             />
           </div>
         </div>
@@ -756,6 +482,7 @@ function SMCInner() {
           <button
             onClick={toggleLeft}
             title={leftOpen ? 'Hide left panel' : 'Show left panel'}
+            aria-label={leftOpen ? 'Hide left panel' : 'Show left panel'}
             className="hidden lg:flex absolute left-0 top-1/2 -translate-y-1/2 z-30
                        h-12 w-4 items-center justify-center
                        bg-white/70 dark:bg-gray-800/70 backdrop-blur-sm
@@ -782,6 +509,7 @@ function SMCInner() {
           <button
             onClick={toggleRight}
             title={rightOpen ? 'Hide right panel' : 'Show right panel'}
+            aria-label={rightOpen ? 'Hide right panel' : 'Show right panel'}
             className="hidden lg:flex absolute right-0 top-1/2 -translate-y-1/2 z-30
                        h-12 w-4 items-center justify-center
                        bg-white/70 dark:bg-gray-800/70 backdrop-blur-sm
@@ -811,6 +539,11 @@ function SMCInner() {
               </span>
             </div>
           )}
+          {(scanError || symbolError) && (
+            <div className="absolute top-2 left-3 z-30 text-[10px] text-red-600 bg-red-50 dark:bg-red-950/80 px-2 py-1 rounded border border-red-200 dark:border-red-800">
+              {scanError || symbolError}
+            </div>
+          )}
           <StockChart hideToolbar {...smcOverlayData} onChartDataReady={handleChartDataReady} />
         </div>
 
@@ -821,13 +554,48 @@ function SMCInner() {
                         shadow-[-1px_0_0_rgba(255,255,255,0.18),-2px_0_12px_rgba(0,0,0,0.06)]
                         dark:shadow-[-1px_0_0_rgba(255,255,255,0.07),-2px_0_16px_rgba(0,0,0,0.4)]
                         transition-all duration-200 ease-in-out
-                        ${rightOpen ? 'w-[15%] min-w-[160px] max-w-[240px]' : 'w-0 min-w-0 max-w-0 overflow-hidden'} ${!rightOpen ? 'screen-panel-collapsed' : ''}`}
+                        ${rightOpen ? 'w-[20%] min-w-[220px] max-w-[300px]' : 'w-0 min-w-0 max-w-0 overflow-hidden'} ${!rightOpen ? 'screen-panel-collapsed' : ''}`}
         >
           <div className="screen-panel-content flex flex-col h-full">
-            <SMCRightPanel smcData={isStock ? smcData : null} signals={signals} />
+            <ProfessionalSMCRightPanel
+              smcData={isStock ? smcData : null}
+              signals={signals}
+              config={config}
+              chartData={scanData}
+              currentPrice={currentPrice}
+              shadowData={shadowData}
+              shadowLoading={shadowLoading}
+              shadowError={shadowError}
+              loading={loading}
+            />
           </div>
         </div>
       </div>
+      <AnalysisMobilePanels
+        panel={mobilePanel}
+        setPanel={setMobilePanel}
+        left={
+          <ProfessionalSMCLeftPanel
+            smcData={isStock ? smcData : null}
+            chartData={scanData}
+            currentPrice={currentPrice}
+            loading={loading}
+          />
+        }
+        right={
+          <ProfessionalSMCRightPanel
+            smcData={isStock ? smcData : null}
+            signals={signals}
+            config={config}
+            chartData={scanData}
+            currentPrice={currentPrice}
+            shadowData={shadowData}
+            shadowLoading={shadowLoading}
+            shadowError={shadowError}
+            loading={loading}
+          />
+        }
+      />
     </>
   )
 }

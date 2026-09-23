@@ -7,7 +7,8 @@ import { API } from './index'
 // ── Users ─────────────────────────────────────────────────────────────────────
 export const getAdminUsers = (params = {}) => API.get('/api/admin/users', { params })
 export const getAdminUser = (id) => API.get(`/api/admin/users/${id}`)
-export const patchUserTier = (id, tier) => API.patch(`/api/admin/users/${id}/tier`, { tier })
+export const patchUserTier = (id, tier, duration) =>
+  API.patch(`/api/admin/users/${id}/tier`, { tier, duration })
 export const patchUserSuspend = (id, data) => API.patch(`/api/admin/users/${id}/suspend`, data)
 export const patchUserForceLogout = (id) => API.patch(`/api/admin/users/${id}/force-logout`)
 
@@ -32,6 +33,7 @@ export const getAllAdminFlags = () => API.get('/api/admin/flags')
 export const patchAdminFlag = (name, data) =>
   API.patch(`/api/admin/flags/${encodeURIComponent(name)}`, data)
 export const postAdminFlag = (data) => API.post('/api/admin/flags', data)
+export const deleteAdminFlag = (name) => API.delete(`/api/admin/flags/${encodeURIComponent(name)}`)
 
 // ── Broadcast ─────────────────────────────────────────────────────────────────
 export const getAdminAnnouncements = (params = {}) =>
@@ -46,3 +48,7 @@ export const getAdminAuditLog = (params = {}) => API.get('/api/admin/audit-log',
 
 // ── AI Usage ──────────────────────────────────────────────────────────────────
 export const getAiUsage = (params = {}) => API.get('/api/admin/ai-usage', { params })
+
+// ── Analytics ─────────────────────────────────────────────────────────────────
+export const getAdminAnalyticsOverview = () => API.get('/api/admin/analytics/overview')
+export const getAdminUserAnalytics = (id) => API.get(`/api/admin/analytics/users/${id}`)

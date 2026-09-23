@@ -1,14 +1,14 @@
 import { createContext, useContext, useState, useRef } from 'react'
 
-const ComplexTabContext = createContext(null)
+const AdvancedTabContext = createContext(null)
 
-export function ComplexTabProvider({ children }) {
+export function AdvancedTabProvider({ children }) {
   const [symbol, setSymbol] = useState(null)
   const [activeModule, setActiveModule] = useState('Backtesting')
   const chartRef = useRef(null)
 
   return (
-    <ComplexTabContext.Provider
+    <AdvancedTabContext.Provider
       value={{
         symbol,
         setSymbol,
@@ -18,12 +18,12 @@ export function ComplexTabProvider({ children }) {
       }}
     >
       {children}
-    </ComplexTabContext.Provider>
+    </AdvancedTabContext.Provider>
   )
 }
 
-export function useComplexTab() {
-  const ctx = useContext(ComplexTabContext)
-  if (!ctx) throw new Error('useComplexTab must be used inside ComplexTabProvider')
+export function useAdvancedTab() {
+  const ctx = useContext(AdvancedTabContext)
+  if (!ctx) throw new Error('useAdvancedTab must be used inside AdvancedTabProvider')
   return ctx
 }

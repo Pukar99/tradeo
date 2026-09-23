@@ -3,6 +3,7 @@ import { useEffect, useRef, useState, useCallback } from 'react'
 import { createPortal } from 'react-dom'
 import { useTheme } from '../../context/ThemeContext'
 import { useScreen } from '../../context/ScreenContext'
+import { useAuth } from '../../context/AuthContext'
 import { getIndexChart, getStockChart, triggerBackfill } from '../../api'
 import { fmtRsSigned, pnlClass } from '../../utils/format'
 import { getTradeHistory, getTopMovers } from '../../utils/globalCache'
@@ -10,6 +11,13 @@ import { nptNow, expectedLatestTradingDate } from '../../utils/nepseCalendar'
 import { useScreenToolbarSlot } from '../../pages/ScreenPage'
 import { useFixedDropdown } from '../common/useFixedDropdown'
 import SymbolSearch from '../common/SymbolSearch'
+import {
+  TIER_ACCENT,
+  TIER_TEXT,
+  TierAccentOverlay,
+  tierRingClass,
+  getDisplayTier,
+} from '../common/TierMaterial'
 
 // ── Module-level caches (survive re-renders, shared across StockChart instances) ─
 const _chartCache = new Map() // `sym:tf` or `idx:id:tf` → { data, latest, ts }
@@ -389,6 +397,7 @@ function ChartIndicatorDropdown({
   onClearDrawings,
   drawCount,
   compact = false,
+  displayTier,
 }) {
   const {
     activeIndicators: _ai,
@@ -409,11 +418,11 @@ function ChartIndicatorDropdown({
       <button
         ref={triggerRef}
         onClick={() => setOpen((p) => !p)}
-        className={`flex items-center gap-1 px-2 py-1 rounded-lg text-[10px] font-semibold border transition-all ${
+        className={`flex items-center gap-1 px-2 py-1 rounded-lg text-[10px] font-semibold border transition-all active:scale-95 ${
           open || totalActive > 0
             ? 'bg-blue-500 border-blue-500 text-white shadow-sm'
             : 'bg-gray-50 dark:bg-gray-800 border-gray-200 dark:border-gray-700 text-gray-500 dark:text-gray-400 hover:border-blue-300 dark:hover:border-blue-600 hover:text-blue-500'
-        }`}
+        } ${tierRingClass(displayTier)}`}
       >
         <svg
           className="w-3 h-3"
@@ -492,7 +501,15 @@ function ChartIndicatorDropdown({
                         >
                           {/* left candle: wick + body */}
                           <line x1="8" y1="3" x2="8" y2="21" />
-                          <rect x="5.5" y="7" width="5" height="8" rx="1" fill="currentColor" stroke="none" />
+                          <rect
+                            x="5.5"
+                            y="7"
+                            width="5"
+                            height="8"
+                            rx="1"
+                            fill="currentColor"
+                            stroke="none"
+                          />
                           {/* right candle: wick + body */}
                           <line x1="16" y1="5" x2="16" y2="19" />
                           <rect x="13.5" y="9" width="5" height="7" rx="1" />
@@ -604,7 +621,7 @@ function ChartIndicatorDropdown({
 }
 
 // Essential controls: chart type + timeframes only
-function ChartHUDControls({ compact = false }) {
+function ChartHUDControls({ compact = false, displayTier }) {
   const { chartType, setChartType, timeframe, setTimeframe } = useScreen() || {}
 
   // Compact (mobile): the inline toolbar is just search + menu; chart-type and
@@ -623,9 +640,9 @@ function ChartHUDControls({ compact = false }) {
             key={type}
             onClick={() => setChartType(type)}
             title={type}
-            className={`px-1.5 py-0.5 rounded text-[10px] transition-colors ${
+            className={`px-1.5 py-0.5 rounded text-[10px] transition-all active:scale-95 ${
               chartType === type
-                ? 'bg-white dark:bg-gray-700 shadow-sm'
+                ? `bg-white dark:bg-gray-700 shadow-sm ${TIER_TEXT[displayTier] || ''}`
                 : 'text-gray-400 dark:text-gray-500 hover:text-gray-700 dark:hover:text-gray-300'
             }`}
           >
@@ -654,49 +671,101 @@ function ChartHUDControls({ compact = false }) {
   )
 }
 
-// ── HUD Price + Symbol ─────────────────────────────────────────────────────────
+// ── Chart Price Panel (HUD price + OHLC hover, merged into one card) ───────────
 
-function ChartHUDPrice({ latestClose, chartData }) {
+// Compact K/M/B abbreviation for volume — matches the style shown on the chart's
+// own volume-axis labels (lightweight-charts' built-in histogram tick formatter).
+function fmtVolShort(v) {
+  const n = Math.abs(parseFloat(v) || 0)
+  if (n >= 1e9) return (n / 1e9).toFixed(2) + 'B'
+  if (n >= 1e6) return (n / 1e6).toFixed(2) + 'M'
+  if (n >= 1e3) return (n / 1e3).toFixed(2) + 'K'
+  return String(Math.round(n))
+}
+
+function ChartPricePanel({ latestClose, chartData, tooltip, displayTier }) {
   const { selectedSymbol, selectedCompanyName } = useScreen()
+  const accent = TIER_ACCENT[displayTier]
 
   const lastBar = chartData.length > 0 ? chartData[chartData.length - 1] : null
   const change = lastBar ? (lastBar.diff_pct ?? lastBar.per_change ?? null) : null
   const isPos = parseFloat(change) >= 0
   const close = latestClose ?? lastBar?.close
 
+  const bar = tooltip
+  const barChange = tooltip?.change
+  const isUp = bar ? (bar.close ?? bar.value) >= (bar.open ?? bar.value) : true
+
+  if (chartData.length === 0) return null
+
+  // Unified: identity (symbol + company) always on top, price+change always shown
+  // (source differs by state), OHLC/Vol grid only appears while hovering.
+  const priceColor = bar ? (isUp ? 'text-emerald-500' : 'text-red-400') : 'text-gray-900 dark:text-white'
+  const displayPrice = bar ? (bar.close ?? bar.value) : close != null ? parseFloat(close) : null
+  const displayChange = bar ? barChange : change != null ? parseFloat(change) : null
+  const displayIsPos = bar ? isUp : isPos
+
   return (
     <div
-      className="flex flex-col pointer-events-none px-2.5 py-1.5 rounded-xl
-                 bg-white/80 dark:bg-gray-950/85 backdrop-blur-md
-                 shadow-md border border-white/70 dark:border-white/[0.12]"
+      className={`relative group pointer-events-auto min-w-[132px] bg-white/85 dark:bg-gray-900/90 border border-white/70 dark:border-white/[0.1]
+                 rounded-lg px-2 py-1.5 shadow-md backdrop-blur-md ${accent ? tierRingClass(displayTier) : ''}`}
       translate="no"
     >
-      <div className="flex items-baseline gap-2">
-        <span className="text-[11px] font-bold text-gray-500 dark:text-gray-400 tracking-wide">
-          {selectedSymbol}
-        </span>
-        {close != null && (
-          <>
-            <span className="text-[19px] font-black text-gray-900 dark:text-white tabular-nums leading-none">
-              {parseFloat(close).toLocaleString('en-NP', {
-                minimumFractionDigits: 2,
-                maximumFractionDigits: 2,
-              })}
+      <TierAccentOverlay accent={accent} radius="rounded-t-lg" />
+      {/* Identity — symbol + company name (+ date once hovering), shown in both states */}
+      <div className="flex items-baseline justify-between gap-2 min-w-0">
+        <div className="flex items-baseline gap-1 min-w-0">
+          <span className="text-[10.5px] font-bold text-gray-800 dark:text-gray-100 tracking-wide shrink-0">
+            {selectedSymbol}
+          </span>
+          {selectedCompanyName && (
+            <span className="text-[8px] font-medium text-gray-400 dark:text-gray-500 truncate max-w-[80px]">
+              {selectedCompanyName}
             </span>
-            {change != null && (
-              <span
-                className={`text-[11px] font-bold ${isPos ? 'text-emerald-500' : 'text-red-400'}`}
-              >
-                {isPos ? '▲' : '▼'} {Math.abs(parseFloat(change)).toFixed(2)}%
-              </span>
-            )}
-          </>
+          )}
+        </div>
+        {bar?.time && (
+          <span className="text-[8px] text-gray-400 dark:text-gray-500 shrink-0">{bar.time}</span>
         )}
       </div>
-      {selectedCompanyName && (
-        <span className="text-[9px] text-gray-400 dark:text-gray-500 leading-tight mt-0.5 truncate max-w-[200px]">
-          {selectedCompanyName}
-        </span>
+
+      {/* Price + change */}
+      {displayPrice != null && (
+        <div className="flex items-baseline gap-1.5 mt-0.5">
+          <span className={`text-[14px] font-black tabular-nums leading-none ${priceColor}`}>
+            {displayPrice.toLocaleString('en-NP', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+          </span>
+          {displayChange != null && (
+            <span
+              className={`text-[9px] font-bold ${displayIsPos ? 'text-emerald-500' : 'text-red-400'}`}
+            >
+              {displayIsPos ? '▲' : '▼'} {Math.abs(displayChange).toFixed(2)}%
+            </span>
+          )}
+        </div>
+      )}
+
+      {/* OHLC + Volume — hover state only, stacked label/value cells */}
+      {bar?.open != null && (
+        <>
+          <div className="h-px bg-gray-100 dark:bg-white/[0.08] mt-1 mb-1" />
+          <div className="grid grid-cols-5 gap-x-1.5">
+            {[
+              ['O', bar.open?.toLocaleString(), 'text-gray-700 dark:text-gray-300'],
+              ['H', bar.high?.toLocaleString(), 'text-emerald-500'],
+              ['L', bar.low?.toLocaleString(), 'text-red-400'],
+              ['C', bar.close?.toLocaleString(), 'text-gray-700 dark:text-gray-300 font-semibold'],
+              ['Vol', bar.volume != null ? fmtVolShort(bar.volume) : '—', 'text-gray-700 dark:text-gray-300'],
+            ].map(([label, value, valueClass]) => (
+              <div key={label}>
+                <p className="text-[7px] text-gray-400 dark:text-gray-500 uppercase tracking-wide mb-0.5">
+                  {label}
+                </p>
+                <p className={`text-[8.5px] tabular-nums ${valueClass}`}>{value}</p>
+              </div>
+            ))}
+          </div>
+        </>
       )}
     </div>
   )
@@ -719,9 +788,10 @@ const ENTRY_TEXT_COLORS = [
   'text-pink-400',
 ]
 
-function PositionBadge({ positions, latestClose }) {
+function PositionBadge({ positions, latestClose, displayTier }) {
   if (!positions?.length) return null
 
+  const accent = TIER_ACCENT[displayTier]
   const close = parseFloat(latestClose) || 0
   const totalQty = positions.reduce((s, p) => s + (p.remaining_quantity ?? p.quantity ?? 0), 0)
   const avgEntry =
@@ -746,7 +816,10 @@ function PositionBadge({ positions, latestClose }) {
 
   return (
     <div className="absolute bottom-16 left-3 z-20 pointer-events-none" translate="no">
-      <div className="bg-white/96 dark:bg-gray-900/96 backdrop-blur-sm border border-gray-200 dark:border-gray-700 rounded-2xl shadow-lg overflow-hidden w-56">
+      <div
+        className={`relative group pointer-events-auto bg-white/96 dark:bg-gray-900/96 backdrop-blur-sm border border-gray-200 dark:border-gray-700 rounded-2xl shadow-lg overflow-hidden w-56 ${accent ? tierRingClass(displayTier) : ''}`}
+      >
+        <TierAccentOverlay accent={accent} />
         {/* Header */}
         <div
           className={`flex items-center justify-between px-3 py-1.5 ${isLong ? 'bg-blue-50 dark:bg-blue-950/40' : 'bg-red-50 dark:bg-red-950/40'}`}
@@ -835,9 +908,7 @@ function PositionBadge({ positions, latestClose }) {
                   {u !== null && (
                     <div>
                       <p className="text-[9px] text-gray-400 uppercase tracking-widest">P&L</p>
-                      <p
-                        className={`text-[10px] font-semibold tabular-nums ${pnlClass(u)}`}
-                      >
+                      <p className={`text-[10px] font-semibold tabular-nums ${pnlClass(u)}`}>
                         {u >= 0 ? '+' : '−'}
                         {Math.abs(Math.round(u)).toLocaleString()}
                       </p>
@@ -912,58 +983,6 @@ function PositionBadge({ positions, latestClose }) {
   )
 }
 
-// ── OHLC Tooltip ──────────────────────────────────────────────────────────────
-
-function OHLCTooltip({ bar, change }) {
-  const isUp = bar ? (bar.close ?? bar.value) >= (bar.open ?? bar.value) : true
-  return (
-    <div
-      className="absolute top-2 right-3 z-10 pointer-events-none"
-      style={{ opacity: bar ? 1 : 0, transition: 'opacity 0.12s ease-out' }}
-      translate="no"
-    >
-      <div className="bg-white/90 dark:bg-gray-950/90 border border-gray-200 dark:border-white/10 rounded-xl px-3 py-2 shadow-lg backdrop-blur-md">
-        {bar && (
-          <>
-            <div className="text-[10px] text-gray-400 mb-1">{bar.time}</div>
-            <div className="flex items-baseline gap-2 mb-1">
-              <span
-                className={`text-[15px] font-bold ${isUp ? 'text-emerald-500' : 'text-red-400'}`}
-              >
-                {(bar.close ?? bar.value)?.toLocaleString()}
-              </span>
-              {change != null && (
-                <span
-                  className={`text-[10px] font-semibold ${pnlClass(change)}`}
-                >
-                  {change >= 0 ? '▲' : '▼'} {Math.abs(change).toFixed(2)}%
-                </span>
-              )}
-            </div>
-            {bar.open != null && (
-              <div className="grid grid-cols-4 gap-x-3 text-[10px]">
-                {['O', 'H', 'L', 'C'].map((l) => (
-                  <span key={l} className="text-gray-400">
-                    {l}
-                  </span>
-                ))}
-                <span className="text-gray-700 dark:text-gray-300">
-                  {bar.open?.toLocaleString()}
-                </span>
-                <span className="text-emerald-500">{bar.high?.toLocaleString()}</span>
-                <span className="text-red-400">{bar.low?.toLocaleString()}</span>
-                <span className="font-semibold text-gray-700 dark:text-gray-300">
-                  {bar.close?.toLocaleString()}
-                </span>
-              </div>
-            )}
-          </>
-        )}
-      </div>
-    </div>
-  )
-}
-
 // ── Skeleton ───────────────────────────────────────────────────────────────────
 
 function ChartSkeleton() {
@@ -1015,6 +1034,8 @@ export default function StockChart({
   paToggles = null,
 }) {
   const { isDark } = useTheme()
+  const { user } = useAuth()
+  const displayTier = getDisplayTier(user)
   const {
     selectedSymbol,
     selectedIndexId,
@@ -1523,7 +1544,9 @@ export default function StockChart({
           the controls; search is shrink-0 so it anchors at the left. */}
         <SymbolSearch
           value={selectedSymbol}
-          onSelect={(symbol, indexId, companyName) => selectSymbol(symbol, indexId, null, companyName)}
+          onSelect={(symbol, indexId, companyName) =>
+            selectSymbol(symbol, indexId, null, companyName)
+          }
           globalTypeToSearch
         />
         {/* Compact (mobile): the row is just search + menu — timeframes/chart-type
@@ -1533,7 +1556,7 @@ export default function StockChart({
             <div className="w-px h-4 bg-gray-200 dark:bg-gray-700 shrink-0" />
             {/* Chart type + timeframes — scrollable section */}
             <div className="flex-1 overflow-x-auto min-w-0 no-scrollbar">
-              <ChartHUDControls compact={compactToolbar} />
+              <ChartHUDControls compact={compactToolbar} displayTier={displayTier} />
             </div>
           </>
         )}
@@ -1543,6 +1566,7 @@ export default function StockChart({
           activeTool={activeTool}
           setActiveTool={setActiveTool}
           compact={compactToolbar}
+          displayTier={displayTier}
           drawCount={drawingsRef.current.length}
           onClearDrawings={() => {
             drawingsRef.current = []
@@ -1641,16 +1665,29 @@ export default function StockChart({
             try {
               const wasIndex = isIndex()
               const bf = await triggerBackfill(expected)
-              if (bf.data?.filled) {
-                const reloaded = wasIndex
-                  ? await getIndexChart({ index_id: selectedIndexId, timeframe })
-                  : await getStockChart({ symbol: selectedSymbol, timeframe })
-                const fresh = reloaded.data.data || []
-                const freshLatest = fresh.length > 0 ? fresh[fresh.length - 1].close : null
-                // Update cache with fresh data after backfill
-                _chartCache.set(cacheKey, { data: fresh, latest: freshLatest, ts: Date.now() })
-                setChartData(fresh)
-                setLatestClose(freshLatest)
+              // The backend intentionally returns 202 while scraping in the
+              // background. Poll chart data until the requested trading date lands
+              // instead of waiting for a `filled` field that a 202 can never contain.
+              if (bf.status === 202 || bf.data?.filled) {
+                for (let attempt = 0; attempt < 8 && !cancelled; attempt++) {
+                  if (bf.status === 202) {
+                    await new Promise((resolve) => setTimeout(resolve, 4000))
+                    if (cancelled) return
+                  }
+                  const reloaded = wasIndex
+                    ? await getIndexChart({ index_id: selectedIndexId, timeframe })
+                    : await getStockChart({ symbol: selectedSymbol, timeframe })
+                  if (cancelled) return
+                  const fresh = reloaded.data.data || []
+                  const newestDate = fresh[fresh.length - 1]?.time
+                  if (!newestDate || newestDate < expected) continue
+                  const freshLatest = fresh[fresh.length - 1].close
+                  _chartCache.set(cacheKey, { data: fresh, latest: freshLatest, ts: Date.now() })
+                  setChartData(fresh)
+                  setLatestClose(freshLatest)
+                  onChartDataReady?.(fresh)
+                  break
+                }
               }
             } catch {
               /* backfill is best-effort */
@@ -1682,8 +1719,10 @@ export default function StockChart({
     seriesRef.current = {}
 
     const changeMap = {}
+    const volMap = {}
     chartData.forEach((d) => {
       changeMap[d.time] = d.diff_pct ?? d.per_change
+      volMap[d.time] = d.volume || d.turnover || 0
     })
 
     let cancelled = false
@@ -1934,7 +1973,7 @@ export default function StockChart({
         }
         const bar = param.seriesData?.get(priceSeries)
         if (!bar) return
-        setTooltip({ ...bar, time: param.time, change: changeMap[param.time] })
+        setTooltip({ ...bar, time: param.time, change: changeMap[param.time], volume: volMap[param.time] })
         // Movers data loads on click only — see subscribeClick below
       })
 
@@ -1943,7 +1982,7 @@ export default function StockChart({
         if (!param.time) return
         const bar = param.seriesData?.get(priceSeries)
         if (!bar) return
-        setTooltip({ ...bar, time: param.time, change: changeMap[param.time] })
+        setTooltip({ ...bar, time: param.time, change: changeMap[param.time], volume: volMap[param.time] })
         // Day-data (movers) load moved to right-click — see onContextMenu below.
       })
 
@@ -2593,23 +2632,32 @@ export default function StockChart({
 
         {/* ── Chart area ── */}
         {/* Position badge — hidden while loading; needs latestClose for P&L */}
-        {!loading && <PositionBadge positions={activePositions} latestClose={latestClose} />}
+        {!loading && (
+          <PositionBadge
+            positions={activePositions}
+            latestClose={latestClose}
+            displayTier={displayTier}
+          />
+        )}
 
         {loading ? (
           <ChartSkeleton />
         ) : (
           <div className="relative flex-1 flex flex-col min-h-0 overflow-hidden animate-chart-in">
-            {/* Price overlay top-left — key on symbol so it fades on symbol change */}
+            {/* Price panel top-left — key on symbol so it fades on symbol change; swaps
+                between HUD price (default) and OHLC hover detail (crosshair active) */}
             <div className="absolute top-2 left-3 z-20 pointer-events-none">
               {chartData.length > 0 && (
                 <div key={selectedSymbol} className="animate-fade-up">
-                  <ChartHUDPrice latestClose={latestClose} chartData={chartData} />
+                  <ChartPricePanel
+                    latestClose={latestClose}
+                    chartData={chartData}
+                    tooltip={tooltip}
+                    displayTier={displayTier}
+                  />
                 </div>
               )}
             </div>
-
-            {/* OHLC tooltip */}
-            <OHLCTooltip bar={tooltip} change={tooltip?.change} />
 
             {/* Pinned hint — only shown for index charts */}
             {overlayData?.pinned && isIndex?.() && (

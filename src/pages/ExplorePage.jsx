@@ -7,6 +7,8 @@ import ComingSoon from '../components/ComingSoon'
 import AuthWall from '../components/AuthWall'
 import PageSkeleton from '../components/PageSkeleton'
 import { useAuth } from '../context/AuthContext'
+import { TIER_TEXT, getDisplayTier } from '../components/common/TierMaterial'
+import { useSlidingIndicator } from '../hooks/useSlidingIndicator'
 
 const IPOPage = lazy(() => import('./IPOPage'))
 const ResearchPage = lazy(() => import('./ResearchPage'))
@@ -130,7 +132,8 @@ export default function ExplorePage() {
   const { tab: urlTab } = useParams()
   const navigate = useNavigate()
   const slotRef = useRef(null)
-  const { user } = useAuth()
+  const { user, loading: authLoading } = useAuth()
+  const displayTier = getDisplayTier(user)
 
   // Default to risklab for unauthenticated users if they land on a locked tab
   // (the bare /explore fallback follows the same rule — ipo is auth-locked)
@@ -149,6 +152,17 @@ export default function ExplorePage() {
     if (resolved !== activeTab) setActiveTab(resolved)
   }, [urlTab]) // eslint-disable-line react-hooks/exhaustive-deps
 
+  // Re-resolve once auth finishes resolving. The initial resolveTab() call above
+  // can run while `user` is still null (authLoading true), silently downgrading
+  // a logged-in user's deep link (e.g. /explore/ipo) to the guest-only 'risklab'
+  // tab — and since the URL-sync effect above only watches `urlTab`, nothing
+  // else ever corrects that stale guess once auth actually resolves.
+  useEffect(() => {
+    if (authLoading) return
+    const resolved = resolveTab(urlTab)
+    if (resolved !== activeTab) setActiveTab(resolved)
+  }, [authLoading]) // eslint-disable-line react-hooks/exhaustive-deps
+
   function handleTab(id) {
     if (id === activeTab) return
     setActiveTab(id)
@@ -156,6 +170,7 @@ export default function ExplorePage() {
     // move between tabs as the sync effect above expects.
     navigate(`/explore/${id}`)
   }
+  const tabIndicator = useSlidingIndicator(activeTab, handleTab)
 
   const isLocked = (id) => !user && AUTH_REQUIRED_IDS.has(id)
 
@@ -172,6 +187,32 @@ export default function ExplorePage() {
     })
   }, [activeTab])
 
+  // Whole shell is skeleton while /api/auth/me resolves — gating only the content
+  // body would leave the real tab labels visible above the skeleton on reload,
+  // and (per the re-sync effect above) would also flash the guest-locked tab
+  // set for logged-in users before the correction kicks in. Shaped like
+  // Explore's own toolbar (tab chips + slot), and reuses PageSkeleton's "tab"
+  // variant for the body — the same shape TabSpinner already shows once a
+  // tab's lazy chunk is loading, so there's no shape change on handoff.
+  if (authLoading) {
+    return (
+      <div
+        className="flex flex-col bg-white dark:bg-gray-950 animate-pulse"
+        style={{ height: 'calc(100dvh - 56px)' }}
+        aria-hidden="true"
+      >
+        <div className="shrink-0 flex items-center gap-1.5 px-3 py-1 border-b border-gray-200 dark:border-gray-800 bg-white dark:bg-gray-900">
+          <div className="h-6 w-64 bg-gray-100 dark:bg-gray-800 rounded-lg shrink-0" />
+          <div className="w-px h-4 bg-gray-200 dark:bg-gray-700 shrink-0" />
+          <div className="flex-1" />
+        </div>
+        <div className="flex-1 min-h-0">
+          <PageSkeleton variant="tab" />
+        </div>
+      </div>
+    )
+  }
+
   return (
     <ExploreToolbarSlotCtx.Provider value={slotRef}>
       <div
@@ -184,14 +225,25 @@ export default function ExplorePage() {
             Only the slot overflows horizontally — tab chips never compress.    */}
         <div className="shrink-0 flex items-center gap-1.5 px-3 py-1 border-b border-gray-200 dark:border-gray-800 bg-white dark:bg-gray-900">
           {/* Compact tab chips — never compress */}
-          <div className="flex items-center gap-0.5 bg-gray-100 dark:bg-gray-800 rounded-lg p-0.5 shrink-0">
+          <div
+            ref={tabIndicator.containerRef}
+            onPointerDown={tabIndicator.onPointerDown}
+            className="relative flex items-center gap-0.5 bg-gray-100 dark:bg-gray-800 rounded-lg p-0.5 shrink-0"
+          >
+            <div
+              aria-hidden="true"
+              className="absolute top-0 left-0 rounded-md bg-white dark:bg-gray-700 shadow-sm transition-[transform,width,height] duration-300 ease-luxury pointer-events-none"
+              style={tabIndicator.indicatorStyle}
+            />
             {TABS.map((tab) => (
               <button
                 key={tab.id}
+                data-indicator-active={activeTab === tab.id || undefined}
+                data-indicator-key={tab.id}
                 onClick={() => handleTab(tab.id)}
-                className={`flex items-center gap-1 px-2 py-0.5 rounded-md text-[10px] font-semibold transition-all whitespace-nowrap relative ${
+                className={`relative z-10 flex items-center gap-1 px-2 py-0.5 rounded-md text-[10px] font-semibold transition-colors whitespace-nowrap ${
                   activeTab === tab.id
-                    ? 'bg-white dark:bg-gray-700 text-gray-900 dark:text-white shadow-sm'
+                    ? TIER_TEXT[displayTier] || 'text-gray-900 dark:text-white'
                     : isLocked(tab.id)
                       ? 'text-gray-400 dark:text-gray-600'
                       : 'text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-300'

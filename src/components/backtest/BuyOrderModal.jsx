@@ -19,6 +19,8 @@ function calcFee(value, isSell = false) {
 }
 
 export default function BuyOrderModal({ session, script, candle, onClose, onOrderPlaced }) {
+  const [position, setPosition] = useState('LONG')
+  const isShort = position === 'SHORT'
   const [price, setPrice] = useState(String(candle?.close || ''))
   const [qty, setQty] = useState('100')
   const [sl, setSl] = useState('')
@@ -64,8 +66,13 @@ export default function BuyOrderModal({ session, script, candle, onClose, onOrde
     }
   }, [candle?.date])
 
-  const rrRatio =
-    slVal && tpVal && slVal < ep && tpVal > ep ? ((tpVal - ep) / (ep - slVal)).toFixed(2) : null
+  const rrRatio = isShort
+    ? slVal && tpVal && slVal > ep && tpVal < ep
+      ? ((ep - tpVal) / (slVal - ep)).toFixed(2)
+      : null
+    : slVal && tpVal && slVal < ep && tpVal > ep
+      ? ((tpVal - ep) / (ep - slVal)).toFixed(2)
+      : null
 
   const validate = useCallback(() => {
     if (!ep || ep <= 0) return 'Enter a valid price'
@@ -74,12 +81,18 @@ export default function BuyOrderModal({ session, script, candle, onClose, onOrde
     if (!qtyInt || qtyInt < 1) return 'Enter a valid quantity'
     if (total > parseFloat(session.available_capital))
       return `Insufficient capital (need Rs.${fmt(total)})`
-    if (slVal !== null && slVal >= ep) return 'SL must be below entry price'
+    if (isShort) {
+      if (slVal !== null && slVal <= ep) return 'SL must be above entry price for a short'
+      if (tpVal !== null && tpVal >= ep) return 'TP must be below entry price for a short'
+    } else {
+      if (slVal !== null && slVal >= ep) return 'SL must be below entry price'
+      if (tpVal !== null && tpVal <= ep) return 'TP must be above entry price'
+    }
     if (slVal !== null && slVal <= 0) return 'SL must be positive'
-    if (tpVal !== null && tpVal <= ep) return 'TP must be above entry price'
+    if (tpVal !== null && tpVal <= 0) return 'TP must be positive'
     if (slVal !== null && tpVal !== null && slVal === tpVal) return 'SL and TP cannot be equal'
     return null
-  }, [ep, qtyInt, total, session, slVal, tpVal, hasRange, dayLow, dayHigh])
+  }, [ep, qtyInt, total, session, slVal, tpVal, hasRange, dayLow, dayHigh, isShort])
 
   const handleConfirm = useCallback(async () => {
     const err = validate()
@@ -95,6 +108,7 @@ export default function BuyOrderModal({ session, script, candle, onClose, onOrde
         quantity: qtyInt,
         sl: slVal,
         tp: tpVal,
+        position,
       })
       onOrderPlaced(res.data)
       onClose()
@@ -103,7 +117,7 @@ export default function BuyOrderModal({ session, script, candle, onClose, onOrde
     } finally {
       setLoading(false)
     }
-  }, [validate, session, script, candle, ep, qtyInt, slVal, tpVal, onOrderPlaced, onClose])
+  }, [validate, session, script, candle, ep, qtyInt, slVal, tpVal, position, onOrderPlaced, onClose])
 
   // Escape key
   useEffect(() => {
@@ -118,7 +132,9 @@ export default function BuyOrderModal({ session, script, candle, onClose, onOrde
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-[2px] p-4">
       <div className="bg-white dark:bg-gray-900 rounded-2xl shadow-2xl w-80 max-w-full p-5 border border-gray-200 dark:border-gray-700 animate-scale-in">
         <div className="flex items-center justify-between mb-3">
-          <div className="text-[13px] font-bold dark:text-white">BUY ORDER — {script.symbol}</div>
+          <div className="text-[13px] font-bold dark:text-white">
+            {isShort ? 'SHORT ORDER' : 'BUY ORDER'} — {script.symbol}
+          </div>
           <button
             onClick={onClose}
             className="text-gray-400 hover:text-gray-600 dark:hover:text-gray-200 text-lg leading-none"
@@ -130,6 +146,31 @@ export default function BuyOrderModal({ session, script, candle, onClose, onOrde
         <div className="text-[10px] text-gray-400 mb-3">
           Date:{' '}
           <span className="font-semibold text-gray-700 dark:text-gray-300">{candle?.date}</span>
+        </div>
+
+        <div className="flex gap-1.5 mb-3">
+          <button
+            type="button"
+            onClick={() => setPosition('LONG')}
+            className={`flex-1 py-1.5 text-[11px] font-bold rounded-md border transition-colors ${
+              !isShort
+                ? 'bg-green-50 dark:bg-green-950/30 border-green-400 text-green-700 dark:text-green-400'
+                : 'border-gray-200 dark:border-gray-700 text-gray-400 dark:text-gray-500'
+            }`}
+          >
+            Buy (Long)
+          </button>
+          <button
+            type="button"
+            onClick={() => setPosition('SHORT')}
+            className={`flex-1 py-1.5 text-[11px] font-bold rounded-md border transition-colors ${
+              isShort
+                ? 'bg-red-50 dark:bg-red-950/30 border-red-400 text-red-700 dark:text-red-400'
+                : 'border-gray-200 dark:border-gray-700 text-gray-400 dark:text-gray-500'
+            }`}
+          >
+            Short
+          </button>
         </div>
 
         <div className="flex flex-col gap-2 text-[11px]">
@@ -226,7 +267,7 @@ export default function BuyOrderModal({ session, script, candle, onClose, onOrde
         {/* Summary */}
         <div className="mt-3 bg-gray-50 dark:bg-gray-800 rounded-lg p-2 text-[10px] space-y-0.5">
           <div className="flex justify-between text-gray-600 dark:text-gray-400">
-            <span>Cost</span>
+            <span>{isShort ? 'Margin Locked' : 'Cost'}</span>
             <span className="font-semibold dark:text-gray-300">Rs.{fmt(cost)}</span>
           </div>
           <div className="flex justify-between text-gray-600 dark:text-gray-400">
@@ -275,9 +316,11 @@ export default function BuyOrderModal({ session, script, candle, onClose, onOrde
           <button
             onClick={handleConfirm}
             disabled={loading || priceOutOfRange}
-            className="flex-1 py-1.5 text-[11px] font-bold rounded-md bg-green-600 hover:bg-green-700 text-white disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+            className={`flex-1 py-1.5 text-[11px] font-bold rounded-md text-white disabled:opacity-50 disabled:cursor-not-allowed transition-colors ${
+              isShort ? 'bg-red-600 hover:bg-red-700' : 'bg-green-600 hover:bg-green-700'
+            }`}
           >
-            {loading ? 'Buying…' : 'Confirm BUY'}
+            {loading ? (isShort ? 'Shorting…' : 'Buying…') : isShort ? 'Confirm SHORT' : 'Confirm BUY'}
           </button>
         </div>
       </div>

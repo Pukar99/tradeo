@@ -2,7 +2,7 @@
 // usePriceAlerts.js — Price alert poller + browser notification dispatcher
 // =============================================================================
 // Sections:
-//   1. EOD Timing       — msUntilEOD helper
+//   1. Refresh Timing   — msUntilNextCheck helper
 //   2. Notification Dedup — session-scoped notified-IDs set
 //   3. Hook             — usePriceAlerts({ user, onAlert })
 // =============================================================================
@@ -10,21 +10,25 @@
 import { useEffect, useRef } from 'react'
 import { checkPriceAlerts } from '../api'
 
-// NEPSE market close: 15:00 NPT = 09:15 UTC. Poll at 15:10 NPT (09:25 UTC) after EOD data lands.
-const EOD_UTC_H = 9
-const EOD_UTC_M = 25
+// Check ten minutes after each scheduled backend market-data refresh.
+const CHECK_TIMES_UTC = [[5, 25], [6, 25], [7, 25], [8, 25], [9, 50]]
 
 // =============================================================================
-// 1. EOD TIMING
+// 1. REFRESH TIMING
 // =============================================================================
 
-// How many ms until the next 15:10 NPT (09:25 UTC) today or tomorrow
-function msUntilEOD() {
+// How many ms until the next scheduled post-refresh check.
+function msUntilNextCheck() {
   const now = new Date()
-  const target = new Date(now)
-  target.setUTCHours(EOD_UTC_H, EOD_UTC_M, 0, 0)
-  if (target <= now) target.setUTCDate(target.getUTCDate() + 1)
-  return target - now
+  for (const [hour, minute] of CHECK_TIMES_UTC) {
+    const target = new Date(now)
+    target.setUTCHours(hour, minute, 0, 0)
+    if (target > now) return target - now
+  }
+  const tomorrow = new Date(now)
+  tomorrow.setUTCDate(tomorrow.getUTCDate() + 1)
+  tomorrow.setUTCHours(CHECK_TIMES_UTC[0][0], CHECK_TIMES_UTC[0][1], 0, 0)
+  return tomorrow - now
 }
 
 // =============================================================================
@@ -32,19 +36,24 @@ function msUntilEOD() {
 // =============================================================================
 
 // Session-scoped set of already-notified alert IDs — prevents repeat notifications
-const NOTIFIED_KEY = 'tradeo_alerted_ids'
-function getNotified() {
+function notifiedKey(userId) {
+  return `tradeo_alerted_ids:${userId}`
+}
+function alertFingerprint(alert) {
+  return `${alert.id}:${alert.price_alert ?? alert.alert_date ?? ''}`
+}
+function getNotified(userId) {
   try {
-    return new Set(JSON.parse(sessionStorage.getItem(NOTIFIED_KEY) || '[]'))
+    return new Set(JSON.parse(localStorage.getItem(notifiedKey(userId)) || '[]'))
   } catch {
     return new Set()
   }
 }
-function markNotified(id) {
-  const set = getNotified()
-  set.add(String(id))
+function markNotified(userId, alert) {
+  const set = getNotified(userId)
+  set.add(alertFingerprint(alert))
   try {
-    sessionStorage.setItem(NOTIFIED_KEY, JSON.stringify([...set]))
+    localStorage.setItem(notifiedKey(userId), JSON.stringify([...set]))
   } catch {}
 }
 
@@ -68,19 +77,23 @@ export function usePriceAlerts({ user, onAlert }) {
       const { triggered = [] } = res.data
       if (!triggered.length) return
 
-      const notified = getNotified()
-      const fresh = triggered.filter((a) => !notified.has(String(a.id)))
+      const userId = userRef.current?.id
+      const notified = getNotified(userId)
+      const fresh = triggered.filter((a) => !notified.has(alertFingerprint(a)))
       if (!fresh.length) return
 
-      if (Notification.permission === 'default') {
+      const notificationsSupported = typeof Notification !== 'undefined'
+      if (notificationsSupported && Notification.permission === 'default') {
         await Notification.requestPermission().catch(() => {})
       }
 
       for (const alert of fresh) {
-        markNotified(alert.id)
-        if (Notification.permission === 'granted') {
+        markNotified(userId, alert)
+        if (notificationsSupported && Notification.permission === 'granted') {
           new Notification(`Tradeo Alert — ${alert.symbol}`, {
-            body: `LTP Rs.${parseFloat(alert.ltp).toLocaleString()} is ${alert.direction} your alert Rs.${parseFloat(alert.price_alert).toLocaleString()} (${alert.dist_pct}% away)`,
+            body: alert.type === 'date'
+              ? alert.notes || `Reminder due for ${alert.symbol}`
+              : `LTP Rs.${parseFloat(alert.ltp).toLocaleString()} is ${alert.direction} your alert Rs.${parseFloat(alert.price_alert).toLocaleString()} (${alert.dist_pct}% away)`,
             icon: '/favicon.ico',
             tag: `tradeo_alert_${alert.id}`,
           })
@@ -98,13 +111,13 @@ export function usePriceAlerts({ user, onAlert }) {
 
     pollRef.current()
 
-    const scheduleEOD = () => {
+    const scheduleNextCheck = () => {
       timerRef.current = setTimeout(() => {
         pollRef.current()
-        scheduleEOD()
-      }, msUntilEOD())
+        scheduleNextCheck()
+      }, msUntilNextCheck())
     }
-    scheduleEOD()
+    scheduleNextCheck()
 
     return () => clearTimeout(timerRef.current)
   }, [userId]) // only re-run when user logs in/out — not on every render

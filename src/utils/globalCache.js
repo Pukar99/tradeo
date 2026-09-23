@@ -183,11 +183,15 @@ import {
   getDashboardInit as _getDashboardInit,
   getCycleAnalytics as _getCycleAnalytics,
 } from '../api'
+import { setMarketHours } from './nepseCalendar'
 
 export async function getMarketSymbols() {
   const cached = gCache.get('symbols')
   if (cached !== undefined) return cached
   const result = await _getMarketSymbols()
+  // market_hours (admin-editable) rides the symbols payload — apply the override
+  // once per fetch so isMarketOpenNow() reflects config without an extra call.
+  if (result?.data?.market_hours) setMarketHours(result.data.market_hours)
   gCache.set('symbols', result, TTL.SYMBOLS)
   return result
 }

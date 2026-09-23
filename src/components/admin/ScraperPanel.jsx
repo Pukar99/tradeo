@@ -1,58 +1,15 @@
 // === ScraperPanel.jsx ===
-import { useState, useEffect, useRef } from 'react'
-import { getSystemScraper, runSystemScraper } from '@api/admin'
-import toast from 'react-hot-toast'
-
-export default function ScraperPanel() {
-  const [status, setStatus] = useState(null)
-  const [loading, setLoading] = useState(true)
-  const [running, setRunning] = useState(false)
-  const pollRef = useRef(null)
-
-  async function fetchStatus() {
-    try {
-      const { data } = await getSystemScraper()
-      setStatus(data)
-      return data
-    } catch {
-      return null
-    } finally {
-      setLoading(false)
-    }
-  }
-
-  // Poll every 3s while scraper is running
-  useEffect(() => {
-    fetchStatus()
-    return () => clearInterval(pollRef.current)
-  }, []) // eslint-disable-line react-hooks/exhaustive-deps
-
-  useEffect(() => {
-    if (status?.running) {
-      pollRef.current = setInterval(async () => {
-        const s = await fetchStatus()
-        if (!s?.running) clearInterval(pollRef.current)
-      }, 3000)
-    } else {
-      clearInterval(pollRef.current)
-    }
-    return () => clearInterval(pollRef.current)
-  }, [status?.running]) // eslint-disable-line react-hooks/exhaustive-deps
-
-  async function handleRun() {
-    if (running || status?.running) return
-    setRunning(true)
-    try {
-      await runSystemScraper()
-      toast.success('Scraper triggered')
-      await fetchStatus()
-    } catch (err) {
-      const msg = err?.response?.data?.error || 'Failed to trigger scraper'
-      toast.error(msg)
-    } finally {
-      setRunning(false)
-    }
-  }
+// Visual pass 2026-08-08. Presentational now — status fetching and the
+// 3s-while-running poll moved up to SystemTab so this panel and the Scraper
+// health tile above it read one poll instead of two.
+//
+// The status pill is gone: the health tile upstairs already owns "what state
+// is the scraper in", and repeating it here was the same duplication problem
+// as the stat tiles. Run now moves into the header, where an action belongs,
+// and drops from a flat green-600 slab to the app's emerald.
+export default function ScraperPanel({ status, loading, triggering, onRun }) {
+  const running = Boolean(status?.running)
+  const busy = triggering || running
 
   const lastRun = status?.lastRun
     ? new Date(status.lastRun).toLocaleString('en-US', {
@@ -64,59 +21,51 @@ export default function ScraperPanel() {
     : 'Never'
 
   return (
-    <div className="border border-gray-200 dark:border-gray-700/50 rounded-xl overflow-hidden">
-      <div className="px-4 py-3 bg-gray-50 dark:bg-gray-800/60 border-b border-gray-200 dark:border-gray-700/50">
-        <p className="text-[10px] font-semibold text-gray-400 dark:text-gray-500 uppercase tracking-wide">
+    <div className="bg-white dark:bg-gray-900 rounded-xl border border-gray-100 dark:border-gray-800 overflow-hidden">
+      <div className="flex items-center justify-between gap-3 px-4 py-2.5 border-b border-gray-100 dark:border-gray-800">
+        <p className="text-[10px] font-semibold text-gray-400 dark:text-gray-500 uppercase tracking-widest">
           Scraper
         </p>
+        <button
+          onClick={onRun}
+          disabled={busy}
+          className="inline-flex items-center gap-1.5 px-3 py-1.5 text-[11px] font-semibold bg-emerald-600 hover:bg-emerald-700 text-white rounded-lg disabled:opacity-40 disabled:hover:bg-emerald-600 transition-colors"
+        >
+          <svg className="w-2.5 h-2.5" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
+            <path d="M6 4l14 8-14 8V4z" />
+          </svg>
+          {running ? 'Running…' : 'Run now'}
+        </button>
       </div>
-      <div className="px-4 py-4 space-y-3">
+
+      <div className="px-4 py-3">
         {loading ? (
-          <div className="space-y-2">
-            <div className="h-3 w-32 bg-gray-200 dark:bg-gray-700 rounded animate-pulse" />
-            <div className="h-3 w-24 bg-gray-200 dark:bg-gray-700 rounded animate-pulse" />
+          <div className="space-y-2.5">
+            <div className="h-3 w-32 bg-gray-200 dark:bg-gray-800 rounded animate-pulse" />
+            <div className="h-3 w-24 bg-gray-200 dark:bg-gray-800 rounded animate-pulse" />
+            <div className="h-3 w-28 bg-gray-200 dark:bg-gray-800 rounded animate-pulse" />
           </div>
         ) : (
-          <>
+          <dl className="space-y-2">
             <div className="flex items-center justify-between">
-              <span className="text-xs text-gray-500 dark:text-gray-400">Status</span>
-              <span
-                className={`px-2 py-0.5 text-[10px] font-semibold rounded-full ${
-                  status?.running
-                    ? 'bg-amber-100 text-amber-700 dark:bg-amber-900/30 dark:text-amber-400'
-                    : 'bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400'
-                }`}
-              >
-                {status?.running ? 'Running…' : 'Idle'}
-              </span>
+              <dt className="text-[11px] text-gray-500 dark:text-gray-400">Status</dt>
+              <dd className="text-[11px] font-medium text-gray-900 dark:text-white">
+                {running ? 'Running' : 'Idle'}
+              </dd>
             </div>
             <div className="flex items-center justify-between">
-              <span className="text-xs text-gray-500 dark:text-gray-400">Last run</span>
-              <span className="text-xs text-gray-700 dark:text-gray-300">{lastRun}</span>
+              <dt className="text-[11px] text-gray-500 dark:text-gray-400">Last run</dt>
+              <dd className="text-[11px] tabular-nums font-medium text-gray-900 dark:text-white">
+                {lastRun}
+              </dd>
             </div>
             <div className="flex items-center justify-between">
-              <span className="text-xs text-gray-500 dark:text-gray-400">Rows saved</span>
-              <span className="text-xs text-gray-700 dark:text-gray-300 tabular-nums">
-                {status?.rowsInserted ?? 0}
-              </span>
+              <dt className="text-[11px] text-gray-500 dark:text-gray-400">Rows saved</dt>
+              <dd className="text-[11px] tabular-nums font-medium text-gray-900 dark:text-white">
+                {(status?.rowsInserted ?? 0).toLocaleString()}
+              </dd>
             </div>
-            {status?.lastError && (
-              <div className="px-3 py-2 bg-red-50 dark:bg-red-900/15 rounded-lg border border-red-100 dark:border-red-800/30">
-                <p className="text-[10px] text-red-600 dark:text-red-400 font-medium break-all">
-                  {status.lastError}
-                </p>
-              </div>
-            )}
-            <div className="flex justify-end pt-1">
-              <button
-                onClick={handleRun}
-                disabled={running || status?.running}
-                className="px-3 py-1.5 text-xs font-semibold bg-green-600 hover:bg-green-700 text-white rounded-lg disabled:opacity-40 transition-colors"
-              >
-                {status?.running ? 'Running…' : 'Run Now'}
-              </button>
-            </div>
-          </>
+          </dl>
         )}
       </div>
     </div>

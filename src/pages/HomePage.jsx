@@ -1,18 +1,34 @@
 // === HomePage.jsx — home page: logged-out landing (blurred preview + hero), logged-in dashboard (stats, watchlist, positions, alerts, NEPSE chart) ===
 import { useAuth } from '../context/AuthContext'
 import { useLanguage } from '../context/LanguageContext'
-import { useContextMenu } from '../components/ContextMenu'
-import { useChatRefresh, useHighlightListener, dispatchHighlight } from '../utils/chatEvents'
+import { useChatRefresh, dispatchHighlight } from '../utils/chatEvents'
 import TaskBoard from '../components/dashboard/TaskBoard'
 import DisciplineScore from '../components/dashboard/DisciplineScore'
 import MonthlyGoals from '../components/dashboard/MonthlyGoals'
 import { Link, useNavigate } from 'react-router-dom'
 import { useState, useEffect, useCallback, useRef, useMemo } from 'react'
-import { useEscapeKey } from '../hooks/useEscapeKey'
+import { useLocalStorage } from '../hooks/useLocalStorage'
 import NEPSEChart from '../components/NEPSEChart'
-import PageSkeleton from '../components/PageSkeleton'
-import { addToWatchlist, updateWatchlist, removeFromWatchlist } from '../api'
-import { getDashboardInit, getMarketSymbols } from '../utils/globalCache'
+import { getDashboardInit } from '../utils/globalCache'
+import { MarketStatusChip } from '../components/common/MarketStatusBadge'
+import StockAvatar from '../components/common/StockAvatar'
+import {
+  IconWarning,
+  IconAlertCircle,
+  IconCheckCircle,
+  IconBell,
+  IconCalendar,
+  IconBolt,
+} from '../components/common/icons'
+import WatchlistPanel from '../components/dashboard/watchlist/WatchlistPanel'
+import { generateSwingCandles } from '../utils/candlestickData'
+import {
+  TIER_ACCENT,
+  TierAccentOverlay,
+  tierRingClass,
+  TIER_TEXT,
+  getDisplayTier,
+} from '../components/common/TierMaterial'
 
 const MOTIVATIONAL_QUOTES = [
   'The market is a device for transferring money from the impatient to the patient.',
@@ -23,70 +39,71 @@ const MOTIVATIONAL_QUOTES = [
   'Discipline is the bridge between trading goals and trading reality.',
 ]
 
-const STOCK_COLORS = [
-  'bg-blue-500',
-  'bg-green-500',
-  'bg-purple-500',
-  'bg-orange-500',
-  'bg-pink-500',
-  'bg-teal-500',
-  'bg-red-500',
-  'bg-indigo-500',
-  'bg-yellow-500',
-  'bg-cyan-500',
-]
-const STOCK_BORDERS = [
-  'border-blue-400',
-  'border-green-400',
-  'border-purple-400',
-  'border-orange-400',
-  'border-pink-400',
-  'border-teal-400',
-  'border-red-400',
-  'border-indigo-400',
-  'border-yellow-400',
-  'border-cyan-400',
-]
-const STOCK_BAR_COLORS = [
-  'bg-blue-400',
-  'bg-green-400',
-  'bg-purple-400',
-  'bg-orange-400',
-  'bg-pink-400',
-  'bg-teal-400',
-  'bg-red-400',
-  'bg-indigo-400',
-  'bg-yellow-400',
-  'bg-cyan-400',
-]
-
-// Hash the full symbol — using only charCodeAt(0) collapsed every same-initial
-// symbol (NABIL/NTC/NLIC/NICA…) onto one color, which is common in NEPSE banks.
-function hashSymbol(symbol) {
-  let h = 0
-  for (let i = 0; i < symbol.length; i++) h = (h * 31 + symbol.charCodeAt(i)) | 0
-  return Math.abs(h)
+// ── Hero feature-grid icons (line style, not emoji — HOME-15 precedent) ───────
+const heroIconProps = {
+  width: 18,
+  height: 18,
+  viewBox: '0 0 24 24',
+  fill: 'none',
+  stroke: 'currentColor',
+  strokeWidth: '1.8',
+  strokeLinecap: 'round',
+  strokeLinejoin: 'round',
 }
-function getStockColor(symbol) {
-  if (!symbol) return 'bg-blue-500'
-  return STOCK_COLORS[hashSymbol(symbol) % STOCK_COLORS.length]
-}
-function getStockBorder(symbol) {
-  if (!symbol) return 'border-blue-400'
-  return STOCK_BORDERS[hashSymbol(symbol) % STOCK_BORDERS.length]
-}
-function getStockBar(symbol) {
-  if (!symbol) return 'bg-blue-400'
-  return STOCK_BAR_COLORS[hashSymbol(symbol) % STOCK_BAR_COLORS.length]
-}
-
-function StockAvatar({ symbol, size = 'w-8 h-8', textSize = 'text-xs' }) {
+// Trade Journal — same mark as Login/SignupPage BrandPanel.
+function HeroIconJournal() {
   return (
-    <div
-      className={`${size} ${getStockColor(symbol)} rounded-lg flex items-center justify-center flex-shrink-0`}
-    >
-      <span className={`text-white font-bold ${textSize}`}>{symbol?.slice(0, 2) || '??'}</span>
-    </div>
+    <svg {...heroIconProps}>
+      <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z" />
+      <polyline points="14 2 14 8 20 8" />
+      <line x1="16" y1="13" x2="8" y2="13" />
+      <line x1="16" y1="17" x2="8" y2="17" />
+    </svg>
+  )
+}
+// Smart Watchlist — same mark as AuthFormShell's password-visibility eye.
+function HeroIconEye() {
+  return (
+    <svg {...heroIconProps}>
+      <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z" />
+      <circle cx="12" cy="12" r="3" />
+    </svg>
+  )
+}
+// Portfolio Tracker
+function HeroIconChart() {
+  return (
+    <svg {...heroIconProps}>
+      <line x1="18" y1="20" x2="18" y2="10" />
+      <line x1="12" y1="20" x2="12" y2="4" />
+      <line x1="6" y1="20" x2="6" y2="14" />
+    </svg>
+  )
+}
+// Discipline Score — same mark as Login/SignupPage BrandPanel.
+function HeroIconClock() {
+  return (
+    <svg {...heroIconProps}>
+      <circle cx="12" cy="12" r="10" />
+      <path d="M12 8v4l3 3" />
+    </svg>
+  )
+}
+// Tradeo AI — same mark as Login/SignupPage BrandPanel.
+function HeroIconChat() {
+  return (
+    <svg {...heroIconProps}>
+      <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z" />
+    </svg>
+  )
+}
+// Risk Lab
+function HeroIconFlask() {
+  return (
+    <svg {...heroIconProps}>
+      <path d="M9 2v6.5L4 18a2 2 0 0 0 1.7 3h12.6a2 2 0 0 0 1.7-3l-5-9.5V2" />
+      <line x1="9" y1="2" x2="15" y2="2" />
+    </svg>
   )
 }
 
@@ -98,36 +115,64 @@ function LoggedOutHome() {
   )
 
   const dummyStats = [
-    { label: 'Total P/L', value: '+Rs. 24,850', color: 'text-green-500' },
-    { label: 'Win Rate', value: '68%', color: 'text-blue-500' },
-    { label: 'Open Trades', value: '4', color: 'text-gray-900 dark:text-white' },
-    { label: 'Streak', value: '🔥 7 days', color: 'text-orange-500' },
+    { label: 'Total P/L Today', value: '+Rs. 24,850', color: 'text-green-500' },
+    { label: 'Realized P/L', value: '+Rs. 18,200', color: 'text-blue-500' },
+    { label: 'Win Rate', value: '68%', color: 'text-gray-900 dark:text-white' },
+    { label: 'Open Positions', value: '4', color: 'text-orange-500' },
   ]
   const dummyWatchlist = ['NABIL', 'NTC', 'SCB', 'EBL', 'NICA', 'HBL', 'NLIC', 'UPPER']
-  const dummyTrades = [
-    { symbol: 'NABIL', entry: 1240, ltp: 1310, pnl: '+Rs. 3,500', pct: '+5.6%' },
-    { symbol: 'NTC', entry: 890, ltp: 860, pnl: '-Rs. 1,200', pct: '-3.4%' },
-    { symbol: 'SCB', entry: 3100, ltp: 3280, pnl: '+Rs. 9,000', pct: '+5.8%' },
-    { symbol: 'EBL', entry: 1560, ltp: 1590, pnl: '+Rs. 1,500', pct: '+1.9%' },
-  ]
   const dummyTasks = [
     'Review morning briefing',
     'Check NABIL resistance',
     'Update trade journal',
     'Set SL for SCB',
   ]
-
-  // Candlestick motif for the brand backdrop (same asset as the auth BrandPanel).
-  const heroCandles = [
-    { x: 40, h: 80, t: 200, green: true },
-    { x: 90, h: 150, t: 150, green: false },
-    { x: 140, h: 60, t: 230, green: true },
-    { x: 190, h: 120, t: 170, green: true },
-    { x: 240, h: 190, t: 130, green: false },
-    { x: 290, h: 90, t: 210, green: true },
-    { x: 340, h: 140, t: 160, green: true },
-    { x: 390, h: 70, t: 235, green: false },
+  const dummyAlerts = [
+    { symbol: 'NABIL', note: 'Crossed Rs.1,300 — BUY zone', tone: 'green' },
+    { symbol: 'SCB', note: 'Approaching SL at Rs.3,050', tone: 'red' },
+    { symbol: 'EBL', note: 'Volume spike, +12% today', tone: 'green' },
   ]
+  const dummyDiscipline = [
+    ['Task Completion', 82],
+    ['Journal Rate', 75],
+    ['Win Rate', 68],
+  ]
+  // Small NEPSE-style candlestick strip for the center chart card preview —
+  // a real swinging price path (each candle connects to the next), not
+  // independent random bars.
+  // Random seed each mount (not fixed) so the pattern is fresh every page
+  // load, still generated by the same connected-swing algorithm so it never
+  // reads as noise. useMemo so it doesn't reshuffle on every incidental
+  // re-render — only once per visit.
+  const chartCandles = useMemo(
+    () =>
+      generateSwingCandles(19, {
+        seed: Math.floor(Math.random() * 1e6),
+        spacing: 15,
+        startX: 10,
+        baseline: 32,
+        amplitude: 14,
+        minBody: 4,
+        maxBody: 11,
+      }),
+    []
+  )
+
+  // Candlestick motif for the brand backdrop (same generator + look as the
+  // auth BrandPanel, tuned for this wider/shorter viewBox).
+  const heroCandles = useMemo(
+    () =>
+      generateSwingCandles(8, {
+        seed: Math.floor(Math.random() * 1e6),
+        spacing: 50,
+        startX: 40,
+        baseline: 140,
+        amplitude: 60,
+        minBody: 28,
+        maxBody: 58,
+      }),
+    []
+  )
 
   return (
     <div className="relative w-full min-h-[calc(100dvh-3.5rem)] overflow-hidden bg-gray-50 dark:bg-gray-950">
@@ -150,16 +195,16 @@ function LoggedOutHome() {
             >
               <line
                 x1={c.x}
-                y1={c.t - 22}
+                y1={c.t - 15}
                 x2={c.x}
-                y2={c.t + c.h + 22}
+                y2={c.t + c.h + 15}
                 stroke={c.green ? '#22c55e' : '#ef4444'}
                 strokeWidth="1.5"
               />
               <rect
-                x={c.x - 9}
+                x={c.x - 6}
                 y={c.t}
-                width="18"
+                width="12"
                 height={c.h}
                 fill={c.green ? '#22c55e' : '#ef4444'}
                 rx="2"
@@ -170,11 +215,15 @@ function LoggedOutHome() {
       </div>
 
       {/* Blurred dashboard preview — desktop only (intentional marketing mock per
-          design.md). Hidden on phones, where it read as a fake-data "vibecoded"
-          wall; phones get the clean brand backdrop above instead. */}
+          design.md), deliberately mirrors the REAL logged-in dashboard's layout
+          (LoggedInHome below): routine+goals left, stats+chart+watchlist center,
+          discipline+alerts right — same 3/6/3 grid, same column names/positions,
+          both side columns hidden below lg exactly like the real one. Hidden on
+          phones, where it read as a fake-data "vibecoded" wall; phones get the
+          clean brand backdrop above instead. */}
       <div className="hidden sm:flex absolute inset-0 select-none pointer-events-none px-4 py-4 flex-col gap-4 overflow-hidden">
         {/* Stats bar */}
-        <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 filter blur-[2px]">
+        <div className="grid grid-cols-4 gap-3 filter blur-[2px]">
           {dummyStats.map((s, i) => (
             <div
               key={i}
@@ -187,43 +236,27 @@ function LoggedOutHome() {
         </div>
 
         <div className="grid grid-cols-12 gap-4">
-          {/* Left column */}
+          {/* Left column — matches real TaskBoard + MonthlyGoals, desktop only */}
           <div className="hidden lg:flex col-span-3 flex-col gap-4">
             <div className="bg-white dark:bg-gray-800 rounded-2xl p-4 shadow-sm border border-gray-100 dark:border-gray-700 filter blur-[2px]">
-              <p className="text-xs font-semibold text-gray-500 mb-3">Discipline Score</p>
-              <div className="flex items-center justify-center">
-                <div className="relative w-24 h-24">
-                  <svg viewBox="0 0 36 36" className="w-full h-full -rotate-90">
-                    <circle cx="18" cy="18" r="15.9" fill="none" stroke="#e5e7eb" strokeWidth="3" />
-                    <circle
-                      cx="18"
-                      cy="18"
-                      r="15.9"
-                      fill="none"
-                      stroke="#22c55e"
-                      strokeWidth="3"
-                      strokeDasharray="68 32"
-                      strokeLinecap="round"
+              <p className="text-xs font-semibold text-gray-500 mb-3">Daily Routine</p>
+              <div className="space-y-2">
+                {dummyTasks.map((task, i) => (
+                  <div key={i} className="flex items-center gap-2">
+                    <div
+                      className={`w-3.5 h-3.5 rounded-full border-2 flex-shrink-0 ${i < 2 ? 'bg-green-400 border-green-400' : 'border-gray-300'}`}
                     />
-                  </svg>
-                  <div className="absolute inset-0 flex flex-col items-center justify-center">
-                    <span className="text-xl font-bold text-gray-900 dark:text-white">68</span>
-                    <span className="text-[10px] text-gray-400">/ 100</span>
-                  </div>
-                </div>
-              </div>
-              <div className="mt-3 space-y-1.5">
-                {['Consistency', 'Risk Mgmt', 'Journaling'].map((l, i) => (
-                  <div key={l} className="flex justify-between items-center">
-                    <span className="text-[10px] text-gray-400">{l}</span>
-                    <div className="w-20 h-1.5 bg-gray-100 dark:bg-gray-700 rounded-full overflow-hidden">
-                      <div
-                        className="h-full bg-green-400 rounded-full"
-                        style={{ width: `${[72, 60, 80][i]}%` }}
-                      />
-                    </div>
+                    <span
+                      className={`text-[11px] ${i < 2 ? 'line-through text-gray-300' : 'text-gray-600 dark:text-gray-300'}`}
+                    >
+                      {task}
+                    </span>
                   </div>
                 ))}
+              </div>
+              <div className="mt-3 pt-2 border-t border-gray-100 dark:border-gray-700 flex justify-between text-[10px] text-gray-400">
+                <span>2 / 4 done</span>
+                <span>50%</span>
               </div>
             </div>
             <div className="bg-white dark:bg-gray-800 rounded-2xl p-4 shadow-sm border border-gray-100 dark:border-gray-700 filter blur-[2px]">
@@ -251,41 +284,49 @@ function LoggedOutHome() {
             </div>
           </div>
 
-          {/* Center column */}
-          <div className="col-span-6 flex flex-col gap-4">
+          {/* Center column — full width until lg (matches the real dashboard:
+              CenterDashboard is the only column shown below lg), 6 of 12 once
+              both side columns reappear at lg */}
+          <div className="col-span-12 lg:col-span-6 flex flex-col gap-4">
             <div className="bg-white dark:bg-gray-800 rounded-2xl shadow-sm border border-gray-100 dark:border-gray-700 overflow-hidden filter blur-[2px]">
               <div className="flex items-center justify-between px-3 py-3 border-b border-gray-100 dark:border-gray-700">
-                <h3 className="text-sm font-semibold text-gray-900 dark:text-white">
-                  Open Positions
-                </h3>
-                <span className="text-xs text-gray-400">4 active</span>
+                <h3 className="text-sm font-semibold text-gray-900 dark:text-white">NEPSE</h3>
+                <div className="flex items-center bg-gray-100 dark:bg-gray-700 rounded-lg p-0.5">
+                  <span className="px-2 py-0.5 rounded-md text-[10px] font-semibold bg-white dark:bg-gray-600 text-gray-900 dark:text-white shadow-sm">
+                    Daily
+                  </span>
+                  <span className="px-2 py-0.5 rounded-md text-[10px] font-semibold text-gray-400">
+                    Weekly
+                  </span>
+                </div>
               </div>
-              <div className="divide-y divide-gray-50 dark:divide-gray-700">
-                {dummyTrades.map((t, i) => (
-                  <div key={i} className="flex items-center justify-between px-3 py-2.5">
-                    <div className="flex items-center gap-2">
-                      <StockAvatar symbol={t.symbol} size="w-7 h-7" />
-                      <div>
-                        <p className="text-xs font-semibold text-gray-900 dark:text-white">
-                          {t.symbol}
-                        </p>
-                        <p className="text-[10px] text-gray-400">Entry Rs.{t.entry}</p>
-                      </div>
-                    </div>
-                    <div className="text-right">
-                      <p
-                        className={`text-xs font-semibold ${t.pnl.startsWith('+') ? 'text-green-500' : 'text-red-500'}`}
-                      >
-                        {t.pnl}
-                      </p>
-                      <p
-                        className={`text-[10px] ${t.pct.startsWith('+') ? 'text-green-400' : 'text-red-400'}`}
-                      >
-                        {t.pct}
-                      </p>
-                    </div>
-                  </div>
-                ))}
+              <div className="px-3 pt-2 flex items-baseline gap-2">
+                <span className="text-sm font-bold text-gray-900 dark:text-white">2,667.97</span>
+                <span className="text-[10px] font-medium text-green-500">+0.18%</span>
+              </div>
+              <div className="px-2 pb-3">
+                <svg viewBox="0 0 300 65" className="w-full h-20">
+                  {chartCandles.map((c, i) => (
+                    <g key={i}>
+                      <line
+                        x1={c.x}
+                        y1={c.t - 3}
+                        x2={c.x}
+                        y2={c.t + c.h + 3}
+                        stroke={c.green ? '#22c55e' : '#ef4444'}
+                        strokeWidth="1"
+                      />
+                      <rect
+                        x={c.x - 2.5}
+                        y={c.t}
+                        width="5"
+                        height={c.h}
+                        fill={c.green ? '#22c55e' : '#ef4444'}
+                        rx="1"
+                      />
+                    </g>
+                  ))}
+                </svg>
               </div>
             </div>
             <div className="bg-white dark:bg-gray-800 rounded-2xl shadow-sm border border-gray-100 dark:border-gray-700 overflow-hidden filter blur-[2px]">
@@ -314,47 +355,41 @@ function LoggedOutHome() {
             </div>
           </div>
 
-          {/* Right column */}
-          <div className="col-span-3 flex flex-col gap-4">
+          {/* Right column — matches real DisciplineScore (compact) + AlertsWidget,
+              desktop only */}
+          <div className="hidden lg:flex col-span-3 flex-col gap-4">
             <div className="bg-white dark:bg-gray-800 rounded-2xl p-4 shadow-sm border border-gray-100 dark:border-gray-700 filter blur-[2px]">
-              <p className="text-xs font-semibold text-gray-500 mb-3">Today's Tasks</p>
+              <div className="flex items-center justify-between mb-3">
+                <p className="text-xs font-semibold text-gray-500">Discipline Score</p>
+                <span className="text-lg font-bold text-green-500">68</span>
+              </div>
               <div className="space-y-2">
-                {dummyTasks.map((task, i) => (
-                  <div key={i} className="flex items-center gap-2">
-                    <div
-                      className={`w-3.5 h-3.5 rounded-full border-2 flex-shrink-0 ${i < 2 ? 'bg-green-400 border-green-400' : 'border-gray-300'}`}
-                    />
-                    <span
-                      className={`text-[11px] ${i < 2 ? 'line-through text-gray-300' : 'text-gray-600 dark:text-gray-300'}`}
-                    >
-                      {task}
+                {dummyDiscipline.map(([l, pct]) => (
+                  <div key={l} className="flex justify-between items-center">
+                    <span className="text-[10px] text-gray-400">{l}</span>
+                    <span className="text-[10px] font-semibold text-gray-700 dark:text-gray-300">
+                      {pct}%
                     </span>
                   </div>
                 ))}
               </div>
-              <div className="mt-3 pt-2 border-t border-gray-100 dark:border-gray-700 flex justify-between text-[10px] text-gray-400">
-                <span>2 / 4 done</span>
-                <span>50%</span>
-              </div>
             </div>
             <div className="bg-white dark:bg-gray-800 rounded-2xl p-4 shadow-sm border border-gray-100 dark:border-gray-700 filter blur-[2px]">
-              <p className="text-xs font-semibold text-gray-500 mb-3">Tradeo AI</p>
+              <p className="text-xs font-semibold text-gray-500 mb-3">Alerts</p>
               <div className="space-y-2">
-                <div className="bg-gray-50 dark:bg-gray-700 rounded-xl px-3 py-2">
-                  <p className="text-[11px] text-gray-500">
-                    NABIL has broken resistance at 1300. Consider reviewing your SL.
-                  </p>
-                </div>
-                <div className="bg-blue-50 dark:bg-blue-900 rounded-xl px-3 py-2 ml-4">
-                  <p className="text-[11px] text-blue-600 dark:text-blue-300">
-                    What's my win rate this month?
-                  </p>
-                </div>
-                <div className="bg-gray-50 dark:bg-gray-700 rounded-xl px-3 py-2">
-                  <p className="text-[11px] text-gray-500">
-                    Your win rate is 68% with 17 trades closed this month.
-                  </p>
-                </div>
+                {dummyAlerts.map((a, i) => (
+                  <div key={i} className="flex items-start gap-2">
+                    <span
+                      className={`w-1.5 h-1.5 rounded-full mt-1.5 flex-shrink-0 ${a.tone === 'green' ? 'bg-green-400' : 'bg-red-400'}`}
+                    />
+                    <p className="text-[11px] text-gray-500 leading-snug">
+                      <span className="font-semibold text-gray-900 dark:text-white">
+                        {a.symbol}
+                      </span>{' '}
+                      {a.note}
+                    </p>
+                  </div>
+                ))}
               </div>
             </div>
           </div>
@@ -388,22 +423,25 @@ function LoggedOutHome() {
               <p className="text-gray-400 text-sm mt-2 leading-relaxed">{t('hero.sub')}</p>
             </div>
 
-            {/* Features grid — 2-up on all phone widths to keep the card short */}
+            {/* Features grid — 2-up on all phone widths to keep the card short.
+                Line icons, not emoji (HOME-15 precedent) — reuses the same Trade
+                Journal / Discipline Score / Tradeo AI marks as Login/SignupPage's
+                BrandPanel for cross-page consistency. */}
             <div className="px-5 sm:px-8 py-3.5 sm:py-5 grid grid-cols-2 gap-x-3 gap-y-2.5 sm:gap-3">
               {[
-                { icon: '📒', title: t('hero.feat1Title'), desc: t('hero.feat1Desc') },
-                { icon: '👁️', title: t('hero.feat2Title'), desc: t('hero.feat2Desc') },
-                { icon: '📊', title: t('hero.feat3Title'), desc: t('hero.feat3Desc') },
-                { icon: '🧠', title: t('hero.feat4Title'), desc: t('hero.feat4Desc') },
-                { icon: '🤖', title: t('hero.feat5Title'), desc: t('hero.feat5Desc') },
-                { icon: '⚗️', title: t('hero.feat6Title'), desc: t('hero.feat6Desc') },
+                { icon: <HeroIconJournal />, title: t('hero.feat1Title'), desc: t('hero.feat1Desc') },
+                { icon: <HeroIconEye />, title: t('hero.feat2Title'), desc: t('hero.feat2Desc') },
+                { icon: <HeroIconChart />, title: t('hero.feat3Title'), desc: t('hero.feat3Desc') },
+                { icon: <HeroIconClock />, title: t('hero.feat4Title'), desc: t('hero.feat4Desc') },
+                { icon: <HeroIconChat />, title: t('hero.feat5Title'), desc: t('hero.feat5Desc') },
+                { icon: <HeroIconFlask />, title: t('hero.feat6Title'), desc: t('hero.feat6Desc') },
               ].map((f, i) => (
                 <div
                   key={f.title}
                   className="flex items-start gap-2.5 animate-fade-up"
                   style={{ animationDelay: `${100 + i * 50}ms` }}
                 >
-                  <span className="text-base mt-0.5">{f.icon}</span>
+                  <span className="text-blue-500 dark:text-blue-400 mt-0.5">{f.icon}</span>
                   <div>
                     <p className="text-xs font-semibold text-gray-900 dark:text-white">{f.title}</p>
                     <p className="text-[11px] text-gray-400 leading-snug">{f.desc}</p>
@@ -421,13 +459,13 @@ function LoggedOutHome() {
             <div className="px-5 sm:px-8 py-3.5 sm:py-5 border-t border-gray-100 dark:border-gray-800 flex flex-col sm:flex-row gap-2.5 sm:gap-3">
               <Link
                 to="/signup"
-                className="active:scale-[0.98] flex-1 bg-green-500 hover:bg-green-400 text-white min-h-[48px] flex items-center justify-center py-3 rounded-xl text-sm font-semibold text-center transition-all shadow-sm shadow-green-500/20"
+                className="active:scale-[0.98] flex-1 bg-green-500 hover:bg-green-400 text-white min-h-[48px] flex items-center justify-center py-3 rounded-xl text-sm font-semibold text-center transition-all duration-200 ease-luxury shadow-sm shadow-green-500/20 hover:shadow-md hover:shadow-green-500/25"
               >
                 {t('hero.cta')}
               </Link>
               <Link
                 to="/login"
-                className="active:scale-[0.98] flex-1 bg-gray-100 dark:bg-gray-800 text-gray-700 dark:text-gray-300 min-h-[48px] flex items-center justify-center py-3 rounded-xl text-sm font-medium text-center hover:bg-gray-200 dark:hover:bg-gray-700 border border-gray-200 dark:border-gray-700 transition-all"
+                className="active:scale-[0.98] flex-1 bg-gray-100 dark:bg-gray-800 text-gray-700 dark:text-gray-300 min-h-[48px] flex items-center justify-center py-3 rounded-xl text-sm font-medium text-center hover:bg-gray-200 dark:hover:bg-gray-700 border border-gray-200 dark:border-gray-700 transition-all duration-200 ease-luxury"
               >
                 {t('hero.ctaLogin')}
               </Link>
@@ -445,6 +483,9 @@ const ALERTS_DEFAULT_LIMIT = 7
 const SEVERITY_ORDER = { danger: 0, warn: 1, success: 2, info: 3 }
 
 function AlertsWidget({ initData }) {
+  const { user } = useAuth()
+  const displayTier = getDisplayTier(user)
+  const accent = TIER_ACCENT[displayTier]
   const navigate = useNavigate()
   const [showAllAlerts, setShowAllAlerts] = useState(false)
   const trades = initData?.trades || []
@@ -583,12 +624,12 @@ function AlertsWidget({ initData }) {
   const hasMoreAlerts = sortedAlerts.length > ALERTS_DEFAULT_LIMIT
 
   const iconMap = {
-    nosl: '⚠',
-    sl: '🔴',
-    tp: '🟢',
-    watch: '🔔',
-    goal: '📅',
-    circuit: '⚡',
+    nosl: <IconWarning />,
+    sl: <IconAlertCircle />,
+    tp: <IconCheckCircle />,
+    watch: <IconBell />,
+    goal: <IconCalendar />,
+    circuit: <IconBolt />,
   }
   const severityClass = {
     danger: 'border-l-red-400 bg-red-50 dark:bg-red-900/10',
@@ -605,7 +646,7 @@ function AlertsWidget({ initData }) {
 
   if (!initData)
     return (
-      <div className="bg-white/70 dark:bg-gray-900/60 backdrop-blur-md rounded-2xl border border-white/60 dark:border-white/10 shadow-sm h-full animate-pulse p-4 space-y-2">
+      <div className="bg-white/70 dark:bg-gray-900/90 backdrop-blur-md dark:backdrop-blur-sm rounded-2xl border border-white/60 dark:border-white/10 shadow-sm h-full animate-pulse p-4 space-y-2">
         <div className="h-3 bg-gray-100 dark:bg-gray-800 rounded w-1/4" />
         {[1, 2, 3].map((i) => (
           <div key={i} className="h-8 bg-gray-100 dark:bg-gray-800 rounded-lg" />
@@ -614,7 +655,10 @@ function AlertsWidget({ initData }) {
     )
 
   return (
-    <div className="hp-card bg-white/70 dark:bg-gray-900/60 backdrop-blur-md rounded-2xl border border-white/60 dark:border-white/10 shadow-sm overflow-hidden h-full flex flex-col min-h-0">
+    <div
+      className={`hp-card group relative bg-white/70 dark:bg-gray-900/90 backdrop-blur-md dark:backdrop-blur-sm rounded-2xl ${accent ? '' : 'border'} border-white/60 dark:border-white/10 overflow-hidden h-full flex flex-col min-h-0 ${accent ? tierRingClass(displayTier) : 'shadow-sm'}`}
+    >
+      <TierAccentOverlay accent={accent} />
       <div className="flex items-center justify-between px-4 py-3 border-b border-gray-100 dark:border-gray-800 flex-shrink-0">
         <h3 className="text-[10px] font-semibold text-gray-400 uppercase tracking-widest">
           Alerts
@@ -649,7 +693,7 @@ function AlertsWidget({ initData }) {
                 }}
                 className={`hp-alert-row w-full text-left flex items-center gap-2.5 px-3 py-2.5 border-l-2 ${severityClass[a.severity]}`}
               >
-                <span className="text-[13px] flex-shrink-0">{iconMap[a.type]}</span>
+                <span className={`flex-shrink-0 ${textClass[a.severity]}`}>{iconMap[a.type]}</span>
                 <span className={`text-[11px] font-medium leading-snug ${textClass[a.severity]}`}>
                   {a.label}
                 </span>
@@ -674,7 +718,7 @@ function AlertsWidget({ initData }) {
 // ── Stats bar ─────────────────────────────────────────────────────────────────
 function StatCard({ label, value, color, sub }) {
   return (
-    <div className="hp-stat bg-white/70 dark:bg-gray-900/60 backdrop-blur-md rounded-xl sm:rounded-2xl px-2 sm:px-4 py-1.5 sm:py-3 border border-white/60 dark:border-white/10 shadow-sm">
+    <div className="hp-stat bg-white/70 dark:bg-gray-900/90 backdrop-blur-md dark:backdrop-blur-sm rounded-xl sm:rounded-2xl px-2 sm:px-4 py-1.5 sm:py-3 border border-white/60 dark:border-white/10 shadow-sm">
       <p className="text-[8px] sm:text-[10px] font-medium text-gray-400 uppercase tracking-wide mb-0.5 sm:mb-1 truncate">
         {label}
       </p>
@@ -686,55 +730,67 @@ function StatCard({ label, value, color, sub }) {
   )
 }
 
+// ── Center dashboard skeleton — shared by CenterDashboard's own initData-loading
+// state and HomeSkeleton (HomePage's authLoading gate), so the two loading
+// phases render pixel-identical markup and the swap between them is invisible.
+function CenterDashboardSkeleton() {
+  return (
+    <div className="flex flex-col gap-3 sm:gap-4 animate-pulse">
+      {/* Stat cards */}
+      <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 sm:gap-2.5">
+        {[1, 2, 3, 4].map((i) => (
+          <div
+            key={i}
+            className="bg-white/70 dark:bg-gray-900/90 backdrop-blur-md dark:backdrop-blur-sm rounded-xl sm:rounded-2xl border border-white/60 dark:border-white/10 shadow-sm px-3 py-2.5"
+          >
+            <div className="h-2 bg-gray-100 dark:bg-gray-800 rounded w-3/4 mb-2" />
+            <div className="h-5 bg-gray-100 dark:bg-gray-800 rounded w-1/2" />
+          </div>
+        ))}
+      </div>
+      {/* Chart placeholder */}
+      <div className="bg-white/70 dark:bg-gray-900/90 backdrop-blur-md dark:backdrop-blur-sm rounded-2xl border border-white/60 dark:border-white/10 shadow-sm h-[200px] sm:h-[220px]" />
+      {/* Watchlist placeholder */}
+      <div className="bg-white/70 dark:bg-gray-900/90 backdrop-blur-md dark:backdrop-blur-sm rounded-2xl border border-white/60 dark:border-white/10 shadow-sm">
+        <div className="h-10 border-b border-gray-100 dark:border-gray-800 px-3 flex items-center gap-2">
+          <div className="h-2 bg-gray-100 dark:bg-gray-800 rounded w-16" />
+          <div className="flex-1" />
+          <div className="h-6 bg-gray-100 dark:bg-gray-800 rounded-lg w-40" />
+        </div>
+        <div className="flex gap-2 p-2 overflow-x-hidden">
+          {[1, 2, 3, 4].map((i) => (
+            <div
+              key={i}
+              className="shrink-0 basis-[calc((100%-1rem)/3)] sm:basis-[calc((100%-1.5rem)/4)] bg-gray-50 dark:bg-gray-800/50 rounded-xl px-1.5 py-1.5 space-y-1.5"
+            >
+              <div className="flex items-center gap-1">
+                <div className="w-5 h-5 bg-gray-200 dark:bg-gray-700 rounded-lg flex-shrink-0" />
+                <div className="h-2.5 bg-gray-200 dark:bg-gray-700 rounded w-2/3" />
+              </div>
+              <div className="h-3 bg-gray-200 dark:bg-gray-700 rounded w-full" />
+              <div className="h-1.5 bg-gray-200 dark:bg-gray-700 rounded-full w-full" />
+            </div>
+          ))}
+        </div>
+      </div>
+    </div>
+  )
+}
+
 // ── Center dashboard (authenticated) ─────────────────────────────────────────
 function CenterDashboard({ navigate, initData, onRefresh, onDataReady, mobileTopTab, setMobileTopTab }) {
   const { t: tr } = useLanguage()
   const [openPositions, setOpenPositions] = useState([])
   const [perfStats, setPerfStats] = useState(null)
   const [watchlist, setWatchlist] = useState([])
-  const [watchlistTab, setWatchlistTab] = useState('active')
-  const { onContextMenu: watchCtx, ContextMenuPortal: WatchMenuPortal } = useContextMenu()
-  const [loading, setLoading] = useState(!initData)
-  const [error, setError] = useState(null)
-
-  // add-flow: null | 'search' | { symbol, refPrice }
-  const [watchAddState, setWatchAddState] = useState(null)
-  // edit-flow
-  const [watchEditItem, setWatchEditItem] = useState(null)
-  const [watchActionErr, setWatchActionErr] = useState(null)
-
-  // symbol list for autocomplete — load once
-  const symbolListRef = useRef([])
   const priceMapRef = useRef({})
-  const [symbolsReady, setSymbolsReady] = useState(false)
-  // search UI
-  const [watchQuery, setWatchQuery] = useState('')
-  const [watchCursor, setWatchCursor] = useState(-1)
-  const watchInputRef = useRef(null)
-  // add-form state
-  const [watchForm, setWatchForm] = useState({
-    price_alert: '',
-    alert_date: '',
-    watch_low: '',
-    watch_high: '',
-    notes: '',
-  })
-  const [watchAdding, setWatchAdding] = useState(false)
-  // edit-form state
-  const [watchEditForm, setWatchEditForm] = useState(null)
-  const [watchSaving, setWatchSaving] = useState(false)
-  // highlight-on-alert-click
-  const [highlightSym, setHighlightSym] = useState(null)
-  const watchRowRefs = useRef({}) // symbol → row DOM node
-  const highlightTimer = useRef(null)
+  const [loading, setLoading] = useState(!initData)
 
-  useEscapeKey(() => {
-    setWatchAddState(null)
-    setWatchEditItem(null)
-    setWatchForm({ price_alert: '', alert_date: '', watch_low: '', watch_high: '', notes: '' })
-    setWatchEditForm(null)
-    setWatchQuery('')
-  })
+  // Stats window in months — READ-ONLY here (HOME-9c: the home screen carries no
+  // settings UI; the control lives in Profile → Dashboard preferences, same key,
+  // until the full Settings page absorbs it). Clamped 1–24, default 2.
+  const [statMonthsRaw] = useLocalStorage('hp.statsMonths', 2)
+  const statMonths = Math.min(24, Math.max(1, parseInt(statMonthsRaw) || 2))
 
   const applyData = useCallback(
     (d) => {
@@ -788,13 +844,13 @@ function CenterDashboard({ navigate, initData, onRefresh, onDataReady, mobileTop
         const day = String(d.getDate()).padStart(2, '0')
         return `${y}-${m}-${day}`
       })()
-      // 2-month window for the explicitly-labeled "Realized P/L (2M)" / "Win Rate (2M)" cards
-      const twoMonthsAgo = new Date()
-      twoMonthsAgo.setMonth(twoMonthsAgo.getMonth() - 2)
-      twoMonthsAgo.setHours(0, 0, 0, 0)
+      // Selected window (statMonths) for the labeled "Realized P/L (nM)" / "Win Rate (nM)" cards
+      const windowStart = new Date()
+      windowStart.setMonth(windowStart.getMonth() - statMonths)
+      windowStart.setHours(0, 0, 0, 0)
       // Backend /init maps last_action_at → updated_at in the trade shape
-      const recent = closed.filter((t) => t.updated_at && new Date(t.updated_at) >= twoMonthsAgo)
-      const realized2M = recent.reduce((s, t) => s + (parseFloat(t.realized_pnl) || 0), 0)
+      const recent = closed.filter((t) => t.updated_at && new Date(t.updated_at) >= windowStart)
+      const realizedWindow = recent.reduce((s, t) => s + (parseFloat(t.realized_pnl) || 0), 0)
       const profitable = recent.filter((t) => (parseFloat(t.realized_pnl) || 0) > 0).length
       const winRate = recent.length > 0 ? Math.round((profitable / recent.length) * 100) : 0
       // "Total P/L" must be a true lifetime figure: all closed realized P/L + open
@@ -815,7 +871,7 @@ function CenterDashboard({ navigate, initData, onRefresh, onDataReady, mobileTop
       const stats = {
         totalPnl: realizedAll + totalUnrealized,
         unrealizedPnl: totalUnrealized,
-        realizedPnl: realized2M,
+        realizedPnl: realizedWindow,
         todayPnl,
         winRate,
         openCount: openWithPrices.length,
@@ -838,399 +894,21 @@ function CenterDashboard({ navigate, initData, onRefresh, onDataReady, mobileTop
       setWatchlist(watchWithPrices)
       if (onDataReady) onDataReady({ openPositions: openWithPrices, perfStats: stats })
     },
-    [onDataReady]
+    [onDataReady, statMonths]
   )
 
-  // Hydrate from parent-supplied initData (avoids a second /init fetch)
-  // eslint-disable-next-line react-hooks/exhaustive-deps
+  // Hydrate from parent-supplied initData (avoids a second /init fetch).
+  // applyData in deps → the stats recompute locally when the window changes (no refetch).
   useEffect(() => {
     if (initData) {
       applyData(initData)
       setLoading(false)
     }
-  }, [initData])
+  }, [initData, applyData])
 
   useChatRefresh(['trades', 'watchlist'], onRefresh)
 
-  // ── Load symbol list once for autocomplete ─────────────────────────────────
-  useEffect(() => {
-    getMarketSymbols()
-      .then((res) => {
-        symbolListRef.current = res.data?.stocks || []
-        setSymbolsReady(true)
-      })
-      .catch(() => setSymbolsReady(true))
-  }, [])
-
-  // Focus search input when add panel opens
-  useEffect(() => {
-    if (watchAddState === 'search') setTimeout(() => watchInputRef.current?.focus(), 50)
-  }, [watchAddState])
-
-  // ── Classify: auto-derive active/pre from signals ───────────────────────────
-  // Stable date ref — computed once per mount, re-computed only if date string changes
-  const watchTodayStr = useMemo(() => {
-    const d = new Date()
-    d.setHours(0, 0, 0, 0)
-    return d.toDateString()
-  }, [])
-  const watchToday = useMemo(() => {
-    const d = new Date()
-    d.setHours(0, 0, 0, 0)
-    return d
-  }, [watchTodayStr]) // eslint-disable-line react-hooks/exhaustive-deps
-
-  const classifiedWatch = useMemo(() => {
-    return watchlist.map((w) => {
-      const ltp = w.currentPrice
-      let priceSignal = 'neutral'
-      if (w.price_alert && ltp) {
-        const pct = Math.abs((ltp - parseFloat(w.price_alert)) / ltp) * 100
-        priceSignal = pct <= 15 ? 'active' : 'pre'
-      }
-      let dateSignal = 'neutral',
-        wStatus = null
-      if (w.alert_date) {
-        const days = Math.ceil((new Date(w.alert_date + 'T00:00:00') - watchToday) / 86400000)
-        if (days >= 0 && days <= 14) {
-          dateSignal = 'active'
-        } else if (days > 14) {
-          dateSignal = 'pre'
-        } else if (days >= -10) {
-          dateSignal = 'active'
-          wStatus = 'grace'
-        } else {
-          dateSignal = 'expired'
-          wStatus = 'expired'
-        }
-      }
-      if (dateSignal === 'expired') return { ...w, category: 'pre', wStatus: 'expired' }
-      if (priceSignal === 'active' || dateSignal === 'active')
-        return { ...w, category: 'active', wStatus }
-      return { ...w, category: 'pre', wStatus }
-    })
-  }, [watchlist, watchToday])
-
-  const activeWatchItems = classifiedWatch.filter((w) => w.category === 'active')
-  const preWatchItems = classifiedWatch.filter((w) => w.category === 'pre')
-  const filteredWatch = watchlistTab === 'active' ? activeWatchItems : preWatchItems
-
-  // ── Highlight a watchlist / position row when its alert is clicked ──────────
-  // Switch to whichever tab actually contains the symbol, scroll it into view,
-  // and flash the glow. Matches by symbol (case-insensitive).
-  useHighlightListener('watchlist', (key) => {
-    const sym = String(key).toUpperCase()
-    let tab = null
-    if (activeWatchItems.some((w) => w.symbol?.toUpperCase() === sym)) tab = 'active'
-    else if (preWatchItems.some((w) => w.symbol?.toUpperCase() === sym)) tab = 'pre'
-    else if (openPositions.some((t) => t.symbol?.toUpperCase() === sym)) tab = 'positions'
-    if (!tab) return
-    setWatchlistTab(tab)
-    setWatchAddState(null)
-    setHighlightSym(sym)
-    requestAnimationFrame(() => {
-      requestAnimationFrame(() => {
-        watchRowRefs.current[sym]?.scrollIntoView({ behavior: 'smooth', block: 'center' })
-      })
-    })
-    clearTimeout(highlightTimer.current)
-    highlightTimer.current = setTimeout(() => setHighlightSym(null), 2100)
-  })
-
-  useEffect(() => () => clearTimeout(highlightTimer.current), [])
-
-  // ── Autocomplete suggestions ────────────────────────────────────────────────
-  // WL-03 fix: depend on symbolsReady so memo re-runs after symbols load
-  const watchSuggestions = useMemo(() => {
-    const q = watchQuery.trim().toUpperCase()
-    if (!q || !symbolsReady) return []
-    return symbolListRef.current
-      .filter((s) => s.symbol.startsWith(q) || s.company_name?.toUpperCase().includes(q))
-      .slice(0, 8)
-  }, [watchQuery, symbolsReady])
-
-  // Returns YYYY-MM-DD string offset by N days from today
-  const dateOffset = (days) => {
-    const d = new Date(watchToday)
-    d.setDate(d.getDate() + days)
-    return d.toISOString().slice(0, 10)
-  }
-  // Returns next weekday (Mon–Fri) from today
-  const nextWeekday = (day) => {
-    // 1=Mon … 5=Fri
-    const d = new Date(watchToday)
-    const curr = d.getDay() // 0=Sun
-    let diff = day - curr
-    if (diff <= 0) diff += 7
-    d.setDate(d.getDate() + diff)
-    return d.toISOString().slice(0, 10)
-  }
-
-  const handleWatchKey = (e) => {
-    if (e.key === 'ArrowDown') {
-      e.preventDefault()
-      setWatchCursor((c) => Math.min(c + 1, watchSuggestions.length - 1))
-    } else if (e.key === 'ArrowUp') {
-      e.preventDefault()
-      setWatchCursor((c) => Math.max(c - 1, 0))
-    } else if (e.key === 'Enter') {
-      e.preventDefault()
-      const pick =
-        watchCursor >= 0
-          ? watchSuggestions[watchCursor]
-          : watchSuggestions.length === 1
-            ? watchSuggestions[0]
-            : null
-      if (pick) {
-        const p = priceMapRef.current[pick.symbol]
-        setWatchAddState({ symbol: pick.symbol, refPrice: p ? parseFloat(p.price) || null : null })
-        setWatchQuery('')
-        setWatchCursor(-1)
-      }
-    } else if (e.key === 'Escape') {
-      setWatchAddState(null)
-      setWatchQuery('')
-    }
-  }
-
-  // ── Add handler ─────────────────────────────────────────────────────────────
-  const handleAddWatch = async (e) => {
-    e.preventDefault()
-    if (!watchAddState || typeof watchAddState !== 'object') return
-    // Case-insensitive guard. Note this only covers non-portfolio items in local
-    // state; a symbol held as a 'portfolio' entry is caught by the backend's unique
-    // constraint (409), surfaced via the catch below.
-    const dupSym = watchAddState.symbol.toUpperCase()
-    if (watchlist.some((w) => w.symbol?.toUpperCase() === dupSym)) {
-      setWatchActionErr(`${watchAddState.symbol} is already in your watchlist.`)
-      return
-    }
-    setWatchAdding(true)
-    setWatchActionErr(null)
-    setWatchQuery('')
-    try {
-      await addToWatchlist({
-        symbol: watchAddState.symbol,
-        price_alert: watchForm.price_alert ? parseFloat(watchForm.price_alert) : null,
-        alert_date: watchForm.alert_date || null,
-        watch_low: watchForm.watch_low ? parseFloat(watchForm.watch_low) : null,
-        watch_high: watchForm.watch_high ? parseFloat(watchForm.watch_high) : null,
-        notes: watchForm.notes || null,
-        category: 'pre',
-      })
-      setWatchAddState(null)
-      setWatchForm({ price_alert: '', alert_date: '', watch_low: '', watch_high: '', notes: '' })
-      if (onRefresh) await onRefresh()
-    } catch (err) {
-      setWatchActionErr(err.response?.data?.error || 'Failed to add.')
-    } finally {
-      setWatchAdding(false)
-    }
-  }
-
-  // ── Edit handlers ───────────────────────────────────────────────────────────
-  const openWatchEdit = (item) => {
-    setWatchActionErr(null) // WL-06 fix: clear stale add-form error before opening edit
-    setWatchEditItem(item)
-    setWatchEditForm({
-      watch_low: item.watch_low != null ? String(item.watch_low) : '',
-      watch_high: item.watch_high != null ? String(item.watch_high) : '',
-      price_alert: item.price_alert != null ? String(item.price_alert) : '',
-      alert_date: item.alert_date ? item.alert_date.slice(0, 10) : '',
-      notes: item.notes || '',
-    })
-  }
-
-  const handleSaveWatch = async (e) => {
-    e.preventDefault()
-    if (!watchEditItem || !watchEditForm) return
-    setWatchSaving(true)
-    setWatchActionErr(null)
-    try {
-      await updateWatchlist(watchEditItem.id, {
-        watch_low: watchEditForm.watch_low !== '' ? parseFloat(watchEditForm.watch_low) : null,
-        watch_high: watchEditForm.watch_high !== '' ? parseFloat(watchEditForm.watch_high) : null,
-        price_alert:
-          watchEditForm.price_alert !== '' ? parseFloat(watchEditForm.price_alert) : null,
-        alert_date: watchEditForm.alert_date || null,
-        notes: watchEditForm.notes || null,
-        category: 'pre',
-      })
-      setWatchEditItem(null)
-      setWatchEditForm(null)
-      if (onRefresh) await onRefresh()
-    } catch (err) {
-      setWatchActionErr(err.response?.data?.error || 'Failed to save.')
-    } finally {
-      setWatchSaving(false)
-    }
-  }
-
-  // ── Remove handler ──────────────────────────────────────────────────────────
-  const handleRemoveWatch = async (id) => {
-    const snapshot = watchlist
-    setWatchActionErr(null)
-    setWatchlist((prev) => prev.filter((w) => w.id !== id))
-    try {
-      await removeFromWatchlist(id)
-    } catch {
-      // Restore the full prior list so the item returns to its original position,
-      // and tell the user it failed instead of silently reappearing.
-      setWatchlist(snapshot)
-      setWatchActionErr('Failed to remove — please try again.')
-    }
-  }
-
-  // alert messages per item
-  function watchAlertMsgs(item) {
-    const msgs = []
-    const ltp = item.currentPrice
-    if (!ltp) return msgs
-    if (item.price_alert) {
-      const alert = parseFloat(item.price_alert)
-      const diff = alert - ltp
-      const pct = Math.abs((diff / ltp) * 100).toFixed(1)
-      if (Math.abs(diff) < ltp * 0.02)
-        msgs.push({
-          text: 'Near alert level',
-          color: 'text-orange-500',
-          bg: 'bg-orange-50 dark:bg-orange-900/30',
-        })
-      else if (diff > 0)
-        msgs.push({
-          text: `+Rs.${Math.abs(Math.round(diff)).toLocaleString()} (${pct}%) to alert`,
-          color: 'text-green-600 dark:text-green-400',
-          bg: 'bg-green-50 dark:bg-green-900/30',
-        })
-      else
-        msgs.push({
-          text: `-Rs.${Math.abs(Math.round(diff)).toLocaleString()} (${pct}%) to alert`,
-          color: 'text-red-500',
-          bg: 'bg-red-50 dark:bg-red-900/30',
-        })
-    }
-    if (item.watch_low && ltp) {
-      const wl = parseFloat(item.watch_low)
-      const diff = ltp - wl
-      const pct = Math.abs((diff / ltp) * 100).toFixed(1)
-      if (diff > 0)
-        msgs.push({
-          text: `-Rs.${Math.abs(Math.round(diff)).toLocaleString()} (${pct}%) to watch low`,
-          color: 'text-red-400',
-          bg: 'bg-red-50 dark:bg-red-900/30',
-        })
-      else
-        msgs.push({
-          text: 'Below watch low',
-          color: 'text-red-500',
-          bg: 'bg-red-50 dark:bg-red-900/30',
-        })
-    }
-    if (item.watch_high && ltp) {
-      const wh = parseFloat(item.watch_high)
-      const diff = wh - ltp
-      const pct = Math.abs((diff / ltp) * 100).toFixed(1)
-      if (diff > 0)
-        msgs.push({
-          text: `+Rs.${Math.abs(Math.round(diff)).toLocaleString()} (${pct}%) to watch high`,
-          color: 'text-green-500',
-          bg: 'bg-green-50 dark:bg-green-900/30',
-        })
-      else
-        msgs.push({
-          text: 'Above watch high',
-          color: 'text-green-500',
-          bg: 'bg-green-50 dark:bg-green-900/30',
-        })
-    }
-    if (item.alert_date) {
-      const days = Math.ceil((new Date(item.alert_date + 'T00:00:00') - watchToday) / 86400000)
-      if (days < -10)
-        msgs.push({
-          text: `Alert expired ${Math.abs(days)}d ago`,
-          color: 'text-gray-400',
-          bg: 'bg-gray-100 dark:bg-gray-800',
-        })
-      else if (days < 0)
-        msgs.push({
-          text: `${Math.abs(days)}d overdue — grace`,
-          color: 'text-amber-500',
-          bg: 'bg-amber-50 dark:bg-amber-900/30',
-        })
-      else if (days === 0)
-        msgs.push({
-          text: 'Alert date is today',
-          color: 'text-orange-500',
-          bg: 'bg-orange-50 dark:bg-orange-900/30',
-        })
-      else if (days <= 3)
-        msgs.push({
-          text: `${days}d left`,
-          color: 'text-orange-500',
-          bg: 'bg-orange-50 dark:bg-orange-900/30',
-        })
-      else if (days <= 14)
-        msgs.push({
-          text: `${days}d left`,
-          color: 'text-blue-500',
-          bg: 'bg-blue-50 dark:bg-blue-900/30',
-        })
-    }
-    return msgs
-  }
-
-  if (loading)
-    return (
-      <div className="flex flex-col gap-3 sm:gap-4 animate-pulse">
-        {/* Stat cards */}
-        <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 sm:gap-2.5">
-          {[1, 2, 3, 4].map((i) => (
-            <div
-              key={i}
-              className="bg-white/70 dark:bg-gray-900/60 backdrop-blur-md rounded-xl sm:rounded-2xl border border-white/60 dark:border-white/10 shadow-sm px-3 py-2.5"
-            >
-              <div className="h-2 bg-gray-100 dark:bg-gray-800 rounded w-3/4 mb-2" />
-              <div className="h-5 bg-gray-100 dark:bg-gray-800 rounded w-1/2" />
-            </div>
-          ))}
-        </div>
-        {/* Chart placeholder */}
-        <div className="bg-white/70 dark:bg-gray-900/60 backdrop-blur-md rounded-2xl border border-white/60 dark:border-white/10 shadow-sm h-[200px] sm:h-[220px]" />
-        {/* Watchlist placeholder */}
-        <div className="bg-white/70 dark:bg-gray-900/60 backdrop-blur-md rounded-2xl border border-white/60 dark:border-white/10 shadow-sm">
-          <div className="h-10 border-b border-gray-100 dark:border-gray-800 px-3 flex items-center gap-2">
-            <div className="h-2 bg-gray-100 dark:bg-gray-800 rounded w-16" />
-            <div className="flex-1" />
-            <div className="h-6 bg-gray-100 dark:bg-gray-800 rounded-lg w-40" />
-          </div>
-          <div className="flex gap-2 p-2 overflow-x-hidden">
-            {[1, 2, 3, 4].map((i) => (
-              <div
-                key={i}
-                className="shrink-0 basis-[calc((100%-1rem)/3)] sm:basis-[calc((100%-1.5rem)/4)] bg-gray-50 dark:bg-gray-800/50 rounded-xl px-1.5 py-1.5 space-y-1.5"
-              >
-                <div className="flex items-center gap-1">
-                  <div className="w-5 h-5 bg-gray-200 dark:bg-gray-700 rounded-lg flex-shrink-0" />
-                  <div className="h-2.5 bg-gray-200 dark:bg-gray-700 rounded w-2/3" />
-                </div>
-                <div className="h-3 bg-gray-200 dark:bg-gray-700 rounded w-full" />
-                <div className="h-1.5 bg-gray-200 dark:bg-gray-700 rounded-full w-full" />
-              </div>
-            ))}
-          </div>
-        </div>
-      </div>
-    )
-
-  if (error)
-    return (
-      <div className="bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 rounded-2xl p-6 text-center">
-        <p className="text-red-600 dark:text-red-400 text-sm">{error}</p>
-        <button onClick={onRefresh} className="mt-3 text-xs text-red-500 hover:underline">
-          Retry
-        </button>
-      </div>
-    )
+  if (loading) return <CenterDashboardSkeleton />
 
   return (
     <div className="flex flex-col gap-3 sm:gap-4">
@@ -1241,7 +919,7 @@ function CenterDashboard({ navigate, initData, onRefresh, onDataReady, mobileTop
             {[1, 2, 3, 4].map((i) => (
               <div
                 key={i}
-                className="bg-white/70 dark:bg-gray-900/60 backdrop-blur-md rounded-xl sm:rounded-2xl border border-white/60 dark:border-white/10 shadow-sm px-2 sm:px-3 py-1.5 sm:py-2.5"
+                className="bg-white/70 dark:bg-gray-900/90 backdrop-blur-md dark:backdrop-blur-sm rounded-xl sm:rounded-2xl border border-white/60 dark:border-white/10 shadow-sm px-2 sm:px-3 py-1.5 sm:py-2.5"
               >
                 <div className="h-2 bg-gray-100 dark:bg-gray-800 rounded w-3/4 mb-1.5 sm:mb-2" />
                 <div className="h-3.5 sm:h-5 bg-gray-100 dark:bg-gray-800 rounded w-1/2" />
@@ -1269,7 +947,7 @@ function CenterDashboard({ navigate, initData, onRefresh, onDataReady, mobileTop
               }
             />
             <StatCard
-              label="Realized P/L (2M)"
+              label={`Realized P/L (${statMonths}M)`}
               value={`${perfStats.realizedPnl >= 0 ? '+' : ''}Rs. ${Math.abs(Math.round(perfStats.realizedPnl)).toLocaleString()}`}
               color={
                 perfStats.realizedPnl > 0
@@ -1280,12 +958,12 @@ function CenterDashboard({ navigate, initData, onRefresh, onDataReady, mobileTop
               }
               sub={
                 perfStats.closedCount > 0
-                  ? `${perfStats.closedCount} trade${perfStats.closedCount !== 1 ? 's' : ''} last 2mo`
-                  : 'No trades last 2mo'
+                  ? `${perfStats.closedCount} trade${perfStats.closedCount !== 1 ? 's' : ''} last ${statMonths}mo`
+                  : `No trades last ${statMonths}mo`
               }
             />
             <StatCard
-              label="Win Rate (2M)"
+              label={`Win Rate (${statMonths}M)`}
               value={`${perfStats.winRate}%`}
               color={
                 perfStats.winRate >= 50
@@ -1296,8 +974,8 @@ function CenterDashboard({ navigate, initData, onRefresh, onDataReady, mobileTop
               }
               sub={
                 perfStats.closedCount > 0
-                  ? `${perfStats.closedCount} trade${perfStats.closedCount !== 1 ? 's' : ''} last 2mo`
-                  : 'No trades last 2mo'
+                  ? `${perfStats.closedCount} trade${perfStats.closedCount !== 1 ? 's' : ''} last ${statMonths}mo`
+                  : `No trades last ${statMonths}mo`
               }
             />
             <StatCard
@@ -1374,926 +1052,15 @@ function CenterDashboard({ navigate, initData, onRefresh, onDataReady, mobileTop
         <NEPSEChart fixed={true} />
       </div>
 
-      {/* ── Watchlist ────────────────────────────────────────────────────────── */}
-      {/* No overflow-hidden here: it has no border-radius and was clipping the inner
-          rounded-2xl card's corners square. The card clips its own content already. */}
-      <div className="flex flex-col">
-        {/* ── Watchlist edit modal — rendered via portal (WL-04 fix) ── */}
-        <WatchMenuPortal />
-        {watchEditItem &&
-          watchEditForm &&
-          (() => {
-            const ltp =
-              watchEditItem.currentPrice != null ? parseFloat(watchEditItem.currentPrice) : null
-            const pctChips = ltp
-              ? [
-                  { label: '−10%', val: (ltp * 0.9).toFixed(2) },
-                  { label: '−5%', val: (ltp * 0.95).toFixed(2) },
-                  { label: 'LTP', val: ltp.toFixed(2) },
-                  { label: '+5%', val: (ltp * 1.05).toFixed(2) },
-                  { label: '+10%', val: (ltp * 1.1).toFixed(2) },
-                ]
-              : null
-            const dateChips = [
-              { label: 'Mon', val: nextWeekday(1) },
-              { label: '+1w', val: dateOffset(7) },
-              { label: '+2w', val: dateOffset(14) },
-              { label: '+1m', val: dateOffset(30) },
-            ]
-            return (
-              <div
-                className="fixed inset-0 z-50 flex items-end sm:items-center justify-center p-0 sm:p-4"
-                role="dialog"
-                aria-modal="true"
-              >
-                <div
-                  className="absolute inset-0 bg-black/40 backdrop-blur-sm"
-                  onClick={() => setWatchEditItem(null)}
-                />
-                <div className="relative bg-white dark:bg-gray-900 rounded-t-2xl sm:rounded-2xl shadow-2xl border border-gray-200 dark:border-gray-700 w-full sm:max-w-xs z-10 overflow-hidden max-h-[90dvh] overflow-y-auto">
-                  {/* Header */}
-                  <div className="flex items-center justify-between px-4 py-3 border-b border-gray-100 dark:border-gray-800">
-                    <div className="min-w-0">
-                      <div className="flex items-center gap-2 flex-wrap">
-                        <p
-                          className="text-[13px] font-bold text-gray-900 dark:text-white"
-                          translate="no"
-                        >
-                          {watchEditItem.symbol}
-                        </p>
-                        {ltp != null && (
-                          <span className="text-[10px] font-semibold text-gray-500 dark:text-gray-400 tabular-nums bg-gray-100 dark:bg-gray-800 px-1.5 py-0.5 rounded">
-                            Rs.{ltp.toLocaleString()}
-                          </span>
-                        )}
-                        {watchEditItem.change != null && (
-                          <span
-                            className={`text-[9px] font-semibold tabular-nums ${watchEditItem.change >= 0 ? 'text-green-500' : 'text-red-500'}`}
-                          >
-                            {watchEditItem.change >= 0 ? '+' : ''}
-                            {watchEditItem.change}%
-                          </span>
-                        )}
-                      </div>
-                      <p className="text-[9px] font-semibold uppercase tracking-widest text-gray-400 mt-0.5">
-                        Edit alert levels
-                      </p>
-                    </div>
-                    <button
-                      onClick={() => setWatchEditItem(null)}
-                      className="w-6 h-6 flex items-center justify-center rounded-full hover:bg-gray-100 dark:hover:bg-gray-800 text-gray-400 hover:text-gray-600 dark:hover:text-gray-300 transition-colors text-base leading-none shrink-0 ml-2"
-                    >
-                      ×
-                    </button>
-                  </div>
-                  <form onSubmit={handleSaveWatch} className="px-4 py-3 space-y-2.5">
-                    {/* ── Price Alert ── */}
-                    <div>
-                      <p className="text-[9px] font-semibold uppercase tracking-widest text-gray-400 mb-1">
-                        Price Alert
-                      </p>
-                      {pctChips && (
-                        <div className="flex gap-1 mb-1.5 flex-wrap">
-                          {pctChips.map((c) => (
-                            <button
-                              key={c.label}
-                              type="button"
-                              onClick={() =>
-                                setWatchEditForm((f) => ({ ...f, price_alert: c.val }))
-                              }
-                              className={`px-1.5 py-0.5 rounded text-[9px] font-semibold transition-colors border ${
-                                watchEditForm.price_alert === c.val
-                                  ? 'bg-blue-600 border-blue-600 text-white'
-                                  : c.label.startsWith('−')
-                                    ? 'border-red-200 dark:border-red-800 text-red-500 dark:text-red-400 hover:bg-red-50 dark:hover:bg-red-950/40'
-                                    : c.label.startsWith('+')
-                                      ? 'border-green-200 dark:border-green-800 text-green-600 dark:text-green-400 hover:bg-green-50 dark:hover:bg-green-950/40'
-                                      : 'border-gray-200 dark:border-gray-700 text-gray-500 dark:text-gray-400 hover:bg-gray-50 dark:hover:bg-gray-800'
-                              }`}
-                            >
-                              {c.label}
-                            </button>
-                          ))}
-                        </div>
-                      )}
-                      <input
-                        type="number"
-                        min="0"
-                        step="0.01"
-                        value={watchEditForm.price_alert}
-                        autoComplete="off"
-                        onChange={(e) =>
-                          setWatchEditForm((f) => ({ ...f, price_alert: e.target.value }))
-                        }
-                        placeholder="0.00"
-                        className="w-full bg-gray-50 dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg px-2.5 py-1.5 text-[11px] text-gray-800 dark:text-gray-100 placeholder-gray-300 dark:placeholder-gray-600 outline-none focus:border-blue-400 dark:focus:border-blue-500 focus:ring-1 focus:ring-blue-300/40 transition-all"
-                      />
-                      {watchEditForm.price_alert &&
-                        ltp != null &&
-                        (() => {
-                          const pct = ((parseFloat(watchEditForm.price_alert) - ltp) / ltp) * 100
-                          return (
-                            <p
-                              className={`text-[9px] mt-0.5 tabular-nums ${pct >= 0 ? 'text-green-500' : 'text-red-400'}`}
-                            >
-                              {pct >= 0 ? '+' : ''}
-                              {pct.toFixed(1)}% from LTP
-                            </p>
-                          )
-                        })()}
-                    </div>
-
-                    {/* ── Target Date ── */}
-                    <div>
-                      <p className="text-[9px] font-semibold uppercase tracking-widest text-gray-400 mb-1">
-                        Target Date
-                      </p>
-                      <div className="flex gap-1 mb-1.5">
-                        {dateChips.map((c) => (
-                          <button
-                            key={c.label}
-                            type="button"
-                            onClick={() => setWatchEditForm((f) => ({ ...f, alert_date: c.val }))}
-                            className={`px-1.5 py-0.5 rounded text-[9px] font-semibold transition-colors border ${
-                              watchEditForm.alert_date === c.val
-                                ? 'bg-blue-600 border-blue-600 text-white'
-                                : 'border-gray-200 dark:border-gray-700 text-gray-500 dark:text-gray-400 hover:bg-gray-50 dark:hover:bg-gray-800'
-                            }`}
-                          >
-                            {c.label}
-                          </button>
-                        ))}
-                      </div>
-                      <input
-                        type="date"
-                        value={watchEditForm.alert_date}
-                        onChange={(e) =>
-                          setWatchEditForm((f) => ({ ...f, alert_date: e.target.value }))
-                        }
-                        className="w-full bg-gray-50 dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg px-2.5 py-1.5 text-[11px] text-gray-800 dark:text-gray-100 outline-none focus:border-blue-400 dark:focus:border-blue-500 focus:ring-1 focus:ring-blue-300/40 transition-all"
-                      />
-                      {watchEditForm.alert_date && (
-                        <p className="text-[9px] mt-0.5 text-blue-500">
-                          {Math.ceil(
-                            (new Date(watchEditForm.alert_date + 'T00:00:00') - watchToday) /
-                              86400000
-                          )}
-                          d from today
-                        </p>
-                      )}
-                    </div>
-
-                    {/* ── Watch Range ── */}
-                    <div className="grid grid-cols-2 gap-2">
-                      <div>
-                        <p className="text-[9px] font-semibold uppercase tracking-widest text-gray-400 mb-1">
-                          Watch Low
-                        </p>
-                        <input
-                          type="number"
-                          min="0"
-                          step="0.01"
-                          value={watchEditForm.watch_low}
-                          autoComplete="off"
-                          onChange={(e) =>
-                            setWatchEditForm((f) => ({ ...f, watch_low: e.target.value }))
-                          }
-                          placeholder="0.00"
-                          className="w-full bg-gray-50 dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg px-2.5 py-1.5 text-[11px] text-gray-800 dark:text-gray-100 placeholder-gray-300 dark:placeholder-gray-600 outline-none focus:border-red-300 dark:focus:border-red-500/50 focus:ring-1 focus:ring-red-200/50 transition-all"
-                        />
-                      </div>
-                      <div>
-                        <p className="text-[9px] font-semibold uppercase tracking-widest text-gray-400 mb-1">
-                          Watch High
-                        </p>
-                        <input
-                          type="number"
-                          min="0"
-                          step="0.01"
-                          value={watchEditForm.watch_high}
-                          autoComplete="off"
-                          onChange={(e) =>
-                            setWatchEditForm((f) => ({ ...f, watch_high: e.target.value }))
-                          }
-                          placeholder="0.00"
-                          className="w-full bg-gray-50 dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg px-2.5 py-1.5 text-[11px] text-gray-800 dark:text-gray-100 placeholder-gray-300 dark:placeholder-gray-600 outline-none focus:border-green-300 dark:focus:border-green-500/50 focus:ring-1 focus:ring-green-200/50 transition-all"
-                        />
-                      </div>
-                    </div>
-
-                    {/* ── Notes ── */}
-                    <div>
-                      <p className="text-[9px] font-semibold uppercase tracking-widest text-gray-400 mb-1">
-                        Notes
-                      </p>
-                      <input
-                        type="text"
-                        value={watchEditForm.notes}
-                        maxLength={300}
-                        autoComplete="off"
-                        onChange={(e) => setWatchEditForm((f) => ({ ...f, notes: e.target.value }))}
-                        placeholder="Setup reason, catalyst…"
-                        className="w-full bg-gray-50 dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg px-2.5 py-1.5 text-[11px] text-gray-800 dark:text-gray-100 placeholder-gray-300 dark:placeholder-gray-600 outline-none focus:border-blue-400 dark:focus:border-blue-500 focus:ring-1 focus:ring-blue-300/40 transition-all"
-                      />
-                    </div>
-
-                    {watchActionErr && (
-                      <p className="text-[10px] text-red-500 bg-red-50 dark:bg-red-950/50 px-2.5 py-1.5 rounded-lg">
-                        {watchActionErr}
-                      </p>
-                    )}
-                    <div className="flex gap-2 pt-0.5">
-                      <button
-                        type="button"
-                        onClick={() => setWatchEditItem(null)}
-                        className="flex-1 bg-gray-100 dark:bg-gray-800 hover:bg-gray-200 dark:hover:bg-gray-700 text-gray-600 dark:text-gray-300 py-2 rounded-lg text-[11px] font-semibold transition-colors"
-                      >
-                        Cancel
-                      </button>
-                      <button
-                        type="submit"
-                        disabled={watchSaving}
-                        className="flex-1 bg-blue-600 hover:bg-blue-700 disabled:opacity-50 text-white py-2 rounded-lg text-[11px] font-bold transition-colors"
-                      >
-                        {watchSaving ? 'Saving…' : 'Save'}
-                      </button>
-                    </div>
-                  </form>
-                </div>
-              </div>
-            )
-          })()}
-
-        {/* ── Watchlist ─────────────────────────────────────────────────────────── */}
-        <div className="hp-card bg-white/70 dark:bg-gray-900/60 backdrop-blur-md rounded-2xl border border-white/60 dark:border-white/10 shadow-sm overflow-hidden">
-          {/* Header row */}
-          <div className="flex items-center gap-2 px-3 py-2.5 border-b border-gray-100 dark:border-gray-800 overflow-x-auto no-scrollbar">
-            <p className="text-[10px] font-semibold uppercase tracking-widest text-gray-400 shrink-0">
-              Watchlist
-            </p>
-            <div className="flex-1 shrink-0 min-w-[8px]" />
-            {/* Tab pill group */}
-            <div className="flex items-center bg-gray-100 dark:bg-gray-800 rounded-lg p-0.5 shrink-0">
-              {[
-                {
-                  id: 'active',
-                  label: `Active${activeWatchItems.length ? ` ${activeWatchItems.length}` : ''}`,
-                },
-                {
-                  id: 'pre',
-                  label: `Pre-Watch${preWatchItems.length ? ` ${preWatchItems.length}` : ''}`,
-                },
-                {
-                  id: 'positions',
-                  label: `Pos.${openPositions.length ? ` ${openPositions.length}` : ''}`,
-                },
-              ].map((tab) => (
-                <button
-                  key={tab.id}
-                  onClick={() => {
-                    setWatchlistTab(tab.id)
-                    setWatchAddState(null)
-                  }}
-                  className={`px-2 py-0.5 rounded-md text-[10px] font-semibold transition-all whitespace-nowrap ${
-                    watchlistTab === tab.id
-                      ? 'bg-white dark:bg-gray-700 text-gray-900 dark:text-white shadow-sm'
-                      : 'text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-300'
-                  }`}
-                >
-                  {tab.label}
-                </button>
-              ))}
-            </div>
-            {/* Add button — only on watchlist tabs */}
-            {watchAddState === null && watchlistTab !== 'positions' && (
-              <button
-                onClick={() => setWatchAddState('search')}
-                className="flex items-center gap-0.5 px-2 py-0.5 rounded-md text-[10px] font-semibold bg-blue-600 hover:bg-blue-700 active:bg-blue-800 text-white transition-colors shrink-0"
-              >
-                <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path
-                    strokeLinecap="round"
-                    strokeLinejoin="round"
-                    strokeWidth={2.5}
-                    d="M12 4v16m8-8H4"
-                  />
-                </svg>
-                Add
-              </button>
-            )}
-          </div>
-
-          {/* Symbol search panel */}
-          {watchAddState === 'search' && (
-            <div className="px-3 pt-3 pb-2 border-b border-gray-100 dark:border-gray-800">
-              <div className="relative">
-                <div className="flex items-center gap-2 bg-gray-50 dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg px-2.5 h-7">
-                  <svg
-                    className="w-3 h-3 text-gray-400 shrink-0"
-                    fill="none"
-                    stroke="currentColor"
-                    viewBox="0 0 24 24"
-                  >
-                    <path
-                      strokeLinecap="round"
-                      strokeLinejoin="round"
-                      strokeWidth={2}
-                      d="M21 21l-4.35-4.35M17 11A6 6 0 1 1 5 11a6 6 0 0 1 12 0z"
-                    />
-                  </svg>
-                  <input
-                    ref={watchInputRef}
-                    type="text"
-                    value={watchQuery}
-                    onChange={(e) => {
-                      setWatchQuery(e.target.value.toUpperCase())
-                      setWatchCursor(-1)
-                    }}
-                    onKeyDown={handleWatchKey}
-                    placeholder="Type symbol…"
-                    className="flex-1 bg-transparent text-[11px] text-gray-800 dark:text-gray-100 placeholder-gray-400 outline-none"
-                    translate="no"
-                  />
-                  {watchQuery && (
-                    <button
-                      onClick={() => setWatchQuery('')}
-                      className="text-gray-400 hover:text-gray-600 text-xs leading-none"
-                    >
-                      ×
-                    </button>
-                  )}
-                </div>
-                {watchSuggestions.length > 0 && (
-                  <div className="absolute top-full left-0 right-0 mt-1 bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-700 rounded-xl shadow-lg z-20 overflow-hidden">
-                    {watchSuggestions.map((s, i) => (
-                      <button
-                        key={s.symbol}
-                        onClick={() => {
-                          const p = priceMapRef.current[s.symbol]
-                          setWatchAddState({
-                            symbol: s.symbol,
-                            refPrice: p ? parseFloat(p.price) || null : null,
-                          })
-                          setWatchQuery('')
-                          setWatchCursor(-1)
-                        }}
-                        className={`w-full flex items-center gap-2.5 px-3 py-2 text-left transition-colors ${i === watchCursor ? 'bg-blue-50 dark:bg-blue-900/30' : 'hover:bg-gray-50 dark:hover:bg-gray-800/50'} ${i < watchSuggestions.length - 1 ? 'border-b border-gray-50 dark:border-gray-800' : ''}`}
-                      >
-                        <div className="min-w-0 flex-1">
-                          <span
-                            className="text-[11px] font-bold text-gray-900 dark:text-white"
-                            translate="no"
-                          >
-                            {s.symbol}
-                          </span>
-                          {s.company_name && (
-                            <span className="text-[10px] text-gray-400 ml-1.5 truncate">
-                              {s.company_name}
-                            </span>
-                          )}
-                        </div>
-                      </button>
-                    ))}
-                  </div>
-                )}
-              </div>
-              <button
-                onClick={() => {
-                  setWatchAddState(null)
-                  setWatchQuery('')
-                  setWatchForm({
-                    price_alert: '',
-                    alert_date: '',
-                    watch_low: '',
-                    watch_high: '',
-                    notes: '',
-                  })
-                }}
-                className="mt-2 text-[10px] text-gray-400 hover:text-gray-600 dark:hover:text-gray-300"
-              >
-                Cancel
-              </button>
-            </div>
-          )}
-
-          {/* Add form — after symbol selected */}
-          {watchAddState &&
-            typeof watchAddState === 'object' &&
-            (() => {
-              const ltp = watchAddState.refPrice
-              const pctChips = ltp
-                ? [
-                    { label: '−10%', val: (ltp * 0.9).toFixed(2) },
-                    { label: '−5%', val: (ltp * 0.95).toFixed(2) },
-                    { label: 'LTP', val: ltp.toFixed(2) },
-                    { label: '+5%', val: (ltp * 1.05).toFixed(2) },
-                    { label: '+10%', val: (ltp * 1.1).toFixed(2) },
-                  ]
-                : null
-              const dateChips = [
-                { label: 'Mon', val: nextWeekday(1) },
-                { label: '+1w', val: dateOffset(7) },
-                { label: '+2w', val: dateOffset(14) },
-                { label: '+1m', val: dateOffset(30) },
-              ]
-              const noteTags = ['Breakout', 'Dip buy', 'Earnings', 'Long term', 'Sector play']
-              return (
-                <div className="border-b border-gray-100 dark:border-gray-800 bg-white dark:bg-gray-900">
-                  {/* Symbol + LTP strip */}
-                  <div className="flex items-center justify-between px-3 py-2 border-b border-gray-100 dark:border-gray-800 bg-gray-50 dark:bg-gray-800/50">
-                    <div className="flex items-center gap-2 min-w-0">
-                      <p
-                        className="text-[12px] font-bold text-gray-900 dark:text-white"
-                        translate="no"
-                      >
-                        {watchAddState.symbol}
-                      </p>
-                      {ltp != null ? (
-                        <span className="text-[10px] font-semibold tabular-nums text-gray-500 dark:text-gray-400 bg-gray-200/60 dark:bg-gray-700 px-1.5 py-0.5 rounded">
-                          LTP Rs.{ltp.toLocaleString()}
-                        </span>
-                      ) : (
-                        <span className="text-[10px] text-gray-400">No live price</span>
-                      )}
-                    </div>
-                    <button
-                      onClick={() => {
-                        setWatchAddState(null)
-                        setWatchForm({
-                          price_alert: '',
-                          alert_date: '',
-                          watch_low: '',
-                          watch_high: '',
-                          notes: '',
-                        })
-                      }}
-                      className="text-[11px] text-gray-400 hover:text-gray-600 dark:hover:text-gray-300 leading-none px-1"
-                    >
-                      ✕
-                    </button>
-                  </div>
-                  <form onSubmit={handleAddWatch} className="px-3 py-2.5 space-y-2.5">
-                    {/* ── Price Alert ── */}
-                    <div>
-                      <p className="text-[9px] font-semibold uppercase tracking-widest text-gray-400 mb-1">
-                        Price Alert
-                      </p>
-                      {pctChips && (
-                        <div className="flex gap-1 mb-1.5 flex-wrap">
-                          {pctChips.map((c) => (
-                            <button
-                              key={c.label}
-                              type="button"
-                              onClick={() => setWatchForm((f) => ({ ...f, price_alert: c.val }))}
-                              className={`px-1.5 py-0.5 rounded text-[9px] font-semibold transition-colors border ${
-                                watchForm.price_alert === c.val
-                                  ? 'bg-blue-600 border-blue-600 text-white'
-                                  : c.label.startsWith('−')
-                                    ? 'border-red-200 dark:border-red-800 text-red-500 dark:text-red-400 hover:bg-red-50 dark:hover:bg-red-950/40'
-                                    : c.label.startsWith('+')
-                                      ? 'border-green-200 dark:border-green-800 text-green-600 dark:text-green-400 hover:bg-green-50 dark:hover:bg-green-950/40'
-                                      : 'border-gray-200 dark:border-gray-700 text-gray-500 dark:text-gray-400 hover:bg-gray-50 dark:hover:bg-gray-800'
-                              }`}
-                            >
-                              {c.label}
-                            </button>
-                          ))}
-                        </div>
-                      )}
-                      <input
-                        type="number"
-                        min="0"
-                        step="0.01"
-                        value={watchForm.price_alert}
-                        onChange={(e) =>
-                          setWatchForm((f) => ({ ...f, price_alert: e.target.value }))
-                        }
-                        placeholder="0.00"
-                        autoComplete="off"
-                        className="w-full bg-gray-50 dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg px-2.5 py-1.5 text-[11px] text-gray-800 dark:text-gray-100 placeholder-gray-300 dark:placeholder-gray-600 outline-none focus:border-blue-400 dark:focus:border-blue-500 focus:ring-1 focus:ring-blue-300/40 transition-all"
-                      />
-                      {watchForm.price_alert &&
-                        ltp != null &&
-                        (() => {
-                          const pct = ((parseFloat(watchForm.price_alert) - ltp) / ltp) * 100
-                          return (
-                            <p
-                              className={`text-[9px] mt-0.5 tabular-nums ${pct >= 0 ? 'text-green-500' : 'text-red-400'}`}
-                            >
-                              {pct >= 0 ? '+' : ''}
-                              {pct.toFixed(1)}% from LTP
-                            </p>
-                          )
-                        })()}
-                    </div>
-
-                    {/* ── Target Date ── */}
-                    <div>
-                      <p className="text-[9px] font-semibold uppercase tracking-widest text-gray-400 mb-1">
-                        Target Date
-                      </p>
-                      <div className="flex gap-1 mb-1.5">
-                        {dateChips.map((c) => (
-                          <button
-                            key={c.label}
-                            type="button"
-                            onClick={() => setWatchForm((f) => ({ ...f, alert_date: c.val }))}
-                            className={`px-1.5 py-0.5 rounded text-[9px] font-semibold transition-colors border ${
-                              watchForm.alert_date === c.val
-                                ? 'bg-blue-600 border-blue-600 text-white'
-                                : 'border-gray-200 dark:border-gray-700 text-gray-500 dark:text-gray-400 hover:bg-gray-50 dark:hover:bg-gray-800'
-                            }`}
-                          >
-                            {c.label}
-                          </button>
-                        ))}
-                      </div>
-                      <input
-                        type="date"
-                        value={watchForm.alert_date}
-                        onChange={(e) =>
-                          setWatchForm((f) => ({ ...f, alert_date: e.target.value }))
-                        }
-                        className="w-full bg-gray-50 dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg px-2.5 py-1.5 text-[11px] text-gray-800 dark:text-gray-100 outline-none focus:border-blue-400 dark:focus:border-blue-500 focus:ring-1 focus:ring-blue-300/40 transition-all"
-                      />
-                      {watchForm.alert_date && (
-                        <p className="text-[9px] mt-0.5 text-blue-500">
-                          {Math.ceil(
-                            (new Date(watchForm.alert_date + 'T00:00:00') - watchToday) / 86400000
-                          )}
-                          d from today
-                        </p>
-                      )}
-                    </div>
-
-                    {/* ── Watch Range ── */}
-                    <div className="grid grid-cols-2 gap-2">
-                      <div>
-                        <p className="text-[9px] font-semibold uppercase tracking-widest text-gray-400 mb-1">
-                          Watch Low
-                        </p>
-                        <input
-                          type="number"
-                          min="0"
-                          step="0.01"
-                          value={watchForm.watch_low}
-                          onChange={(e) =>
-                            setWatchForm((f) => ({ ...f, watch_low: e.target.value }))
-                          }
-                          placeholder="0.00"
-                          autoComplete="off"
-                          className="w-full bg-gray-50 dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg px-2.5 py-1.5 text-[11px] text-gray-800 dark:text-gray-100 placeholder-gray-300 dark:placeholder-gray-600 outline-none focus:border-red-300 dark:focus:border-red-500/50 focus:ring-1 focus:ring-red-200/50 transition-all"
-                        />
-                      </div>
-                      <div>
-                        <p className="text-[9px] font-semibold uppercase tracking-widest text-gray-400 mb-1">
-                          Watch High
-                        </p>
-                        <input
-                          type="number"
-                          min="0"
-                          step="0.01"
-                          value={watchForm.watch_high}
-                          onChange={(e) =>
-                            setWatchForm((f) => ({ ...f, watch_high: e.target.value }))
-                          }
-                          placeholder="0.00"
-                          autoComplete="off"
-                          className="w-full bg-gray-50 dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg px-2.5 py-1.5 text-[11px] text-gray-800 dark:text-gray-100 placeholder-gray-300 dark:placeholder-gray-600 outline-none focus:border-green-300 dark:focus:border-green-500/50 focus:ring-1 focus:ring-green-200/50 transition-all"
-                        />
-                      </div>
-                    </div>
-
-                    {/* ── Notes + quick tags ── */}
-                    <div>
-                      <p className="text-[9px] font-semibold uppercase tracking-widest text-gray-400 mb-1">
-                        Notes
-                      </p>
-                      <div className="flex gap-1 flex-wrap mb-1.5">
-                        {noteTags.map((tag) => (
-                          <button
-                            key={tag}
-                            type="button"
-                            onClick={() =>
-                              setWatchForm((f) => {
-                                // Append the tag (comma-separated) instead of no-op'ing once
-                                // notes had any text. Skip if the tag is already present.
-                                const cur = f.notes.trim()
-                                if (cur.split(/,\s*/).includes(tag)) return f
-                                return { ...f, notes: cur ? `${cur}, ${tag}` : tag }
-                              })
-                            }
-                            className="px-1.5 py-0.5 rounded text-[9px] font-medium border border-gray-200 dark:border-gray-700 text-gray-500 dark:text-gray-400 hover:bg-gray-50 dark:hover:bg-gray-800 transition-colors"
-                          >
-                            {tag}
-                          </button>
-                        ))}
-                      </div>
-                      <input
-                        type="text"
-                        value={watchForm.notes}
-                        maxLength={300}
-                        autoComplete="off"
-                        onChange={(e) => setWatchForm((f) => ({ ...f, notes: e.target.value }))}
-                        placeholder="Setup reason, catalyst…"
-                        className="w-full bg-gray-50 dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg px-2.5 py-1.5 text-[11px] text-gray-800 dark:text-gray-100 placeholder-gray-300 dark:placeholder-gray-600 outline-none focus:border-blue-400 dark:focus:border-blue-500 focus:ring-1 focus:ring-blue-300/40 transition-all"
-                      />
-                    </div>
-
-                    {watchActionErr && (
-                      <p className="text-[10px] text-red-500 bg-red-50 dark:bg-red-950/50 px-2.5 py-1.5 rounded-lg">
-                        {watchActionErr}
-                      </p>
-                    )}
-                    <button
-                      type="submit"
-                      disabled={watchAdding}
-                      className="w-full bg-blue-600 hover:bg-blue-700 disabled:opacity-50 text-white py-2 rounded-lg text-[11px] font-bold transition-colors"
-                    >
-                      {watchAdding ? 'Adding…' : 'Add to Watchlist'}
-                    </button>
-                  </form>
-                </div>
-              )
-            })()}
-
-          {/* List */}
-          {watchlistTab === 'positions' ? (
-            <div className="overflow-y-auto no-scrollbar max-h-[280px]">
-              {openPositions.length === 0 ? (
-                <div className="p-6 text-center">
-                  <p className="text-gray-400 text-xs">No open positions</p>
-                  <button
-                    onClick={() => navigate('/logs')}
-                    className="mt-2 text-blue-500 text-xs hover:underline"
-                  >
-                    + Add a trade
-                  </button>
-                </div>
-              ) : (
-                <div className="divide-y divide-gray-50 dark:divide-gray-800">
-                  {openPositions.map((t) => {
-                    const slDistPct =
-                      t.sl != null && t.currentPrice
-                        ? t.position === 'SHORT'
-                          ? (((t.sl - t.currentPrice) / t.currentPrice) * 100).toFixed(1)
-                          : (((t.currentPrice - t.sl) / t.currentPrice) * 100).toFixed(1)
-                        : null
-                    const tpDistPct =
-                      t.tp != null && t.currentPrice
-                        ? t.position === 'SHORT'
-                          ? (((t.currentPrice - t.tp) / t.currentPrice) * 100).toFixed(1)
-                          : (((t.tp - t.currentPrice) / t.currentPrice) * 100).toFixed(1)
-                        : null
-                    const isHl = highlightSym === t.symbol?.toUpperCase()
-                    return (
-                      <div
-                        key={t.id}
-                        ref={(el) => {
-                          const k = t.symbol?.toUpperCase()
-                          if (!k) return
-                          if (el) watchRowRefs.current[k] = el
-                          else delete watchRowRefs.current[k]
-                        }}
-                        className={`px-3 py-2.5 hover:bg-gray-50 dark:hover:bg-gray-800 transition-colors ${isHl ? 'hp-highlight' : ''}`}
-                        translate="no"
-                      >
-                        <div className="flex items-center justify-between">
-                          <div className="flex items-center gap-2">
-                            <StockAvatar symbol={t.symbol} size="w-7 h-7" textSize="text-[10px]" />
-                            <div>
-                              <div className="flex items-center gap-1.5">
-                                <p className="text-xs font-semibold text-gray-900 dark:text-white">
-                                  {t.symbol}
-                                </p>
-                                <span
-                                  className={`text-[10px] px-1 py-0.5 rounded font-medium ${
-                                    t.position === 'LONG'
-                                      ? 'bg-green-100 text-green-700 dark:bg-green-900 dark:text-green-300'
-                                      : 'bg-red-100 text-red-700 dark:bg-red-900 dark:text-red-300'
-                                  }`}
-                                >
-                                  {t.position}
-                                </span>
-                                {t.status === 'PARTIAL' && (
-                                  <span className="text-[10px] px-1 py-0.5 rounded bg-orange-100 text-orange-600 dark:bg-orange-900 dark:text-orange-300 font-medium">
-                                    P
-                                  </span>
-                                )}
-                              </div>
-                              <p className="text-[10px] text-gray-400">
-                                {t.quantity} @ Rs.{(t.entry_price || 0).toLocaleString()}
-                              </p>
-                            </div>
-                          </div>
-                          <div className="text-right">
-                            {t.unrealizedPnl != null ? (
-                              <p
-                                className={`text-xs font-semibold ${t.unrealizedPnl >= 0 ? 'text-green-500' : 'text-red-500'}`}
-                              >
-                                {t.unrealizedPnl >= 0 ? '+' : ''}Rs.
-                                {Math.abs(t.unrealizedPnl).toLocaleString()}
-                              </p>
-                            ) : (
-                              <p className="text-xs text-gray-400">—</p>
-                            )}
-                            {t.pnlPct != null && (
-                              <p
-                                className={`text-[10px] ${parseFloat(t.pnlPct) >= 0 ? 'text-green-400' : 'text-red-400'}`}
-                              >
-                                {parseFloat(t.pnlPct) >= 0 ? '+' : ''}
-                                {t.pnlPct}%
-                              </p>
-                            )}
-                          </div>
-                        </div>
-                        <div className="flex items-center gap-1.5 mt-1.5 ml-9 flex-wrap">
-                          {t.sl != null ? (
-                            <span className="text-[10px] bg-red-50 dark:bg-red-900/40 text-red-500 px-1.5 py-0.5 rounded">
-                              SL{' '}
-                              {slDistPct !== null
-                                ? `${parseFloat(slDistPct) > 0 ? '+' : ''}${slDistPct}%`
-                                : `Rs.${t.sl.toLocaleString()}`}
-                            </span>
-                          ) : (
-                            <span className="text-[10px] bg-orange-50 dark:bg-orange-900/40 text-orange-500 px-1.5 py-0.5 rounded">
-                              ⚠ No SL
-                            </span>
-                          )}
-                          {t.tp != null && (
-                            <span className="text-[10px] bg-green-50 dark:bg-green-900/40 text-green-500 px-1.5 py-0.5 rounded">
-                              TP{' '}
-                              {tpDistPct !== null
-                                ? `${parseFloat(tpDistPct) > 0 ? '+' : ''}${tpDistPct}%`
-                                : `Rs.${t.tp.toLocaleString()}`}
-                            </span>
-                          )}
-                        </div>
-                      </div>
-                    )
-                  })}
-                  <button
-                    onClick={() => navigate('/portfolio')}
-                    className="w-full px-4 py-2 text-[11px] font-semibold text-blue-500 hover:text-blue-700 hover:bg-blue-50 dark:hover:bg-blue-900/20 transition-colors text-center"
-                  >
-                    View all in Portfolio →
-                  </button>
-                </div>
-              )}
-            </div>
-          ) : (
-            <div className="flex gap-2 p-2 overflow-x-auto no-scrollbar snap-x snap-mandatory">
-              {filteredWatch.length === 0 ? (
-                <div className="w-full py-8 text-center">
-                  <p className="text-[11px] text-gray-400">
-                    No stocks in {watchlistTab === 'active' ? 'Active' : 'Pre-Watch'}
-                  </p>
-                  <p className="text-[10px] text-gray-300 dark:text-gray-600 mt-1">
-                    {watchlistTab === 'active'
-                      ? 'Items auto-promote when alert is within 15% or 2 weeks'
-                      : 'Click + to add a symbol'}
-                  </p>
-                </div>
-              ) : (
-                filteredWatch.map((item) => {
-                  const isExpired = item.wStatus === 'expired'
-                  const inGrace = item.wStatus === 'grace'
-                  const priceFill =
-                    item.price_alert && item.currentPrice
-                      ? Math.max(
-                          0,
-                          Math.min(
-                            100,
-                            100 -
-                              (Math.abs(
-                                (item.currentPrice - parseFloat(item.price_alert)) /
-                                  item.currentPrice
-                              ) *
-                                100) /
-                                15
-                          )
-                        )
-                      : null
-                  const meta = item.price_alert
-                    ? `@ Rs.${parseFloat(item.price_alert).toLocaleString()}`
-                    : item.alert_date
-                      ? `By ${new Date(item.alert_date + 'T00:00:00').toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}`
-                      : item.notes || null
-                  const isUp = item.change != null && item.change >= 0
-
-                  const isHl = highlightSym === item.symbol?.toUpperCase()
-                  return (
-                    <div
-                      key={item.id}
-                      ref={(el) => {
-                        const k = item.symbol?.toUpperCase()
-                        if (!k) return
-                        if (el) watchRowRefs.current[k] = el
-                        else delete watchRowRefs.current[k]
-                      }}
-                      onContextMenu={watchCtx([
-                        { label: 'Edit', icon: '✏️', action: () => openWatchEdit(item) },
-                        { separator: true },
-                        {
-                          label: 'Delete',
-                          icon: '🗑️',
-                          danger: true,
-                          action: () => handleRemoveWatch(item.id),
-                        },
-                      ])}
-                      className={`hp-watch-item relative flex flex-col gap-1 px-1.5 py-1.5 rounded-xl cursor-default snap-start
-                    shrink-0 basis-[calc((100%-1rem)/3)] sm:basis-[calc((100%-1.5rem)/4)]
-                    bg-white/70 dark:bg-gray-800/50 border border-white/80 dark:border-white/5
-                    backdrop-blur-sm shadow-sm border-l-[3px] ${getStockBorder(item.symbol)}
-                    ${isExpired ? 'opacity-50' : ''} ${isHl ? 'hp-highlight' : ''}`}
-                      translate="no"
-                    >
-                      {/* Avatar + symbol */}
-                      <div className="flex items-center gap-1">
-                        <StockAvatar symbol={item.symbol} size="w-5 h-5" textSize="text-[8px]" />
-                        <span
-                          className={`text-[10px] font-bold leading-none truncate ${isExpired ? 'text-gray-400 dark:text-gray-500' : 'text-gray-900 dark:text-white'}`}
-                        >
-                          {item.symbol}
-                        </span>
-                      </div>
-
-                      {/* Price + change */}
-                      <div className="flex items-baseline justify-between gap-0.5">
-                        <p className="text-[11px] font-bold tabular-nums text-gray-900 dark:text-white leading-none truncate">
-                          {item.currentPrice != null
-                            ? `Rs.${parseFloat(item.currentPrice).toLocaleString()}`
-                            : '—'}
-                        </p>
-                        {item.change != null && (
-                          <span
-                            className={`text-[9px] font-semibold tabular-nums shrink-0 ${isUp ? 'text-green-500 dark:text-green-400' : 'text-red-500 dark:text-red-400'}`}
-                          >
-                            {isUp ? '+' : ''}
-                            {item.change}%
-                          </span>
-                        )}
-                      </div>
-
-                      {/* Meta */}
-                      {meta && (
-                        <p className="text-[8px] text-gray-400 dark:text-gray-500 truncate leading-none">
-                          {meta}
-                        </p>
-                      )}
-
-                      {/* Status badges */}
-                      {(isExpired || inGrace) && (
-                        <div className="flex gap-1">
-                          {isExpired && (
-                            <span className="text-[8px] px-1 py-0.5 rounded bg-gray-100 dark:bg-gray-700 text-gray-400 font-semibold uppercase tracking-wide">
-                              Exp
-                            </span>
-                          )}
-                          {inGrace && (
-                            <span className="text-[8px] px-1 py-0.5 rounded bg-amber-100 dark:bg-amber-900/30 text-amber-600 dark:text-amber-400 font-semibold uppercase tracking-wide">
-                              Grace
-                            </span>
-                          )}
-                        </div>
-                      )}
-
-                      {/* Progress bar */}
-                      {watchlistTab === 'active' && priceFill != null && (
-                        <div className="h-0.5 w-full bg-gray-100 dark:bg-gray-700/60 rounded-full overflow-hidden">
-                          <div
-                            className={`h-full rounded-full ${getStockBar(item.symbol)} transition-all`}
-                            style={{ width: `${priceFill}%` }}
-                          />
-                        </div>
-                      )}
-
-                      {/* Alert badges */}
-                      {(() => {
-                        const msgs = watchAlertMsgs(item)
-                        if (!msgs.length) return null
-                        return (
-                          <div className="flex flex-wrap gap-0.5">
-                            {msgs.map((m, i) => (
-                              <span
-                                key={i}
-                                className={`text-[8px] font-medium px-1 py-0.5 rounded-full ${m.bg} ${m.color}`}
-                              >
-                                {m.text}
-                              </span>
-                            ))}
-                          </div>
-                        )
-                      })()}
-                    </div>
-                  )
-                })
-              )}
-            </div>
-          )}
-        </div>
-      </div>
-      {/* end watchlist section */}
+      {/* ── Watchlist (extracted t30 HOME-10; multi-select delete HOME-16) ────── */}
+      <WatchlistPanel
+        watchlist={watchlist}
+        setWatchlist={setWatchlist}
+        openPositions={openPositions}
+        onRefresh={onRefresh}
+        priceMapRef={priceMapRef}
+        navigate={navigate}
+      />
     </div>
   )
 }
@@ -2303,6 +1070,7 @@ function LoggedInHome() {
   const { user } = useAuth()
   const navigate = useNavigate()
   const [initData, setInitData] = useState(null)
+  const [fetchError, setFetchError] = useState(null)
   const [mobileTopTab, setMobileTopTab] = useState('tasks') // 'tasks' | 'discipline'
   const [mobileBottomTab, setMobileBottomTab] = useState('goals') // 'goals' | 'alerts'
 
@@ -2311,8 +1079,10 @@ function LoggedInHome() {
     try {
       const res = await getDashboardInit(force)
       setInitData(res.data)
+      setFetchError(null)
     } catch (err) {
       console.error(err)
+      setFetchError('Failed to load dashboard. Please refresh.')
     }
   }, [])
 
@@ -2336,28 +1106,54 @@ function LoggedInHome() {
     day: 'numeric',
   })
 
+  // A failed initial fetch left `initData` null forever — without this, CenterDashboard's own
+  // `loading` (derived purely from `!initData`) never clears, so the page was stuck on the
+  // skeleton indefinitely with no error shown and no way to retry.
+  if (fetchError && !initData)
+    return (
+      <div className="flex items-center justify-center min-h-[60vh]">
+        <div className="text-center space-y-3">
+          <p className="text-[13px] text-red-400 font-medium">{fetchError}</p>
+          <button
+            onClick={() => {
+              setFetchError(null)
+              fetchDashboard(true)
+            }}
+            className="text-[11px] text-blue-500 border border-blue-200 dark:border-blue-800 px-4 py-1.5 rounded-lg transition-colors hover:text-blue-400"
+          >
+            Retry
+          </button>
+        </div>
+      </div>
+    )
+
   return (
     <>
       {/* Use flex-col so side columns can stretch to remaining height without hardcoding greeting bar px */}
-      <div className="w-full px-3 sm:px-4 py-3 sm:py-4 pb-safe min-h-[100dvh] flex flex-col bg-gradient-to-br from-slate-100 via-gray-50 to-blue-50/30 dark:from-gray-950 dark:via-gray-950 dark:to-slate-900">
-        {/* Greeting bar — shrinks to its content, never stretches */}
-        <div className="flex items-center justify-between mb-3 sm:mb-4 px-1 animate-fade-up flex-shrink-0">
-          <div>
-            <p className="text-sm font-semibold text-gray-800 dark:text-gray-200">
-              {getGreeting()}, {user?.name?.split(' ')[0] || 'Trader'} 👋
-            </p>
-            <p className="text-[11px] text-gray-400 mt-0.5">{today}</p>
+      <div className="w-full px-3 sm:px-4 py-3 sm:py-4 pb-safe min-h-[100dvh] flex flex-col bg-gradient-to-br from-slate-100 via-gray-50 to-blue-50/30 dark:bg-none dark:bg-gray-950">
+        {/* Content cap — wider than LogsPage/PortfolioPage's max-w-7xl on purpose
+            (owner call: this is a trading OS, a 27" monitor is a real target, not
+            an edge case to shrink away from). Below ~1800px this is a no-op; above
+            it, stops the 12-col grid from linear-stretching into oversized cards
+            with huge dead space. Background gradient stays full-bleed on the outer
+            div above. */}
+        <div className="w-full max-w-[1800px] mx-auto flex flex-col flex-1 min-h-0">
+          {/* Greeting bar — shrinks to its content, never stretches */}
+          <div className="flex items-center justify-between mb-3 sm:mb-4 px-1 animate-fade-up flex-shrink-0">
+            <div>
+              <p className="text-sm font-semibold text-gray-800 dark:text-gray-200">
+                {getGreeting()},{' '}
+                <span className={TIER_TEXT[getDisplayTier(user)] || ''}>
+                  {user?.name?.split(' ')[0] || 'Trader'}
+                </span>
+              </p>
+              <p className="text-[11px] text-gray-400 mt-0.5">{today}</p>
+            </div>
+            <MarketStatusChip />
           </div>
-          <div className="flex items-center gap-1.5 bg-green-50 dark:bg-green-900/20 border border-green-200 dark:border-green-800/40 rounded-full px-2.5 py-1">
-            <div className="w-1.5 h-1.5 bg-green-500 rounded-full animate-pulse flex-shrink-0" />
-            <span className="text-[10px] font-semibold text-green-600 dark:text-green-400">
-              Live
-            </span>
-          </div>
-        </div>
 
-        {/* 3-Column Layout — flex-1 so it fills exactly the remaining height */}
-        <div className="flex-1 min-h-0 grid grid-cols-12 gap-3 sm:gap-4">
+          {/* 3-Column Layout — flex-1 so it fills exactly the remaining height */}
+          <div className="flex-1 min-h-0 grid grid-cols-12 gap-3 sm:gap-4">
           {/* CENTER — always first on mobile */}
           <div className="col-span-12 lg:col-span-6 order-1 lg:order-2 min-h-0">
             <CenterDashboard
@@ -2369,10 +1165,12 @@ function LoggedInHome() {
             />
           </div>
 
-          {/* LEFT column — desktop only: stacked 35/65 rows, fills remaining height exactly */}
+          {/* LEFT column — desktop only: Daily Routine sizes to its own content (HOME-18 —
+              was a forced 35fr row, leaving dead space below its short task list), Monthly
+              Goals absorbs whatever height is left. */}
           <div
             className="hidden lg:grid col-span-3 order-1 gap-3 min-h-0"
-            style={{ gridTemplateRows: '35fr 65fr' }}
+            style={{ gridTemplateRows: 'auto 1fr' }}
           >
             {initData ? (
               <>
@@ -2381,21 +1179,22 @@ function LoggedInHome() {
               </>
             ) : (
               <>
-                <div className="rounded-2xl bg-gray-100 dark:bg-gray-800 animate-pulse min-h-[120px]" />
+                <div className="rounded-2xl bg-gray-100 dark:bg-gray-800 animate-pulse min-h-[170px]" />
                 <div className="rounded-2xl bg-gray-100 dark:bg-gray-800 animate-pulse min-h-[200px]" />
               </>
             )}
           </div>
 
-          {/* RIGHT column — desktop only: stacked 35/65 rows, fills remaining height exactly */}
+          {/* RIGHT column — desktop only: Discipline Score sizes to its own content (HOME-18 —
+              same forced-height issue as the left column), Alerts absorbs what's left. */}
           <div
             className="hidden lg:grid col-span-3 order-3 gap-3 min-h-0"
-            style={{ gridTemplateRows: '35fr 65fr' }}
+            style={{ gridTemplateRows: 'auto 1fr' }}
           >
             {initData ? (
               <DisciplineScore initData={initData.discipline} />
             ) : (
-              <div className="rounded-2xl bg-gray-100 dark:bg-gray-800 animate-pulse min-h-[120px]" />
+              <div className="rounded-2xl bg-gray-100 dark:bg-gray-800 animate-pulse min-h-[170px]" />
             )}
             {initData ? (
               <AlertsWidget initData={initData} />
@@ -2448,8 +1247,65 @@ function LoggedInHome() {
           </div>
           {/* end mobile panels wrapper */}
         </div>
+        </div>
       </div>
     </>
+  )
+}
+
+// ── Home skeleton — the authLoading gate's placeholder. Mirrors LoggedInHome's
+// own shell (greeting bar + 3-column grid) instead of the generic cross-page
+// PageSkeleton, so there's no shape change when LoggedInHome takes over —
+// previously the generic skeleton → this one was an visible seam on any slow
+// reload (cold cache / hard reload), since it only ever showed briefly enough
+// to go unnoticed on a warm reload. `user` isn't known yet at this point, so
+// the greeting text itself is a pulse bar rather than real content.
+function HomeSkeleton() {
+  return (
+    <div className="w-full px-3 sm:px-4 py-3 sm:py-4 pb-safe min-h-[100dvh] flex flex-col bg-gradient-to-br from-slate-100 via-gray-50 to-blue-50/30 dark:bg-none dark:bg-gray-950">
+      <div className="w-full max-w-[1800px] mx-auto flex flex-col flex-1 min-h-0">
+        {/* Greeting bar */}
+        <div className="flex items-center justify-between mb-3 sm:mb-4 px-1 flex-shrink-0 animate-pulse">
+          <div>
+            <div className="h-[18px] w-40 bg-gray-100 dark:bg-gray-800 rounded mb-1.5" />
+            <div className="h-[14px] w-52 bg-gray-100 dark:bg-gray-800 rounded" />
+          </div>
+          <div className="h-6 w-24 bg-gray-100 dark:bg-gray-800 rounded-full" />
+        </div>
+
+        {/* 3-Column Layout */}
+        <div className="flex-1 min-h-0 grid grid-cols-12 gap-3 sm:gap-4">
+          {/* CENTER — always first on mobile */}
+          <div className="col-span-12 lg:col-span-6 order-1 lg:order-2 min-h-0">
+            <CenterDashboardSkeleton />
+          </div>
+
+          {/* LEFT column — desktop only. Rows match LoggedInHome's real auto/1fr split (HOME-18)
+              so the skeleton→real swap has no visible shape change. */}
+          <div
+            className="hidden lg:grid col-span-3 order-1 gap-3 min-h-0"
+            style={{ gridTemplateRows: 'auto 1fr' }}
+          >
+            <div className="rounded-2xl bg-gray-100 dark:bg-gray-800 animate-pulse min-h-[170px]" />
+            <div className="rounded-2xl bg-gray-100 dark:bg-gray-800 animate-pulse min-h-[200px]" />
+          </div>
+
+          {/* RIGHT column — desktop only. Same auto/1fr split as LoggedInHome (HOME-18). */}
+          <div
+            className="hidden lg:grid col-span-3 order-3 gap-3 min-h-0"
+            style={{ gridTemplateRows: 'auto 1fr' }}
+          >
+            <div className="rounded-2xl bg-gray-100 dark:bg-gray-800 animate-pulse min-h-[170px]" />
+            <div className="rounded-2xl bg-gray-100 dark:bg-gray-800 animate-pulse min-h-[200px]" />
+          </div>
+
+          {/* MOBILE only */}
+          <div className="col-span-12 lg:hidden order-2">
+            <div className="rounded-2xl bg-gray-100 dark:bg-gray-800 animate-pulse min-h-[180px]" />
+          </div>
+        </div>
+      </div>
+    </div>
   )
 }
 
@@ -2457,12 +1313,14 @@ function LoggedInHome() {
 function HomePage() {
   const { user, loading } = useAuth()
   return (
-    <div className="min-h-[100dvh] bg-gradient-to-br from-slate-100 via-gray-50 to-blue-50/30 dark:from-gray-950 dark:via-gray-950 dark:to-slate-900 transition-colors">
+    <div className="min-h-[100dvh] bg-gradient-to-br from-slate-100 via-gray-50 to-blue-50/30 dark:bg-none dark:bg-gray-950 transition-colors">
       {/* Wait for /api/auth/me before choosing a view. `/` is public, so without
           this gate `user` is null on reload and the logged-OUT landing flashes
-          for ~1s before flipping to LoggedInHome. Spinner matches PrivateRoute. */}
+          for ~1s before flipping to LoggedInHome. HomeSkeleton (not the generic
+          PageSkeleton) so the loading shape stays identical once LoggedInHome
+          takes over and shows its own initData-loading state. */}
       {loading ? (
-        <PageSkeleton />
+        <HomeSkeleton />
       ) : user ? (
         <LoggedInHome />
       ) : (

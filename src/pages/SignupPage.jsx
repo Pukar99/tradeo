@@ -11,6 +11,7 @@ import AuthFormShell, {
   PasswordToggle,
   AuthErrorBanner,
   AuthSubmitButton,
+  GoogleAuthSection,
 } from '../components/auth/AuthFormShell'
 import { suggestEmail, authFieldClass } from '../utils/authForm'
 
@@ -230,7 +231,7 @@ function SignupPage() {
   const [loading, setLoading] = useState(false)
   const [emailHint, setEmailHint] = useState('') // "did you mean …" suggestion
 
-  const { login, user } = useAuth()
+  const { user } = useAuth()
   const { t } = useLanguage()
   const navigate = useNavigate()
 
@@ -291,8 +292,8 @@ function SignupPage() {
     setLoading(true)
     try {
       const { data } = await signupUser({ name: name.trim(), email: email.trim(), password })
-      login(data.user, data.token)
-      navigate('/')
+      // No session yet — signup now requires email verification before login.
+      navigate('/verify', { state: { email: data.email } })
     } catch (err) {
       setServerError(err.response?.data?.message || 'Signup failed. Please try again.')
     } finally {
@@ -478,6 +479,8 @@ function SignupPage() {
           {t('signupPage.btn')}
         </AuthSubmitButton>
       </form>
+
+      <GoogleAuthSection onError={setServerError} />
 
       <p className="text-sm text-gray-400 mt-5 text-center">
         {t('signupPage.hasAccount')}{' '}

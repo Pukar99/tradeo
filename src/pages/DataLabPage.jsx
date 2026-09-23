@@ -11,7 +11,7 @@ import {
 } from 'react'
 import { useNavbarAutoHide, useNavbarState } from '../App'
 import { createPortal } from 'react-dom'
-import { ComplexTabProvider } from '../hooks/useComplexTab.jsx'
+import { AdvancedTabProvider } from '../hooks/useAdvancedTab.jsx'
 import ErrorBoundary from '../components/ErrorBoundary'
 import UpgradePrompt from '../components/UpgradePrompt'
 import AuthWall from '../components/AuthWall'
@@ -20,6 +20,8 @@ import ComingSoon from '../components/ComingSoon'
 import { useAuth } from '../context/AuthContext'
 import { safeSessionGet, safeSessionSet } from '../utils/safeSession'
 import { DataLabControlsProvider } from '../components/datalab/DataLabControls'
+import { TIER_TEXT, getDisplayTier } from '../components/common/TierMaterial'
+import { useSlidingIndicator } from '../hooks/useSlidingIndicator'
 
 // ── Toolbar slot — portal approach ────────────────────────────────────────────
 // Parent passes a ref to the slot DOM node via context.
@@ -276,26 +278,26 @@ function TabContent({ activeTab }) {
     return user.tier === 'basic' && !user?.is_admin ? (
       <UpgradePrompt feature="Insight" />
     ) : (
-      <ComplexTabProvider>
+      <AdvancedTabProvider>
         <ErrorBoundary label="Insight">
           <Suspense fallback={<TabLoader />}>
             <InsightPage />
           </Suspense>
         </ErrorBoundary>
-      </ComplexTabProvider>
+      </AdvancedTabProvider>
     )
 
   if (activeTab === 'breakdown')
     return user.tier === 'basic' && !user?.is_admin ? (
       <UpgradePrompt feature="Breakdown" />
     ) : (
-      <ComplexTabProvider>
+      <AdvancedTabProvider>
         <ErrorBoundary label="Breakdown">
           <Suspense fallback={<TabLoader />}>
             <BreakdownPage />
           </Suspense>
         </ErrorBoundary>
-      </ComplexTabProvider>
+      </AdvancedTabProvider>
     )
 
   return null
@@ -315,6 +317,7 @@ export default function DataLabPage() {
   )
   const slotRef = useRef(null)
   const { user, loading: authLoading } = useAuth()
+  const displayTier = getDisplayTier(user)
 
   // Opt into navbar auto-hide — activates on mount, restores on unmount
   useNavbarAutoHide()
@@ -324,16 +327,32 @@ export default function DataLabPage() {
     setActiveTab(id)
     safeSessionSet('tradeo_datalab_tab', id)
   }
+  const tabIndicator = useSlidingIndicator(activeTab, handleTab)
 
   // Whole shell is skeleton while /api/auth/me resolves — gating only the content
   // body would leave the real tab labels visible above the skeleton on reload.
+  // Shaped like DataLab's own toolbar (chips + slot + info button), and reuses
+  // PageSkeleton's "tab" variant for the body since that's already the same
+  // shape TabLoader shows once a tab's lazy chunk is loading — no shape change
+  // on handoff either way.
   if (authLoading) {
     return (
       <div
-        className="flex flex-col overflow-hidden bg-white dark:bg-gray-900"
+        className="flex flex-col overflow-hidden bg-white dark:bg-gray-900 animate-pulse"
         style={{ height: '100dvh' }}
+        aria-hidden="true"
       >
-        <PageSkeleton toolbar />
+        <div className="w-full max-w-[1800px] mx-auto flex-1 min-h-0 flex flex-col">
+          <div className="shrink-0 flex items-center gap-1.5 px-3 py-1 border-b border-gray-200 dark:border-gray-800">
+            <div className="h-6 w-52 bg-gray-100 dark:bg-gray-800 rounded-lg shrink-0" />
+            <div className="w-px h-4 bg-gray-100 dark:bg-gray-800 shrink-0" />
+            <div className="flex-1" />
+            <div className="h-5 w-5 bg-gray-100 dark:bg-gray-800 rounded-full shrink-0" />
+          </div>
+          <div className="flex-1 min-h-0 flex flex-col">
+            <PageSkeleton variant="tab" />
+          </div>
+        </div>
       </div>
     )
   }
@@ -351,6 +370,10 @@ export default function DataLabPage() {
           transition: 'padding-top 300ms ease-in-out',
         }}
       >
+        {/* Content cap — matches every other page's max-w-[1800px] convention
+            (owner call: consistent even on this workspace-style page). Toolbar
+            and content stay aligned since both live inside this same wrapper. */}
+        <div className="w-full max-w-[1800px] mx-auto flex-1 min-h-0 flex flex-col">
         {/* ── Tab bar + inline toolbar ──
             Strategy: ONLY the slot scrolls horizontally. The outer row is a
             simple flex with hard shrink-0 on the chips and info button so they
@@ -363,16 +386,27 @@ export default function DataLabPage() {
           onMouseEnter={showNavbar}
         >
           {/* Compact tab chips — never compress */}
-          <div className="flex items-center gap-0.5 bg-gray-100 dark:bg-gray-800 rounded-lg p-0.5 shrink-0">
+          <div
+            ref={tabIndicator.containerRef}
+            onPointerDown={tabIndicator.onPointerDown}
+            className="relative flex items-center gap-0.5 bg-gray-100 dark:bg-gray-800 rounded-lg p-0.5 shrink-0"
+          >
+            <div
+              aria-hidden="true"
+              className="absolute top-0 left-0 rounded-md bg-white dark:bg-gray-700 shadow-sm transition-[transform,width,height] duration-300 ease-luxury pointer-events-none"
+              style={tabIndicator.indicatorStyle}
+            />
             {TABS.map((tab) => {
               const isActive = tab.id === activeTab
               return (
                 <button
                   key={tab.id}
+                  data-indicator-active={isActive || undefined}
+                  data-indicator-key={tab.id}
                   onClick={() => handleTab(tab.id)}
-                  className={`flex items-center gap-1 px-2 py-0.5 rounded-md text-[10px] font-semibold transition-all whitespace-nowrap ${
+                  className={`relative z-10 flex items-center gap-1 px-2 py-0.5 rounded-md text-[10px] font-semibold transition-colors whitespace-nowrap ${
                     isActive
-                      ? 'bg-white dark:bg-gray-700 text-gray-900 dark:text-white shadow-sm'
+                      ? TIER_TEXT[displayTier] || 'text-gray-900 dark:text-white'
                       : 'text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-300'
                   }`}
                 >
@@ -423,6 +457,7 @@ export default function DataLabPage() {
           onMouseEnter={navHidden ? undefined : scheduleHide}
         >
           <TabContent activeTab={activeTab} />
+        </div>
         </div>
       </div>
       </DataLabControlsProvider>

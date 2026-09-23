@@ -16,6 +16,9 @@ import {
   ToolbarMenu,
   ToolbarMenuSection,
 } from '../components/screen/ScreenToolbarAtoms'
+import { useAuth } from '../context/AuthContext'
+import { TIER_TEXT, getDisplayTier } from '../components/common/TierMaterial'
+import { useSlidingIndicator } from '../hooks/useSlidingIndicator'
 
 import TradeActionsTab from '../components/logs/TradeActionsTab'
 import AuditTab from '../components/logs/AuditTab'
@@ -42,6 +45,8 @@ function resolveTabParam(t) {
 }
 
 export default function LogsPage() {
+  const { user } = useAuth()
+  const displayTier = getDisplayTier(user)
   const [positions, setPositions] = useState([])
   const [ltpMap, setLtpMap] = useState({})
   const [loading, setLoading] = useState(true)
@@ -70,9 +75,11 @@ export default function LogsPage() {
     },
     [setSearchParams]
   )
+  const mainTabIndicator = useSlidingIndicator(activeTab, handleTabChange)
 
   // Shared log view — persists across Trades + Market tabs
   const [view, setView] = useState('database')
+  const viewIndicator = useSlidingIndicator(view, setView)
   const [filter, setFilter] = useState('open')
   const [search, setSearch] = useState('')
   const [addModal, setAddModal] = useState(false)
@@ -210,17 +217,28 @@ export default function LogsPage() {
 
   // Shared view toggle (Database/Gallery) — inline on desktop, inside the ☰ menu on mobile
   const viewToggle = (
-    <div className="flex items-center gap-0.5 bg-gray-100 dark:bg-gray-800 rounded-md p-0.5">
+    <div
+      ref={viewIndicator.containerRef}
+      onPointerDown={viewIndicator.onPointerDown}
+      className="relative flex items-center gap-0.5 bg-gray-100 dark:bg-gray-800 rounded-md p-0.5"
+    >
+      <div
+        aria-hidden="true"
+        className="absolute top-0 left-0 rounded bg-white dark:bg-gray-700 shadow-sm transition-[transform,width,height] duration-300 ease-luxury pointer-events-none"
+        style={viewIndicator.indicatorStyle}
+      />
       {[
         { key: 'database', label: 'Database' },
         { key: 'gallery', label: 'Gallery' },
       ].map((v) => (
         <button
           key={v.key}
+          data-indicator-active={view === v.key || undefined}
+          data-indicator-key={v.key}
           onClick={() => setView(v.key)}
-          className={`flex-1 px-1.5 py-0.5 rounded text-[10px] font-semibold transition-colors whitespace-nowrap ${
+          className={`relative z-10 flex-1 px-1.5 py-0.5 rounded text-[10px] font-semibold transition-colors whitespace-nowrap ${
             view === v.key
-              ? 'bg-white dark:bg-gray-700 text-gray-900 dark:text-white shadow-sm'
+              ? TIER_TEXT[displayTier] || 'text-gray-900 dark:text-white'
               : 'text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-300'
           }`}
         >
@@ -235,14 +253,25 @@ export default function LogsPage() {
       {/* ── Sticky toolbar — full-width border-b, DataLab pattern exactly ── */}
       <div className="shrink-0 flex items-center gap-1.5 px-3 py-1 border-b border-gray-200 dark:border-gray-800 bg-white dark:bg-gray-900">
         {/* Tab chips */}
-        <div className="flex items-center gap-0.5 bg-gray-100 dark:bg-gray-800 rounded-lg p-0.5 shrink-0">
+        <div
+          ref={mainTabIndicator.containerRef}
+          onPointerDown={mainTabIndicator.onPointerDown}
+          className="relative flex items-center gap-0.5 bg-gray-100 dark:bg-gray-800 rounded-lg p-0.5 shrink-0"
+        >
+          <div
+            aria-hidden="true"
+            className="absolute top-0 left-0 rounded-md bg-white dark:bg-gray-700 shadow-sm transition-[transform,width,height] duration-300 ease-luxury pointer-events-none"
+            style={mainTabIndicator.indicatorStyle}
+          />
           {TABS.map((tab) => (
             <button
               key={tab.key}
+              data-indicator-active={activeTab === tab.key || undefined}
+              data-indicator-key={tab.key}
               onClick={() => handleTabChange(tab.key)}
-              className={`px-2 py-0.5 rounded-md text-[10px] font-semibold transition-all whitespace-nowrap ${
+              className={`relative z-10 px-2 py-0.5 rounded-md text-[10px] font-semibold transition-colors whitespace-nowrap ${
                 activeTab === tab.key
-                  ? 'bg-white dark:bg-gray-700 text-gray-900 dark:text-white shadow-sm'
+                  ? TIER_TEXT[displayTier] || 'text-gray-900 dark:text-white'
                   : 'text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-300'
               }`}
             >
@@ -488,7 +517,7 @@ export default function LogsPage() {
           </div>
         )}
 
-        <div className="px-3 sm:px-5 py-4 pb-16 max-w-7xl mx-auto">
+        <div className="px-3 sm:px-5 py-4 pb-16 max-w-[1800px] mx-auto">
           {activeTab === 'trades' && (
             <TradeActionsTab
               positions={positions}

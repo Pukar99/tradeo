@@ -30,31 +30,35 @@ function ChatPage() {
   }
 
   return (
-    // Edge-to-edge: no max-width cap, fills full viewport height minus the navbar.
-    // 56px mobile navbar / 64px desktop — kept as data-comment; update if Navbar height changes.
-    <div className="bg-gray-100 dark:bg-gray-950 h-[calc(100dvh-56px)] sm:h-[calc(100dvh-64px)] flex gap-3 p-3 sm:p-4">
+    // Fills full viewport height minus the navbar (56px mobile / 64px desktop —
+    // kept as data-comment; update if Navbar height changes). Content is capped
+    // at max-w-[1800px] below (owner call: consistent with every other page,
+    // even the workspace-style ones) so the chat column doesn't get absurdly
+    // wide on 27"+ monitors; background stays full-bleed on this outer div.
+    <div className="bg-gray-100 dark:bg-gray-950 h-[calc(100dvh-56px)] sm:h-[calc(100dvh-64px)] p-3 sm:p-4">
+      <div className="max-w-[1800px] mx-auto h-full flex gap-3">
+        {/* ── Left sidebar: Trader Profile (desktop only, always open) ── */}
+        <aside className="hidden lg:flex flex-col w-72 xl:w-80 flex-shrink-0 min-h-0 overflow-y-auto gap-3">
+          {/* Sidebar header */}
+          <div className="bg-white dark:bg-gray-900 rounded-2xl border border-gray-100 dark:border-gray-800 px-4 py-3">
+            <p className="text-sm font-bold text-gray-900 dark:text-white leading-none">AI Trading Assistant</p>
+            <p className="text-[11px] text-gray-400 mt-0.5">Powered by Groq · NEPSE-aware</p>
+          </div>
+          {/* TraderProfile — opened by default in ChatPage (full profile always visible) */}
+          <TraderProfile defaultOpen />
+        </aside>
 
-      {/* ── Left sidebar: Trader Profile (desktop only, always open) ── */}
-      <aside className="hidden lg:flex flex-col w-72 xl:w-80 flex-shrink-0 min-h-0 overflow-y-auto gap-3">
-        {/* Sidebar header */}
-        <div className="bg-white dark:bg-gray-900 rounded-2xl border border-gray-100 dark:border-gray-800 px-4 py-3">
-          <p className="text-sm font-bold text-gray-900 dark:text-white leading-none">AI Trading Assistant</p>
-          <p className="text-[11px] text-gray-400 mt-0.5">Powered by Groq · NEPSE-aware</p>
-        </div>
-        {/* TraderProfile — opened by default in ChatPage (full profile always visible) */}
-        <TraderProfile defaultOpen />
-      </aside>
-
-      {/* ── Right: chat panel, fills remaining space, never overflows ── */}
-      <div className="flex-1 min-w-0 flex flex-col">
-        {/* Mobile page label (hidden lg+, the chat header already says "Tradeo AI") */}
-        <div className="lg:hidden mb-2 px-1">
-          <p className="text-[13px] font-bold text-gray-900 dark:text-white">AI Trading Assistant</p>
-          <p className="text-[10px] text-gray-400">Powered by Groq · NEPSE-aware</p>
-        </div>
-        {/* Chat container: rounded card, strict height so only the message list scrolls */}
-        <div className="flex-1 min-h-0 bg-white dark:bg-gray-900 rounded-2xl border border-gray-100 dark:border-gray-800 overflow-hidden flex flex-col">
-          <AIChat isFullPage={true} />
+        {/* ── Right: chat panel, fills remaining space, never overflows ── */}
+        <div className="flex-1 min-w-0 flex flex-col">
+          {/* Mobile page label (hidden lg+, the chat header already says "Tradeo AI") */}
+          <div className="lg:hidden mb-2 px-1">
+            <p className="text-[13px] font-bold text-gray-900 dark:text-white">AI Trading Assistant</p>
+            <p className="text-[10px] text-gray-400">Powered by Groq · NEPSE-aware</p>
+          </div>
+          {/* Chat container: rounded card, strict height so only the message list scrolls */}
+          <div className="flex-1 min-h-0 bg-white dark:bg-gray-900 rounded-2xl border border-gray-100 dark:border-gray-800 overflow-hidden flex flex-col">
+            <AIChat isFullPage={true} />
+          </div>
         </div>
       </div>
     </div>

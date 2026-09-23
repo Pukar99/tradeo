@@ -1,4 +1,4 @@
-import { describe, test, expect } from 'vitest'
+import { describe, test, expect, vi } from 'vitest'
 import {
   nepseCommission,
   sebonFee,
@@ -66,6 +66,12 @@ describe('NEPSE fee utilities', () => {
 describe('number formatters', () => {
   test('today() is YYYY-MM-DD', () => {
     expect(today()).toMatch(/^\d{4}-\d{2}-\d{2}$/)
+  })
+  test('today() rolls over at Nepal midnight, not UTC midnight', () => {
+    vi.useFakeTimers()
+    vi.setSystemTime(new Date('2026-07-18T18:30:00.000Z'))
+    expect(today()).toBe('2026-07-19')
+    vi.useRealTimers()
   })
   test('fmtRs: absolute, rounded, grouped; forex → $2dp', () => {
     expect(fmtRs(-500)).toBe('Rs.500')

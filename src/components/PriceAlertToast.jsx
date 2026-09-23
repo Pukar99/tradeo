@@ -21,6 +21,7 @@ function Toast({ alert, onDismiss }) {
   }, [onDismiss])
 
   const isAbove = alert.direction === 'above'
+  const isDateReminder = alert.type === 'date'
 
   return (
     <div className="flex items-start gap-3 bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-700 rounded-2xl shadow-xl px-4 py-3 w-72 animate-fade-up">
@@ -34,19 +35,25 @@ function Toast({ alert, onDismiss }) {
       {/* Content */}
       <div className="flex-1 min-w-0">
         <p className="text-[11px] font-bold text-gray-900 dark:text-white">
-          {alert.symbol} — Alert Triggered
+          {alert.symbol} — {isDateReminder ? 'Reminder Due' : 'Alert Triggered'}
         </p>
-        <p className="text-[10px] text-gray-500 dark:text-gray-400 mt-0.5 leading-snug">
-          LTP{' '}
-          <span className="font-semibold text-gray-800 dark:text-gray-200">
-            Rs.{parseFloat(alert.ltp).toLocaleString()}
-          </span>{' '}
-          {isAbove ? 'reached' : 'near'} your target{' '}
-          <span className={`font-semibold ${isAbove ? 'text-emerald-500' : 'text-amber-500'}`}>
-            Rs.{parseFloat(alert.price_alert).toLocaleString()}
-          </span>
-        </p>
-        {alert.pct_change != null && (
+        {isDateReminder ? (
+          <p className="text-[10px] text-gray-500 dark:text-gray-400 mt-0.5 leading-snug">
+            {alert.notes || `Reminder scheduled for ${alert.alert_date}`}
+          </p>
+        ) : (
+          <p className="text-[10px] text-gray-500 dark:text-gray-400 mt-0.5 leading-snug">
+            LTP{' '}
+            <span className="font-semibold text-gray-800 dark:text-gray-200">
+              Rs.{parseFloat(alert.ltp).toLocaleString()}
+            </span>{' '}
+            {isAbove ? 'reached' : 'near'} your target{' '}
+            <span className={`font-semibold ${isAbove ? 'text-emerald-500' : 'text-amber-500'}`}>
+              Rs.{parseFloat(alert.price_alert).toLocaleString()}
+            </span>
+          </p>
+        )}
+        {!isDateReminder && alert.pct_change != null && (
           <p
             className={`text-[10px] font-semibold mt-0.5 ${alert.pct_change >= 0 ? 'text-emerald-500' : 'text-red-400'}`}
           >

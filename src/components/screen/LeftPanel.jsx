@@ -1,7 +1,7 @@
 // === LeftPanel.jsx — screen left panel: portfolio positions, watchlist, BUY/SELL modal, SL/TP alerts ===
 import { useState, useEffect, useCallback, useRef, useMemo, memo } from 'react'
 import { createPortal } from 'react-dom'
-import { newPosition, closePosition, removeFromWatchlist, updateWatchlist } from '../../api'
+import { closePosition, removeFromWatchlist, updateWatchlist } from '../../api'
 import { getBatchPrices, getWatchlist, clearWatchlistCache } from '../../utils/globalCache'
 import { useContextMenu } from '../ContextMenu'
 import { useChatRefresh, dispatchChatAction } from '../../utils/chatEvents'
@@ -10,130 +10,11 @@ import { useAuth } from '../../context/AuthContext'
 import { useEscapeKey } from '../../hooks/useEscapeKey'
 import { ALERT_PCT_THRESHOLD } from '../../utils/constants'
 import { apiError } from '../../utils/format'
-
-// ── BUY / SELL Modal ──────────────────────────────────────────────────────────
-
-function TradeModal({ side, symbol, onClose, onSaved }) {
-  const [form, setForm] = useState({ entry_price: '', sl: '', tp: '', quantity: '', notes: '' })
-  const [saving, setSaving] = useState(false)
-  const [err, setErr] = useState(null)
-
-  useEscapeKey(onClose)
-
-  const isBuy = side === 'BUY'
-  const set = (k, v) => setForm((f) => ({ ...f, [k]: v }))
-
-  const handleSave = async () => {
-    if (!form.entry_price || !form.quantity) {
-      setErr('Entry price and quantity are required')
-      return
-    }
-    setSaving(true)
-    setErr(null)
-    try {
-      await newPosition({
-        symbol,
-        position: isBuy ? 'LONG' : 'SHORT',
-        entry_price: parseFloat(form.entry_price),
-        sl: form.sl ? parseFloat(form.sl) : null,
-        tp: form.tp ? parseFloat(form.tp) : null,
-        quantity: parseInt(form.quantity),
-        notes: form.notes || null,
-        entry_date: new Date().toISOString().slice(0, 10),
-      })
-      dispatchChatAction('ADD_TRADE')
-      onSaved()
-      onClose()
-    } catch (e) {
-      setErr(apiError(e, 'Failed to save trade'))
-    } finally {
-      setSaving(false)
-    }
-  }
-
-  return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
-      <div className="absolute inset-0 bg-black/60 backdrop-blur-sm" onClick={onClose} />
-      <div className="relative bg-white dark:bg-gray-900 rounded-2xl shadow-2xl border border-gray-200 dark:border-gray-700 w-full max-w-sm z-10 overflow-hidden flex flex-col max-h-[90vh] animate-modal-in">
-        <div
-          className={`flex items-center justify-between px-5 py-4 shrink-0 ${isBuy ? 'bg-gradient-to-r from-emerald-500 to-emerald-600' : 'bg-gradient-to-r from-red-500 to-red-600'}`}
-        >
-          <div className="flex items-center gap-2.5">
-            <div className="w-7 h-7 rounded-full bg-white/20 flex items-center justify-center">
-              <span className="text-white text-[11px] font-black">{isBuy ? '↑' : '↓'}</span>
-            </div>
-            <div>
-              <p className="text-[13px] font-black text-white tracking-wide">
-                {isBuy ? 'BUY' : 'SELL'}
-              </p>
-              <p className="text-[10px] text-white/70 font-medium" translate="no">
-                {symbol}
-              </p>
-            </div>
-          </div>
-          <button
-            onClick={onClose}
-            className="w-7 h-7 flex items-center justify-center rounded-full bg-white/15 hover:bg-white/25 transition-colors text-white text-[16px]"
-          >
-            ×
-          </button>
-        </div>
-
-        <div className="px-5 py-4 space-y-3 overflow-y-auto">
-          {[
-            ['Entry Price', 'entry_price', 'e.g. 1234'],
-            ['Stop Loss (SL)', 'sl', 'e.g. 1100'],
-            ['Target Price (TP)', 'tp', 'e.g. 1400'],
-            ['Quantity', 'quantity', 'No. of shares'],
-          ].map(([label, key, ph]) => (
-            <div key={key}>
-              <label className="block text-[10px] font-semibold uppercase tracking-widest text-gray-400 mb-1">
-                {label}
-              </label>
-              <input
-                type="number"
-                value={form[key]}
-                onChange={(e) => set(key, e.target.value)}
-                placeholder={ph}
-                className="w-full bg-gray-50 dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-xl px-3 py-2 text-[12px] text-gray-800 dark:text-gray-200 outline-none focus:ring-2 focus:ring-blue-300 dark:focus:ring-blue-800 transition-all"
-              />
-            </div>
-          ))}
-          <div>
-            <label className="block text-[10px] font-semibold uppercase tracking-widest text-gray-400 mb-1">
-              Notes
-            </label>
-            <input
-              type="text"
-              value={form.notes}
-              onChange={(e) => set('notes', e.target.value)}
-              placeholder="Optional notes..."
-              className="w-full bg-gray-50 dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-xl px-3 py-2 text-[12px] text-gray-800 dark:text-gray-200 outline-none focus:ring-2 focus:ring-blue-300 dark:focus:ring-blue-800 transition-all"
-            />
-          </div>
-
-          {err && (
-            <p className="text-[10px] text-red-500 bg-red-50 dark:bg-red-950/50 px-3 py-2 rounded-xl">
-              {err}
-            </p>
-          )}
-
-          <button
-            onClick={handleSave}
-            disabled={saving}
-            className={`w-full py-3 rounded-xl text-[12px] font-bold text-white transition-all shadow-lg ${
-              isBuy
-                ? 'bg-gradient-to-r from-emerald-500 to-emerald-600 hover:from-emerald-600 hover:to-emerald-700 shadow-emerald-200 dark:shadow-emerald-900/40 disabled:opacity-50'
-                : 'bg-gradient-to-r from-red-500 to-red-600 hover:from-red-600 hover:to-red-700 shadow-red-200 dark:shadow-red-900/40 disabled:opacity-50'
-            }`}
-          >
-            {saving ? 'Saving...' : `Confirm ${side}`}
-          </button>
-        </div>
-      </div>
-    </div>
-  )
-}
+import { nptToday } from '../../utils/nepseCalendar'
+import { TIER_TEXT, getDisplayTier } from '../common/TierMaterial'
+import { useSlidingIndicator } from '../../hooks/useSlidingIndicator'
+import TradeModal from './TradeModal'
+import { IconBell } from '../common/icons'
 
 // ── Close Position Confirm ────────────────────────────────────────────────────
 
@@ -150,7 +31,7 @@ function CloseConfirm({ position, onClose, onDone }) {
       const latestClose = position._latestPrice || position.entry_price
       await closePosition(position.trade_id, {
         exit_price: latestClose,
-        date: new Date().toISOString().slice(0, 10),
+        date: nptToday(),
       })
       dispatchChatAction('CLOSE_TRADE')
       onDone()
@@ -474,6 +355,17 @@ const WatchlistCard = memo(function WatchlistCard({ w, selected, onSelect, onEdi
                 )}
               </div>
             )}
+            {w.price_alert && (
+              <div
+                className="flex items-center gap-1 mt-1 text-[9px] text-amber-500 dark:text-amber-400"
+                translate="no"
+              >
+                <IconBell className="w-2.5 h-2.5 shrink-0" />
+                <span className="font-semibold">
+                  Alert @ Rs.{parseFloat(w.price_alert).toLocaleString()}
+                </span>
+              </div>
+            )}
             {w.notes && <p className="text-[9px] text-gray-400 mt-0.5 truncate">{w.notes}</p>}
           </div>
         </div>
@@ -494,6 +386,7 @@ export default function LeftPanel() {
     positionsLoading,
   } = useScreen()
   const { user } = useAuth()
+  const displayTier = getDisplayTier(user)
 
   const positions = useMemo(
     () =>
@@ -518,6 +411,7 @@ export default function LeftPanel() {
   const [watchlist, setWatchlist] = useState([])
   const [pendingDelete, setPendingDelete] = useState(null)
   const [tab, setTab] = useState('portfolio')
+  const tabIndicator = useSlidingIndicator(tab, setTab)
   const [watchErr, setWatchErr] = useState(null)
   // Guests have no watchlist — start resolved so the panel shows its empty state
   // instead of a spinner (the fetch below is skipped for them).
@@ -677,17 +571,28 @@ export default function LeftPanel() {
       <div className="flex-1 flex flex-col min-h-0">
         {/* Tab bar */}
         <div className="flex gap-1 px-2 pt-2 pb-1.5 shrink-0">
-          <div className="flex gap-1 flex-1 bg-white/30 dark:bg-white/[0.05] backdrop-blur-sm rounded-xl p-0.5 border border-white/20 dark:border-white/[0.06]">
+          <div
+            ref={tabIndicator.containerRef}
+            onPointerDown={tabIndicator.onPointerDown}
+            className="relative flex gap-1 flex-1 bg-white/30 dark:bg-white/[0.05] backdrop-blur-sm rounded-xl p-0.5 border border-white/20 dark:border-white/[0.06]"
+          >
+            <div
+              aria-hidden="true"
+              className="absolute top-0 left-0 rounded-lg bg-white dark:bg-gray-700 shadow-sm transition-[transform,width,height] duration-300 ease-luxury pointer-events-none"
+              style={tabIndicator.indicatorStyle}
+            />
             {[
               ['portfolio', 'Portfolio', positions.length],
               ['watchlist', 'Watchlist', watchlist.length],
             ].map(([key, label, count]) => (
               <button
                 key={key}
+                data-indicator-active={tab === key || undefined}
+                data-indicator-key={key}
                 onClick={() => setTab(key)}
-                className={`flex-1 flex items-center justify-center gap-1 py-1.5 rounded-lg text-[10px] font-bold transition-all ${
+                className={`relative z-10 flex-1 flex items-center justify-center gap-1 py-1.5 rounded-lg text-[10px] font-bold transition-colors ${
                   tab === key
-                    ? 'bg-white dark:bg-gray-700 text-gray-900 dark:text-white shadow-sm'
+                    ? TIER_TEXT[displayTier] || 'text-gray-900 dark:text-white'
                     : 'text-gray-400 dark:text-gray-500 hover:text-gray-600 dark:hover:text-gray-400'
                 }`}
               >

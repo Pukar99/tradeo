@@ -282,11 +282,6 @@ export default function BreakdownPage() {
   useEffect(() => {
     if (focused) {
       runAnalysis(focused)
-      if (pendingStockRef.current) {
-        const s = pendingStockRef.current
-        pendingStockRef.current = null
-        loadStockChart(s, focused)
-      }
     } else clearAnalysis()
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [focused, runAnalysis, clearAnalysis])
@@ -371,11 +366,6 @@ export default function BreakdownPage() {
     },
     [focused]
   )
-
-  // pendingStockRef: queues a stock selected before its cycle is focused —
-  // focusing runs analysis, which resets stock state, so the queued symbol
-  // loads after the focus effect fires (see the useEffect above).
-  const pendingStockRef = useRef(null)
 
   // Analytics rework: clicking a Top movers / Consistency / Scan row routes the
   // stock into Compare (side A = NEPSE/index baseline, side B = the clicked stock)

@@ -4,7 +4,6 @@ import { useNavigate } from 'react-router-dom'
 import {
   getTodayTasks,
   toggleFixedTask,
-  addCustomTask,
   updateCustomTask,
   deleteCustomTask,
   getMindset,
@@ -12,6 +11,9 @@ import {
 } from '../../api'
 import { gCache } from '../../utils/globalCache'
 import { useContextMenu } from '../ContextMenu'
+import { IconTrash } from '../common/icons'
+import { useAuth } from '../../context/AuthContext'
+import { TIER_ACCENT, TierAccentOverlay, tierRingClass, getDisplayTier } from '../common/TierMaterial'
 
 // ── SVG icons (no emojis) ─────────────────────────────────────────────────────
 const Icons = {
@@ -98,11 +100,6 @@ const Icons = {
         strokeLinejoin="round"
         d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14"
       />
-    </svg>
-  ),
-  plus: (
-    <svg className="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-      <path strokeLinecap="round" strokeLinejoin="round" d="M12 4v16m8-8H4" />
     </svg>
   ),
   tradeLog: (
@@ -544,55 +541,6 @@ function JournalChoiceModal({ onClose, onDone }) {
   )
 }
 
-// ── Grade system (blue/indigo — distinct from DisciplineScore's green) ────────
-const GRADE = (pct) => {
-  if (pct >= 100) return { color: 'text-indigo-500', ring: '#6366f1' }
-  if (pct >= 67) return { color: 'text-blue-500', ring: '#3b82f6' }
-  if (pct >= 33) return { color: 'text-blue-400', ring: '#60a5fa' }
-  return { color: 'text-gray-400', ring: '#9ca3af' }
-}
-
-// ── Ring — same as DisciplineScore, blue palette ──────────────────────────────
-function Ring({ pct, completed, total }) {
-  const size = 72
-  const r = 27
-  const circ = 2 * Math.PI * r
-  const offset = circ - (pct / 100) * circ
-  const grade = GRADE(pct)
-
-  return (
-    <div className="relative flex-shrink-0" style={{ width: size, height: size }}>
-      <svg width={size} height={size} viewBox="0 0 72 72" className="-rotate-90">
-        <circle
-          cx="36"
-          cy="36"
-          r={r}
-          fill="none"
-          stroke="currentColor"
-          className="text-gray-100 dark:text-gray-800"
-          strokeWidth="6"
-        />
-        <circle
-          cx="36"
-          cy="36"
-          r={r}
-          fill="none"
-          stroke={grade.ring}
-          strokeWidth="6"
-          strokeLinecap="round"
-          strokeDasharray={circ}
-          strokeDashoffset={offset}
-          style={{ transition: 'stroke-dashoffset 0.9s ease' }}
-        />
-      </svg>
-      <div className="absolute inset-0 flex flex-col items-center justify-center">
-        <span className={`text-base font-bold leading-none ${grade.color}`}>{completed}</span>
-        <span className={`text-[9px] font-semibold ${grade.color} opacity-70`}>/ {total}</span>
-      </div>
-    </div>
-  )
-}
-
 // ── Task bar — mirrors DimBar from DisciplineScore ────────────────────────────
 const BAR_COLOR = (done) =>
   done ? 'bg-gradient-to-r from-blue-400 to-indigo-400' : 'bg-gray-200 dark:bg-gray-700'
@@ -660,14 +608,14 @@ function TaskBar({ label, iconType = 'custom', done, onClick, onDelete }) {
 
 // ── Main component ────────────────────────────────────────────────────────────
 function TaskBoard({ initData, mindsetContent }) {
+  const { user } = useAuth()
+  const displayTier = getDisplayTier(user)
+  const accent = TIER_ACCENT[displayTier]
   const [fixedTasks, setFixedTasks] = useState(
     FIXED_TASKS.map((task) => ({ ...task, completed: false }))
   )
   const [customTasks, setCustomTasks] = useState([])
-  const [newTask, setNewTask] = useState('')
   const [loading, setLoading] = useState(!initData)
-  const [adding, setAdding] = useState(false)
-  const [showAdd, setShowAdd] = useState(false)
   const [activeModal, setActiveModal] = useState(null)
   const [mutateErr, setMutateErr] = useState(null)
   const { onContextMenu: _ocm, ContextMenuPortal } = useContextMenu()
@@ -681,7 +629,7 @@ function TaskBoard({ initData, mindsetContent }) {
         preventDefault: () => {},
         stopPropagation: () => {},
       }
-      _ocm([{ label: 'Delete', icon: '🗑️', danger: true, action: onDelete }])(fakeEvent)
+      _ocm([{ label: 'Delete', icon: <IconTrash />, danger: true, action: onDelete }])(fakeEvent)
     }
     window.addEventListener('taskrow-context', handler)
     return () => window.removeEventListener('taskrow-context', handler)
@@ -724,44 +672,32 @@ function TaskBoard({ initData, mindsetContent }) {
     setActiveModal({ type: task.type, task })
   }
 
+  // Optimistic toggles: flip the UI immediately, roll back on API failure —
+  // the card never waits on the network for a checkbox.
   const handleTaskDone = async (taskId) => {
+    setMutateErr(null)
+    setFixedTasks((prev) => prev.map((t) => (t.id === taskId ? { ...t, completed: true } : t)))
     try {
       await toggleFixedTask(taskId)
-      setFixedTasks((prev) => prev.map((t) => (t.id === taskId ? { ...t, completed: true } : t)))
       gCache.del('dashboard')
     } catch (err) {
       console.error('[toggle error]', err.response?.data || err.message)
+      setFixedTasks((prev) => prev.map((t) => (t.id === taskId ? { ...t, completed: false } : t)))
       setMutateErr('Failed to save — please try again')
     }
   }
 
   const handleToggleCustom = async (task) => {
     setMutateErr(null)
+    const flip = (val) => (prev) =>
+      prev.map((t) => (t.id === task.id ? { ...t, completed: val } : t))
+    setCustomTasks(flip(!task.completed))
     try {
       await updateCustomTask(task.id, !task.completed)
-      setCustomTasks((prev) =>
-        prev.map((t) => (t.id === task.id ? { ...t, completed: !t.completed } : t))
-      )
       gCache.del('dashboard')
     } catch {
+      setCustomTasks(flip(task.completed))
       setMutateErr('Failed to update task')
-    }
-  }
-
-  const handleAddTask = async (e) => {
-    e.preventDefault()
-    if (!newTask.trim()) return
-    setAdding(true)
-    setMutateErr(null)
-    try {
-      const res = await addCustomTask(newTask.trim())
-      setCustomTasks((prev) => [...prev, res.data])
-      setNewTask('')
-      setShowAdd(false)
-    } catch {
-      setMutateErr('Failed to add task')
-    } finally {
-      setAdding(false)
     }
   }
 
@@ -777,15 +713,13 @@ function TaskBoard({ initData, mindsetContent }) {
 
   if (loading)
     return (
-      <div className="bg-white/70 dark:bg-gray-900/60 backdrop-blur-md rounded-2xl border border-white/60 dark:border-white/10 shadow-sm p-4 flex flex-col gap-3 animate-pulse h-full">
+      <div className="bg-white/70 dark:bg-gray-900/90 backdrop-blur-md dark:backdrop-blur-sm rounded-2xl border border-white/60 dark:border-white/10 shadow-sm p-4 flex flex-col gap-3 animate-pulse">
         <div className="h-3 bg-gray-100 dark:bg-gray-800 rounded w-1/2" />
-        <div className="flex gap-3">
-          <div className="w-[72px] h-[72px] rounded-full bg-gray-100 dark:bg-gray-800 flex-shrink-0" />
-          <div className="flex-1 space-y-3 pt-2">
-            {[1, 2, 3].map((i) => (
-              <div key={i} className="h-5 bg-gray-100 dark:bg-gray-800 rounded" />
-            ))}
-          </div>
+        <div className="h-1 bg-gray-100 dark:bg-gray-800 rounded-full w-full" />
+        <div className="space-y-3">
+          {[1, 2, 3].map((i) => (
+            <div key={i} className="h-5 bg-gray-100 dark:bg-gray-800 rounded" />
+          ))}
         </div>
       </div>
     )
@@ -814,105 +748,74 @@ function TaskBoard({ initData, mindsetContent }) {
         />
       )}
 
-      <div className="hp-card bg-white/70 dark:bg-gray-900/60 backdrop-blur-md rounded-2xl border border-white/60 dark:border-white/10 shadow-sm flex flex-col h-full overflow-hidden">
-        {/* Fixed header — never scrolls */}
-        <div className="flex items-center justify-between px-4 pt-4 pb-2 flex-shrink-0">
-          <h3 className="text-[11px] font-semibold uppercase tracking-widest text-gray-400 dark:text-gray-500">
-            Daily Routine
-          </h3>
-          {totalDone === totalTasks && totalTasks > 0 && (
-            <span className="text-[10px] text-indigo-400 font-medium tracking-wide">
-              All done ✓
-            </span>
-          )}
-        </div>
-
-        {/* Ring + scrollable task list */}
-        <div className="flex items-start gap-3 px-4 min-w-0 flex-1 min-h-0">
-          {/* Ring — fixed, never scrolls */}
-          <div className="flex flex-col items-center gap-1 flex-shrink-0 pt-1">
-            <Ring pct={fixedProgress} completed={totalDone} total={totalTasks} />
+      <div
+        className={`hp-card group relative bg-white/70 dark:bg-gray-900/90 backdrop-blur-md dark:backdrop-blur-sm rounded-2xl ${accent ? '' : 'border'} border-white/60 dark:border-white/10 flex flex-col overflow-hidden ${accent ? tierRingClass(displayTier) : 'shadow-sm'}`}
+      >
+        <TierAccentOverlay accent={accent} />
+        {/* Header — title + done-count + progress bar, same shape as MonthlyGoals' header
+            (HOME-18: replaces the old ring — mirrors the card directly below it instead of
+            inventing a second progress idiom). */}
+        <div className="px-4 pt-4 pb-3">
+          <div className="flex items-center justify-between mb-2">
+            <h3 className="text-[11px] font-semibold uppercase tracking-widest text-gray-400 dark:text-gray-500">
+              Daily Routine
+            </h3>
+            {totalDone === totalTasks && totalTasks > 0 && (
+              <span className="text-[10px] text-indigo-400 font-medium tracking-wide">
+                All done ✓
+              </span>
+            )}
           </div>
-
-          {/* Task list — scrolls when overflow */}
-          <div className="flex-1 min-w-0 overflow-y-auto no-scrollbar py-1 space-y-2.5">
-            {fixedTasks.map((task) => (
-              <TaskBar
-                key={task.id}
-                label={task.title}
-                iconType={task.type}
-                done={task.completed}
-                onClick={() => handleFixedClick(task)}
-              />
-            ))}
-            {customTasks.map((task) => (
-              <TaskBar
-                key={task.id}
-                label={task.title}
-                iconType="custom"
-                done={task.completed}
-                onClick={() => handleToggleCustom(task)}
-                onDelete={() => handleDeleteCustom(task.id)}
-              />
-            ))}
+          <p className="text-[10px] text-gray-400 mt-0.5 mb-2">
+            {totalDone}/{totalTasks} done · {fixedProgress}%
+          </p>
+          <div className="w-full h-1 bg-gray-100 dark:bg-gray-800 rounded-full overflow-hidden">
+            <div
+              className={`h-full rounded-full transition-all duration-500 ${
+                fixedProgress === 100
+                  ? 'bg-gradient-to-r from-indigo-500 to-violet-500'
+                  : fixedProgress >= 50
+                    ? 'bg-gradient-to-r from-indigo-500 to-blue-400'
+                    : 'bg-indigo-400'
+              }`}
+              style={{ width: `${fixedProgress}%` }}
+            />
           </div>
         </div>
 
-        {/* Fixed footer — add task, never scrolls */}
-        <div className="flex-shrink-0 border-t border-gray-50 dark:border-gray-800 px-4 py-2.5 space-y-1.5">
-          {mutateErr && (
+        {/* Task list — card now sizes to its content (no forced height), so this is
+            plain block flow, not a scroll area. */}
+        <div className="px-4 pb-4 flex flex-col gap-2.5">
+          {fixedTasks.map((task) => (
+            <TaskBar
+              key={task.id}
+              label={task.title}
+              iconType={task.type}
+              done={task.completed}
+              onClick={() => handleFixedClick(task)}
+            />
+          ))}
+          {customTasks.map((task) => (
+            <TaskBar
+              key={task.id}
+              label={task.title}
+              iconType="custom"
+              done={task.completed}
+              onClick={() => handleToggleCustom(task)}
+              onDelete={() => handleDeleteCustom(task.id)}
+            />
+          ))}
+        </div>
+
+        {/* Mutation errors only (custom tasks are added via the AI chat / future
+            Settings page, not from the routine card) */}
+        {mutateErr && (
+          <div className="border-t border-gray-50 dark:border-gray-800 px-4 py-2.5">
             <p className="text-[10px] text-red-500 bg-red-50 dark:bg-red-950 px-2 py-1 rounded-lg">
               {mutateErr}
             </p>
-          )}
-          {showAdd ? (
-            <form onSubmit={handleAddTask} className="flex gap-1.5">
-              <input
-                type="text"
-                value={newTask}
-                onChange={(e) => setNewTask(e.target.value)}
-                placeholder="Task name…"
-                autoFocus
-                maxLength={100}
-                className="flex-1 bg-gray-50 dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg px-2.5 py-1.5 text-[11px] text-gray-800 dark:text-white placeholder-gray-400 focus:outline-none focus:border-blue-400 transition-colors min-w-0"
-              />
-              <button
-                type="submit"
-                disabled={adding || !newTask.trim()}
-                className="bg-blue-500 hover:bg-blue-400 disabled:opacity-40 text-white px-3 py-1.5 rounded-lg text-[11px] font-semibold transition-colors flex-shrink-0"
-              >
-                {adding ? '…' : 'Add'}
-              </button>
-              <button
-                type="button"
-                onClick={() => {
-                  setShowAdd(false)
-                  setNewTask('')
-                  setMutateErr(null)
-                }}
-                className="text-gray-400 hover:text-gray-600 flex items-center px-1.5 transition-colors flex-shrink-0"
-              >
-                <svg
-                  className="w-3.5 h-3.5"
-                  fill="none"
-                  viewBox="0 0 24 24"
-                  stroke="currentColor"
-                  strokeWidth={2}
-                >
-                  <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" />
-                </svg>
-              </button>
-            </form>
-          ) : (
-            <button
-              onClick={() => setShowAdd(true)}
-              className="flex items-center gap-1.5 text-[10px] text-gray-400 hover:text-blue-500 transition-colors group"
-            >
-              <span className="group-hover:text-blue-500 transition-colors">{Icons.plus}</span>
-              Add custom task
-            </button>
-          )}
-        </div>
+          </div>
+        )}
       </div>
     </>
   )

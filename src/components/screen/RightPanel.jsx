@@ -4,6 +4,7 @@ import { createPortal } from 'react-dom'
 import { getMarketDates, getDayFull, getMarketFeed, getTopMovers } from '../../utils/globalCache'
 import { useScreen } from '../../context/ScreenContext'
 import { useEscapeKey } from '../../hooks/useEscapeKey'
+import { useSlidingIndicator } from '../../hooks/useSlidingIndicator'
 import { safeUrl } from '../../utils/format'
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
@@ -21,6 +22,38 @@ function ChangeBar({ value }) {
     >
       {isPos ? '▲' : '▼'} {Math.abs(v).toFixed(2)}%
     </span>
+  )
+}
+
+// ── Mover row — plain hover row (hp-watch-item, same class Home's own
+// watchlist rows use — owner rejected a bordered-card treatment twice, no
+// border/background box), keeping only a thin colored left accent stripe
+// for at-a-glance identification. `right` is an optional extra value shown
+// before the change badge (last price for gainers/losers, turnover for
+// volume); `children` renders below the row (volume's turnover bar). ───────
+function MoverRow({ rank, symbol, right, changeValue, accent, onClick, index, children }) {
+  return (
+    <div
+      onClick={onClick}
+      className="hp-watch-item flex overflow-hidden rounded-lg cursor-pointer transition-colors group animate-fade-up hover:bg-white dark:hover:bg-gray-800/60"
+      style={{ animationDelay: `${index * 20}ms` }}
+      translate="no"
+    >
+      <div className={`w-[3px] shrink-0 rounded-l-lg ${accent}`} />
+      <div className="flex-1 px-2 py-1.5 min-w-0">
+        <div className="flex items-center gap-1.5">
+          <span className="text-[9px] text-gray-300 dark:text-gray-600 tabular-nums w-3 shrink-0">
+            {rank}
+          </span>
+          <span className="flex-1 text-[10px] font-bold text-gray-800 dark:text-gray-100 group-hover:text-blue-500 transition-colors truncate">
+            {symbol}
+          </span>
+          {right}
+          <ChangeBar value={changeValue} />
+        </div>
+        {children}
+      </div>
+    </div>
   )
 }
 
@@ -324,10 +357,8 @@ function SummaryTab({ summary, selectSymbol }) {
           const ptChg = nepse.point_change
           return (
             <div
-              className={`rounded-xl px-2.5 py-2 border ${
-                isPos
-                  ? 'bg-emerald-50/60 dark:bg-emerald-950/30 border-emerald-200 dark:border-emerald-800'
-                  : 'bg-red-50/60 dark:bg-red-950/30 border-red-200 dark:border-red-800'
+              className={`relative overflow-hidden rounded-xl pl-3 pr-2.5 py-2 border border-gray-100 dark:border-gray-800 bg-gray-50/40 dark:bg-gray-800/20 before:content-[''] before:absolute before:left-0 before:top-0 before:bottom-0 before:w-[3px] ${
+                isPos ? 'before:bg-emerald-400' : 'before:bg-red-400'
               }`}
             >
               <div className="flex items-center justify-between mb-1">
@@ -462,7 +493,8 @@ export default function RightPanel() {
   const [dates, setDates] = useState([])
   const [selectedDate, setSelectedDate] = useState('')
   const [latestDate, setLatestDate] = useState('')
-  const [moverTab, setMoverTab] = useState('gainers')
+  const [moverTab, setMoverTab] = useState('summary')
+  const moverTabIndicator = useSlidingIndicator(moverTab, setMoverTab)
   const [loading, setLoading] = useState(false)
   const [moversErr, setMoversErr] = useState(null)
   const [datesErr, setDatesErr] = useState(null)
@@ -475,14 +507,17 @@ export default function RightPanel() {
 
   // Client-side cache: date → { movers, volume, summary } — avoids re-fetching same date
   const dayCache = useRef({})
+  const requestIdRef = useRef(0)
 
   const fetchForDate = useCallback(async (date) => {
     if (!date) return
+    const requestId = ++requestIdRef.current
     if (dayCache.current[date]) {
       const c = dayCache.current[date]
       setDbMovers(c.movers)
       setDbVolume(c.volume)
       setSummary(c.summary)
+      setLoading(false)
       return
     }
     setLoading(true)
@@ -495,13 +530,14 @@ export default function RightPanel() {
         volume: r.data.volume,
         summary: r.data.summary,
       }
+      if (requestId !== requestIdRef.current) return
       setDbMovers(r.data.movers)
       setDbVolume(r.data.volume)
       setSummary(r.data.summary)
     } catch {
-      setMoversErr('Failed to load market data')
+      if (requestId === requestIdRef.current) setMoversErr('Failed to load market data')
     } finally {
-      setLoading(false)
+      if (requestId === requestIdRef.current) setLoading(false)
     }
   }, [])
 
@@ -532,23 +568,15 @@ export default function RightPanel() {
         }
       })
       .catch(() => setDatesErr('Failed to load dates'))
-  }, []) // eslint-disable-line react-hooks/exhaustive-deps
+  }, [])
 
-  // When user navigates to a different date (not the initial load)
-  const prevSelectedDate = useRef('')
+  // Keep the auxiliary volume/summary data aligned with either the pinned candle
+  // or the date navigator, including restoring the selected date after unpinning.
   useEffect(() => {
-    if (!selectedDate || selectedDate === prevSelectedDate.current) return
-    prevSelectedDate.current = selectedDate
-    fetchForDate(selectedDate)
-  }, [selectedDate, fetchForDate])
-
-  // When candle is pinned, use the same cached fetchForDate (movers from chart cache still shown via clickedMovers)
-  useEffect(() => {
-    if (!clickedMovers) return
-    const d = clickedMovers.date
-    if (d === selectedDate) return
-    fetchForDate(d)
-  }, [clickedMovers?.date]) // eslint-disable-line react-hooks/exhaustive-deps
+    const date = clickedMovers?.date || selectedDate
+    if (!date) return
+    fetchForDate(date)
+  }, [clickedMovers?.date, selectedDate, fetchForDate])
 
   // Load news/IPO feed once
   useEffect(() => {
@@ -601,22 +629,15 @@ export default function RightPanel() {
   const maxTurnover =
     volData.length > 0 && parseFloat(volData[0].t) > 0 ? parseFloat(volData[0].t) : 1
 
-  const TAB_LABELS = [
-    ['gainers', 'Gainers'],
-    ['losers', 'Losers'],
-    ['volume', 'Volume'],
-    ['summary', 'Summary'],
-  ]
-
   const TAB_CONFIG = {
+    summary: { label: 'Market', color: 'text-violet-500', dot: 'bg-violet-400' },
     gainers: { label: 'Gainers', color: 'text-emerald-500', dot: 'bg-emerald-400' },
     losers: { label: 'Losers', color: 'text-red-400', dot: 'bg-red-400' },
     volume: { label: 'Volume', color: 'text-blue-500', dot: 'bg-blue-400' },
-    summary: { label: 'Market', color: 'text-violet-500', dot: 'bg-violet-400' },
   }
 
   return (
-    <div className="flex flex-col h-full overflow-y-auto">
+    <div className="flex flex-col h-full overflow-hidden">
       {/* ── Date navigation ───────────────────────────────────────────────── */}
       <div className="px-2 pt-2 pb-1.5 shrink-0">
         {isPinned ? (
@@ -635,7 +656,7 @@ export default function RightPanel() {
         ) : datesErr ? (
           <p className="text-[10px] text-red-400 px-1">{datesErr}</p>
         ) : (
-          <div className="flex items-center bg-white dark:bg-gray-800 rounded-xl border border-gray-100 dark:border-gray-700/60 overflow-hidden">
+          <div className="relative flex items-center bg-white dark:bg-gray-800 rounded-xl border border-gray-100 dark:border-gray-700/60 overflow-hidden">
             <button
               onClick={() => {
                 const i = dates.indexOf(selectedDate)
@@ -646,11 +667,14 @@ export default function RightPanel() {
             >
               ‹
             </button>
-            <div className="flex-1 text-center">
-              <span className="text-[10px] font-bold text-gray-700 dark:text-gray-200 tabular-nums">
-                {selectedDate || '—'}
-              </span>
-            </div>
+            {/* Absolutely centered on the full bar (not the flex-1 gap between the
+              arrows) — the conditional Live button below only sits on the right
+              side, so a flex-1-centered date used to drift left whenever Live was
+              showing (owner-caught). This stays dead-center regardless. */}
+            <span className="absolute left-1/2 -translate-x-1/2 text-[10px] font-bold text-gray-700 dark:text-gray-200 tabular-nums pointer-events-none">
+              {selectedDate || '—'}
+            </span>
+            <div className="flex-1" />
             {selectedDate && selectedDate !== latestDate && (
               <button
                 onClick={() => setSelectedDate(latestDate)}
@@ -674,14 +698,25 @@ export default function RightPanel() {
       </div>
 
       {/* ── Tab bar ───────────────────────────────────────────────────────── */}
-      <div className="flex gap-0.5 px-2 mb-2 shrink-0 bg-white/25 dark:bg-white/[0.06] backdrop-blur-sm rounded-xl p-0.5 border border-white/20 dark:border-white/[0.06]">
+      <div
+        ref={moverTabIndicator.containerRef}
+        onPointerDown={moverTabIndicator.onPointerDown}
+        className="relative flex gap-0.5 px-2 mb-2 shrink-0 bg-white/25 dark:bg-white/[0.06] backdrop-blur-sm rounded-xl p-0.5 border border-white/20 dark:border-white/[0.06]"
+      >
+        <div
+          aria-hidden="true"
+          className="absolute top-0 left-0 rounded-lg bg-white dark:bg-gray-700/90 shadow-sm transition-[transform,width,height] duration-300 ease-luxury pointer-events-none"
+          style={moverTabIndicator.indicatorStyle}
+        />
         {Object.entries(TAB_CONFIG).map(([key, cfg]) => (
           <button
             key={key}
+            data-indicator-active={moverTab === key || undefined}
+            data-indicator-key={key}
             onClick={() => setMoverTab(key)}
-            className={`flex-1 py-1.5 rounded-lg text-[10px] font-semibold transition-all ${
+            className={`relative z-10 flex-1 py-1.5 rounded-lg text-[10px] font-semibold transition-colors ${
               moverTab === key
-                ? `bg-white dark:bg-gray-700/90 ${cfg.color} shadow-sm animate-scale-in`
+                ? cfg.color
                 : 'text-gray-400 dark:text-gray-500 hover:text-gray-600 dark:hover:text-gray-300'
             }`}
           >
@@ -693,8 +728,15 @@ export default function RightPanel() {
         ))}
       </div>
 
-      {/* ── Tab content ───────────────────────────────────────────────────── */}
-      <div className="px-2 shrink-0">
+      {/* ── Tab content — capped + independently scrollable (owner-caught: a tall
+        Market/summary tab used to push Market Intel off-screen since the whole
+        panel scrolled as one unit). max-h (not flex-1) so a SHORT list (e.g.
+        10 gainers) sizes to its own content with no dead gap below it —
+        flex-1 was claiming all remaining space regardless of content height,
+        which owner also caught live. Tall content (Market tab) scrolls within
+        the cap instead of growing past it; Market Intel sits immediately
+        after whatever height this actually renders at. ── */}
+      <div className="px-2 max-h-[45vh] overflow-y-auto shrink-0">
         {moverTab === 'summary' ? (
           <SummaryTab summary={summary} selectSymbol={selectSymbol} />
         ) : (
@@ -707,74 +749,64 @@ export default function RightPanel() {
                 <div className="w-4 h-4 border-2 border-blue-400 border-t-transparent rounded-full animate-spin" />
               </div>
             ) : (
-              <div className="space-y-0 animate-fade-up" translate="no">
+              <div className="space-y-0.5">
                 {moverTab === 'gainers' &&
                   gainers.slice(0, 10).map((s, i) => (
-                    <div
+                    <MoverRow
                       key={s.s}
+                      rank={i + 1}
+                      symbol={s.s}
+                      right={
+                        <span className="text-[9px] text-gray-400 tabular-nums shrink-0">
+                          {s.c?.toLocaleString()}
+                        </span>
+                      }
+                      changeValue={s.p}
+                      accent="bg-emerald-400"
                       onClick={() => selectSymbol(s.s)}
-                      className="hp-watch-item flex items-center gap-1.5 px-2 py-1.5 rounded-lg cursor-pointer hover:bg-white dark:hover:bg-gray-800/60 group transition-colors"
-                      style={{ animationDelay: `${i * 20}ms` }}
-                    >
-                      <span className="text-[9px] text-gray-300 dark:text-gray-600 tabular-nums w-3 shrink-0">
-                        {i + 1}
-                      </span>
-                      <span className="flex-1 text-[10px] font-bold text-gray-800 dark:text-gray-100 group-hover:text-blue-500 transition-colors truncate">
-                        {s.s}
-                      </span>
-                      <span className="text-[9px] text-gray-400 tabular-nums shrink-0">
-                        {s.c?.toLocaleString()}
-                      </span>
-                      <ChangeBar value={s.p} />
-                    </div>
+                      index={i}
+                    />
                   ))}
                 {moverTab === 'losers' &&
                   losers.slice(0, 10).map((s, i) => (
-                    <div
+                    <MoverRow
                       key={s.s}
+                      rank={i + 1}
+                      symbol={s.s}
+                      right={
+                        <span className="text-[9px] text-gray-400 tabular-nums shrink-0">
+                          {s.c?.toLocaleString()}
+                        </span>
+                      }
+                      changeValue={s.p}
+                      accent="bg-red-400"
                       onClick={() => selectSymbol(s.s)}
-                      className="hp-watch-item flex items-center gap-1.5 px-2 py-1.5 rounded-lg cursor-pointer hover:bg-white dark:hover:bg-gray-800/60 group transition-colors"
-                      style={{ animationDelay: `${i * 20}ms` }}
-                    >
-                      <span className="text-[9px] text-gray-300 dark:text-gray-600 tabular-nums w-3 shrink-0">
-                        {i + 1}
-                      </span>
-                      <span className="flex-1 text-[10px] font-bold text-gray-800 dark:text-gray-100 group-hover:text-blue-500 transition-colors truncate">
-                        {s.s}
-                      </span>
-                      <span className="text-[9px] text-gray-400 tabular-nums shrink-0">
-                        {s.c?.toLocaleString()}
-                      </span>
-                      <ChangeBar value={s.p} />
-                    </div>
+                      index={i}
+                    />
                   ))}
                 {moverTab === 'volume' &&
                   volData.slice(0, 10).map((s, i) => (
-                    <div
+                    <MoverRow
                       key={s.s}
-                      onClick={() => selectSymbol(s.s)}
-                      className="hp-watch-item px-2 py-1.5 rounded-lg cursor-pointer hover:bg-white dark:hover:bg-gray-800/60 group transition-colors"
-                      style={{ animationDelay: `${i * 20}ms` }}
-                    >
-                      <div className="flex items-center gap-1.5 mb-0.5">
-                        <span className="text-[9px] text-gray-300 dark:text-gray-600 tabular-nums w-3 shrink-0">
-                          {i + 1}
-                        </span>
-                        <span className="flex-1 text-[10px] font-bold text-gray-800 dark:text-gray-100 group-hover:text-blue-500 transition-colors truncate">
-                          {s.s}
-                        </span>
+                      rank={i + 1}
+                      symbol={s.s}
+                      right={
                         <span className="text-[9px] text-gray-400 tabular-nums shrink-0 whitespace-nowrap">
                           {isNaN(parseFloat(s.t)) ? '—' : (parseFloat(s.t) / 1e6).toFixed(1) + 'M'}
                         </span>
-                        <ChangeBar value={s.p} />
-                      </div>
-                      <div className="ml-4 h-0.5 bg-gray-100 dark:bg-gray-700 rounded-full overflow-hidden">
+                      }
+                      changeValue={s.p}
+                      accent="bg-blue-400"
+                      onClick={() => selectSymbol(s.s)}
+                      index={i}
+                    >
+                      <div className="ml-4 mt-1 h-0.5 bg-gray-100 dark:bg-gray-700 rounded-full overflow-hidden">
                         <div
                           className="h-full bg-gradient-to-r from-blue-400 to-blue-500 rounded-full transition-all"
                           style={{ width: `${(parseFloat(s.t) / maxTurnover) * 100}%` }}
                         />
                       </div>
-                    </div>
+                    </MoverRow>
                   ))}
               </div>
             )}
@@ -794,7 +826,11 @@ export default function RightPanel() {
                 {moverTab !== 'volume' && (
                   <button
                     onClick={() => setShowAllMovers(true)}
-                    className="text-[9px] font-bold text-white bg-blue-500 hover:bg-blue-600 px-2.5 py-1 rounded-lg transition-colors shadow-sm shadow-blue-500/30"
+                    className={`text-[9px] font-bold text-white px-2.5 py-1 rounded-lg transition-colors shadow-sm ${
+                      moverTab === 'gainers'
+                        ? 'bg-emerald-500 hover:bg-emerald-600 shadow-emerald-500/30'
+                        : 'bg-red-500 hover:bg-red-600 shadow-red-500/30'
+                    }`}
                   >
                     All →
                   </button>

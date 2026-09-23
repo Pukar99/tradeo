@@ -11,6 +11,7 @@
 import { useState, useCallback, useRef, useEffect } from 'react'
 import { apiError } from '../utils/format'
 import { btGetSession, btGetOHLCV, btUpdateSession, btSettleOrder } from '../api/backtest'
+import { nptToday } from '../utils/nepseCalendar'
 
 // Coalesce cursor-persist writes to at most one per this interval (see persistTimerRef).
 const PERSIST_INTERVAL_MS = 1500
@@ -53,11 +54,29 @@ export function useBacktestSession() {
     setSession(resolved)
   }, [])
 
-  const setCurrentScriptSynced = useCallback((val) => {
-    const resolved = typeof val === 'function' ? val(currentScriptRef.current) : val
-    currentScriptRef.current = resolved
-    setCurrentScript(resolved)
-  }, [])
+  const setCurrentScriptSynced = useCallback(
+    (val) => {
+      const resolved = typeof val === 'function' ? val(currentScriptRef.current) : val
+      currentScriptRef.current = resolved
+      setCurrentScript(resolved)
+
+      if (resolved?.id && sessionRef.current) {
+        setSessionSynced((prev) => {
+          if (!prev) return prev
+          const scripts = prev.scripts || []
+          const exists = scripts.some((script) => script.id === resolved.id)
+          return {
+            ...prev,
+            active_script: resolved.symbol,
+            scripts: exists
+              ? scripts.map((script) => (script.id === resolved.id ? resolved : script))
+              : [...scripts, resolved],
+          }
+        })
+      }
+    },
+    [setSessionSynced]
+  )
 
   // =============================================================================
   // 2. LOCAL MUTATIONS
@@ -69,7 +88,9 @@ export function useBacktestSession() {
         if (!prev) return prev
         return {
           ...prev,
-          positions: prev.positions.map((p) => (p.id === orderId ? { ...p, ...changes } : p)),
+          positions: (prev.positions || []).map((p) =>
+            p.id === orderId ? { ...p, ...changes } : p
+          ),
         }
       })
     },
@@ -136,8 +157,7 @@ export function useBacktestSession() {
         setCurrentScriptSynced((prev) => ({ ...prev, total_candles: cached.length }))
       } else {
         try {
-          const today = new Date().toISOString().slice(0, 10)
-          const res = await btGetOHLCV(script.symbol, script.start_date, today)
+          const res = await btGetOHLCV(script.symbol, script.start_date, nptToday())
           const allCandles = res.data.candles || []
           if (allCandles.length === 0) {
             setError(`No chart data found for ${script.symbol}. Check the date range.`)
@@ -197,7 +217,7 @@ export function useBacktestSession() {
     pendingPersistRef.current = null
     const sess = sessionRef.current
     if (!sess) return
-    btUpdateSession(sess.id, {
+    return btUpdateSession(sess.id, {
       script_id: pending.scriptId,
       cursor_index: pending.cursorIndex,
       current_date: pending.date,
@@ -239,7 +259,8 @@ export function useBacktestSession() {
     async (currentDate) => {
       const script = currentScriptRef.current
       const sess = sessionRef.current
-      if (!script?.positions || !sess) return
+      if (!script?.positions || !sess) return []
+      const failed = []
 
       const toSettle = script.positions.filter(
         (p) =>
@@ -259,8 +280,16 @@ export function useBacktestSession() {
           // and give up after MAX_SETTLE_RETRIES so playback isn't a silent retry storm.
           settleRetriesRef.current[pos.id] = (settleRetriesRef.current[pos.id] || 0) + 1
           console.error('[Session] settle failed for', pos.id, err?.message)
+          if (settleRetriesRef.current[pos.id] >= MAX_SETTLE_RETRIES) {
+            failed.push(pos)
+            // Playback is paused and the failure is surfaced. Keep one retry
+            // available so an explicit user resume can recover after a transient
+            // backend outage without restoring the old automatic retry storm.
+            settleRetriesRef.current[pos.id] = MAX_SETTLE_RETRIES - 1
+          }
         }
       }
+      return failed
     },
     [updatePositionLocal]
   )

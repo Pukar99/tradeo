@@ -19,25 +19,36 @@ import {
   markAllNotificationsRead,
 } from '../api/notifications'
 import PageSkeleton from './PageSkeleton'
+import { TIER_ACCENT, TIER_RING, TIER_TEXT, TierName, getDisplayTier } from './common/TierMaterial'
 
 // =============================================================================
 // 1. LOGO
 // =============================================================================
 
-function TradeoLogo() {
+// tier prop: candle colors (green/red) stay exactly as-is regardless of tier
+// — that's the market up/down visual language, not brand decoration. Wordmark
+// next to it stays plain (untouched by tier, per owner call — text color/font
+// never changes, only adjusts for light/dark theme like it always did). The
+// logo itself gets the same ring/glow token as the avatar (TIER_RING) — one
+// consistent "identity" visual language, not a separate technique. SVG needs
+// an HTML wrapper for the box-shadow ring to render reliably.
+function TradeoLogo({ tier }) {
+  const ring = TIER_RING[tier]
   return (
-    <svg width="34" height="34" viewBox="0 0 40 40" fill="none" xmlns="http://www.w3.org/2000/svg">
-      <rect width="40" height="40" rx="8" className="tradeo-logo-bg" strokeWidth="1" />
-      <rect x="6" y="18" width="6" height="14" rx="1.5" fill="#22c55e" />
-      <line x1="9" y1="12" x2="9" y2="18" stroke="#22c55e" strokeWidth="1.5" />
-      <line x1="9" y1="32" x2="9" y2="36" stroke="#22c55e" strokeWidth="1.5" />
-      <rect x="17" y="12" width="6" height="16" rx="1.5" fill="#ef4444" />
-      <line x1="20" y1="6" x2="20" y2="12" stroke="#ef4444" strokeWidth="1.5" />
-      <line x1="20" y1="28" x2="20" y2="32" stroke="#ef4444" strokeWidth="1.5" />
-      <rect x="28" y="14" width="6" height="12" rx="1.5" fill="#22c55e" />
-      <line x1="31" y1="8" x2="31" y2="14" stroke="#22c55e" strokeWidth="1.5" />
-      <line x1="31" y1="26" x2="31" y2="30" stroke="#22c55e" strokeWidth="1.5" />
-    </svg>
+    <span className={`inline-flex rounded-lg ${ring || ''}`}>
+      <svg width="34" height="34" viewBox="0 0 40 40" fill="none" xmlns="http://www.w3.org/2000/svg">
+        <rect width="40" height="40" rx="8" className="tradeo-logo-bg" strokeWidth="1" />
+        <rect x="6" y="18" width="6" height="14" rx="1.5" fill="#22c55e" />
+        <line x1="9" y1="12" x2="9" y2="18" stroke="#22c55e" strokeWidth="1.5" />
+        <line x1="9" y1="32" x2="9" y2="36" stroke="#22c55e" strokeWidth="1.5" />
+        <rect x="17" y="12" width="6" height="16" rx="1.5" fill="#ef4444" />
+        <line x1="20" y1="6" x2="20" y2="12" stroke="#ef4444" strokeWidth="1.5" />
+        <line x1="20" y1="28" x2="20" y2="32" stroke="#ef4444" strokeWidth="1.5" />
+        <rect x="28" y="14" width="6" height="12" rx="1.5" fill="#22c55e" />
+        <line x1="31" y1="8" x2="31" y2="14" stroke="#22c55e" strokeWidth="1.5" />
+        <line x1="31" y1="26" x2="31" y2="30" stroke="#22c55e" strokeWidth="1.5" />
+      </svg>
+    </span>
   )
 }
 
@@ -63,6 +74,7 @@ function getInitials(name) {
 
 function Navbar({ autoHide = false, hidden = false, onMouseEnter, onMouseLeave }) {
   const { user, logout, loading: authLoading } = useAuth()
+  const displayTier = getDisplayTier(user)
   const { isDark, toggleTheme } = useTheme()
   const { t, isNepali, toggleLang } = useLanguage()
   const location = useLocation()
@@ -230,7 +242,7 @@ function Navbar({ autoHide = false, hidden = false, onMouseEnter, onMouseLeave }
   return (
     <nav
       className={[
-        'glass-bar px-4 lg:px-6 py-0 flex justify-between items-center z-50',
+        'glass-bar px-4 lg:px-6 py-0 z-50',
         // When auto-hide is active: fixed + slide transition.
         // When normal: sticky (all other pages unchanged).
         autoHide
@@ -240,10 +252,18 @@ function Navbar({ autoHide = false, hidden = false, onMouseEnter, onMouseLeave }
       ].join(' ')}
       onMouseEnter={autoHide ? onMouseEnter : undefined}
     >
+      {/* Content cap — matches HomePage's max-w-[1800px] (wider than the
+          max-w-7xl used elsewhere — owner call: this is a trading OS, 27"
+          monitors are a real target). Without it, on 27"+ monitors the logo/
+          links pin to the far left and the icons/user menu pin to the far right
+          with a huge dead gap between them. The mobile dropdown below stays
+          OUTSIDE this wrapper (a sibling of it) so its absolute left-0/right-0
+          still spans the full nav, positioned relative to <nav> itself. */}
+      <div className="w-full max-w-[1800px] mx-auto flex justify-between items-center">
       {/* ── Left: Logo + Desktop nav links ─────────────────────────────────── */}
       <div className="flex items-center gap-6">
         <Link to="/" className="flex items-center gap-2.5 py-3 flex-shrink-0">
-          <TradeoLogo />
+          <TradeoLogo tier={displayTier} />
           <div className="flex items-baseline gap-2">
             <span className="text-gray-900 dark:text-white font-bold text-lg tracking-tight">
               Tradeo
@@ -265,14 +285,20 @@ function Navbar({ autoHide = false, hidden = false, onMouseEnter, onMouseLeave }
               to={link.path}
               className={`relative px-3 py-4 text-sm font-medium transition-colors inline-flex items-center gap-1 ${
                 isActive(link.path)
-                  ? 'text-green-600 dark:text-white'
+                  ? TIER_TEXT[displayTier] || 'text-green-600 dark:text-white'
                   : 'text-gray-500 dark:text-gray-400 hover:text-gray-900 dark:hover:text-gray-200'
               }`}
             >
               {link.label}
               {link.authOnly && !user && LockGlyph}
               {isActive(link.path) && (
-                <span className="absolute bottom-0 left-0 right-0 h-0.5 bg-green-500 rounded-t-full animate-scale-x-in origin-left" />
+                <span
+                  className={`absolute bottom-0 left-0 right-0 h-0.5 rounded-t-full animate-scale-x-in origin-left ${
+                    TIER_ACCENT[displayTier]
+                      ? `bg-gradient-to-r ${TIER_ACCENT[displayTier].bar}`
+                      : 'bg-green-500'
+                  }`}
+                />
               )}
             </Link>
           ))}
@@ -281,13 +307,19 @@ function Navbar({ autoHide = false, hidden = false, onMouseEnter, onMouseLeave }
               to="/admin"
               className={`relative px-3 py-4 text-sm font-medium transition-colors ${
                 isActive('/admin')
-                  ? 'text-green-600 dark:text-white'
+                  ? TIER_TEXT[displayTier] || 'text-green-600 dark:text-white'
                   : 'text-gray-500 dark:text-gray-400 hover:text-gray-900 dark:hover:text-gray-200'
               }`}
             >
               Admin
               {isActive('/admin') && (
-                <span className="absolute bottom-0 left-0 right-0 h-0.5 bg-green-500 rounded-t-full animate-scale-x-in origin-left" />
+                <span
+                  className={`absolute bottom-0 left-0 right-0 h-0.5 rounded-t-full animate-scale-x-in origin-left ${
+                    TIER_ACCENT[displayTier]
+                      ? `bg-gradient-to-r ${TIER_ACCENT[displayTier].bar}`
+                      : 'bg-green-500'
+                  }`}
+                />
               )}
             </Link>
           )}
@@ -448,7 +480,9 @@ function Navbar({ autoHide = false, hidden = false, onMouseEnter, onMouseLeave }
               aria-label="Open user menu"
               className="flex items-center gap-2 px-2 min-h-[44px] rounded-lg hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors group"
             >
-              <div className="w-7 h-7 rounded-full bg-green-500 flex items-center justify-center overflow-hidden flex-shrink-0">
+              <div
+                className={`w-7 h-7 rounded-full bg-green-500 flex items-center justify-center overflow-hidden flex-shrink-0 ${TIER_RING[displayTier] || ''}`}
+              >
                 {user.avatar_url && !avatarError ? (
                   <img
                     src={user.avatar_url}
@@ -461,7 +495,7 @@ function Navbar({ autoHide = false, hidden = false, onMouseEnter, onMouseLeave }
                 )}
               </div>
               <span className="hidden sm:inline text-sm text-gray-700 dark:text-gray-300 group-hover:text-gray-900 dark:group-hover:text-white font-medium">
-                {firstName}
+                <TierName tier={displayTier} name={firstName} />
               </span>
               <svg
                 className={`w-3 h-3 text-gray-400 transition-transform ${dropdownOpen ? 'rotate-180' : ''}`}
@@ -494,6 +528,7 @@ function Navbar({ autoHide = false, hidden = false, onMouseEnter, onMouseLeave }
                   {[
                     { to: '/', icon: '🏠', label: t('nav.dashboard'), kbd: 'Alt+H' },
                     { to: '/profile', icon: '👤', label: t('nav.profile') },
+                    { to: '/settings', icon: '⚙️', label: t('nav.settings') },
                     { to: '/chat', icon: '🤖', label: t('nav.aiChat'), kbd: 'Alt+C' },
                     { to: '/logs', icon: '📈', label: t('nav.tradeLog'), kbd: 'Alt+L' },
                     { to: '/portfolio', icon: '💼', label: t('nav.portfolio'), kbd: 'Alt+P' },
@@ -502,7 +537,11 @@ function Navbar({ autoHide = false, hidden = false, onMouseEnter, onMouseLeave }
                       key={item.to}
                       to={item.to}
                       role="menuitem"
-                      className="flex items-center gap-2 px-3 py-2 text-sm text-gray-600 dark:text-gray-300 hover:text-gray-900 dark:hover:text-white hover:bg-gray-50 dark:hover:bg-gray-800 rounded-lg transition-colors"
+                      className={`flex items-center gap-2 px-3 py-2 text-sm rounded-lg transition-colors ${
+                        location.pathname === item.to
+                          ? 'bg-gray-50 dark:bg-gray-800 text-gray-900 dark:text-white font-medium'
+                          : 'text-gray-600 dark:text-gray-300 hover:text-gray-900 dark:hover:text-white hover:bg-gray-50 dark:hover:bg-gray-800'
+                      }`}
                     >
                       <span>{item.icon}</span> {item.label}
                       {item.kbd && (
@@ -592,6 +631,7 @@ function Navbar({ autoHide = false, hidden = false, onMouseEnter, onMouseLeave }
           )}
         </button>
       </div>
+      </div>
 
       {/* ── Mobile menu drawer — slide-down on open ─────────────────────────── */}
       {mobileMenuOpen && (
@@ -613,8 +653,46 @@ function Navbar({ autoHide = false, hidden = false, onMouseEnter, onMouseLeave }
             document.body
           )}
           <div className="lg:hidden absolute top-full left-0 right-0 max-h-[calc(100vh-56px)] overflow-y-auto bg-white dark:bg-gray-950 border-b border-gray-200 dark:border-gray-800 shadow-2xl z-50 animate-slide-down">
-            {/* green accent bar at top */}
-            <div className="h-0.5 bg-gradient-to-r from-green-500 via-green-400 to-transparent" />
+            {/* Accent bar — tier gradient for Pro/Premium (reuses the same
+                TIER_ACCENT.bar stops as the dashboard cards), plain green
+                (the original brand accent) for Basic/logged-out. */}
+            <div
+              className={`h-0.5 bg-gradient-to-r ${TIER_ACCENT[displayTier]?.bar || 'from-green-500 via-green-400 to-transparent'}`}
+            />
+            {/* Identity header — mobile has no avatar/name display anywhere
+                else (unlike the desktop dropdown trigger), so this is the
+                one place the tier ring + name chip can land on mobile. */}
+            {user && (
+              <div className="flex items-center gap-3 px-4 py-3 border-b border-gray-100 dark:border-gray-800">
+                <div
+                  className={`w-9 h-9 rounded-full bg-green-500 flex items-center justify-center overflow-hidden flex-shrink-0 ${TIER_RING[displayTier] || ''}`}
+                >
+                  {user.avatar_url && !avatarError ? (
+                    <img
+                      src={user.avatar_url}
+                      alt={displayName}
+                      className="w-full h-full object-cover"
+                      onError={() => setAvatarError(true)}
+                    />
+                  ) : (
+                    <span className="text-white text-sm font-bold">{getInitials(user.name)}</span>
+                  )}
+                </div>
+                <div className="min-w-0">
+                  {/* No `truncate` here (unlike the email line below) — it
+                      bundles `overflow: hidden`, which clipped TierName's
+                      corner tag: the tag pokes -8px above its own box via
+                      absolute positioning, and this <p> is its nearest
+                      overflow-hidden ancestor (real bug, caught live on
+                      mobile — tag rendered cut off). firstName is short
+                      enough that overflow isn't a real risk here. */}
+                  <p className="text-sm font-semibold text-gray-900 dark:text-white">
+                    <TierName tier={displayTier} name={firstName} />
+                  </p>
+                  <p className="text-[11px] text-gray-400 truncate">{user.email}</p>
+                </div>
+              </div>
+            )}
             <div className="px-4 py-3 space-y-1">
             {NAV_LINKS.map((link, i) => (
               <Link
@@ -712,9 +790,26 @@ function Navbar({ autoHide = false, hidden = false, onMouseEnter, onMouseLeave }
               <Link
                 to="/profile"
                 onClick={() => setMobileMenuOpen(false)}
-                className="flex items-center gap-2 px-4 py-3 min-h-[48px] rounded-xl text-sm font-semibold text-gray-600 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-800/80 hover:text-gray-900 dark:hover:text-white transition-all"
+                className={`flex items-center gap-2 px-4 py-3 min-h-[48px] rounded-xl text-sm font-semibold transition-all ${
+                  location.pathname === '/profile'
+                    ? 'bg-gray-50 dark:bg-gray-800 text-gray-900 dark:text-white'
+                    : 'text-gray-600 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-800/80 hover:text-gray-900 dark:hover:text-white'
+                }`}
               >
                 <span>👤</span> {t('nav.profile')}
+              </Link>
+
+              {/* Settings — in profile menu */}
+              <Link
+                to="/settings"
+                onClick={() => setMobileMenuOpen(false)}
+                className={`flex items-center gap-2 px-4 py-3 min-h-[48px] rounded-xl text-sm font-semibold transition-all ${
+                  location.pathname === '/settings'
+                    ? 'bg-gray-50 dark:bg-gray-800 text-gray-900 dark:text-white'
+                    : 'text-gray-600 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-800/80 hover:text-gray-900 dark:hover:text-white'
+                }`}
+              >
+                <span>⚙️</span> {t('nav.settings')}
               </Link>
 
               {/* Portfolio — off the main nav, reachable via profile menu only */}

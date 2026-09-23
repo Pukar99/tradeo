@@ -82,23 +82,26 @@ export function ScreenProvider({
   // dep of ctxValue below, would defeat the context memoization entirely
   const isIndex = useCallback(() => selectedIsIndex, [selectedIsIndex])
 
-  const selectSymbol = useCallback((sym, indexId = null, positions = null, companyName = null) => {
-    setSelectedSymbol(sym)
-    setSelectedCompanyName(indexId != null ? null : companyName)
-    setSelectedIsIndex(indexId != null)
-    if (indexId != null) setSelectedIndexId(indexId)
-    setPinnedDate(null)
-    setPinnedMovers(null)
-    onSymbolChange?.(sym, indexId, companyName)
-    // positions can be null, a single object (legacy), or an array
-    if (positions === null) {
-      setActivePositions(null)
-    } else if (Array.isArray(positions)) {
-      setActivePositions(positions)
-    } else {
-      setActivePositions([positions])
-    }
-  }, [])
+  const selectSymbol = useCallback(
+    (sym, indexId = null, positions = null, companyName = null) => {
+      setSelectedSymbol(sym)
+      setSelectedCompanyName(indexId != null ? null : companyName)
+      setSelectedIsIndex(indexId != null)
+      if (indexId != null) setSelectedIndexId(indexId)
+      setPinnedDate(null)
+      setPinnedMovers(null)
+      onSymbolChange?.(sym, indexId, companyName)
+      // positions can be null, a single object (legacy), or an array
+      if (positions === null) {
+        setActivePositions(null)
+      } else if (Array.isArray(positions)) {
+        setActivePositions(positions)
+      } else {
+        setActivePositions([positions])
+      }
+    },
+    [onSymbolChange]
+  )
 
   // On mount: read navigate state from LogsPage "Go to Chart"
   // disableNavState=true skips this for MultiChart panels — otherwise all panels

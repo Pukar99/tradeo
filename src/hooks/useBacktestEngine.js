@@ -2,18 +2,24 @@
 // useBacktestEngine.js — Backtest candle-by-candle playback engine
 // =============================================================================
 // Sections:
-//   1. Refs             — playing, processing, speed, timer, cursor, candles
-//   2. processCandle    — SL/TP checks, settlement, cursor advance
-//   3. Public API       — play, pause, stepForward, stepBack, setSpeed
-//   4. Cleanup          — unmount timer teardown
+//   1. Refs             — session/script (business state only — the timer's own
+//                          playing/speed/timer/cursor/candles refs now live in
+//                          the shared usePlaybackEngine, see SCR-11)
+//   2. processCandle    — SL/TP checks, settlement, cursor advance (this file's
+//                          `onTick` callback for usePlaybackEngine)
+//   3. Engine wiring     — usePlaybackEngine + step-back guard
 // =============================================================================
-// All mutable state is in refs to avoid stale closures inside setInterval.
-// processingRef guards against concurrent processCandle calls from the interval.
 // SL takes priority over TP: if both hit on the same candle, SL closes first.
+// The processingRef guard against concurrent processCandle calls (interval
+// firing again before a previous async processCandle resolves) now lives
+// inside usePlaybackEngine (`guardConcurrent: true` below) — it is NOT dropped,
+// just centralized so Replay's identical-shaped timer doesn't have to
+// reimplement it.
 // =============================================================================
 
-import { useRef, useCallback, useEffect } from 'react'
+import { useRef, useCallback } from 'react'
 import { btExitOrder, btLogBehavior } from '../api/backtest'
+import { usePlaybackEngine } from './usePlaybackEngine'
 
 export function useBacktestEngine({
   session,
@@ -28,56 +34,37 @@ export function useBacktestEngine({
   onDataEnd,
   onActionError,
 }) {
-  const playingRef = useRef(false)
-  const processingRef = useRef(false) // guard against concurrent processCandle calls
-  const speedRef = useRef(1)
-  const timerRef = useRef(null)
-  const speedTimerRef = useRef(null) // pending setSpeed restart
-  const cursorRef = useRef(cursorIndex)
-  const candlesRef = useRef(candles)
   const sessionRef = useRef(session)
   const scriptRef = useRef(currentScript)
 
-  // Keep all refs in sync on every render
-  cursorRef.current = cursorIndex
-  candlesRef.current = candles
+  // Keep refs in sync on every render
   sessionRef.current = session
   scriptRef.current = currentScript
 
   // =============================================================================
-  // 1. REFS — all mutable playback state
+  // 2. PROCESS CANDLE — usePlaybackEngine's onTick callback
   // =============================================================================
+  // Called for every tick (interval-fired or a manual step). `pause` and `total`
+  // are handed in by usePlaybackEngine itself — see that file. This function no
+  // longer advances the timer or guards concurrency itself; usePlaybackEngine
+  // does both (the guard via `guardConcurrent: true` below).
 
-  // (declared above — keep refs section header here for readability)
-
-  // =============================================================================
-  // 2. PROCESS CANDLE
-  // =============================================================================
-
-  const pauseInternal = useCallback(() => {
-    playingRef.current = false
-    if (timerRef.current) {
-      clearInterval(timerRef.current)
-      timerRef.current = null
-    }
-  }, [])
-
-  // ── Process a single candle ───────────────────────────────────────────────────
   const processCandle = useCallback(
-    async (candle, index) => {
-      // Guard: skip if already processing a candle (prevents interval stacking)
-      if (processingRef.current) return
-      processingRef.current = true
-
+    async (candle, index, { total, pause }) => {
       const sess = sessionRef.current
-      const script = scriptRef.current
       if (!sess || !candle) {
-        processingRef.current = false
         return
       }
 
       // 1. Settle positions whose settlement_date <= candle.date
-      await settlePositions(candle.date)
+      const settlementFailures = await settlePositions(candle.date)
+      if (settlementFailures?.length) {
+        pause()
+        onActionError?.(
+          `Settlement failed repeatedly for ${settlementFailures.map((p) => p.symbol).join(', ')} — playback paused`
+        )
+        return
+      }
 
       // 2. Read open positions from ref (always fresh after settlePositions updates)
       //    We re-read scriptRef after await so we see the settled updates
@@ -88,15 +75,20 @@ export function useBacktestEngine({
       for (const pos of openPositions) {
         const sl = pos.sl ? parseFloat(pos.sl) : null
         const tp = pos.tp ? parseFloat(pos.tp) : null
-        const settled = pos.settled || pos.settlement_date?.slice(0, 10) <= candle.date
+        const settled = pos.settled === true
+        const isShort = pos.position === 'SHORT'
 
-        // ── SL check — strict < so touching SL price exactly doesn't trigger ──────
-        // SL takes priority over TP: if both levels are hit on the same candle,
-        // SL is processed first and the position is closed — TP check is skipped.
-        if (sl !== null && candle.low < sl) {
+        // SL sits on the opposite side of entry for a short (above, not below), so
+        // a breach is the candle's HIGH reaching it, not the low.
+        const slBreached = sl !== null && (isShort ? candle.high >= sl : candle.low <= sl)
+
+        // ── SL check — SL takes priority over TP: if both levels are hit on the
+        // same candle, SL is processed first and the position is closed — TP
+        // check is skipped.
+        if (slBreached) {
           if (!settled) {
             // Pre-settlement SL breach — prompt user
-            pauseInternal()
+            pause()
             onSLBreach({
               pos,
               candle,
@@ -105,21 +97,19 @@ export function useBacktestEngine({
                 {
                   label: 'Close Early (EARLY_EXIT)',
                   action: async () => {
-                    try {
-                      const res = await btExitOrder(sess.id, pos.id, {
-                        exit_date: candle.date,
-                        exit_price: candle.close,
-                        reason: 'EARLY_EXIT',
-                      })
-                      closePositionLocal(pos.id, res.data)
-                      await btLogBehavior(sess.id, {
-                        order_id: pos.id,
-                        event_date: candle.date,
-                        event_type: 'EARLY_EXIT',
-                        symbol: pos.symbol,
-                        detail: { sl, low: candle.low },
-                      }).catch(() => {})
-                    } catch {}
+                    const res = await btExitOrder(sess.id, pos.id, {
+                      exit_date: candle.date,
+                      exit_price: candle.close,
+                      reason: 'EARLY_EXIT',
+                    })
+                    closePositionLocal(pos.id, res.data)
+                    await btLogBehavior(sess.id, {
+                      order_id: pos.id,
+                      event_date: candle.date,
+                      event_type: 'EARLY_EXIT',
+                      symbol: pos.symbol,
+                      detail: { sl, breach: isShort ? candle.high : candle.low },
+                    }).catch(() => {})
                   },
                 },
                 {
@@ -130,21 +120,32 @@ export function useBacktestEngine({
                       event_date: candle.date,
                       event_type: 'SL_IGNORED',
                       symbol: pos.symbol,
-                      detail: { sl, low: candle.low },
+                      detail: { sl, breach: isShort ? candle.high : candle.low },
                     }).catch(() => {})
+                    advanceCursor(index, candle.date)
                   },
                 },
-                { label: 'Keep Position', action: () => {} },
+                {
+                  label: 'Keep Position',
+                  action: () => {
+                    advanceCursor(index, candle.date)
+                  },
+                },
               ],
             })
-            processingRef.current = false
             return // pause — wait for user
           }
 
           // Post-settlement SL breach
           if (sess.sl_mode === 'AUTO') {
             try {
-              const exitPrice = candle.open < sl ? candle.open : sl
+              const exitPrice = isShort
+                ? candle.open > sl
+                  ? candle.open
+                  : sl
+                : candle.open < sl
+                  ? candle.open
+                  : sl
               const res = await btExitOrder(sess.id, pos.id, {
                 exit_date: candle.date,
                 exit_price: exitPrice,
@@ -159,17 +160,17 @@ export function useBacktestEngine({
               // local state from the DB. Pause, surface the error, and stop processing
               // this candle so the user can retry rather than trade on a phantom fill.
               console.error('[Engine] AUTO SL exit failed for', pos.id, err?.message)
-              pauseInternal()
+              pause()
               onActionError?.(
-                err?.response?.data?.message || `Auto SL exit failed for ${pos.symbol} — playback paused`
+                err?.response?.data?.message ||
+                  `Auto SL exit failed for ${pos.symbol} — playback paused`
               )
-              processingRef.current = false
               return
             }
           }
 
           if (sess.sl_mode === 'MANUAL') {
-            pauseInternal()
+            pause()
             onSLBreach({
               pos,
               candle,
@@ -178,27 +179,23 @@ export function useBacktestEngine({
                 {
                   label: `Close at SL Rs.${sl}`,
                   action: async () => {
-                    try {
-                      const res = await btExitOrder(sess.id, pos.id, {
-                        exit_date: candle.date,
-                        exit_price: sl,
-                        reason: 'SL_HIT',
-                      })
-                      closePositionLocal(pos.id, res.data)
-                    } catch {}
+                    const res = await btExitOrder(sess.id, pos.id, {
+                      exit_date: candle.date,
+                      exit_price: sl,
+                      reason: 'SL_HIT',
+                    })
+                    closePositionLocal(pos.id, res.data)
                   },
                 },
                 {
                   label: `Close at Today's Close Rs.${candle.close}`,
                   action: async () => {
-                    try {
-                      const res = await btExitOrder(sess.id, pos.id, {
-                        exit_date: candle.date,
-                        exit_price: candle.close,
-                        reason: 'SL_HIT',
-                      })
-                      closePositionLocal(pos.id, res.data)
-                    } catch {}
+                    const res = await btExitOrder(sess.id, pos.id, {
+                      exit_date: candle.date,
+                      exit_price: candle.close,
+                      reason: 'SL_HIT',
+                    })
+                    closePositionLocal(pos.id, res.data)
                   },
                 },
                 {
@@ -209,21 +206,25 @@ export function useBacktestEngine({
                       event_date: candle.date,
                       event_type: 'SL_IGNORED',
                       symbol: pos.symbol,
-                      detail: { sl, low: candle.low },
+                      detail: { sl, breach: isShort ? candle.high : candle.low },
                     }).catch(() => {})
+                    advanceCursor(index, candle.date)
                   },
                 },
               ],
             })
-            processingRef.current = false
             return // pause for user
           }
         }
 
+        // TP sits on the opposite side of entry for a short (below, not above), so
+        // a hit is the candle's LOW reaching it, not the high.
+        const tpHit = tp !== null && (isShort ? candle.low <= tp : candle.high >= tp)
+
         // ── TP check (only after settlement) ───────────────────────────────────────
-        if (tp !== null && candle.high >= tp) {
+        if (tpHit) {
           if (!settled) {
-            pauseInternal()
+            pause()
             onTPHit({
               pos,
               candle,
@@ -232,33 +233,41 @@ export function useBacktestEngine({
                 {
                   label: 'Close Early (EARLY_EXIT)',
                   action: async () => {
-                    try {
-                      const res = await btExitOrder(sess.id, pos.id, {
-                        exit_date: candle.date,
-                        exit_price: candle.close,
-                        reason: 'EARLY_EXIT',
-                      })
-                      closePositionLocal(pos.id, res.data)
-                      await btLogBehavior(sess.id, {
-                        order_id: pos.id,
-                        event_date: candle.date,
-                        event_type: 'EARLY_EXIT',
-                        symbol: pos.symbol,
-                        detail: { tp, high: candle.high },
-                      }).catch(() => {})
-                    } catch {}
+                    const res = await btExitOrder(sess.id, pos.id, {
+                      exit_date: candle.date,
+                      exit_price: candle.close,
+                      reason: 'EARLY_EXIT',
+                    })
+                    closePositionLocal(pos.id, res.data)
+                    await btLogBehavior(sess.id, {
+                      order_id: pos.id,
+                      event_date: candle.date,
+                      event_type: 'EARLY_EXIT',
+                      symbol: pos.symbol,
+                      detail: { tp, breach: isShort ? candle.low : candle.high },
+                    }).catch(() => {})
                   },
                 },
-                { label: 'Keep Position', action: () => {} },
+                {
+                  label: 'Keep Position',
+                  action: () => {
+                    advanceCursor(index, candle.date)
+                  },
+                },
               ],
             })
-            processingRef.current = false
             return
           }
 
           // TP hit after settlement — auto-close
           try {
-            const exitPrice = candle.open > tp ? candle.open : tp
+            const exitPrice = isShort
+              ? candle.open < tp
+                ? candle.open
+                : tp
+              : candle.open > tp
+                ? candle.open
+                : tp
             const res = await btExitOrder(sess.id, pos.id, {
               exit_date: candle.date,
               exit_price: exitPrice,
@@ -269,92 +278,33 @@ export function useBacktestEngine({
             // TP hit but exit failed — pause and surface rather than silently
             // leaving the position open (it would re-trigger every candle).
             console.error('[Engine] TP exit failed for', pos.id, err?.message)
-            pauseInternal()
+            pause()
             onActionError?.(
-              err?.response?.data?.message || `Auto TP exit failed for ${pos.symbol} — playback paused`
+              err?.response?.data?.message ||
+                `Auto TP exit failed for ${pos.symbol} — playback paused`
             )
-            processingRef.current = false
             return
           }
         }
       }
 
       // 3. Advance cursor
-      const nextIndex = index + 1
-      advanceCursor(nextIndex, candle.date)
+      advanceCursor(index, candle.date)
 
       // 4. Check end of data
-      if (nextIndex >= candlesRef.current.length) {
-        playingRef.current = false
-        if (timerRef.current) {
-          clearInterval(timerRef.current)
-          timerRef.current = null
-        }
+      if (index >= total - 1) {
+        pause()
         onDataEnd()
       }
-
-      processingRef.current = false
     },
-    [
-      settlePositions,
-      advanceCursor,
-      closePositionLocal,
-      onSLBreach,
-      onTPHit,
-      onDataEnd,
-      onActionError,
-      pauseInternal,
-    ]
+    [settlePositions, advanceCursor, closePositionLocal, onSLBreach, onTPHit, onDataEnd, onActionError]
   )
 
   // =============================================================================
-  // 3. PUBLIC API
+  // 3. ENGINE WIRING
   // =============================================================================
 
-  const play = useCallback(() => {
-    if (playingRef.current) return
-    if (cursorRef.current >= candlesRef.current.length) return
-
-    playingRef.current = true
-    const ms = 1000 / parseFloat(speedRef.current)
-
-    timerRef.current = setInterval(async () => {
-      if (!playingRef.current) {
-        clearInterval(timerRef.current)
-        timerRef.current = null
-        return
-      }
-      const idx = cursorRef.current
-      const candle = candlesRef.current[idx]
-      if (!candle) {
-        pauseInternal()
-        onDataEnd()
-        return
-      }
-      await processCandle(candle, idx)
-    }, ms)
-  }, [processCandle, pauseInternal, onDataEnd])
-
-  const pause = useCallback(() => {
-    playingRef.current = false
-    if (timerRef.current) {
-      clearInterval(timerRef.current)
-      timerRef.current = null
-    }
-  }, [])
-
-  const stepForward = useCallback(async () => {
-    if (playingRef.current) return
-    const idx = cursorRef.current
-    const candle = candlesRef.current[idx]
-    if (!candle) {
-      onDataEnd()
-      return
-    }
-    await processCandle(candle, idx)
-  }, [processCandle, onDataEnd])
-
-  // ── Step back ───────────────────────────────────────────────────────────────
+  // ── Step back guard ────────────────────────────────────────────────────────
   // IMPORTANT: step-back is a CHART-VIEW REWIND ONLY. It decrements the cursor so
   // the user can re-examine the prior candle, but it does NOT undo side effects that
   // were already applied while advancing forward — settlements (btSettleOrder),
@@ -370,51 +320,15 @@ export function useBacktestEngine({
     return (scriptRef.current?.positions || []).length > 0
   }, [])
 
-  const canStepBack = useCallback(() => {
-    return !playingRef.current && cursorRef.current > 0 && !hasAnyPosition()
-  }, [hasAnyPosition])
-
-  const stepBack = useCallback(() => {
-    if (!canStepBack()) return
-    const idx = cursorRef.current
-    const newIndex = idx - 1
-    const candle = candlesRef.current[newIndex]
-    if (!candle) return
-    advanceCursor(newIndex, candle.date)
-  }, [advanceCursor, canStepBack])
-
-  const setSpeed = useCallback(
-    (s) => {
-      speedRef.current = parseFloat(s)
-      if (playingRef.current) {
-        pause()
-        // Cancel any pending restart from a previous speed change
-        if (speedTimerRef.current) clearTimeout(speedTimerRef.current)
-        speedTimerRef.current = setTimeout(() => {
-          speedTimerRef.current = null
-          play()
-        }, 50)
-      }
-    },
-    [pause, play]
-  )
-
-  // =============================================================================
-  // 4. CLEANUP
-  // =============================================================================
-
-  useEffect(() => {
-    return () => {
-      if (timerRef.current) {
-        clearInterval(timerRef.current)
-        timerRef.current = null
-      }
-      if (speedTimerRef.current) {
-        clearTimeout(speedTimerRef.current)
-        speedTimerRef.current = null
-      }
-    }
-  }, [])
+  const { play, pause, stepForward, stepBack, canStepBack, setSpeed } = usePlaybackEngine({
+    candles,
+    cursorIndex,
+    onTick: processCandle,
+    onEnd: onDataEnd,
+    onStepBack: (newIndex, candle) => advanceCursor(newIndex, candle.date),
+    canStepBack: () => !hasAnyPosition(),
+    guardConcurrent: true, // load-bearing — prevents interval-stacking around async processCandle
+  })
 
   return {
     play,

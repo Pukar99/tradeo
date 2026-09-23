@@ -18,25 +18,31 @@ import { usePriceAlerts } from './hooks/usePriceAlerts'
 import { useAuth } from './context/AuthContext'
 import { useTheme } from './context/ThemeContext'
 import { useHotkeys } from './hooks/useHotkeys'
+import { usePageViewTracking } from './hooks/usePageViewTracking'
 import { runMeroshareAutoApplyOnLogin } from './api'
 import { getProfile } from './utils/globalCache'
 import Navbar from './components/Navbar'
 import FloatingChat from './components/FloatingChat'
 import PrivateRoute from './components/PrivateRoute'
 import AdminRoute from './components/AdminRoute'
+// Not lazy — it's the app's front door, everyone needs this chunk on first
+// load anyway, so code-splitting it only adds a Suspense spinner flash in
+// front of the page's own loading skeleton on cold/hard reloads for no gain.
+import HomePage from './pages/HomePage'
 
 // Lazy-loaded pages — each becomes its own JS chunk, reducing initial bundle size
-const HomePage = lazy(() => import('./pages/HomePage'))
 const ScreenPage = lazy(() => import('./pages/ScreenPage'))
 const PortfolioPage = lazy(() => import('./pages/PortfolioPage'))
 const NotFoundPage = lazy(() => import('./pages/NotFoundPage'))
 const LoginPage = lazy(() => import('./pages/LoginPage'))
 const SignupPage = lazy(() => import('./pages/SignupPage'))
+const VerifyOtpPage = lazy(() => import('./pages/VerifyOtpPage'))
 const LogsPage = lazy(() => import('./pages/LogsPage'))
 const ResearchPage = lazy(() => import('./pages/ResearchPage'))
 const ResearchEditorPage = lazy(() => import('./pages/ResearchEditorPage'))
 const ResearchViewPage = lazy(() => import('./pages/ResearchViewPage'))
 const ProfilePage = lazy(() => import('./pages/ProfilePage'))
+const SettingsPage = lazy(() => import('./pages/SettingsPage'))
 const ChatPage = lazy(() => import('./pages/ChatPage'))
 const DataLabPage = lazy(() => import('./pages/DataLabPage'))
 const ExplorePage = lazy(() => import('./pages/ExplorePage'))
@@ -111,7 +117,7 @@ class ErrorBoundary extends Component {
 }
 
 // Auth-only pages that should not show the navbar
-const AUTH_ROUTES = ['/login', '/signup']
+const AUTH_ROUTES = ['/login', '/signup', '/verify']
 
 const HIDE_DELAY = 3000 // ms before navbar auto-hides on page open (no interaction yet)
 
@@ -122,6 +128,7 @@ function AppContent() {
   const navigate = useNavigate()
   const { toasts, addToast, dismissToast } = useAlertToasts()
   usePriceAlerts({ user, onAlert: addToast })
+  usePageViewTracking()
 
   // ── Navbar auto-hide state ────────────────────────────────────────────────
   const [autoHideActive, setAutoHideActive] = useState(false)
@@ -330,6 +337,14 @@ function AppContent() {
               }
             />
             <Route
+              path="/settings"
+              element={
+                <PrivateRoute>
+                  <SettingsPage />
+                </PrivateRoute>
+              }
+            />
+            <Route
               path="/chat"
               element={
                 <PrivateRoute>
@@ -351,6 +366,7 @@ function AppContent() {
             />
             <Route path="/login" element={<LoginPage />} />
             <Route path="/signup" element={<SignupPage />} />
+            <Route path="/verify" element={<VerifyOtpPage />} />
             <Route path="*" element={<NotFoundPage />} />
           </Routes>
         </Suspense>

@@ -1,6 +1,6 @@
 // === BacktestPage.jsx — backtest page root: session orchestration, modals, chart, keyboard shortcuts ===
 
-import { useState, useCallback, useEffect } from 'react'
+import { useState, useCallback, useEffect, useRef } from 'react'
 import { useBacktestSession } from '../../hooks/useBacktestSession'
 import { useBacktestEngine } from '../../hooks/useBacktestEngine'
 import BacktestHome from './BacktestHome'
@@ -12,7 +12,9 @@ import BuyOrderModal from './BuyOrderModal'
 import SLTPUpdateModal from './SLTPUpdateModal'
 import SLValidationPrompt from './SLValidationPrompt'
 import BacktestPartialExitModal from './BacktestPartialExitModal'
-import { btExitOrder } from '../../api/backtest'
+import ModeToggle from './ModeToggle'
+import ReplayMode from './ReplayMode'
+import { btEndSession, btExitOrder } from '../../api/backtest'
 
 export default function BacktestPage() {
   const {
@@ -46,6 +48,18 @@ export default function BacktestPage() {
   const [isPlaying, setIsPlaying] = useState(false)
   // Exit/action error toast — set by manual exit and by engine auto SL/TP failures
   const [exitError, setExitError] = useState('')
+  const endingRef = useRef(false)
+
+  // Backtesting/Replay mode toggle (SCR-10, Wave 5) — only meaningful when there's no
+  // active backtest session (see the `!session` render branch below); persisted the
+  // same way ScreenPage.jsx's ScreenInner persists mode/simpleTab/advancedTab.
+  const [mode, setModeState] = useState(() =>
+    sessionStorage.getItem('tradeo_backtest_mode') === 'replay' ? 'replay' : 'backtest'
+  )
+  const setMode = (m) => {
+    setModeState(m)
+    sessionStorage.setItem('tradeo_backtest_mode', m)
+  }
 
   // Load session on mount (restore if active)
   useEffect(() => {
@@ -73,10 +87,20 @@ export default function BacktestPage() {
     setPrompt({ ...data, type: 'PRE_SETTLEMENT_TP' })
   }, [])
 
-  const handleDataEnd = useCallback(() => {
+  const handleDataEnd = useCallback(async () => {
     setIsPlaying(false)
-    setShowReport(true)
-  }, [])
+    if (!session || endingRef.current) return
+    endingRef.current = true
+    try {
+      await flushPersist()
+      await btEndSession(session.id)
+      setShowReport(true)
+    } catch (err) {
+      setExitError(err.response?.data?.message || 'Failed to complete the session. Please retry.')
+    } finally {
+      endingRef.current = false
+    }
+  }, [session, flushPersist])
 
   // Surface engine-side action failures (auto SL/TP exits) and stop the UI play state
   // so the engine's internal pause is reflected in the controls.
@@ -132,8 +156,12 @@ export default function BacktestPage() {
 
   // ── Prompt dismiss/action ─────────────────────────────────────────────────────
   const handlePromptAction = useCallback(async (opt) => {
-    await opt.action()
-    setPrompt(null)
+    try {
+      await opt.action()
+      setPrompt(null)
+    } catch (err) {
+      setExitError(err.response?.data?.message || 'The selected action failed. Please try again.')
+    }
   }, [])
 
   // ── Full exit (from panel button) ─────────────────────────────────────────────
@@ -174,10 +202,27 @@ export default function BacktestPage() {
   )
 
   // ── End session ───────────────────────────────────────────────────────────────
-  const handleEndSession = useCallback(() => {
+  // Mirrors handleDataEnd: a manual end must COMPLETE the backend session (status→COMPLETED),
+  // not just show the report — otherwise the session stays ACTIVE and loadSession() restores it.
+  // Returns true/false (never throws) so callers (BacktestActivePanel's own end-session
+  // button) can react to success/failure without making their own duplicate btEndSession
+  // call — the error toast here (exitError) already covers the failure case.
+  const handleEndSession = useCallback(async () => {
     handlePause()
-    setShowReport(true)
-  }, [handlePause])
+    if (!session || endingRef.current) return false
+    endingRef.current = true
+    try {
+      await flushPersist()
+      await btEndSession(session.id)
+      setShowReport(true)
+      return true
+    } catch (err) {
+      setExitError(err.response?.data?.message || 'Failed to complete the session. Please retry.')
+      return false
+    } finally {
+      endingRef.current = false
+    }
+  }, [handlePause, session, flushPersist])
 
   // ── Keyboard shortcuts (must be after all handlers) ───────────────────────────
   useEffect(() => {
@@ -240,8 +285,22 @@ export default function BacktestPage() {
     },
   }
 
-  // ── No active session → redesigned home (lifetime KPIs + history + setup) ───────
-  if (!session) return <BacktestHome onSessionStarted={sidePanelSetupProps.onSessionStarted} />
+  // ── No active session → mode toggle (Live Backtest / Replay) + the selected mode's
+  // own entry screen. An active BACKTEST session (checked above) always wins over
+  // `mode` — this branch only runs when there's no session to resume, so Replay mode
+  // is reachable. Replay mode renders its own toggle (top of its setup screen only,
+  // hidden once a replay is actively running) via ReplayMode's `onExit` prop.
+  if (!session) {
+    if (mode === 'replay') return <ReplayMode onExit={() => setMode('backtest')} />
+    return (
+      <div className="flex-1 flex flex-col min-h-0 overflow-hidden">
+        <div className="shrink-0 px-4 md:px-6 pt-4">
+          <ModeToggle mode={mode} onChange={setMode} />
+        </div>
+        <BacktestHome onSessionStarted={sidePanelSetupProps.onSessionStarted} />
+      </div>
+    )
+  }
 
   const sidePanelActiveProps = {
     session,

@@ -3,7 +3,11 @@
 // different bits (brand copy, feature lists, fields, spacing values) stay in the
 // pages — spacing differences arrive here as explicit class props so the rendered
 // DOM stays pixel-identical to the pre-extraction pages.
-import { Link } from 'react-router-dom'
+import { Link, useNavigate } from 'react-router-dom'
+import { GoogleLogin } from '@react-oauth/google'
+import { useAuth } from '../../context/AuthContext'
+import { googleAuth } from '../../api'
+import { generateSwingCandles } from '../../utils/candlestickData'
 
 export function EyeIcon() {
   return (
@@ -64,19 +68,20 @@ export function TradeoLogo({ size = 44 }) {
   )
 }
 
-// Candlestick data for animated background bars
-const CANDLES = [
-  { x: 40, h: 80, t: 200, green: true },
-  { x: 80, h: 140, t: 160, green: false },
-  { x: 120, h: 60, t: 220, green: true },
-  { x: 160, h: 110, t: 180, green: true },
-  { x: 200, h: 180, t: 140, green: false },
-  { x: 240, h: 90, t: 210, green: true },
-  { x: 280, h: 130, t: 170, green: true },
-  { x: 320, h: 70, t: 230, green: false },
-  { x: 360, h: 160, t: 150, green: true },
-  { x: 400, h: 100, t: 190, green: false },
-]
+// Candlestick data for the animated background — a real swinging price path
+// (each candle connects to the next), not independent random bars. Tuned for
+// this panel's tall 420x700 viewBox: wide amplitude so the swing genuinely
+// reads as "up and down" instead of a thin flat band. Random seed each page
+// load (not a fixed one) so the pattern is fresh every time, still generated
+// by the same connected-swing algorithm so it never reads as noise.
+const CANDLES = generateSwingCandles(10, {
+  seed: Math.floor(Math.random() * 1e6),
+  spacing: 40,
+  baseline: 350,
+  amplitude: 110,
+  minBody: 15,
+  maxBody: 38,
+})
 
 // Dark brand column (md+) with the animated candlestick backdrop.
 // Page-specific copy/features/footer render as children on top of it.
@@ -97,16 +102,16 @@ export function BrandPanelShell({ children }) {
           >
             <line
               x1={c.x}
-              y1={c.t - 20}
+              y1={c.t - 14}
               x2={c.x}
-              y2={c.t + c.h + 20}
+              y2={c.t + c.h + 14}
               stroke={c.green ? '#22c55e' : '#ef4444'}
               strokeWidth="1"
             />
             <rect
-              x={c.x - 8}
+              x={c.x - 6}
               y={c.t}
-              width="16"
+              width="12"
               height={c.h}
               fill={c.green ? '#22c55e' : '#ef4444'}
               rx="2"
@@ -169,13 +174,47 @@ export function AuthSubmitButton({ loading, busyLabel, mt, children }) {
     <button
       type="submit"
       disabled={loading}
-      className={`active:scale-95 w-full bg-blue-600 text-white min-h-[52px] py-3.5 rounded-xl text-sm font-semibold hover:bg-blue-700 disabled:opacity-50 transition-all duration-150 flex items-center justify-center gap-2 ${mt} shadow-sm hover:shadow-md`}
+      className={`active:scale-95 w-full bg-blue-600 text-white min-h-[52px] py-3.5 rounded-xl text-sm font-semibold hover:bg-blue-700 disabled:opacity-50 transition-all duration-200 ease-luxury flex items-center justify-center gap-2 ${mt} shadow-sm hover:shadow-md`}
     >
       {loading && (
         <span className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" />
       )}
       {loading ? busyLabel : children}
     </button>
+  )
+}
+
+// Shared Google Sign-In button + divider — used identically by LoginPage/SignupPage.
+// Owns the API call + login + redirect itself (needs useAuth/useNavigate), so
+// callers just render <GoogleAuthSection onError={setServerError} /> and nothing else.
+export function GoogleAuthSection({ onError }) {
+  const { login } = useAuth()
+  const navigate = useNavigate()
+
+  const handleSuccess = async (credentialResponse) => {
+    try {
+      const { data } = await googleAuth({ credential: credentialResponse.credential })
+      login(data.user, data.token)
+      navigate('/')
+    } catch (err) {
+      onError?.(err.response?.data?.message || 'Google sign-in failed, please try again')
+    }
+  }
+
+  return (
+    <div className="mt-5">
+      <div className="flex items-center gap-3">
+        <div className="flex-1 h-px bg-gray-200 dark:bg-gray-700" />
+        <span className="text-xs text-gray-400">or</span>
+        <div className="flex-1 h-px bg-gray-200 dark:bg-gray-700" />
+      </div>
+      <div className="mt-4 flex justify-center">
+        <GoogleLogin
+          onSuccess={handleSuccess}
+          onError={() => onError?.('Google sign-in failed, please try again')}
+        />
+      </div>
+    </div>
   )
 }
 
