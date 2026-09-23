@@ -483,7 +483,7 @@ export default function BacktestSetupPanel({ onSessionStarted }) {
         </button>
 
         <div className="text-[10px] text-gray-400 text-center leading-tight mt-2">
-          NEPSE · Long only · T+2 settlement · No intraday
+          NEPSE · Long & Short · T+2 settlement · No intraday
         </div>
       </div>
     </div>

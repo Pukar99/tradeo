@@ -18,6 +18,7 @@ const REASONS = ['MANUAL', 'TP_HIT', 'SL_HIT', 'OTHER']
 
 export default function BacktestPartialExitModal({ session, order, candle, onClose, onExited }) {
   const ep = parseFloat(order.entry_price)
+  const isShort = order.position === 'SHORT'
   const remQty = parseFloat(order.remaining_quantity ?? order.quantity)
   const [exitQty, setExitQty] = useState(String(Math.floor(remQty / 2)))
   const [exitPrice, setExitPrice] = useState(String(candle?.close || ''))
@@ -36,8 +37,11 @@ export default function BacktestPartialExitModal({ session, order, candle, onClo
 
   const grossVal = xQty * xPrice
   const fee = grossVal > 0 ? calcFee(grossVal) : 0
-  const proceeds = grossVal - fee
-  const partialPnl = xQty * (xPrice - ep) - fee
+  const partialPnl = xQty * (isShort ? ep - xPrice : xPrice - ep) - fee
+  // LONG: proceeds are simply the sale value. SHORT: entry locked ep*xQty as
+  // margin — exit releases that margin back plus/minus the P&L, not the sale
+  // value. Mirrors the backend's proceeds formula (routes/backtest.js /partial).
+  const proceeds = isShort ? ep * xQty + partialPnl : grossVal - fee
   const remaining = remQty - xQty
 
   const handleConfirm = useCallback(async () => {
@@ -77,7 +81,12 @@ export default function BacktestPartialExitModal({ session, order, candle, onClo
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40">
       <div className="bg-white dark:bg-gray-900 rounded-xl shadow-2xl w-68 p-4 border border-gray-100 dark:border-gray-800">
         <div className="flex items-center justify-between mb-3">
-          <div className="text-[12px] font-bold dark:text-white">PARTIAL EXIT — {order.symbol}</div>
+          <div className="text-[12px] font-bold dark:text-white">
+            PARTIAL EXIT — {order.symbol}{' '}
+            <span className={isShort ? 'text-red-500' : 'text-green-600'}>
+              ({isShort ? 'SHORT' : 'LONG'})
+            </span>
+          </div>
           <button
             onClick={onClose}
             className="text-gray-400 hover:text-gray-600 dark:hover:text-gray-200 text-lg leading-none"
@@ -183,7 +192,7 @@ export default function BacktestPartialExitModal({ session, order, candle, onClo
             <span className="dark:text-gray-300">Rs.{fmt(fee)}</span>
           </div>
           <div className="flex justify-between font-bold border-t border-gray-100 dark:border-gray-700 pt-0.5 dark:text-white">
-            <span>Proceeds</span>
+            <span>{isShort ? 'Margin Released' : 'Proceeds'}</span>
             <span>Rs.{fmt(proceeds)}</span>
           </div>
           <div className="flex justify-between">

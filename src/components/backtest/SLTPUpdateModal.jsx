@@ -5,6 +5,7 @@ import { btUpdateSLTP } from '../../api/backtest'
 
 export default function SLTPUpdateModal({ session, order, onClose, onUpdated }) {
   const ep = parseFloat(order.entry_price)
+  const isShort = order.position === 'SHORT'
   const [sl, setSl] = useState(order.sl ? String(order.sl) : '')
   const [tp, setTp] = useState(order.tp ? String(order.tp) : '')
   const [loading, setLoading] = useState(false)
@@ -13,15 +14,25 @@ export default function SLTPUpdateModal({ session, order, onClose, onUpdated }) 
   const slVal = sl ? parseFloat(sl) : null
   const tpVal = tp ? parseFloat(tp) : null
 
-  const slValid = slVal === null || slVal < ep
-  const tpValid = tpVal === null || tpVal > ep
+  // SHORT flips both sides: SL sits above entry, TP sits below entry — matches
+  // the backend's PUT /order/:orderId validation (routes/backtest.js `isShort`).
+  const slValid = slVal === null || (isShort ? slVal > ep : slVal < ep)
+  const tpValid = tpVal === null || (isShort ? tpVal < ep : tpVal > ep)
   const bothNeq = slVal === null || tpVal === null || slVal !== tpVal
 
   const handleUpdate = useCallback(async () => {
     setError('')
-    if (slVal !== null && slVal >= ep) return setError(`SL must be below entry price Rs.${ep}`)
+    const slInvalid = slVal !== null && (isShort ? slVal <= ep : slVal >= ep)
+    if (slInvalid)
+      return setError(
+        isShort ? `SL must be above entry price Rs.${ep}` : `SL must be below entry price Rs.${ep}`
+      )
     if (slVal !== null && slVal <= 0) return setError('SL must be positive')
-    if (tpVal !== null && tpVal <= ep) return setError(`TP must be above entry price Rs.${ep}`)
+    const tpInvalid = tpVal !== null && (isShort ? tpVal >= ep : tpVal <= ep)
+    if (tpInvalid)
+      return setError(
+        isShort ? `TP must be below entry price Rs.${ep}` : `TP must be above entry price Rs.${ep}`
+      )
     if (slVal !== null && tpVal !== null && slVal === tpVal)
       return setError('SL and TP cannot be equal')
 
@@ -35,7 +46,7 @@ export default function SLTPUpdateModal({ session, order, onClose, onUpdated }) 
     } finally {
       setLoading(false)
     }
-  }, [session, order, slVal, tpVal, ep, onUpdated, onClose])
+  }, [session, order, slVal, tpVal, ep, isShort, onUpdated, onClose])
 
   useEffect(() => {
     const h = (e) => {
@@ -49,7 +60,12 @@ export default function SLTPUpdateModal({ session, order, onClose, onUpdated }) 
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40">
       <div className="bg-white dark:bg-gray-900 rounded-xl shadow-2xl w-64 p-4 border border-gray-100 dark:border-gray-800">
         <div className="flex items-center justify-between mb-3">
-          <div className="text-[12px] font-bold dark:text-white">SL/TP — {order.symbol}</div>
+          <div className="text-[12px] font-bold dark:text-white">
+            SL/TP — {order.symbol}{' '}
+            <span className={isShort ? 'text-red-500' : 'text-green-600'}>
+              ({isShort ? 'SHORT' : 'LONG'})
+            </span>
+          </div>
           <button
             onClick={onClose}
             className="text-gray-400 hover:text-gray-600 dark:hover:text-gray-200 text-lg leading-none"
@@ -80,7 +96,9 @@ export default function SLTPUpdateModal({ session, order, onClose, onUpdated }) 
               }`}
             />
             {!slValid && (
-              <div className="text-[10px] text-red-500 mt-0.5">Must be below Rs.{ep}</div>
+              <div className="text-[10px] text-red-500 mt-0.5">
+                Must be {isShort ? 'above' : 'below'} Rs.{ep}
+              </div>
             )}
           </div>
 
@@ -100,7 +118,9 @@ export default function SLTPUpdateModal({ session, order, onClose, onUpdated }) 
               }`}
             />
             {!tpValid && (
-              <div className="text-[10px] text-red-500 mt-0.5">Must be above Rs.{ep}</div>
+              <div className="text-[10px] text-red-500 mt-0.5">
+                Must be {isShort ? 'below' : 'above'} Rs.{ep}
+              </div>
             )}
           </div>
         </div>

@@ -9,10 +9,11 @@ import { TIER_ACCENT, getDisplayTier, TierAccentOverlay, tierRingClass } from '.
 
 function PositionCard({ pos, currentCandle, onEditSLTP, onExit, onPartial }) {
   const ep = parseFloat(pos.entry_price) || 0
+  const isShort = pos.position === 'SHORT'
   const ltp = currentCandle?.close != null ? parseFloat(currentCandle.close) : ep
   const remQty = parseFloat(pos.remaining_quantity ?? pos.quantity)
-  const unrealized = (ltp - ep) * remQty
-  const unrealizedPct = ep > 0 ? ((ltp - ep) / ep) * 100 : 0
+  const unrealized = (isShort ? ep - ltp : ltp - ep) * remQty
+  const unrealizedPct = ep > 0 ? ((isShort ? ep - ltp : ltp - ep) / ep) * 100 : 0
   const settled = pos.settled
   const nearSL = pos.sl && ltp > 0 && Math.abs(ltp - parseFloat(pos.sl)) / ltp < 0.03
 
@@ -21,7 +22,14 @@ function PositionCard({ pos, currentCandle, onEditSLTP, onExit, onPartial }) {
       className={`rounded-lg border p-2 text-[10px] ${nearSL ? 'border-red-400 bg-red-50 dark:bg-red-900/10' : 'border-gray-100 dark:border-gray-800 bg-gray-50 dark:bg-gray-900'}`}
     >
       <div className="flex items-center justify-between mb-1">
-        <span className="font-bold text-[11px] dark:text-white">{pos.symbol}</span>
+        <span className="font-bold text-[11px] dark:text-white flex items-center gap-1">
+          {pos.symbol}
+          <span
+            className={`text-[9px] font-bold px-1 py-0.5 rounded ${isShort ? 'bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-400' : 'bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400'}`}
+          >
+            {isShort ? 'SHORT' : 'LONG'}
+          </span>
+        </span>
         <span
           className={`inline-flex items-center gap-1 text-[10px] font-semibold px-1.5 py-0.5 rounded-full ${settled ? 'bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400' : 'bg-orange-100 text-orange-700 dark:bg-orange-900/30 dark:text-orange-400'}`}
         >
@@ -138,14 +146,17 @@ export default function BacktestActivePanel({
       (parseFloat(p.entry_price) || 0) * (parseFloat(p.remaining_quantity ?? p.quantity) || 0),
     0
   )
-  const marketValue = sessionOpenPositions.reduce((sum, p) => {
+  const unrealizedTotal = sessionOpenPositions.reduce((sum, p) => {
     const entry = parseFloat(p.entry_price) || 0
     const isCurrentScript = p.script_id === currentScript?.id
     const mark = isCurrentScript && currentCandle?.close != null ? +currentCandle.close : entry
-    return sum + mark * (parseFloat(p.remaining_quantity ?? p.quantity) || 0)
+    const qty = parseFloat(p.remaining_quantity ?? p.quantity) || 0
+    const isShort = p.position === 'SHORT'
+    return sum + (isShort ? entry - mark : mark - entry) * qty
   }, 0)
-  const unrealizedTotal = marketValue - inCapital
-  const totalEquity = availCap + marketValue
+  // Margin (inCapital) is always returned in full regardless of direction — only
+  // the sign of the P&L on top of it differs for SHORT (see unrealizedTotal above).
+  const totalEquity = availCap + inCapital + unrealizedTotal
   const totalEquityPct = initCap > 0 ? ((totalEquity - initCap) / initCap) * 100 : 0
 
   const progress =
@@ -396,7 +407,7 @@ export default function BacktestActivePanel({
           onClick={onBuy}
           className="w-full py-2 text-[11px] font-bold rounded-lg bg-green-600 hover:bg-green-700 active:bg-green-800 text-white transition-colors shadow-sm"
         >
-          BUY
+          NEW ORDER
         </button>
       </div>
     </div>

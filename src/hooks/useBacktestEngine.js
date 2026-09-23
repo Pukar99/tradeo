@@ -76,11 +76,16 @@ export function useBacktestEngine({
         const sl = pos.sl ? parseFloat(pos.sl) : null
         const tp = pos.tp ? parseFloat(pos.tp) : null
         const settled = pos.settled === true
+        const isShort = pos.position === 'SHORT'
 
-        // ── SL check — `<=` so a candle low that touches OR breaches SL triggers ──
-        // SL takes priority over TP: if both levels are hit on the same candle,
-        // SL is processed first and the position is closed — TP check is skipped.
-        if (sl !== null && candle.low <= sl) {
+        // SL sits on the opposite side of entry for a short (above, not below), so
+        // a breach is the candle's HIGH reaching it, not the low.
+        const slBreached = sl !== null && (isShort ? candle.high >= sl : candle.low <= sl)
+
+        // ── SL check — SL takes priority over TP: if both levels are hit on the
+        // same candle, SL is processed first and the position is closed — TP
+        // check is skipped.
+        if (slBreached) {
           if (!settled) {
             // Pre-settlement SL breach — prompt user
             pause()
@@ -103,7 +108,7 @@ export function useBacktestEngine({
                       event_date: candle.date,
                       event_type: 'EARLY_EXIT',
                       symbol: pos.symbol,
-                      detail: { sl, low: candle.low },
+                      detail: { sl, breach: isShort ? candle.high : candle.low },
                     }).catch(() => {})
                   },
                 },
@@ -115,7 +120,7 @@ export function useBacktestEngine({
                       event_date: candle.date,
                       event_type: 'SL_IGNORED',
                       symbol: pos.symbol,
-                      detail: { sl, low: candle.low },
+                      detail: { sl, breach: isShort ? candle.high : candle.low },
                     }).catch(() => {})
                     advanceCursor(index, candle.date)
                   },
@@ -134,7 +139,13 @@ export function useBacktestEngine({
           // Post-settlement SL breach
           if (sess.sl_mode === 'AUTO') {
             try {
-              const exitPrice = candle.open < sl ? candle.open : sl
+              const exitPrice = isShort
+                ? candle.open > sl
+                  ? candle.open
+                  : sl
+                : candle.open < sl
+                  ? candle.open
+                  : sl
               const res = await btExitOrder(sess.id, pos.id, {
                 exit_date: candle.date,
                 exit_price: exitPrice,
@@ -195,7 +206,7 @@ export function useBacktestEngine({
                       event_date: candle.date,
                       event_type: 'SL_IGNORED',
                       symbol: pos.symbol,
-                      detail: { sl, low: candle.low },
+                      detail: { sl, breach: isShort ? candle.high : candle.low },
                     }).catch(() => {})
                     advanceCursor(index, candle.date)
                   },
@@ -206,8 +217,12 @@ export function useBacktestEngine({
           }
         }
 
+        // TP sits on the opposite side of entry for a short (below, not above), so
+        // a hit is the candle's LOW reaching it, not the high.
+        const tpHit = tp !== null && (isShort ? candle.low <= tp : candle.high >= tp)
+
         // ── TP check (only after settlement) ───────────────────────────────────────
-        if (tp !== null && candle.high >= tp) {
+        if (tpHit) {
           if (!settled) {
             pause()
             onTPHit({
@@ -229,7 +244,7 @@ export function useBacktestEngine({
                       event_date: candle.date,
                       event_type: 'EARLY_EXIT',
                       symbol: pos.symbol,
-                      detail: { tp, high: candle.high },
+                      detail: { tp, breach: isShort ? candle.low : candle.high },
                     }).catch(() => {})
                   },
                 },
@@ -246,7 +261,13 @@ export function useBacktestEngine({
 
           // TP hit after settlement — auto-close
           try {
-            const exitPrice = candle.open > tp ? candle.open : tp
+            const exitPrice = isShort
+              ? candle.open < tp
+                ? candle.open
+                : tp
+              : candle.open > tp
+                ? candle.open
+                : tp
             const res = await btExitOrder(sess.id, pos.id, {
               exit_date: candle.date,
               exit_price: exitPrice,

@@ -168,6 +168,7 @@ export default function BacktestReport({ sessionId, onClose }) {
     if (!report?.trades?.length) return
     const headers = [
       'Symbol',
+      'Direction',
       'Entry Date',
       'Exit Date',
       'Qty',
@@ -180,6 +181,7 @@ export default function BacktestReport({ sessionId, onClose }) {
     ]
     const rows = report.trades.map((t) => [
       t.symbol,
+      t.position === 'SHORT' ? 'SHORT' : 'LONG',
       t.entry_date?.slice(0, 10),
       t.exit_date?.slice(0, 10),
       t.quantity,
@@ -385,7 +387,12 @@ export default function BacktestReport({ sessionId, onClose }) {
           {s.best_trade && (
             <div className="bg-white dark:bg-gray-900 rounded-2xl border border-green-200 dark:border-green-900 p-3">
               <div className="text-[10px] text-green-500 font-bold uppercase mb-1">Best Trade</div>
-              <div className="font-bold dark:text-white">{s.best_trade.symbol}</div>
+              <div className="font-bold dark:text-white">
+                {s.best_trade.symbol}{' '}
+                <span className="text-[10px] font-semibold text-gray-400">
+                  ({s.best_trade.position})
+                </span>
+              </div>
               <div className="text-green-600 font-bold">+Rs.{fmt(s.best_trade.pnl)}</div>
               <div className="text-[10px] text-gray-400">{s.best_trade.date}</div>
             </div>
@@ -393,7 +400,12 @@ export default function BacktestReport({ sessionId, onClose }) {
           {s.worst_trade && (
             <div className="bg-white dark:bg-gray-900 rounded-2xl border border-red-200 dark:border-red-900 p-3">
               <div className="text-[10px] text-red-500 font-bold uppercase mb-1">Worst Trade</div>
-              <div className="font-bold dark:text-white">{s.worst_trade.symbol}</div>
+              <div className="font-bold dark:text-white">
+                {s.worst_trade.symbol}{' '}
+                <span className="text-[10px] font-semibold text-gray-400">
+                  ({s.worst_trade.position})
+                </span>
+              </div>
               <div className="text-red-500 font-bold">Rs.{fmt(s.worst_trade.pnl)}</div>
               <div className="text-[10px] text-gray-400">{s.worst_trade.date}</div>
             </div>
@@ -416,6 +428,7 @@ export default function BacktestReport({ sessionId, onClose }) {
                   {[
                     '#',
                     'Symbol',
+                    'Dir',
                     'Entry',
                     'Exit',
                     'Qty',
@@ -442,6 +455,13 @@ export default function BacktestReport({ sessionId, onClose }) {
                     >
                       <td className="py-1 px-1 text-gray-400">{i + 1}</td>
                       <td className="py-1 px-1 font-bold dark:text-white">{t.symbol}</td>
+                      <td className="py-1 px-1">
+                        <span
+                          className={`px-1 py-0.5 rounded text-[9px] font-bold whitespace-nowrap ${t.position === 'SHORT' ? 'bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-400' : 'bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400'}`}
+                        >
+                          {t.position === 'SHORT' ? 'SHORT' : 'LONG'}
+                        </span>
+                      </td>
                       <td className="py-1 px-1 text-gray-600 dark:text-gray-400 whitespace-nowrap">
                         {t.entry_date?.slice(0, 10)}
                       </td>
