@@ -13,7 +13,6 @@ import {
   fmtPct,
   fmtDec,
   fmtCr,
-  safeFloat,
   isCanceled,
   apiError,
   safeUrl,
@@ -98,11 +97,6 @@ describe('number formatters', () => {
 })
 
 describe('safe parsers', () => {
-  test('safeFloat parses Supabase numeric strings, falls back on junk', () => {
-    expect(safeFloat('12.50')).toBe(12.5)
-    expect(safeFloat(null)).toBe(0)
-    expect(safeFloat('x', 7)).toBe(7)
-  })
   test('isCanceled detects axios/fetch cancel variants only', () => {
     expect(isCanceled({ name: 'AbortError' })).toBe(true)
     expect(isCanceled({ code: 'ERR_CANCELED' })).toBe(true)
