@@ -357,6 +357,23 @@ export function PriceChart({
 // ─────────────────────────────────────────────────────────────────────────────
 // MINI OVERVIEW — full history, short height, click band to select cycle
 // ─────────────────────────────────────────────────────────────────────────────
+// Breakdown redesign Wave 1: the overview SHOWS the chosen date range; the
+// From/To date boxes in the toolbar are the only way to set it (owner: one
+// way to pick dates, no drag-zoom). `candles` is the full history and `view`
+// ({ from, to } ISO dates, either may be null) picks the visible slice.
+function sliceIdx(candles, view) {
+  const n = candles?.length || 0
+  if (!n || !view) return [0, Math.max(0, n - 1)]
+  let a = view.from ? candles.findIndex((c) => c.date >= view.from) : 0
+  if (a < 0) a = n - 1
+  let b = n - 1
+  if (view.to) {
+    const j = candles.findIndex((c) => c.date > view.to)
+    b = j < 0 ? n - 1 : Math.max(a, j - 1)
+  }
+  return [a, b]
+}
+
 export function MiniOverview({
   candles,
   cycles,
@@ -364,7 +381,7 @@ export function MiniOverview({
   focusedKey = null,
   onCycleClick,
   dark,
-  range = 'all',
+  view = null,
 }) {
   const svgRef = useRef(null)
   const wrapRef = useRef(null)
@@ -385,67 +402,61 @@ export function MiniOverview({
   const PAD = { top: 10, bottom: 20, left: 44, right: 8 }
   const chartW = VW - PAD.left - PAD.right
   const chartH = VH - PAD.top - PAD.bottom
+  const all = useMemo(() => candles || [], [candles])
 
-  // Range preset: one cutoff date-string ('all' → no cutoff). Compared against
-  // candle/cycle ISO date strings directly — no per-candle Date parsing.
-  const cutoff = useMemo(() => {
-    if (range === 'all') return null
-    const years = range === '5y' ? 5 : range === '2y' ? 2 : null
-    if (years == null) return null
-    const d = new Date()
-    d.setFullYear(d.getFullYear() - years)
-    return d.toISOString().slice(0, 10)
-  }, [range])
-
-  const visibleCandles = useMemo(
-    () => (cutoff ? (candles || []).filter((c) => c.date >= cutoff) : candles),
-    [candles, cutoff]
-  )
-
+  const [a, b] = useMemo(() => sliceIdx(all, view), [all, view])
+  const visibleCandles = useMemo(() => all.slice(a, b + 1), [all, a, b])
   const visibleCycles = useMemo(
-    () => (cutoff ? (cycles || []).filter((c) => c.end_date >= cutoff) : cycles),
-    [cycles, cutoff]
+    () => (cycles || []).filter((c) => c.end_date >= all[a]?.date && c.start_date <= all[b]?.date),
+    [cycles, all, a, b]
   )
 
-  const handleMouseMove = useCallback(
+  const idxAt = useCallback(
     (e) => {
-      if (!svgRef.current || !visibleCandles?.length) return
       const rect = svgRef.current.getBoundingClientRect()
       const relX = (e.clientX - rect.left) * (VW / rect.width) - PAD.left
-      const idx = Math.round((relX / chartW) * (visibleCandles.length - 1))
-      setHover(Math.max(0, Math.min(visibleCandles.length - 1, idx)))
-    },
-    [visibleCandles, chartW]
-  )
-
-  // Band candle-indices are O(cycles × candles) to compute — memoized so hover
-  // re-renders (every mousemove) don't rescan ~7k candles per cycle.
-  const bands = useMemo(
-    () =>
-      (visibleCycles || [])
-        .map((cyc) => {
-          const si = visibleCandles.findIndex((c) => c.date >= cyc.start_date)
-          const ei = visibleCandles.findIndex((c) => c.date >= cyc.end_date)
-          return { cyc, si, ei }
-        })
-        .filter((b) => b.si >= 0 && b.ei >= 0),
-    [visibleCandles, visibleCycles, range]
-  )
-
-  const handleClick = useCallback(
-    (e) => {
-      if (!svgRef.current || !visibleCandles?.length) return
-      const rect = svgRef.current.getBoundingClientRect()
-      const relX = (e.clientX - rect.left) * (VW / rect.width) - PAD.left
-      const clamped = Math.max(
+      return Math.max(
         0,
         Math.min(
           visibleCandles.length - 1,
           Math.round((relX / chartW) * (visibleCandles.length - 1))
         )
       )
+    },
+    [visibleCandles.length, VW, chartW, PAD.left]
+  )
+
+  const handleMouseMove = useCallback(
+    (e) => {
+      if (!svgRef.current || !visibleCandles.length) return
+      setHover(idxAt(e))
+    },
+    [visibleCandles.length, idxAt]
+  )
+
+  // Band candle-indices are O(cycles × candles) to compute — memoized so hover
+  // re-renders (every mousemove) don't rescan ~7k candles per cycle.
+  const bands = useMemo(
+    () =>
+      visibleCycles
+        .map((cyc) => {
+          // A cycle cut by the range edge clamps to it (start → 0, end → last)
+          const si = visibleCandles.findIndex((c) => c.date >= cyc.start_date)
+          let ei = visibleCandles.findIndex((c) => c.date >= cyc.end_date)
+          if (si < 0) return null
+          if (ei < 0) ei = visibleCandles.length - 1
+          return { cyc, si, ei }
+        })
+        .filter(Boolean),
+    [visibleCandles, visibleCycles]
+  )
+
+  const handleClick = useCallback(
+    (e) => {
+      if (!svgRef.current || !visibleCandles.length) return
+      const clamped = idxAt(e)
       // Direct hit
-      const hit = bands.find((b) => clamped >= b.si && clamped <= b.ei)
+      const hit = bands.find((bd) => clamped >= bd.si && clamped <= bd.ei)
       if (hit) {
         onCycleClick(hit.cyc)
         return
@@ -455,20 +466,19 @@ export function MiniOverview({
       const grace = Math.max(3, Math.round(visibleCandles.length * 0.015))
       let bestDist = Infinity,
         bestCycle = null
-      for (const b of bands) {
-        const mid = (b.si + b.ei) / 2
-        const dist = Math.abs(clamped - mid)
+      for (const bd of bands) {
+        const dist = Math.abs(clamped - (bd.si + bd.ei) / 2)
         if (dist <= grace && dist < bestDist) {
           bestDist = dist
-          bestCycle = b.cyc
+          bestCycle = bd.cyc
         }
       }
       if (bestCycle) onCycleClick(bestCycle)
     },
-    [visibleCandles, bands, chartW, onCycleClick]
+    [visibleCandles.length, bands, idxAt, onCycleClick]
   )
 
-  if (!visibleCandles?.length) return <div style={{ height: VH }} />
+  if (!visibleCandles.length) return <div style={{ height: VH }} />
 
   const allVals = visibleCandles.flatMap((c) => [+(c.open ?? c.close), +c.close])
   const minV = Math.min(...allVals)
@@ -484,117 +494,148 @@ export function MiniOverview({
     .join(' ')
 
   // Cursor: pointer when hovering inside a clickable cycle band, default otherwise
-  const inBand = hover != null && bands.some((b) => hover >= b.si && hover <= b.ei)
+  const inBand = hover != null && bands.some((bd) => hover >= bd.si && hover <= bd.ei)
 
   const yTicks = [0, 0.5, 1].map((f) => ({ v: minV + f * span, y: cy(minV + f * span) }))
   const xLabels = [0, 0.25, 0.5, 0.75, 1].map((f) => Math.round(f * (visibleCandles.length - 1)))
 
+  // Readout under the chart: what the chosen range spans
+  const first = visibleCandles[0],
+    last = visibleCandles[visibleCandles.length - 1]
+  const spanPct = +first.close ? (+last.close / +first.close - 1) * 100 : 0
+
   return (
-    <div ref={wrapRef} className="relative w-full select-none" style={{ height: VH }}>
-      <svg
-        ref={svgRef}
-        width="100%"
-        height="100%"
-        viewBox={`0 0 ${VW} ${VH}`}
-        style={{ display: 'block', cursor: inBand ? 'pointer' : 'default' }}
-        onMouseMove={handleMouseMove}
-        onMouseLeave={() => setHover(null)}
-        onClick={handleClick}
-      >
-        {yTicks.map((t, i) => (
-          <g key={i}>
-            <line
-              x1={PAD.left}
-              y1={t.y}
-              x2={PAD.left + chartW}
-              y2={t.y}
-              stroke={dark ? '#1e293b' : '#f1f5f9'}
-              strokeWidth="1"
-            />
-            <text
-              x={PAD.left - 4}
-              y={t.y + 3}
-              textAnchor="end"
-              fontSize="9"
-              fontFamily="monospace"
-              fill={dark ? '#475569' : '#94a3b8'}
-            >
-              {t.v >= 1000 ? `${(t.v / 1000).toFixed(1)}k` : t.v.toFixed(0)}
-            </text>
-          </g>
-        ))}
-
-        {bands.map(({ cyc, si, ei }, i) => {
-          const isSelected = selectedKeys.has(cycleKey(cyc))
-          const isFocused = cycleKey(cyc) === focusedKey
-          const hue = cyc.type === 'bull' ? '#10b981' : '#ef4444'
-          const base = cyc.type === 'bull' ? 'rgba(16,185,129,' : 'rgba(239,68,68,'
-          // S3 §8.4.1a — selection must be unmistakable: unselected bands are
-          // near-invisible (0.03), selected are strong (0.22), focused adds a
-          // bold 2.5px outline in the band's own hue (focus implies selected).
-          const fill = `${base}${isSelected ? '0.22' : '0.03'})`
-          const stroke = isFocused ? hue : 'none'
-          return (
-            <rect
-              key={i}
-              x={cx(si)}
-              y={PAD.top}
-              width={Math.max(2, cx(ei) - cx(si))}
-              height={chartH}
-              fill={fill}
-              stroke={stroke}
-              strokeWidth={isFocused ? 2.5 : 0}
-            />
-          )
-        })}
-
-        <path d={linePath} fill="none" stroke={dark ? '#94a3b8' : '#475569'} strokeWidth="1.2" />
-
-        {hover !== null && (
-          <line
-            x1={cx(hover)}
-            y1={PAD.top}
-            x2={cx(hover)}
-            y2={PAD.top + chartH}
-            stroke={dark ? '#64748b' : '#cbd5e1'}
-            strokeWidth="1"
-            strokeDasharray="3,2"
-          />
-        )}
-
-        {xLabels.map((idx, i) => (
-          <text
-            key={i}
-            x={cx(idx)}
-            y={VH - 4}
-            textAnchor="middle"
-            fontSize="9"
-            fill={dark ? '#64748b' : '#94a3b8'}
-          >
-            {visibleCandles[idx]?.date?.slice(0, 7)}
-          </text>
-        ))}
-      </svg>
-
-      {hover !== null && visibleCandles[hover] && (
-        <div
-          className="pointer-events-none absolute top-1 z-20 text-[10px] rounded-lg px-2 py-1 shadow border whitespace-nowrap"
-          style={{
-            left:
-              (cx(hover) / VW) * 100 > 60 ? undefined : `calc(${(cx(hover) / VW) * 100}% + 8px)`,
-            right:
-              (cx(hover) / VW) * 100 > 60
-                ? `calc(${((VW - cx(hover)) / VW) * 100}% + 8px)`
-                : undefined,
-            background: dark ? '#1e293b' : 'white',
-            borderColor: dark ? '#334155' : '#e5e7eb',
-            color: dark ? '#f1f5f9' : '#1e293b',
-          }}
+    <div ref={wrapRef} className="relative w-full select-none">
+      <div className="relative" style={{ height: VH }}>
+        <svg
+          ref={svgRef}
+          width="100%"
+          height="100%"
+          viewBox={`0 0 ${VW} ${VH}`}
+          style={{ display: 'block', cursor: inBand ? 'pointer' : 'default' }}
+          onMouseMove={handleMouseMove}
+          onMouseLeave={() => setHover(null)}
+          onClick={handleClick}
         >
-          <span className="text-gray-400">{visibleCandles[hover].date}</span>
-          <span className="font-bold ml-2">{(+visibleCandles[hover].close).toLocaleString()}</span>
-        </div>
-      )}
+          {yTicks.map((t, i) => (
+            <g key={i}>
+              <line
+                x1={PAD.left}
+                y1={t.y}
+                x2={PAD.left + chartW}
+                y2={t.y}
+                stroke={dark ? '#1e293b' : '#f1f5f9'}
+                strokeWidth="1"
+              />
+              <text
+                x={PAD.left - 4}
+                y={t.y + 3}
+                textAnchor="end"
+                fontSize="9"
+                fontFamily="monospace"
+                fill={dark ? '#475569' : '#94a3b8'}
+              >
+                {t.v >= 1000 ? `${(t.v / 1000).toFixed(1)}k` : t.v.toFixed(0)}
+              </text>
+            </g>
+          ))}
+
+          {bands.map(({ cyc, si, ei }, i) => {
+            const isSelected = selectedKeys.has(cycleKey(cyc))
+            const isFocused = cycleKey(cyc) === focusedKey
+            const hue = cyc.type === 'bull' ? '#10b981' : '#ef4444'
+            const base = cyc.type === 'bull' ? 'rgba(16,185,129,' : 'rgba(239,68,68,'
+            // S3 §8.4.1a — selection must be unmistakable: unselected bands are
+            // near-invisible (0.03), selected are strong (0.22), focused adds a
+            // bold 2.5px outline in the band's own hue (focus implies selected).
+            return (
+              <rect
+                key={i}
+                x={cx(si)}
+                y={PAD.top}
+                width={Math.max(2, cx(ei) - cx(si))}
+                height={chartH}
+                fill={`${base}${isSelected ? '0.22' : '0.03'})`}
+                stroke={isFocused ? hue : 'none'}
+                strokeWidth={isFocused ? 2.5 : 0}
+              />
+            )
+          })}
+
+          <path d={linePath} fill="none" stroke={dark ? '#94a3b8' : '#475569'} strokeWidth="1.2" />
+
+          {hover !== null && (
+            <line
+              x1={cx(hover)}
+              y1={PAD.top}
+              x2={cx(hover)}
+              y2={PAD.top + chartH}
+              stroke={dark ? '#64748b' : '#cbd5e1'}
+              strokeWidth="1"
+              strokeDasharray="3,2"
+            />
+          )}
+
+          {xLabels.map((idx, i) => (
+            <text
+              key={i}
+              x={cx(idx)}
+              y={VH - 4}
+              textAnchor={i === 0 ? 'start' : i === xLabels.length - 1 ? 'end' : 'middle'}
+              fontSize="9"
+              fill={dark ? '#64748b' : '#94a3b8'}
+            >
+              {visibleCandles[idx]?.date?.slice(0, 7)}
+            </text>
+          ))}
+        </svg>
+
+        {hover !== null && visibleCandles[hover] && (
+          <div
+            className="pointer-events-none absolute top-1 z-20 text-[10px] rounded-lg px-2 py-1 shadow border whitespace-nowrap"
+            style={{
+              left:
+                (cx(hover) / VW) * 100 > 60 ? undefined : `calc(${(cx(hover) / VW) * 100}% + 8px)`,
+              right:
+                (cx(hover) / VW) * 100 > 60
+                  ? `calc(${((VW - cx(hover)) / VW) * 100}% + 8px)`
+                  : undefined,
+              background: dark ? '#1e293b' : 'white',
+              borderColor: dark ? '#334155' : '#e5e7eb',
+              color: dark ? '#f1f5f9' : '#1e293b',
+            }}
+          >
+            <span className="text-gray-400">{visibleCandles[hover].date}</span>
+            <span className="font-bold ml-2">
+              {(+visibleCandles[hover].close).toLocaleString()}
+            </span>
+          </div>
+        )}
+      </div>
+
+      <div className="flex flex-wrap items-center gap-x-4 gap-y-0.5 px-3 py-1 border-t border-gray-100 dark:border-gray-800 text-[10px] text-gray-500 dark:text-gray-400 tabular-nums">
+        <span>
+          <b className="text-gray-700 dark:text-gray-200">{first.date}</b> →{' '}
+          <b className="text-gray-700 dark:text-gray-200">{last.date}</b>
+        </span>
+        <span>
+          <b className="text-gray-700 dark:text-gray-200">{visibleCandles.length - 1}</b> trading
+          days
+        </span>
+        <span>
+          Change{' '}
+          <b
+            className={
+              spanPct >= 0
+                ? 'text-emerald-600 dark:text-emerald-400'
+                : 'text-red-600 dark:text-red-400'
+            }
+          >
+            {spanPct >= 0 ? '+' : ''}
+            {spanPct.toFixed(1)}%
+          </b>
+        </span>
+      </div>
     </div>
   )
 }

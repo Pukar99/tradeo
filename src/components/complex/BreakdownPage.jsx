@@ -24,6 +24,7 @@ import CycleAnalyticsCards from './breakdown/CycleAnalyticsCards'
 import FocusedCyclePanel from './breakdown/FocusedCyclePanel'
 import CompareMiniCharts from './breakdown/CompareMiniCharts'
 import NowBox from './breakdown/NowBox'
+import { RangeStocks, RangeSectors } from './breakdown/RangeResults'
 import { useCycleSelection, cycleKey } from './breakdown/useCycleSelection'
 
 // ── Small chrome icons (match DataLabPage tab-icon style: 24x24, stroke 2,
@@ -56,10 +57,30 @@ function IconChevronLeft({ className = 'w-3 h-3' }) {
 const RANGE_VIEWS = [
   { id: 'all', label: 'All' },
   { id: '5y', label: '5Y' },
-  { id: '4y', label: '4Y' },
   { id: '3y', label: '3Y' },
   { id: '2y', label: '2Y' },
+  { id: '1y', label: '1Y' },
 ]
+
+const MODE_VIEWS = [
+  { id: 'range', label: 'Date range' },
+  { id: 'cycles', label: 'Bull / Bear' },
+]
+
+// Preset id → view ({ from, to } ISO dates; null = full history). The year
+// count comes from the id ('3y' → 3), so RANGE_VIEWS stays the single source.
+function presetView(id) {
+  const m = /^(\d+)y$/.exec(id)
+  if (!m) return null
+  const d = new Date()
+  d.setFullYear(d.getFullYear() - Number(m[1]))
+  return { from: d.toISOString().slice(0, 10), to: null }
+}
+// Which preset (if any) the current view equals — null means a custom drag.
+function activePreset(view) {
+  if (!view) return 'all'
+  return RANGE_VIEWS.find((r) => r.id !== 'all' && !view.to && presetView(r.id).from === view.from)?.id ?? null
+}
 
 // ─────────────────────────────────────────────────────────────────────────────
 // MAIN PAGE
@@ -97,30 +118,54 @@ export default function BreakdownPage() {
     safeSessionSet('tradeo_breakdown_threshold', String(ranThreshold))
   }, [ranThreshold])
 
-  // Full-history overview range preset (spec §5.3 · pain #5)
-  const [range, setRange] = useState(() => {
-    const v = safeSessionGet('tradeo_breakdown_range', 'all')
-    return RANGE_VIEWS.some((r) => r.id === v) ? v : 'all'
+  // Overview view window (redesign Wave 1): { from, to } ISO dates or null =
+  // full history. Set ONLY by the From/To date boxes (presets just fill them) —
+  // owner chose one way to pick dates, no drag-zoom on the chart.
+  const [view, setView] = useState(() => {
+    try {
+      const v = JSON.parse(safeSessionGet('tradeo_breakdown_view', 'null'))
+      return v && typeof v.from === 'string' ? { from: v.from, to: v.to || null } : null
+    } catch {
+      return null
+    }
   })
   useEffect(() => {
-    safeSessionSet('tradeo_breakdown_range', range)
-  }, [range])
-  // Range now SCOPES DETECTION too (owner eyeball 2026-07-08): Detect sends
-  // this start date, so 2Y detects cycles in the last 2 years only.
-  const rangeFrom = (r) => {
-    // Derive the year count from the range id (e.g. '3y' → 3) so RANGE_VIEWS is
-    // the single source of truth — adding a new NyY option needs no edit here.
-    const m = /^(\d+)y$/.exec(r)
-    const years = m ? Number(m[1]) : null
-    if (!years) return undefined
-    const d = new Date()
-    d.setFullYear(d.getFullYear() - years)
-    return d.toISOString().slice(0, 10)
-  }
-  const [ranRange, setRanRange] = useState(range) // range of the last Detect run
+    safeSessionSet('tradeo_breakdown_view', JSON.stringify(view))
+  }, [view])
+  // Analysis mode (redesign Wave 2): 'range' = just your From/To dates (owner's
+  // default — no bull/bear involved); 'cycles' = the original bull/bear analysis.
+  const [mode, setMode] = useState(() =>
+    safeSessionGet('tradeo_breakdown_mode', 'range') === 'cycles' ? 'cycles' : 'range'
+  )
+  useEffect(() => {
+    safeSessionSet('tradeo_breakdown_mode', mode)
+  }, [mode])
+  const [rangeSector, setRangeSector] = useState(null) // sector filter in range mode
+  // The view's start SCOPES DETECTION (owner eyeball 2026-07-08): Detect sends
+  // this start date, so a 2-year window detects cycles in those 2 years only.
+  const [ranFrom, setRanFrom] = useState(view?.from ?? null) // `from` of the last Detect run
 
   const [cycles, setCycles] = useState([])
   const [allCandles, setAllCandles] = useState([])
+  // Full-history candles for the overview + its range window, independent of
+  // the detection start, so you can always zoom back out past it.
+  const [fullCandles, setFullCandles] = useState([])
+  // The chosen dates snapped to real trading days + NEPSE's move over them.
+  const rangeInfo = useMemo(() => {
+    if (!fullCandles.length) return null
+    const from = view?.from || fullCandles[0].date
+    const to = view?.to || fullCandles[fullCandles.length - 1].date
+    const inR = fullCandles.filter((c) => c.date >= from && c.date <= to)
+    if (inR.length < 2) return null
+    const c0 = parseFloat(inR[0].close),
+      c1 = parseFloat(inR[inR.length - 1].close)
+    return {
+      from: inR[0].date,
+      to: inR[inR.length - 1].date,
+      pct: c0 ? (c1 / c0 - 1) * 100 : 0,
+      days: inR.length - 1,
+    }
+  }, [fullCandles, view])
   const [detecting, setDetecting] = useState(false)
   const [detectError, setDetectError] = useState('')
 
@@ -155,7 +200,7 @@ export default function BreakdownPage() {
 
   // Detect cycles (Rule 45 — abort superseded)
   const detectCtrlRef = useRef(null)
-  const detectCycles = useCallback(async (thresh, idxId, rng = 'all') => {
+  const detectCycles = useCallback(async (thresh, idxId, from = null) => {
     if (detectCtrlRef.current) detectCtrlRef.current.abort()
     const ctrl = new AbortController()
     detectCtrlRef.current = ctrl
@@ -165,16 +210,22 @@ export default function BreakdownPage() {
     setThreshold(thresh)
     const t = Math.min(50, Math.max(5, parseFloat(thresh) || 10))
     setRanThreshold(t)
-    setRanRange(rng)
+    setRanFrom(from)
     setDetecting(true)
     setDetectError('')
     try {
-      const from = rangeFrom(rng)
-      const { data } = await getMarketCycles(
-        { threshold: t, index_id: idxId, ...(from ? { from } : {}) },
-        { signal: ctrl.signal }
-      )
+      // Scoped run (for the cycles) + unscoped run (for the full-history
+      // overview). The backend caches per index/threshold/from, so the second
+      // call is cheap and only made when the run is scoped.
+      const [{ data }, full] = await Promise.all([
+        getMarketCycles(
+          { threshold: t, index_id: idxId, ...(from ? { from } : {}) },
+          { signal: ctrl.signal }
+        ),
+        from ? getMarketCycles({ threshold: t, index_id: idxId }, { signal: ctrl.signal }) : null,
+      ])
       if (ctrl.signal.aborted) return
+      setFullCandles((full ? full.data.candles : data.candles) || [])
       // Inject canonical names: Bull 1, Bear 1, Bull 2... in chronological order.
       // Backend already sorts by start_date ascending.
       let b = 0,
@@ -203,16 +254,16 @@ export default function BreakdownPage() {
   useEffect(() => {
     if (mountedRef.current) return
     mountedRef.current = true
-    detectCycles(threshold, indexId, range)
+    detectCycles(threshold, indexId, view?.from ?? null)
   }, []) // eslint-disable-line react-hooks/exhaustive-deps
 
   const handleIndexSelect = useCallback(
     (id) => {
       if (id === indexId) return
       setIndexId(id)
-      detectCycles(threshold, id, range)
+      detectCycles(threshold, id, view?.from ?? null)
     },
-    [indexId, threshold, range, detectCycles]
+    [indexId, threshold, view, detectCycles]
   )
 
   // AbortController refs hoisted together so runAnalysis can cancel sibling
@@ -419,19 +470,21 @@ export default function BreakdownPage() {
   // auto-resets the selection via the hook's cyclesSig effect.
   const handleReset = useCallback(() => {
     setCycleFilter('all')
-    setRange('all')
+    setView(null)
+    setMode('range')
+    setRangeSector(null)
     setSymbol('')
     setSideA({ index_id: 12 })
     setSideB(null)
     setAnalyticsView('movers')
-    if (ranThreshold !== 10 || indexId !== 12 || ranRange !== 'all') {
+    if (ranThreshold !== 10 || indexId !== 12 || ranFrom !== null) {
       setIndexId(12)
-      detectCycles(10, 12, 'all')
+      detectCycles(10, 12, null)
     } else {
       setThreshold(10)
       sel.reset()
     }
-  }, [ranThreshold, indexId, ranRange, detectCycles, setSymbol, setThreshold, sel])
+  }, [ranThreshold, indexId, ranFrom, detectCycles, setSymbol, setThreshold, sel])
 
   // Derived values (memoized — Rule 37)
   const sectors = useMemo(() => analysis?.sectors || [], [analysis])
@@ -498,7 +551,7 @@ export default function BreakdownPage() {
   const thresholdDirty =
     cycles.length > 0 &&
     (Math.min(50, Math.max(5, parseFloat(threshold) || 10)) !== ranThreshold ||
-      range !== ranRange)
+      (view?.from ?? null) !== ranFrom)
   const focusedKey = focused ? cycleKey(focused) : null
 
   const cycleCandles = useMemo(() => {
@@ -566,8 +619,16 @@ export default function BreakdownPage() {
   // Detect + counts + mobile cycles button stay here.
   const toolbar = useToolbarSlot(
     <div className="flex items-center gap-2 flex-nowrap whitespace-nowrap">
-      <SymbolSearch value={symbol} stocksOnly onSelect={setSymbol} />
+      <ViewSwitcher
+        views={MODE_VIEWS}
+        active={mode}
+        onChange={setMode}
+        ariaLabel="Analysis mode"
+      />
 
+      {mode === 'cycles' && <SymbolSearch value={symbol} stocksOnly onSelect={setSymbol} />}
+
+      {mode === 'cycles' && (
       <div className="flex items-center gap-1 shrink-0">
         <span className={`${LABEL} normal-case`}>Swing ≥</span>
         <input
@@ -578,14 +639,14 @@ export default function BreakdownPage() {
           step={1}
           onChange={(e) => setThreshold(e.target.value)}
           onKeyDown={(e) => {
-            if (e.key === 'Enter') detectCycles(threshold, indexId, range)
+            if (e.key === 'Enter') detectCycles(threshold, indexId, view?.from ?? null)
           }}
           className="w-10 text-[10px] font-semibold text-center border border-gray-200 dark:border-gray-700 rounded px-1 py-0.5 dark:bg-gray-900 dark:text-gray-100 focus:outline-none focus:ring-1 focus:ring-gray-400"
         />
         <span className={`${LABEL} normal-case`}>%</span>
         {/* Amber = input differs from the threshold the visible cycles were detected with */}
         <button
-          onClick={() => detectCycles(threshold, indexId, range)}
+          onClick={() => detectCycles(threshold, indexId, view?.from ?? null)}
           disabled={detecting}
           title={thresholdDirty ? 'Threshold or range changed — press Detect to re-run' : undefined}
           className={`px-2 py-0.5 rounded select-none text-[10px] font-semibold hover:opacity-80 disabled:opacity-40 transition-opacity ${
@@ -597,16 +658,64 @@ export default function BreakdownPage() {
           {detecting ? '…' : 'Detect'}
         </button>
       </div>
+      )}
 
-      <ViewSwitcher views={RANGE_VIEWS} active={range} onChange={setRange} ariaLabel="Overview range" />
+      <ViewSwitcher
+        views={RANGE_VIEWS}
+        active={activePreset(view)}
+        onChange={(id) => setView(presetView(id))}
+        ariaLabel="Overview range"
+      />
+      {/* Exact dates (owner: e.g. 2023-12-21 → 2024-07-22). Same view the
+          presets and the chart drag set; blue when it matches no preset. */}
+      <span
+        className={`flex items-center gap-1 pl-1.5 pr-1 py-0.5 rounded-md text-[10px] font-semibold shrink-0 border ${
+          view && !activePreset(view)
+            ? 'border-blue-200 dark:border-blue-900 bg-blue-50 dark:bg-blue-950/40 text-blue-600 dark:text-blue-400'
+            : 'border-gray-200 dark:border-gray-700 text-gray-600 dark:text-gray-300'
+        }`}
+      >
+        <input
+          type="date"
+          aria-label="From date"
+          value={view?.from || fullCandles[0]?.date || ''}
+          min={fullCandles[0]?.date}
+          max={view?.to || fullCandles[fullCandles.length - 1]?.date}
+          onChange={(e) => e.target.value && setView({ from: e.target.value, to: view?.to ?? null })}
+          className="bg-transparent text-[10px] font-semibold w-[92px] focus:outline-none dark:[color-scheme:dark]"
+        />
+        <span className="text-gray-400">→</span>
+        <input
+          type="date"
+          aria-label="To date"
+          value={view?.to || fullCandles[fullCandles.length - 1]?.date || ''}
+          min={view?.from || fullCandles[0]?.date}
+          max={fullCandles[fullCandles.length - 1]?.date}
+          onChange={(e) =>
+            e.target.value &&
+            setView({ from: view?.from || fullCandles[0]?.date, to: e.target.value })
+          }
+          className="bg-transparent text-[10px] font-semibold w-[92px] focus:outline-none dark:[color-scheme:dark]"
+        />
+        {view && (
+          <button
+            onClick={() => setView(null)}
+            aria-label="Clear date range"
+            title="Back to full history"
+            className="w-4 h-4 flex items-center justify-center rounded hover:bg-gray-100 dark:hover:bg-gray-800"
+          >
+            <IconX className="w-2.5 h-2.5" />
+          </button>
+        )}
+      </span>
 
-      {cycles.length > 0 && (
+      {mode === 'cycles' && cycles.length > 0 && (
         <span className={`${LABEL} normal-case hidden sm:inline`}>
           {bearCycles.length}▼ {bullCycles.length}▲ · {selectedIndexLabel}
         </span>
       )}
 
-      {cycles.length > 0 && (
+      {mode === 'cycles' && cycles.length > 0 && (
         <button
           className="lg:hidden flex items-center gap-1 px-2 py-0.5 rounded select-none text-[10px] font-semibold border border-gray-200 dark:border-gray-700 text-gray-600 dark:text-gray-300"
           onClick={() => setMobileCycles(true)}
@@ -680,13 +789,17 @@ export default function BreakdownPage() {
               onSelect={handleIndexSelect}
               wrap
             />
-            {quickChips}
+            {mode === 'cycles' && quickChips}
           </div>
-          {filterTabs('py-1.5')}
-          {detecting && <Skeleton variant="rows" rows={5} minH={120} />}
-          <div className="flex-1 min-w-0 min-h-0 overflow-y-auto overflow-x-hidden bg-white/40 dark:bg-gray-950/40">
-            {cycleChecklist((c) => sel.toggle(c))}
-          </div>
+          {mode === 'cycles' && (
+            <>
+              {filterTabs('py-1.5')}
+              {detecting && <Skeleton variant="rows" rows={5} minH={120} />}
+              <div className="flex-1 min-w-0 min-h-0 overflow-y-auto overflow-x-hidden bg-white/40 dark:bg-gray-950/40">
+                {cycleChecklist((c) => sel.toggle(c))}
+              </div>
+            </>
+          )}
         </CollapsiblePanel>
 
         {/* ── CENTER ── */}
@@ -701,36 +814,56 @@ export default function BreakdownPage() {
                 <svg className="w-3 h-3 shrink-0" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round">
                   <polyline points="22 12 18 12 15 21 9 3 6 12 2 12" />
                 </svg>
-                {selectedIndexLabel} — Full History
+                {selectedIndexLabel} —{' '}
+                {view
+                  ? RANGE_VIEWS.find((r) => r.id === activePreset(view))?.label
+                    ? `Last ${RANGE_VIEWS.find((r) => r.id === activePreset(view)).label}`
+                    : 'Custom range'
+                  : 'Full History'}
               </span>
               <span className={`${LABEL} normal-case hidden sm:inline`}>
                 {detecting
                   ? 'Detecting…'
-                  : allCandles.length === 0
+                  : fullCandles.length === 0
                     ? 'No data'
-                    : 'Click a shaded zone'}
+                    : mode === 'cycles'
+                      ? 'Click a shaded zone'
+                      : ''}
               </span>
             </div>
-            {detecting && allCandles.length === 0 ? (
+            {detecting && fullCandles.length === 0 ? (
               <Skeleton minH={160} />
-            ) : allCandles.length === 0 ? (
+            ) : fullCandles.length === 0 ? (
               <div className="h-[160px] flex items-center justify-center text-[11px] text-gray-400">
                 No price data available
               </div>
             ) : (
               <MiniOverview
-                candles={allCandles}
-                cycles={cycles}
+                candles={fullCandles}
+                cycles={mode === 'cycles' ? cycles : []}
                 selectedKeys={sel.selectedKeys}
                 focusedKey={focusedKey}
                 onCycleClick={sel.toggle}
                 dark={isDark}
-                range={range}
+                view={view}
               />
             )}
           </div>
 
           {/* Top Movers + Consistency + Compare for the SELECTED cycles — fills the rest */}
+          {mode === 'range' ? (
+            rangeInfo && (
+              <RangeStocks
+                from={rangeInfo.from}
+                to={rangeInfo.to}
+                pct={rangeInfo.pct}
+                indexId={indexId}
+                indexLbl={selectedIndexLabel}
+                sector={rangeSector}
+                onClearSector={() => setRangeSector(null)}
+              />
+            )
+          ) : (
           <CycleAnalyticsCards
             selectedCycles={sel.selectedCycles}
             view={analyticsView}
@@ -747,6 +880,7 @@ export default function BreakdownPage() {
               onFocusRow: handleCompareFocusRow,
             }}
           />
+          )}
 
           {/* Mobile-only detail (no right panel below lg) — focused cycle drill-down */}
           {focused && (
@@ -883,7 +1017,20 @@ export default function BreakdownPage() {
           open={rightOpen}
           widthCls="w-[360px] lg:w-[420px] min-w-[300px]"
         >
-          {analyticsView === 'compare' ? (
+          {mode === 'range' ? (
+            rangeInfo && (
+              <RangeSectors
+                from={rangeInfo.from}
+                to={rangeInfo.to}
+                pct={rangeInfo.pct}
+                days={rangeInfo.days}
+                indexId={indexId}
+                indexLbl={selectedIndexLabel}
+                sector={rangeSector}
+                onSector={setRangeSector}
+              />
+            )
+          ) : analyticsView === 'compare' ? (
             <CompareMiniCharts focused={focused} a={sideA} b={sideB} dark={isDark} cycles={cycles} />
           ) : !focused ? (
             <div className="flex-1 min-h-0 overflow-y-auto bg-white/40 dark:bg-gray-950/40 p-3 space-y-3">
