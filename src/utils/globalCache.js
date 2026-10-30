@@ -282,7 +282,8 @@ export async function getPositions(status) {
 // sessionStorage so re-selecting the same cycle set or reloading is instant.
 export async function getCycleAnalytics(payload) {
   const cyc = [...payload.cycles].map((c) => `${c.start_date}|${c.end_date}`).sort().join(',')
-  const key = `cycle-analytics:${payload.index_id ?? 12}:${payload.sector_index || ''}:${cyc}:${payload.n ?? 15}`
+  // v3: payload gained insights + index_rets, late-listing nulls (2026-10-31) — don't serve old cached shapes
+  const key = `cycle-analytics:v3:${payload.index_id ?? 12}:${payload.sector_index || ''}:${cyc}:${payload.n ?? 15}`
   const cached = gCache.get(key)
   if (cached !== undefined) return cached
   const result = await _getCycleAnalytics(payload)

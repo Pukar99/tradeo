@@ -1,5 +1,5 @@
 import { describe, expect, test } from 'vitest'
-import { corrBlocks, barPct } from '../../src/components/complex/breakdown/CycleAnalyticsCards'
+import { corrBlocks, barPct } from '../../src/components/complex/breakdown/insightsMath'
 
 describe('corrBlocks', () => {
   test('maps correlation bands to 0..5 filled blocks', () => {

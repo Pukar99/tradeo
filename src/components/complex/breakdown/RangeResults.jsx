@@ -53,7 +53,17 @@ export function RangeStocks({ from, to, pct, indexId, indexLbl, sector, onClearS
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [from, to, indexId, sector])
 
-  const stocks = useMemo(() => data?.stocks || [], [data])
+  // A stock whose first trade is >7 days after `from` listed (or resumed)
+  // mid-range: its return is "since listing", so it's badged and kept out of
+  // the went-up / beat counts (logic test 2026-10-31).
+  const stocks = useMemo(
+    () =>
+      (data?.stocks || []).map((s) => ({
+        ...s,
+        late: !!s.first_date && (new Date(s.first_date) - new Date(from)) / 86400000 > 7,
+      })),
+    [data, from]
+  )
   const rows = useMemo(() => {
     const term = q.trim().toUpperCase()
     const list = term
@@ -67,8 +77,9 @@ export function RangeStocks({ from, to, pct, indexId, indexLbl, sector, onClearS
     })
   }, [stocks, q, sortBy, desc])
 
-  const up = stocks.filter((s) => s.avg_ret > 0).length
-  const beat = stocks.filter((s) => s.vs_index != null && s.vs_index > 0).length
+  const full = stocks.filter((s) => !s.late)
+  const up = full.filter((s) => s.avg_ret > 0).length
+  const beat = full.filter((s) => s.vs_index != null && s.vs_index > 0).length
   const max = Math.max(1, ...stocks.map((s) => Math.abs(s.avg_ret || 0)))
 
   function sortCol(col) {
@@ -87,7 +98,7 @@ export function RangeStocks({ from, to, pct, indexId, indexLbl, sector, onClearS
         {data && (
           <>
             <span className="text-[10px] text-gray-500 dark:text-gray-400 tabular-nums">
-              <b className="text-gray-800 dark:text-gray-100">{up}</b> of {stocks.length} went up
+              <b className="text-gray-800 dark:text-gray-100">{up}</b> of {full.length} went up
             </span>
             <span className="text-[10px] text-gray-500 dark:text-gray-400 tabular-nums">
               <b className="text-gray-800 dark:text-gray-100">{beat}</b> beat {indexLbl}
@@ -147,6 +158,14 @@ export function RangeStocks({ from, to, pct, indexId, indexLbl, sector, onClearS
                     {s.symbol}
                   </span>
                   <span className="ml-2 text-[10px] text-gray-400 truncate">{s.company_name}</span>
+                  {s.late && (
+                    <span
+                      title="Started trading after your From date — return is since listing, not comparable"
+                      className="ml-2 px-1.5 py-px rounded-full text-[9px] font-semibold bg-amber-50 dark:bg-amber-950/40 text-amber-600 dark:text-amber-400"
+                    >
+                      listed {s.first_date}
+                    </span>
+                  )}
                 </span>
                 <span className="flex items-center justify-end gap-2">
                   <span className="w-14 h-1 rounded-full bg-gray-100 dark:bg-gray-800 overflow-hidden">

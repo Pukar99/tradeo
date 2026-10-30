@@ -20,9 +20,10 @@ import { stripIndexName, phaseCls, addDays } from './breakdown/helpers'
 import { PriceChart, MiniOverview, SectorIndexChart } from './breakdown/charts'
 import { SectorMatrix, StockList } from './breakdown/SectorMatrix'
 import { AggregateStats, CyclePill, IndexSelector } from './breakdown/atoms'
-import CycleAnalyticsCards from './breakdown/CycleAnalyticsCards'
+import CycleInsights from './breakdown/CycleInsights'
+import StockDeepDive from './breakdown/StockDeepDive'
+import { useCycleInsights } from './breakdown/useCycleInsights'
 import FocusedCyclePanel from './breakdown/FocusedCyclePanel'
-import CompareMiniCharts from './breakdown/CompareMiniCharts'
 import NowBox from './breakdown/NowBox'
 import { RangeStocks, RangeSectors } from './breakdown/RangeResults'
 import { useCycleSelection, cycleKey } from './breakdown/useCycleSelection'
@@ -62,6 +63,8 @@ const RANGE_VIEWS = [
   { id: '1y', label: '1Y' },
 ]
 
+const NO_CYCLES = [] // stable empty selection so the insights hook doesn't refetch
+
 const MODE_VIEWS = [
   { id: 'range', label: 'Date range' },
   { id: 'cycles', label: 'Bull / Bear' },
@@ -91,15 +94,9 @@ export default function BreakdownPage() {
   // Swing threshold now lives in the shared DataLab toolbar controls (S2b) —
   // clamped 5–50 + session-persisted inside the provider.
   const { threshold, setThreshold, symbol, setSymbol } = useDataLabControls()
-  // Center analytics card view + Compare sides (S3). Lifted here because the
-  // right panel switches to Compare mini charts when view === 'compare' (T7).
-  const [analyticsView, setAnalyticsView] = useState('movers')
-  const [sideA, setSideA] = useState({ index_id: 12 })
-  const [sideB, setSideB] = useState(null)
-  // Toolbar search feeds Compare side B (spec §8.4.5)
-  useEffect(() => {
-    if (symbol) setSideB({ symbol })
-  }, [symbol])
+  // Stock opened in the right-panel deep dive (redesign 2026-10-31) — set by a
+  // click on the insights Map/Table or by the toolbar search. Replaces Compare.
+  const [picked, setPicked] = useState(null)
 
   // Core state — index survives refresh via sessionStorage
   const [indexId, setIndexId] = useState(() => {
@@ -109,10 +106,6 @@ export default function BreakdownPage() {
   const [ranThreshold, setRanThreshold] = useState(threshold) // clamped value of the last Detect run
   useEffect(() => {
     safeSessionSet('tradeo_breakdown_index', String(indexId))
-  }, [indexId])
-  // Owner eyeball: Compare side A mirrors the left-panel index selection.
-  useEffect(() => {
-    setSideA({ index_id: indexId })
   }, [indexId])
   useEffect(() => {
     safeSessionSet('tradeo_breakdown_threshold', String(ranThreshold))
@@ -418,19 +411,6 @@ export default function BreakdownPage() {
     [focused]
   )
 
-  // Analytics rework: clicking a Top movers / Consistency / Scan row routes the
-  // stock into Compare (side A = NEPSE/index baseline, side B = the clicked stock)
-  // and switches the center view to Compare. Reuses the existing Compare panel.
-  const handleAnalyticsCompare = useCallback(
-    (stock) => {
-      if (!stock?.symbol) return
-      setSideA({ index_id: indexId })
-      setSideB({ symbol: stock.symbol })
-      setAnalyticsView('compare')
-    },
-    [indexId]
-  )
-
   const handleStockSelect = useCallback(
     (stock) => {
       if (!stock || selectedStock?.symbol === stock.symbol) {
@@ -442,16 +422,6 @@ export default function BreakdownPage() {
       }
     },
     [selectedStock, loadStockChart]
-  )
-
-  // Owner eyeball: clicking a Compare "Cycle Returns" row focuses that cycle
-  // (drives the right-panel mini charts) instead of anchoring the ladder.
-  const handleCompareFocusRow = useCallback(
-    (r) => {
-      const c = cycles.find((x) => x.start_date === r.start_date && x.end_date === r.end_date)
-      if (c) sel.setFocused(c)
-    },
-    [cycles, sel]
   )
 
   const toggleSort = useCallback(
@@ -474,9 +444,7 @@ export default function BreakdownPage() {
     setMode('range')
     setRangeSector(null)
     setSymbol('')
-    setSideA({ index_id: 12 })
-    setSideB(null)
-    setAnalyticsView('movers')
+    setPicked(null)
     if (ranThreshold !== 10 || indexId !== 12 || ranFrom !== null) {
       setIndexId(12)
       detectCycles(10, 12, null)
@@ -548,6 +516,12 @@ export default function BreakdownPage() {
 
   const selectedIndexLabel = INDEX_OPTIONS.find((o) => o.id === indexId)?.label || 'NEPSE'
   const sectorIndexName = INDEX_OPTIONS.find((o) => o.id === indexId)?.sector_index || null
+  // Cycle insights (Map/Table + deep dive) — only fetched in Bull / Bear mode.
+  const insights = useCycleInsights(
+    mode === 'cycles' ? sel.selectedCycles : NO_CYCLES,
+    indexId,
+    sectorIndexName
+  )
   const thresholdDirty =
     cycles.length > 0 &&
     (Math.min(50, Math.max(5, parseFloat(threshold) || 10)) !== ranThreshold ||
@@ -626,7 +600,16 @@ export default function BreakdownPage() {
         ariaLabel="Analysis mode"
       />
 
-      {mode === 'cycles' && <SymbolSearch value={symbol} stocksOnly onSelect={setSymbol} />}
+      {mode === 'cycles' && (
+        <SymbolSearch
+          value={symbol}
+          stocksOnly
+          onSelect={(s) => {
+            setSymbol(s)
+            setPicked(s ? s.toUpperCase() : null)
+          }}
+        />
+      )}
 
       {mode === 'cycles' && (
       <div className="flex items-center gap-1 shrink-0">
@@ -864,21 +847,16 @@ export default function BreakdownPage() {
               />
             )
           ) : (
-          <CycleAnalyticsCards
+          <CycleInsights
             selectedCycles={sel.selectedCycles}
-            view={analyticsView}
-            onViewChange={setAnalyticsView}
-            indexId={indexId}
-            sectorIndex={sectorIndexName}
+            data={insights.data}
+            loading={insights.loading}
+            error={insights.error}
+            onDismissError={insights.dismissError}
             indexLbl={selectedIndexLabel}
-            onStockOpen={handleAnalyticsCompare}
-            compare={{
-              a: sideA,
-              b: sideB,
-              onChangeA: setSideA,
-              onChangeB: setSideB,
-              onFocusRow: handleCompareFocusRow,
-            }}
+            picked={picked}
+            onPick={(sym) => setPicked((p) => (p === sym ? null : sym))}
+            dark={isDark}
           />
           )}
 
@@ -1030,8 +1008,16 @@ export default function BreakdownPage() {
                 onSector={setRangeSector}
               />
             )
-          ) : analyticsView === 'compare' ? (
-            <CompareMiniCharts focused={focused} a={sideA} b={sideB} dark={isDark} cycles={cycles} />
+          ) : picked ? (
+            <StockDeepDive
+              key={picked}
+              symbol={picked}
+              data={insights.data}
+              selectedCycles={sel.selectedCycles}
+              indexLbl={selectedIndexLabel}
+              onClose={() => setPicked(null)}
+              dark={isDark}
+            />
           ) : !focused ? (
             <div className="flex-1 min-h-0 overflow-y-auto bg-white/40 dark:bg-gray-950/40 p-3 space-y-3">
               <div className={`${CARD} p-3`}>
